@@ -1,0 +1,225 @@
+import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { useTranslation } from "react-i18next";
+import {
+  LayoutDashboardIcon,
+  BusIcon,
+  MapPinIcon,
+  RouteIcon,
+  CalendarIcon,
+  UsersIcon,
+  BuildingIcon,
+  MenuIcon,
+  XIcon,
+  CreditCardIcon,
+  BarChart3Icon,
+  FileTextIcon,
+  MapIcon,
+  UserCheckIcon,
+  MessageSquareIcon,
+  TagIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils.ts";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+
+type NavItem = {
+  toSuffix: string;
+  labelKey: string;
+  icon: typeof LayoutDashboardIcon;
+  end?: boolean;
+};
+
+type NavSection = {
+  titleKey: string;
+  items: NavItem[];
+};
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    titleKey: "sidebar.section_main",
+    items: [
+      { toSuffix: "/owner", labelKey: "sidebar.overview", icon: LayoutDashboardIcon, end: true },
+      { toSuffix: "/owner/company", labelKey: "sidebar.my_company", icon: BuildingIcon },
+      { toSuffix: "/owner/reviews", labelKey: "sidebar.reviews", icon: MessageSquareIcon },
+      { toSuffix: "/owner/promo-codes", labelKey: "sidebar.promo_codes", icon: TagIcon },
+      { toSuffix: "/owner/subscription", labelKey: "sidebar.subscription", icon: CreditCardIcon },
+    ],
+  },
+  {
+    titleKey: "sidebar.section_analytics",
+    items: [
+      { toSuffix: "/owner/analytics", labelKey: "sidebar.analytics", icon: BarChart3Icon, end: true },
+      { toSuffix: "/owner/analytics/tickets", labelKey: "sidebar.ticket_reports", icon: FileTextIcon },
+      { toSuffix: "/owner/analytics/trips", labelKey: "sidebar.trip_reports", icon: MapIcon },
+      { toSuffix: "/owner/analytics/travelers", labelKey: "sidebar.travelers", icon: UserCheckIcon },
+    ],
+  },
+  {
+    titleKey: "sidebar.section_operations",
+    items: [
+      { toSuffix: "/owner/buses", labelKey: "sidebar.fleet", icon: BusIcon },
+      { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
+      { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
+      { toSuffix: "/owner/trips", labelKey: "sidebar.trips", icon: CalendarIcon },
+      { toSuffix: "/owner/sellers", labelKey: "sidebar.sellers", icon: UsersIcon },
+    ],
+  },
+];
+
+function SidebarContent({ onClose }: { onClose?: () => void }) {
+  const { t } = useTranslation("owner");
+  const { lng } = useParams<{ lng: string }>();
+  const company = useQuery(api.companies.getMyCompany, {});
+
+  return (
+    <div className="flex flex-col h-full py-4">
+      {/* Company Info */}
+      <div className="px-3 mb-5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/80">
+          <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
+            {company?.logoUrl ? (
+              <img src={company.logoUrl} alt="logo" className="w-9 h-9 rounded-lg object-cover" />
+            ) : (
+              <BuildingIcon className="w-4 h-4 text-sidebar-primary-foreground" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm text-sidebar-foreground truncate">
+              {company?.name ?? t("sidebar.my_company")}
+            </div>
+            {company?.subscriptionStatus && company.subscriptionStatus !== "none" ? (
+              <Badge className="text-[9px] h-3.5 px-1 mt-0.5">{company.planId?.toUpperCase()}</Badge>
+            ) : (
+              <span className="text-[10px] text-sidebar-foreground/50">{t("labels.no_active_plan", { ns: "common" })}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Nav sections */}
+      <nav className="flex-1 px-3 space-y-5 overflow-y-auto">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.titleKey}>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-sidebar-foreground/40 px-3 mb-1.5">
+              {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map(({ toSuffix, labelKey, icon: Icon, end }) => (
+                <NavLink
+                  key={toSuffix}
+                  to={`/${lng}${toSuffix}`}
+                  end={end}
+                  onClick={onClose}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150",
+                      isActive
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <div className={cn(
+                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
+                        isActive ? "bg-white/15" : "bg-sidebar-accent/50"
+                      )}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="truncate">{t(labelKey)}</span>
+                      {isActive && (
+                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-sidebar-primary-foreground/80" />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+export default function OwnerLayout() {
+  const { t } = useTranslation("owner");
+  const { lng } = useParams<{ lng: string }>();
+  const navigate = useNavigate();
+  const user = useQuery(api.users.getCurrentUser, {});
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Show loading skeleton while user role is being fetched
+  if (user === undefined) {
+    return (
+      <div className="flex h-[calc(100vh-3.5rem)]">
+        <aside className="hidden md:flex flex-col w-60 bg-sidebar border-r border-sidebar-border shrink-0">
+          <div className="flex flex-col h-full py-4 px-3 space-y-4">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded-lg" />
+            ))}
+          </div>
+        </aside>
+        <div className="flex-1 overflow-auto p-6 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.role !== "owner" && user?.role !== "superadmin") {
+    navigate(`/${lng}`, { replace: true });
+    return null;
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-3.5rem)]">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex flex-col w-60 bg-sidebar border-r border-sidebar-border shrink-0">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-sidebar flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-4 pt-4">
+              <span className="text-sidebar-foreground font-bold text-sm">{t("header.menu", { ns: "common" })}</span>
+              <button onClick={() => setMobileOpen(false)} className="cursor-pointer text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors">
+                <XIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </aside>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        {/* Mobile top bar for sidebar toggle */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+          <button onClick={() => setMobileOpen(true)} className="cursor-pointer p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <MenuIcon className="w-5 h-5" />
+          </button>
+          <span className="font-semibold text-sm">{t("header.owner_dashboard", { ns: "common" })}</span>
+        </div>
+        <Outlet />
+      </div>
+    </div>
+  );
+}
