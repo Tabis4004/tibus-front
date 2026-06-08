@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { cn } from "@/lib/utils.ts";
 import { PAYMENT_NETWORK_OPTIONS } from "@/lib/payment-networks.ts";
 import {
   getTravelerPaymentNoticeSupabase,
@@ -37,8 +38,10 @@ function emptyHint(sortOrder: number): TravelerPaymentNoticeHint {
 
 export default function TravelerBookingNoticePanel({
   countries,
+  embedded = false,
 }: {
   countries: CountryOption[];
+  embedded?: boolean;
 }) {
   const { t } = useTranslation("admin");
   const { t: tc } = useTranslation("common");
@@ -96,16 +99,21 @@ export default function TravelerBookingNoticePanel({
     }
   };
 
-  return (
-    <Card className="border-dashed">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <MessageSquareIcon className="w-4 h-4" />
-          {t("booking_notice.title")}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">{t("booking_notice.desc")}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const body = (
+    <>
+      {!embedded && (
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageSquareIcon className="w-4 h-4" />
+            {t("booking_notice.title")}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{t("booking_notice.desc")}</p>
+        </CardHeader>
+      )}
+      <CardContent className={cn("space-y-4", embedded && "p-0")}>
+        {embedded && (
+          <p className="text-xs text-muted-foreground">{t("booking_notice.desc")}</p>
+        )}
         {notice === null ? (
           <Skeleton className="h-48 w-full" />
         ) : (
@@ -222,6 +230,10 @@ export default function TravelerBookingNoticePanel({
           </>
         )}
       </CardContent>
-    </Card>
+    </>
   );
+
+  if (embedded) return body;
+
+  return <Card className="border-dashed">{body}</Card>;
 }

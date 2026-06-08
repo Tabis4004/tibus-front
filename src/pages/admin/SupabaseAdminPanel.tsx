@@ -47,6 +47,9 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+  Accordion,
+} from "@/components/ui/accordion.tsx";
 import { cn } from "@/lib/utils.ts";
 import GatewayFeeSettingsPanel from "./_components/GatewayFeeSettingsPanel.tsx";
 import PaymentGatewaySettingsPanel from "./_components/PaymentGatewaySettingsPanel.tsx";
@@ -57,6 +60,7 @@ import PlatformLoyaltySettingsPanel from "./_components/PlatformLoyaltySettingsP
 import LegalPagesPanel from "./_components/LegalPagesPanel.tsx";
 import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPanel.tsx";
 import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
+import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
 import SupabasePlansTab from "./_components/SupabasePlansTab.tsx";
 import SupabaseSubscriptionsTab from "./_components/SupabaseSubscriptionsTab.tsx";
 
@@ -731,22 +735,47 @@ export default function SupabaseAdminPanel() {
                     <span className="text-destructive">{errors.commissions}</span>
                   </p>
                 )}
-                <CommissionSettingsManager
-                  settings={data.commissionSettings}
-                  companies={data.companies}
-                  onChanged={() => setRefreshKey((key) => key + 1)}
-                />
-                {appUser.isSuperAdmin && <PaymentGatewaySettingsPanel />}
-                <GatewayFeeSettingsPanel countries={data.countries.map((country) => ({
-                  id: country.id,
-                  name: country.name,
-                }))} />
-                {appUser.isSuperAdmin && (
-                  <TravelerBookingNoticePanel countries={data.countries.map((country) => ({
-                    id: country.id,
-                    name: country.name,
-                  }))} />
-                )}
+                <Accordion type="multiple" defaultValue={[]} className="flex flex-col gap-2">
+                  <CommissionSettingsManager
+                    settings={data.commissionSettings}
+                    companies={data.companies}
+                    onChanged={() => setRefreshKey((key) => key + 1)}
+                  />
+                  {appUser.isSuperAdmin && (
+                    <AdminCollapsibleSection
+                      value="payment-gateway"
+                      title={t("payment_gateway.title", { defaultValue: "Passerelle de paiement" })}
+                    >
+                      <PaymentGatewaySettingsPanel embedded />
+                    </AdminCollapsibleSection>
+                  )}
+                  <AdminCollapsibleSection
+                    value="gateway-fees"
+                    title={t("gateway_fees.title", { defaultValue: "Frais passerelle" })}
+                  >
+                    <GatewayFeeSettingsPanel
+                      embedded
+                      countries={data.countries.map((country) => ({
+                        id: country.id,
+                        name: country.name,
+                      }))}
+                    />
+                  </AdminCollapsibleSection>
+                  {appUser.isSuperAdmin && (
+                    <AdminCollapsibleSection
+                      value="booking-notice"
+                      title={t("booking_notice.title", { defaultValue: "Message voyageur au paiement" })}
+                    >
+                      <TravelerBookingNoticePanel
+                        embedded
+                        countries={data.countries.map((country) => ({
+                          id: country.id,
+                          name: country.name,
+                        }))}
+                      />
+                    </AdminCollapsibleSection>
+                  )}
+                </Accordion>
               </>
             )}
           </CardContent>
@@ -1067,45 +1096,175 @@ function CommissionSettingsManager({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold text-sm">
-            {t("commissions.country_settings", { defaultValue: "Taux par pays" })}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {t("commissions.country_settings_desc", {
-              defaultValue: "Le taux pays s'applique par défaut aux ventes tiers de toutes les compagnies du pays.",
-            })}
-          </p>
-        </div>
+    <>
+      <AdminCollapsibleSection
+        value="commission-country-rates"
+        title={t("commissions.country_settings", { defaultValue: "Taux par pays" })}
+        count={countrySettings.length}
+      >
+        <p className="text-xs text-muted-foreground">
+          {t("commissions.country_settings_desc", {
+            defaultValue: "Le taux pays s'applique par défaut aux ventes tiers de toutes les compagnies du pays.",
+          })}
+        </p>
 
         {countrySettings.length === 0 ? (
-          <EmptyState
-            icon={GlobeIcon}
-            title={t("geo.no_countries")}
-            description={t("commissions.apply_migration", {
-              defaultValue: "Appliquez le script 018 pour charger les pays autorisés.",
-            })}
-          />
-        ) : (
-          <div className="divide-y">
-            {countrySettings.map((setting) => {
-              const draft = draftFor(setting);
-              const key = settingKey(setting);
-              return (
-                <div key={key} className="grid gap-3 py-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{setting.countryName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {setting.source === "unset"
-                        ? t("commissions.unset", { defaultValue: "Aucun taux configure" })
-                        : t("commissions.configured", { defaultValue: "Configure" })}
-                      {setting.updatedByName ? ` · ${setting.updatedByName}` : ""}
-                    </p>
+            <EmptyState
+              icon={GlobeIcon}
+              title={t("geo.no_countries")}
+              description={t("commissions.apply_migration", {
+                defaultValue: "Appliquez le script 018 pour charger les pays autorisés.",
+              })}
+            />
+          ) : (
+            <div className="divide-y rounded-lg border">
+              {countrySettings.map((setting) => {
+                const draft = draftFor(setting);
+                const key = settingKey(setting);
+                return (
+                  <div key={key} className="grid gap-3 p-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{setting.countryName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {setting.source === "unset"
+                          ? t("commissions.unset", { defaultValue: "Aucun taux configure" })
+                          : t("commissions.configured", { defaultValue: "Configure" })}
+                        {setting.updatedByName ? ` · ${setting.updatedByName}` : ""}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t("commissions.rate")}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={draft.rate}
+                        onChange={(event) => setDraft(setting, { rate: event.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t("commissions.paid_by")}</Label>
+                      <Select
+                        value={draft.paidBy}
+                        onValueChange={(value) => setDraft(setting, { paidBy: value === "traveler" ? "traveler" : "company" })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="company">{t("commissions.paid_by_company")}</SelectItem>
+                          <SelectItem value="traveler">{t("commissions.paid_by_traveler")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2 md:justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() => handleSave(setting)}
+                        disabled={savingKey === key}
+                      >
+                        {savingKey === key ? tc("buttons.saving") : tc("buttons.save")}
+                      </Button>
+                      {setting.id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDelete(setting)}
+                          disabled={savingKey === key}
+                          aria-label={t("commissions.delete", { defaultValue: "Supprimer" })}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label>{t("commissions.rate")}</Label>
+                );
+              })}
+            </div>
+          )}
+      </AdminCollapsibleSection>
+
+      <AdminCollapsibleSection
+        value="commission-company-overrides"
+        title={t("commissions.company_overrides", { defaultValue: "Exceptions par compagnie" })}
+        count={companySettings.length}
+      >
+        <p className="text-xs text-muted-foreground">
+            {t("commissions.company_overrides_desc", {
+              defaultValue: "A utiliser seulement quand une compagnie doit remplacer le taux de son pays.",
+            })}
+          </p>
+
+          <div className="grid gap-3 rounded-lg border bg-muted/50 p-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
+            <div className="space-y-1">
+              <Label>{t("commissions.company")}</Label>
+              <Select value={companyId} onValueChange={setCompanyId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">{t("commissions.select_company")}</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name} · {company.countryName ?? ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>{t("commissions.rate")}</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={companyRate}
+                onChange={(event) => setCompanyRate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>{t("commissions.paid_by")}</Label>
+              <Select
+                value={companyPaidBy}
+                onValueChange={(value) => setCompanyPaidBy(value === "traveler" ? "traveler" : "company")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="company">{t("commissions.paid_by_company")}</SelectItem>
+                  <SelectItem value="traveler">{t("commissions.paid_by_traveler")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              className="gap-2"
+              onClick={handleAddCompanyOverride}
+              disabled={companyId === "__none" || savingKey === "company:new"}
+            >
+              <PlusIcon className="h-4 w-4" />
+              {t("commissions.add_override", { defaultValue: "Ajouter" })}
+            </Button>
+          </div>
+
+          {companySettings.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {t("commissions.no_company_overrides", { defaultValue: "Aucune exception compagnie." })}
+            </p>
+          ) : (
+            <div className="divide-y rounded-lg border">
+              {companySettings.map((setting) => {
+                const draft = draftFor(setting);
+                const key = settingKey(setting);
+                return (
+                  <div key={key} className="grid gap-3 p-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{setting.companyName}</p>
+                      <p className="text-xs text-muted-foreground">{setting.countryName}</p>
+                    </div>
                     <Input
                       type="number"
                       min={0}
@@ -1114,9 +1273,6 @@ function CommissionSettingsManager({
                       value={draft.rate}
                       onChange={(event) => setDraft(setting, { rate: event.target.value })}
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>{t("commissions.paid_by")}</Label>
                     <Select
                       value={draft.paidBy}
                       onValueChange={(value) => setDraft(setting, { paidBy: value === "traveler" ? "traveler" : "company" })}
@@ -1129,152 +1285,23 @@ function CommissionSettingsManager({
                         <SelectItem value="traveler">{t("commissions.paid_by_traveler")}</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="flex gap-2 md:justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => handleSave(setting)}
-                      disabled={savingKey === key}
-                    >
-                      {savingKey === key ? tc("buttons.saving") : tc("buttons.save")}
-                    </Button>
-                    {setting.id && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(setting)}
-                        disabled={savingKey === key}
-                        aria-label={t("commissions.delete", { defaultValue: "Supprimer" })}
-                      >
-                        <TrashIcon className="h-4 w-4" />
+                    <div className="flex gap-2 md:justify-end">
+                      <Button size="sm" onClick={() => handleSave(setting)} disabled={savingKey === key}>
+                        {savingKey === key ? tc("buttons.saving") : tc("buttons.save")}
                       </Button>
-                    )}
+                      {setting.id && (
+                        <Button size="sm" variant="outline" onClick={() => handleDelete(setting)} disabled={savingKey === key}>
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl border p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold text-sm">
-            {t("commissions.company_overrides", { defaultValue: "Exceptions par compagnie" })}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {t("commissions.company_overrides_desc", {
-              defaultValue: "A utiliser seulement quand une compagnie doit remplacer le taux de son pays.",
-            })}
-          </p>
-        </div>
-
-        <div className="grid gap-3 rounded-lg bg-muted/50 p-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
-          <div className="space-y-1">
-            <Label>{t("commissions.company")}</Label>
-            <Select value={companyId} onValueChange={setCompanyId}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">{t("commissions.select_company")}</SelectItem>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name} · {company.countryName ?? ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>{t("commissions.rate")}</Label>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              step={0.1}
-              value={companyRate}
-              onChange={(event) => setCompanyRate(event.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>{t("commissions.paid_by")}</Label>
-            <Select
-              value={companyPaidBy}
-              onValueChange={(value) => setCompanyPaidBy(value === "traveler" ? "traveler" : "company")}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="company">{t("commissions.paid_by_company")}</SelectItem>
-                <SelectItem value="traveler">{t("commissions.paid_by_traveler")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            size="sm"
-            className="gap-2"
-            onClick={handleAddCompanyOverride}
-            disabled={companyId === "__none" || savingKey === "company:new"}
-          >
-            <PlusIcon className="h-4 w-4" />
-            {t("commissions.add_override", { defaultValue: "Ajouter" })}
-          </Button>
-        </div>
-
-        {companySettings.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {t("commissions.no_company_overrides", { defaultValue: "Aucune exception compagnie." })}
-          </p>
-        ) : (
-          <div className="divide-y">
-            {companySettings.map((setting) => {
-              const draft = draftFor(setting);
-              const key = settingKey(setting);
-              return (
-                <div key={key} className="grid gap-3 py-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{setting.companyName}</p>
-                    <p className="text-xs text-muted-foreground">{setting.countryName}</p>
-                  </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    value={draft.rate}
-                    onChange={(event) => setDraft(setting, { rate: event.target.value })}
-                  />
-                  <Select
-                    value={draft.paidBy}
-                    onValueChange={(value) => setDraft(setting, { paidBy: value === "traveler" ? "traveler" : "company" })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="company">{t("commissions.paid_by_company")}</SelectItem>
-                      <SelectItem value="traveler">{t("commissions.paid_by_traveler")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex gap-2 md:justify-end">
-                    <Button size="sm" onClick={() => handleSave(setting)} disabled={savingKey === key}>
-                      {savingKey === key ? tc("buttons.saving") : tc("buttons.save")}
-                    </Button>
-                    {setting.id && (
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(setting)} disabled={savingKey === key}>
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                );
+              })}
+            </div>
+          )}
+      </AdminCollapsibleSection>
+    </>
   );
 }
 

@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
   formatFeeInput,
   parseFeeInputOrZero,
@@ -54,8 +55,10 @@ type CountryOption = { id: string; name: string };
 
 export default function GatewayFeeSettingsPanel({
   countries,
+  embedded = false,
 }: {
   countries: CountryOption[];
+  embedded?: boolean;
 }) {
   const { t } = useTranslation("admin");
   const { t: tc } = useTranslation("common");
@@ -153,21 +156,25 @@ export default function GatewayFeeSettingsPanel({
     }
   };
 
-  return (
-    <Card className="border-dashed">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <SettingsIcon className="w-4 h-4" />
-          {t("gateway_fees.title")}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {t("gateway_fees.desc_db")}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {t("gateway_fees.network_hint")}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const body = (
+    <>
+      {!embedded && (
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <SettingsIcon className="w-4 h-4" />
+            {t("gateway_fees.title")}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{t("gateway_fees.desc_db")}</p>
+          <p className="text-xs text-muted-foreground">{t("gateway_fees.network_hint")}</p>
+        </CardHeader>
+      )}
+      <CardContent className={cn("space-y-4", embedded && "p-0")}>
+        {embedded && (
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>{t("gateway_fees.desc_db")}</p>
+            <p>{t("gateway_fees.network_hint")}</p>
+          </div>
+        )}
         <div className="rounded-lg bg-muted/50 p-3 text-sm">
           <p className="font-medium">{t("gateway_fees.formula")}</p>
           <p className="text-muted-foreground mt-1">{t("gateway_fees.margin_source")}</p>
@@ -301,8 +308,12 @@ export default function GatewayFeeSettingsPanel({
           </div>
         )}
       </CardContent>
-    </Card>
+    </>
   );
+
+  if (embedded) return body;
+
+  return <Card className="border-dashed">{body}</Card>;
 }
 
 function GatewayFeeRow({

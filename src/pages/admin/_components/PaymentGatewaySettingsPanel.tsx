@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
   getActivePaymentGatewaySupabase,
   setActivePaymentGatewaySupabase,
   type ActivePaymentGateway,
 } from "@/lib/supabase/payment-gateway.ts";
 
-export default function PaymentGatewaySettingsPanel() {
+export default function PaymentGatewaySettingsPanel({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation("admin");
   const [gateway, setGateway] = useState<ActivePaymentGateway>("fedapay");
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,9 @@ export default function PaymentGatewaySettingsPanel() {
   };
 
   if (loading) {
+    if (embedded) {
+      return <Skeleton className="h-16 w-full" />;
+    }
     return (
       <Card>
         <CardContent className="pt-6">
@@ -62,16 +66,21 @@ export default function PaymentGatewaySettingsPanel() {
     );
   }
 
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <CreditCardIcon className="w-4 h-4" />
-          {t("payment_gateway.title")}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">{t("payment_gateway.desc")}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const body = (
+    <>
+      {!embedded && (
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCardIcon className="w-4 h-4" />
+            {t("payment_gateway.title")}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">{t("payment_gateway.desc")}</p>
+        </CardHeader>
+      )}
+      <CardContent className={cn("space-y-4", embedded && "p-0")}>
+        {embedded && (
+          <p className="text-xs text-muted-foreground">{t("payment_gateway.desc")}</p>
+        )}
         <div className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -99,6 +108,10 @@ export default function PaymentGatewaySettingsPanel() {
         </div>
         <p className="text-xs text-muted-foreground">{t("payment_gateway.fees_hint")}</p>
       </CardContent>
-    </Card>
+    </>
   );
+
+  if (embedded) return body;
+
+  return <Card>{body}</Card>;
 }
