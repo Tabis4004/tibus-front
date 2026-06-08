@@ -56,6 +56,7 @@ import ContactSettingsPanel from "./_components/ContactSettingsPanel.tsx";
 import PlatformLoyaltySettingsPanel from "./_components/PlatformLoyaltySettingsPanel.tsx";
 import LegalPagesPanel from "./_components/LegalPagesPanel.tsx";
 import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPanel.tsx";
+import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
 
 type SupabaseUserRow = {
   id: string;
@@ -875,7 +876,12 @@ export default function SupabaseAdminPanel() {
 
       {tab === "legal" && appUser.isSuperAdmin && <LegalPagesPanel />}
 
-      {tab === "scaling_metrics" && appUser.isSuperAdmin && <PlatformScalingMetricsPanel />}
+      {tab === "scaling_metrics" && appUser.isSuperAdmin && (
+        <div className="space-y-6">
+          <TpePosDiagnosticsPanel />
+          <PlatformScalingMetricsPanel />
+        </div>
+      )}
 
       {tab === "landing" && (
         <ComingSoon
