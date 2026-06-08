@@ -188,6 +188,17 @@ export default function SupabaseHome() {
                   icon={ShieldIcon}
                 />
               )}
+
+              {(showOwnerDashboard || appUser.isSuperAdmin) && (
+                <HomeActionBlock
+                  to={`/${locale}/manual/compagnie`}
+                  title={t("manual.nav_title", { defaultValue: "Manuel compagnie" })}
+                  description={t("manual.nav_desc", {
+                    defaultValue: "Guide complet avec captures d'écran pour former vos équipes",
+                  })}
+                  icon={BookOpenIcon}
+                />
+              )}
             </HomeBlockSection>
           )}
 

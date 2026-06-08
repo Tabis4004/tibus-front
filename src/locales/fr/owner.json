@@ -22,6 +22,8 @@
   "sidebar.section_main": "Général",
   "sidebar.section_analytics": "Analyses",
   "sidebar.section_operations": "Opérations",
+  "sidebar.section_help": "Formation",
+  "sidebar.company_manual": "Manuel compagnie",
   "company.create_title": "Créer votre entreprise",
   "company.settings_title": "Paramètres de l'entreprise",
   "company.create_desc": "Configurez le profil de votre entreprise de transport.",

@@ -21,6 +21,7 @@ import {
   BookingConfirmation,
   CompanyProfile,
   CompanySettings,
+  CompanyManual,
   CompleteProfile,
   ContactPage,
   FleetManager,
@@ -128,6 +129,7 @@ export default function App() {
                 <Route path="seller" element={<SellerDashboard />} />
                 <Route path="contact" element={<ContactPage />} />
                 <Route path="guide" element={<GuidePageRoute />} />
+                <Route path="manual/compagnie" element={<CompanyManual />} />
                 <Route path="admin" element={<AdminPanel />} />
                 <Route path="admin/users/new" element={<AdminUserForm />} />
                 <Route path="admin/users/:userId/edit" element={<AdminUserForm />} />

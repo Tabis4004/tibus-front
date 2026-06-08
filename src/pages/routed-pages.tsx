@@ -70,6 +70,7 @@ import ColisSettingsPage from "./owner/ColisSettingsPage.tsx";
 import LoyaltyPage from "./owner/LoyaltyPage.tsx";
 import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
 import OwnerMessagesPage from "./owner/OwnerMessagesPage.tsx";
+import CompanyManualPage from "./manual/CompanyManualPage.tsx";
 
 function useSupabaseBranch<T>(supabase: T, convex: T): T {
   return isSupabaseAuth() ? supabase : convex;
@@ -109,6 +110,10 @@ export function ContactPage() {
 
 export function GuidePageRoute() {
   return <GuidePage />;
+}
+
+export function CompanyManual() {
+  return <CompanyManualPage />;
 }
 
 export function CompleteProfile() {

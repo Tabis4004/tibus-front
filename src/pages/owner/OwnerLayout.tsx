@@ -26,6 +26,7 @@ import {
   ReceiptTextIcon,
   PercentIcon,
   ScanLineIcon,
+  BookOpenIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -119,6 +120,12 @@ const SUPABASE_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
       { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
       { toSuffix: "/owner/sellers", labelKey: "sidebar.sellers", icon: UsersIcon },
+    ],
+  },
+  {
+    titleKey: "sidebar.section_help",
+    items: [
+      { toSuffix: "/manual/compagnie", labelKey: "sidebar.company_manual", icon: BookOpenIcon },
     ],
   },
 ];
@@ -255,6 +262,9 @@ function OwnerSidebarNav({
         const items = section.items.filter((item) => {
           if (item.toSuffix === "/owner/guarantee-fund") return canSeeGuaranteeFund;
           if (item.toSuffix === "/owner/cash-register") return canSeeGuaranteeFund;
+          if (item.toSuffix === "/manual/compagnie") {
+            return Boolean(isSuperAdmin || roles?.includes("owner"));
+          }
           return true;
         });
         if (items.length === 0) return null;

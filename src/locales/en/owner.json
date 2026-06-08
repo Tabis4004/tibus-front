@@ -22,6 +22,8 @@
   "sidebar.section_main": "General",
   "sidebar.section_analytics": "Analytics",
   "sidebar.section_operations": "Operations",
+  "sidebar.section_help": "Training",
+  "sidebar.company_manual": "Company manual",
   "company.create_title": "Create Your Company",
   "company.settings_title": "Company Settings",
   "company.create_desc": "Set up your transport company profile.",
