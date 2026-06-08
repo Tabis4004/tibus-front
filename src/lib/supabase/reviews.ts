@@ -13,18 +13,19 @@ export type OwnerReviewRow = {
 
 export async function listOwnerReviewsSupabase(
   appUserId: string,
+  companyId?: string | null,
   limit = 20,
   offset = 0,
 ): Promise<OwnerReviewRow[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
   const { data, error } = await supabase
     .from("Reviews")
     .select(
       "id, rating, comment, ownerReply, ownerRepliedAt, createdAt, Users(firstName, lastName, email)",
     )
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .order("createdAt", { ascending: false })
     .range(offset, offset + limit - 1);
 

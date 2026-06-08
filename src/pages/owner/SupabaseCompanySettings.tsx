@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import {
   getOwnerCompanyDetailsSupabase,
   updateOwnerCompanySupabase,
@@ -32,6 +33,7 @@ type CompanyFormData = z.infer<typeof companySchema>;
 export default function SupabaseCompanySettings() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
   const [company, setCompany] = useState<OwnerCompanyDetails | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
@@ -57,9 +59,16 @@ export default function SupabaseCompanySettings() {
   const logoUrl = watch("logo");
 
   useEffect(() => {
-    if (!appUserId) return;
+    if (!appUserId || !isReady) return;
+
+    if (!companyId) {
+      setCompany(null);
+      return;
+    }
+
     let cancelled = false;
-    void getOwnerCompanyDetailsSupabase(appUserId)
+    setCompany(undefined);
+    void getOwnerCompanyDetailsSupabase(appUserId, companyId)
       .then((row) => {
         if (cancelled) return;
         setCompany(row);
@@ -82,10 +91,10 @@ export default function SupabaseCompanySettings() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId, reset, t]);
+  }, [appUserId, companyId, isReady, reset, t]);
 
   const onSubmit = async (data: CompanyFormData) => {
-    if (!company) return;
+    if (!company || !companyId) return;
     setSaving(true);
     try {
       await updateOwnerCompanySupabase(company.id, {
@@ -95,7 +104,7 @@ export default function SupabaseCompanySettings() {
         voyageColisMsg: data.voyageColisMsg?.trim() || null,
         arretReservation: data.arretReservation,
       });
-      const refreshed = await getOwnerCompanyDetailsSupabase(appUserId!);
+      const refreshed = await getOwnerCompanyDetailsSupabase(appUserId!, companyId);
       setCompany(refreshed);
       if (refreshed) {
         reset({
@@ -114,7 +123,7 @@ export default function SupabaseCompanySettings() {
     }
   };
 
-  if (company === undefined) {
+  if (company === undefined || !isReady || companyLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
         <Skeleton className="h-8 w-48" />

@@ -16,6 +16,17 @@ import {
   WalletIcon,
 } from "lucide-react";
 
+export const GUARANTEE_FUND_ACCESS_ROLES = [
+  "owner",
+  "comptable_compagnie",
+  "super_admin",
+] as const;
+
+export function canAccessGuaranteeFund(roles: string[], isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  return GUARANTEE_FUND_ACCESS_ROLES.some((role) => roles.includes(role));
+}
+
 export type OwnerConsoleModule = {
   id: string;
   titleKey: string;
@@ -88,7 +99,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Solde, dépôts plateforme et validation comptable.",
     toSuffix: "/owner/guarantee-fund",
     icon: LandmarkIcon,
-    roles: ["owner", "comptable_compagnie", "super_admin"],
+    roles: [...GUARANTEE_FUND_ACCESS_ROLES],
   },
   {
     id: "cash",

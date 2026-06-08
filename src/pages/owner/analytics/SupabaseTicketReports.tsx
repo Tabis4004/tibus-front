@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   getOwnerTicketReportSupabase,
   type OwnerTicketReport,
@@ -38,15 +39,16 @@ function statusVariant(status: string) {
 export default function SupabaseTicketReports() {
   const { t } = useTranslation("analytics");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [report, setReport] = useState<OwnerTicketReport | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     let cancelled = false;
-    void getOwnerTicketReportSupabase(appUserId)
+    void getOwnerTicketReportSupabase(appUserId, companyId)
       .then((data) => {
         if (!cancelled) setReport(data);
       })
@@ -56,7 +58,21 @@ export default function SupabaseTicketReports() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId]);
+  }, [appUserId, companyId]);
+
+  useEffect(() => {
+    if (!appUserId || !companyId) return;
+    const onRefresh = () => {
+      setReport(undefined);
+      void getOwnerTicketReportSupabase(appUserId, companyId)
+        .then(setReport)
+        .catch(() =>
+          setReport({ tickets: [], filters: { sellers: [], buses: [], routes: [], departureCities: [] } }),
+        );
+    };
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+  }, [appUserId, companyId]);
 
   const filteredTickets = useMemo(() => {
     const tickets = report?.tickets ?? [];

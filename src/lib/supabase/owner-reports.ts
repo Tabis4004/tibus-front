@@ -286,11 +286,12 @@ async function loadIssuedBookingsForDepartures(departures: OwnerDeparture[]) {
 
 export async function getOwnerTicketReportSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerTicketReport> {
-  const departures = await listOwnerDeparturesSupabase(appUserId);
+  const departures = await listOwnerDeparturesSupabase(appUserId, companyId);
   const tripMap = new Map(departures.map((trip) => [trip.id, trip]));
   const { bookings, paymentMap, userMap } = await loadIssuedBookingsForDepartures(departures);
-  const company = await getMyCompanySupabase(appUserId);
+  const company = await getMyCompanySupabase(appUserId, companyId);
   const currency = company?.currency ?? "XOF";
 
   const tickets: OwnerTicketReportRow[] = [];
@@ -344,8 +345,9 @@ export async function getOwnerTicketReportSupabase(
 
 export async function getOwnerTripReportSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerTripReport> {
-  const departures = await listOwnerDeparturesSupabase(appUserId);
+  const departures = await listOwnerDeparturesSupabase(appUserId, companyId);
   const { bookings } = await loadIssuedBookingsForDepartures(departures);
   const bookingsByReservation = new Map<string, { count: number; revenue: number }>();
 
@@ -496,14 +498,15 @@ export async function getTripManifestSupabase(
 
 export async function getOwnerTravelersSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerTravelerReportRow[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
-  const departures = await listOwnerDeparturesSupabase(appUserId);
+  const departures = await listOwnerDeparturesSupabase(appUserId, resolvedCompanyId);
   const tripMap = new Map(departures.map((trip) => [trip.id, trip]));
   const { bookings, paymentMap, userMap } = await loadIssuedBookingsForDepartures(departures);
-  const company = await getMyCompanySupabase(appUserId);
+  const company = await getMyCompanySupabase(appUserId, resolvedCompanyId);
   const currency = company?.currency ?? "XOF";
   const travelers = new Map<string, OwnerTravelerReportRow>();
 

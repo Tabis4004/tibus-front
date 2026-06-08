@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   getOwnerTravelersSupabase,
   type OwnerTravelerReportRow,
@@ -15,13 +16,14 @@ import {
 export default function SupabaseTravelersReport() {
   const { t } = useTranslation("analytics");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [travelers, setTravelers] = useState<OwnerTravelerReportRow[] | undefined>(undefined);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     let cancelled = false;
-    void getOwnerTravelersSupabase(appUserId)
+    void getOwnerTravelersSupabase(appUserId, companyId)
       .then((rows) => {
         if (!cancelled) setTravelers(rows);
       })
@@ -31,7 +33,17 @@ export default function SupabaseTravelersReport() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId]);
+  }, [appUserId, companyId]);
+
+  useEffect(() => {
+    if (!appUserId || !companyId) return;
+    const onRefresh = () => {
+      setTravelers(undefined);
+      void getOwnerTravelersSupabase(appUserId, companyId).then(setTravelers).catch(() => setTravelers([]));
+    };
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+  }, [appUserId, companyId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

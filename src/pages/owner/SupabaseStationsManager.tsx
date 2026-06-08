@@ -43,6 +43,7 @@ import {
   EmptyContent,
 } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerStationsSupabase,
   createOwnerStationSupabase,
@@ -60,11 +61,13 @@ type StationFormData = z.infer<typeof stationSchema>;
 function StationDialog({
   station,
   appUserId,
+  companyId,
   onClose,
   onSaved,
 }: {
   station?: SupabaseOwnerStation;
   appUserId: string;
+  companyId: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -89,6 +92,7 @@ function StationDialog({
       if (station) {
         await updateOwnerStationSupabase({
           appUserId,
+          companyId,
           stationId: station.id,
           name: data.name,
           googleMapsLink: data.googleMapsLink,
@@ -97,6 +101,7 @@ function StationDialog({
       } else {
         await createOwnerStationSupabase({
           appUserId,
+          companyId,
           name: data.name,
           googleMapsLink: data.googleMapsLink,
         });
@@ -155,24 +160,31 @@ function StationDialog({
 export default function SupabaseStationsManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [stations, setStations] = useState<SupabaseOwnerStation[] | undefined>(undefined);
   const [editStation, setEditStation] = useState<SupabaseOwnerStation | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SupabaseOwnerStation | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     setStations(undefined);
     try {
-      setStations(await listOwnerStationsSupabase(appUserId));
+      setStations(await listOwnerStationsSupabase(appUserId, companyId));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("stations.station_error"));
       setStations([]);
     }
-  }, [appUserId, t]);
+  }, [appUserId, companyId, t]);
 
   useEffect(() => {
     void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onRefresh = () => void loadData();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);
 
   const cityNames = [
@@ -182,7 +194,7 @@ export default function SupabaseStationsManager() {
   const handleDelete = async () => {
     if (!deleteTarget || !appUserId) return;
     try {
-      await deleteOwnerStationSupabase(appUserId, deleteTarget.id);
+      await deleteOwnerStationSupabase(appUserId, deleteTarget.id, companyId);
       toast.success(t("stations.station_removed"));
       void loadData();
     } catch (err) {
@@ -296,10 +308,11 @@ export default function SupabaseStationsManager() {
         </div>
       )}
 
-      {(showForm || editStation) && appUserId && (
+      {(showForm || editStation) && appUserId && companyId && (
         <StationDialog
           station={editStation ?? undefined}
           appUserId={appUserId}
+          companyId={companyId}
           onClose={() => {
             setShowForm(false);
             setEditStation(null);

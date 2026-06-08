@@ -56,24 +56,17 @@ function fullName(user: {
   return name || user.email || "Utilisateur";
 }
 
-function roleNameFromJoin(
-  role: { name: string } | { name: string }[] | null | undefined,
-): string | null {
-  if (!role) return null;
-  if (Array.isArray(role)) return role[0]?.name ?? null;
-  return role.name ?? null;
-}
-
 export async function listOwnerFleetBusesSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<SupabaseOwnerBus[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
   const { data, error } = await supabase
     .from("Bus")
     .select("id, model, registrationNumber, capacity, isActive")
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .order("registrationNumber");
 
   if (error) throw error;
@@ -91,11 +84,12 @@ export async function listOwnerFleetBusesSupabase(
 
 export async function createOwnerBusSupabase(input: {
   appUserId: string;
+  companyId?: string | null;
   name: string;
   plateNumber: string;
   capacity: number;
 }): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(input.appUserId);
+  const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase.from("Bus").insert({
@@ -111,13 +105,14 @@ export async function createOwnerBusSupabase(input: {
 
 export async function updateOwnerBusSupabase(input: {
   appUserId: string;
+  companyId?: string | null;
   busId: string;
   name: string;
   plateNumber: string;
   capacity: number;
   isActive: boolean;
 }): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(input.appUserId);
+  const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase
@@ -137,29 +132,31 @@ export async function updateOwnerBusSupabase(input: {
 export async function deleteOwnerBusSupabase(
   appUserId: string,
   busId: string,
+  companyId?: string | null,
 ): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) throw new Error("Compagnie introuvable");
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase
     .from("Bus")
     .delete()
     .eq("id", busId)
-    .eq("companyId", companyId);
+    .eq("companyId", resolvedCompanyId);
 
   if (error) throw error;
 }
 
 export async function listOwnerStationsSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<SupabaseOwnerStation[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
   const { data, error } = await supabase
     .from("Gares")
     .select("id, name, googleMapsLink")
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .order("name");
 
   if (error) throw error;
@@ -178,10 +175,11 @@ export async function listOwnerStationsSupabase(
 
 export async function createOwnerStationSupabase(input: {
   appUserId: string;
+  companyId?: string | null;
   name: string;
   googleMapsLink?: string;
 }): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(input.appUserId);
+  const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase.from("Gares").insert({
@@ -195,11 +193,12 @@ export async function createOwnerStationSupabase(input: {
 
 export async function updateOwnerStationSupabase(input: {
   appUserId: string;
+  companyId?: string | null;
   stationId: string;
   name: string;
   googleMapsLink?: string;
 }): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(input.appUserId);
+  const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase
@@ -217,15 +216,16 @@ export async function updateOwnerStationSupabase(input: {
 export async function deleteOwnerStationSupabase(
   appUserId: string,
   stationId: string,
+  companyId?: string | null,
 ): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) throw new Error("Compagnie introuvable");
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase
     .from("Gares")
     .delete()
     .eq("id", stationId)
-    .eq("companyId", companyId);
+    .eq("companyId", resolvedCompanyId);
 
   if (error) throw error;
 }
@@ -234,7 +234,7 @@ export async function listOwnerSellersSupabase(
   appUserId: string,
   companyId?: string | null,
 ): Promise<SupabaseOwnerSeller[]> {
-  const resolvedCompanyId = companyId ?? await resolveOwnerCompanyId(appUserId);
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
   if (!resolvedCompanyId) return [];
 
   const { data, error } = await supabase.rpc("list_owner_team_members", {
@@ -348,6 +348,7 @@ export async function removeCompanySellerSupabase(
   appUserId: string,
   userId: string,
   roleName?: OwnerTeamRoleName,
+  companyId?: string | null,
 ): Promise<void> {
   if (roleName) {
     const { error } = await supabase.rpc("remove_company_user_role", {
@@ -358,8 +359,8 @@ export async function removeCompanySellerSupabase(
     return;
   }
 
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) throw new Error("Compagnie introuvable");
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) throw new Error("Compagnie introuvable");
 
   const { data: roles, error: roleError } = await supabase
     .from("Role")
@@ -374,7 +375,7 @@ export async function removeCompanySellerSupabase(
   const { error } = await supabase
     .from("UserRoles")
     .delete()
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .eq("userId", userId)
     .in("roleId", roleIds);
 

@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useAppUser, normalizeRoleForUi } from "@/hooks/use-app-user.ts";
 import {
+  canAccessGuaranteeFund,
   filterOwnerConsoleModules,
   groupOwnerConsoleModules,
   type OwnerConsoleModule,
 } from "@/lib/owner-console-modules.tsx";
 import type { OwnerCompany } from "@/lib/supabase/owner-company";
+import GuaranteeFundOverviewCard from "./GuaranteeFundOverviewCard.tsx";
 
 type Props = {
   company: OwnerCompany;
@@ -138,6 +140,7 @@ export default function OwnerConsoleModules({ company }: Props) {
 
   const modules = filterOwnerConsoleModules(appUser.roles, appUser.isSuperAdmin);
   const sections = groupOwnerConsoleModules(modules);
+  const showGuaranteeFund = canAccessGuaranteeFund(appUser.roles, appUser.isSuperAdmin);
 
   return (
     <div className="space-y-6">
@@ -147,9 +150,13 @@ export default function OwnerConsoleModules({ company }: Props) {
             {t(section.sectionKey, { defaultValue: section.sectionDefault })}
           </h2>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {section.items.map((module) => (
-              <ModuleCard key={module.id} module={module} lng={lng ?? "fr"} t={t} />
-            ))}
+            {section.items.map((module) =>
+              module.id === "guarantee" && showGuaranteeFund ? (
+                <GuaranteeFundOverviewCard key={module.id} companyId={company.id} />
+              ) : (
+                <ModuleCard key={module.id} module={module} lng={lng ?? "fr"} t={t} />
+              ),
+            )}
           </div>
         </div>
       ))}

@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/empty.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerDeparturesSupabase,
   listOwnerRoutesSupabase,
@@ -104,6 +105,7 @@ function TripFormDialog({
   onClose,
   onSaved,
   appUserId,
+  companyId,
 }: {
   trip?: OwnerDeparture;
   routes: OwnerRouteOption[];
@@ -111,6 +113,7 @@ function TripFormDialog({
   onClose: () => void;
   onSaved: () => void;
   appUserId: string;
+  companyId: string;
 }) {
   const { t } = useTranslation("owner");
   const [saving, setSaving] = useState(false);
@@ -164,6 +167,7 @@ function TripFormDialog({
       if (trip) {
         await updateOwnerDepartureSupabase({
           appUserId,
+          companyId,
           reservationId: trip.id,
           departureIso: depISO,
           capacity: data.capacity,
@@ -174,6 +178,7 @@ function TripFormDialog({
       } else {
         await createOwnerDepartureSupabase({
           appUserId,
+          companyId,
           trajetId: data.routeId,
           busId: data.busId,
           departureIso: depISO,
@@ -302,6 +307,7 @@ type FilterTab = (typeof FILTER_TABS)[number];
 export default function SupabaseTripsManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [trips, setTrips] = useState<OwnerDeparture[] | undefined>(undefined);
   const [routes, setRoutes] = useState<OwnerRouteOption[]>([]);
   const [buses, setBuses] = useState<OwnerBusOption[]>([]);
@@ -311,13 +317,13 @@ export default function SupabaseTripsManager() {
   const [filter, setFilter] = useState<FilterTab>("all");
 
   const loadData = useCallback(async () => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     setTrips(undefined);
     try {
       const [departures, routeList, busList] = await Promise.all([
-        listOwnerDeparturesSupabase(appUserId),
-        listOwnerRoutesSupabase(appUserId),
-        listOwnerBusesSupabase(appUserId),
+        listOwnerDeparturesSupabase(appUserId, companyId),
+        listOwnerRoutesSupabase(appUserId, companyId),
+        listOwnerBusesSupabase(appUserId, companyId),
       ]);
       setTrips(departures);
       setRoutes(routeList);
@@ -328,10 +334,16 @@ export default function SupabaseTripsManager() {
       );
       setTrips([]);
     }
-  }, [appUserId]);
+  }, [appUserId, companyId, t]);
 
   useEffect(() => {
     void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onRefresh = () => void loadData();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);
 
   const filteredTrips = (trips ?? []).filter(
@@ -341,7 +353,7 @@ export default function SupabaseTripsManager() {
   const handleDelete = async () => {
     if (!deleteId || !appUserId) return;
     try {
-      await deleteOwnerDepartureSupabase(appUserId, deleteId);
+      await deleteOwnerDepartureSupabase(appUserId, deleteId, companyId);
       toast.success(t("trips.deleted"));
       void loadData();
     } catch (err) {
@@ -506,12 +518,13 @@ export default function SupabaseTripsManager() {
         </div>
       )}
 
-      {(showForm || editTrip) && appUserId && (
+      {(showForm || editTrip) && appUserId && companyId && (
         <TripFormDialog
           trip={editTrip ?? undefined}
           routes={routes}
           buses={buses}
           appUserId={appUserId}
+          companyId={companyId}
           onClose={() => {
             setShowForm(false);
             setEditTrip(null);

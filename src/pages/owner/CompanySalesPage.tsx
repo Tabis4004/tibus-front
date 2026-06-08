@@ -1,39 +1,21 @@
-import { useEffect, useState } from "react";
-import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { getMyCompanySupabase, type OwnerCompany } from "@/lib/supabase/owner-company";
 import CompanySalesLedger from "./_components/CompanySalesLedger.tsx";
 
 export default function CompanySalesPage() {
-  const { appUserId } = useSupabaseAuth();
-  const [company, setCompany] = useState<OwnerCompany | null | undefined>(undefined);
+  const { selectedCompany, isLoading, isReady } = useOwnerCompany();
 
-  useEffect(() => {
-    if (!appUserId) return;
-    let cancelled = false;
-    void getMyCompanySupabase(appUserId)
-      .then((row) => {
-        if (!cancelled) setCompany(row);
-      })
-      .catch(() => {
-        if (!cancelled) setCompany(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [appUserId]);
-
-  if (company === undefined) {
+  if (!isReady || isLoading) {
     return <Skeleton className="h-48 w-full" />;
   }
 
-  if (!company) {
+  if (!selectedCompany) {
     return <p className="text-sm text-muted-foreground p-6">Compagnie introuvable.</p>;
   }
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      <CompanySalesLedger companyId={company.id} canCancel />
+      <CompanySalesLedger key={selectedCompany.id} companyId={selectedCompany.id} canCancel />
     </div>
   );
 }

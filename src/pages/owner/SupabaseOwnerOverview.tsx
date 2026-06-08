@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils.ts";
 import { motion } from "motion/react";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useAppUser } from "@/hooks/use-app-user.ts";
+import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import {
   getMyCompanySupabase,
   type OwnerCompany,
@@ -31,6 +32,7 @@ export default function SupabaseOwnerOverview() {
   const { lng } = useParams<{ lng: string }>();
   const { appUserId } = useSupabaseAuth();
   const appUser = useAppUser();
+  const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
   const [company, setCompany] = useState<OwnerCompany | null | undefined>(
     undefined,
   );
@@ -40,15 +42,24 @@ export default function SupabaseOwnerOverview() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!appUserId) return;
+    if (!appUserId || !isReady) return;
+
+    if (!companyId) {
+      setCompany(null);
+      setDashboard(null);
+      setError(null);
+      return;
+    }
 
     let cancelled = false;
+    setCompany(undefined);
+    setDashboard(undefined);
 
     void (async () => {
       try {
         const [companyRow, dashboardRow] = await Promise.all([
-          getMyCompanySupabase(appUserId),
-          getCompanyAccountingDashboardSupabase(),
+          getMyCompanySupabase(appUserId, companyId),
+          getCompanyAccountingDashboardSupabase(companyId),
         ]);
         if (!cancelled) {
           setCompany(companyRow);
@@ -67,9 +78,15 @@ export default function SupabaseOwnerOverview() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId]);
+  }, [appUserId, companyId, isReady]);
 
-  if (company === undefined || dashboard === undefined || appUser.isLoading) {
+  if (
+    !isReady ||
+    companyLoading ||
+    company === undefined ||
+    dashboard === undefined ||
+    appUser.isLoading
+  ) {
     return (
       <div className="p-6 space-y-4 max-w-6xl mx-auto">
         <Skeleton className="h-10 w-72" />

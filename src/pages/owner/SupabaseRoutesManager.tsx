@@ -33,6 +33,7 @@ import {
   EmptyContent,
 } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerRoutesSupabase,
   listOwnerRouteStationsSupabase,
@@ -186,17 +187,18 @@ function RouteDialog({
 export default function SupabaseRoutesManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [routes, setRoutes] = useState<OwnerRouteOption[] | undefined>(undefined);
   const [stations, setStations] = useState<OwnerStationOption[]>([]);
   const [showForm, setShowForm] = useState(false);
 
   const loadData = useCallback(async () => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     setRoutes(undefined);
     try {
       const [routeList, stationList] = await Promise.all([
-        listOwnerRoutesSupabase(appUserId),
-        listOwnerRouteStationsSupabase(appUserId),
+        listOwnerRoutesSupabase(appUserId, companyId),
+        listOwnerRouteStationsSupabase(appUserId, companyId),
       ]);
       setRoutes(routeList);
       setStations(stationList);
@@ -204,10 +206,16 @@ export default function SupabaseRoutesManager() {
       toast.error(err instanceof Error ? err.message : t("routes.create_error"));
       setRoutes([]);
     }
-  }, [appUserId, t]);
+  }, [appUserId, companyId, t]);
 
   useEffect(() => {
     void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onRefresh = () => void loadData();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);
 
   return (

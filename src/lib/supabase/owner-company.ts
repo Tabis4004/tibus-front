@@ -60,14 +60,25 @@ export async function resolveCompanyStaffCompanyId(
 export type OwnerCompanyOption = {
   id: string;
   name: string;
+  countryId: string | null;
+  countryName: string | null;
+  currency: string | null;
+  logo: string | null;
 };
+
+function joinedOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 export async function listOwnerCompaniesSupabase(
   appUserId: string,
 ): Promise<OwnerCompanyOption[]> {
   const { data, error } = await supabase
     .from("UserRoles")
-    .select("companyId, Role(name), Companies(id, name)")
+    .select(
+      "companyId, Role(name), Companies(id, name, logo, countryId, Countries(name, currency))",
+    )
     .eq("userId", appUserId);
 
   if (error) throw error;
@@ -80,29 +91,101 @@ export async function listOwnerCompaniesSupabase(
     const companyId = row.companyId as string | null;
     if (!companyId) continue;
 
-    const joined = Array.isArray(row.Companies) ? row.Companies[0] : row.Companies;
-    const name =
-      (joined as { name?: string } | null)?.name
-      ?? companies.get(companyId)?.name
-      ?? "Compagnie";
+    const joined = joinedOne(
+      row.Companies as
+        | {
+            name?: string;
+            logo?: string | null;
+            countryId?: string | null;
+            Countries?:
+              | { name: string; currency: string | null }
+              | { name: string; currency: string | null }[]
+              | null;
+          }
+        | {
+            name?: string;
+            logo?: string | null;
+            countryId?: string | null;
+            Countries?:
+              | { name: string; currency: string | null }
+              | { name: string; currency: string | null }[]
+              | null;
+          }[]
+        | null,
+    );
+    const country = joinedOne(joined?.Countries ?? null);
+    const name = joined?.name ?? companies.get(companyId)?.name ?? "Compagnie";
 
-    companies.set(companyId, { id: companyId, name });
+    companies.set(companyId, {
+      id: companyId,
+      name,
+      countryId: (joined?.countryId as string | null) ?? null,
+      countryName: country?.name ?? null,
+      currency: country?.currency ?? null,
+      logo: (joined?.logo as string | null) ?? null,
+    });
   }
 
-  return [...companies.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...companies.values()].sort((a, b) => {
+    const countryCompare = (a.countryName ?? "").localeCompare(b.countryName ?? "");
+    if (countryCompare !== 0) return countryCompare;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+async function readStoredActiveOwnerCompanyId(
+  appUserId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("Users")
+    .select("activeOwnerCompanyId")
+    .eq("id", appUserId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "42703") return null;
+    throw error;
+  }
+
+  return (data?.activeOwnerCompanyId as string | null) ?? null;
 }
 
 export async function resolveOwnerCompanyId(
   appUserId: string,
+  preferredCompanyId?: string | null,
 ): Promise<string | null> {
   const companies = await listOwnerCompaniesSupabase(appUserId);
+  if (!companies.length) return null;
+
+  if (
+    preferredCompanyId &&
+    companies.some((company) => company.id === preferredCompanyId)
+  ) {
+    return preferredCompanyId;
+  }
+
+  const storedActive = await readStoredActiveOwnerCompanyId(appUserId);
+  if (storedActive && companies.some((company) => company.id === storedActive)) {
+    return storedActive;
+  }
+
   return companies[0]?.id ?? null;
+}
+
+export async function setOwnerActiveCompanySupabase(
+  companyId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_owner_active_company", {
+    p_company_id: companyId,
+  });
+  if (error) throw error;
 }
 
 export async function getOwnerCompanyDetailsSupabase(
   appUserId: string,
+  preferredCompanyId?: string | null,
 ): Promise<OwnerCompanyDetails | null> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
+  const companyId = await resolveOwnerCompanyId(appUserId, preferredCompanyId);
   if (!companyId) return null;
 
   const { data, error } = await supabase
@@ -187,8 +270,9 @@ export async function getCompanyForAppUserSupabase(
 
 export async function getMyCompanySupabase(
   appUserId: string,
+  preferredCompanyId?: string | null,
 ): Promise<OwnerCompany | null> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
+  const companyId = await resolveOwnerCompanyId(appUserId, preferredCompanyId);
   if (!companyId) return null;
 
   const { data, error } = await supabase
@@ -221,8 +305,9 @@ export async function getMyCompanySupabase(
 
 export async function getOwnerKPIsSupabase(
   appUserId: string,
+  preferredCompanyId?: string | null,
 ): Promise<OwnerKPIs | null> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
+  const companyId = await resolveOwnerCompanyId(appUserId, preferredCompanyId);
   if (!companyId) return null;
 
   const now = new Date().toISOString();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { CheckIcon, ExternalLinkIcon, LandmarkIcon, XIcon } from "lucide-react";
@@ -41,6 +42,7 @@ export default function GuaranteeFundPanel({
   canValidateDeposits?: boolean;
   canConfigureNegative?: boolean;
 }) {
+  const { t } = useTranslation("owner");
   const [fund, setFund] = useState<CompanyGuaranteeFund | null | undefined>(undefined);
   const [ledger, setLedger] = useState<GuaranteeLedgerRow[] | undefined>(undefined);
   const [deposits, setDeposits] = useState<GuaranteeDepositRow[] | undefined>(undefined);
@@ -52,23 +54,24 @@ export default function GuaranteeFundPanel({
     setFund(undefined);
     setLedger(undefined);
     setDeposits(undefined);
-    void Promise.all([
-      getCompanyGuaranteeFundSupabase(companyId),
-      listCompanyGuaranteeLedgerSupabase(companyId, 200),
-      listCompanyGuaranteeDepositsSupabase(companyId),
-    ])
-      .then(([nextFund, nextLedger, nextDeposits]) => {
+
+    void getCompanyGuaranteeFundSupabase(companyId)
+      .then((nextFund) => {
         setFund(nextFund);
-        setLedger(nextLedger);
-        setDeposits(nextDeposits);
         setAllowNegative(nextFund.allowNegative);
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Chargement impossible");
         setFund(null);
-        setLedger([]);
-        setDeposits([]);
       });
+
+    void listCompanyGuaranteeLedgerSupabase(companyId, 200)
+      .then(setLedger)
+      .catch(() => setLedger([]));
+
+    void listCompanyGuaranteeDepositsSupabase(companyId)
+      .then(setDeposits)
+      .catch(() => setDeposits([]));
   };
 
   useEffect(() => {
@@ -141,9 +144,18 @@ export default function GuaranteeFundPanel({
 
   if (!fund) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Fond de garantie indisponible. Exécutez les scripts SQL 028 et 029.
-      </p>
+      <div className="rounded-xl border border-dashed p-6 text-center space-y-3">
+        <LandmarkIcon className="w-8 h-8 text-muted-foreground mx-auto" />
+        <p className="text-sm text-muted-foreground">
+          {t("console.guarantee_unavailable", {
+            defaultValue:
+              "Le module fond de garantie n'est pas encore activé sur cette base. Exécutez les scripts SQL 028 et 029 sur Supabase.",
+          })}
+        </p>
+        <Button variant="secondary" size="sm" onClick={load}>
+          {t("buttons.retry", { ns: "common", defaultValue: "Réessayer" })}
+        </Button>
+      </div>
     );
   }
 

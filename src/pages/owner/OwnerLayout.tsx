@@ -32,8 +32,11 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAppUser } from "@/hooks/use-app-user.ts";
+import { canAccessGuaranteeFund } from "@/lib/owner-console-modules.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getMyCompanySupabase, type OwnerCompany } from "@/lib/supabase/owner-company";
+import { OwnerCompanyProvider, useOwnerCompany } from "@/hooks/use-owner-company.tsx";
+import OwnerCompanySwitcher from "./_components/OwnerCompanySwitcher.tsx";
 
 type NavItem = {
   toSuffix: string;
@@ -163,6 +166,7 @@ function ConvexSidebarContent({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const company = useQuery(api.companies.getMyCompany, {});
+  const appUser = useAppUser();
 
   return (
     <div className="flex flex-col h-full py-4">
@@ -172,7 +176,13 @@ function ConvexSidebarContent({ onClose }: { onClose?: () => void }) {
         planLabel={company?.subscriptionStatus && company.subscriptionStatus !== "none" ? company.planId?.toUpperCase() ?? null : null}
         noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
       />
-      <OwnerSidebarNav onClose={onClose} lng={lng} t={t} />
+      <OwnerSidebarNav
+        onClose={onClose}
+        lng={lng}
+        t={t}
+        roles={appUser.roles}
+        isSuperAdmin={appUser.isSuperAdmin}
+      />
     </div>
   );
 }
@@ -180,42 +190,38 @@ function ConvexSidebarContent({ onClose }: { onClose?: () => void }) {
 function SupabaseSidebarContent({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
-  const { appUserId } = useSupabaseAuth();
-  const [company, setCompany] = useState<OwnerCompany | null | undefined>(undefined);
-
-  useEffect(() => {
-    if (!appUserId) {
-      setCompany(null);
-      return;
-    }
-    let cancelled = false;
-    void getMyCompanySupabase(appUserId)
-      .then((result) => {
-        if (!cancelled) setCompany(result);
-      })
-      .catch(() => {
-        if (!cancelled) setCompany(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [appUserId]);
+  const { selectedCompany, isLoading } = useOwnerCompany();
+  const appUser = useAppUser();
 
   return (
     <div className="flex flex-col h-full py-4">
-      {company === undefined ? (
+      <OwnerCompanySwitcher />
+      {isLoading ? (
         <div className="px-3 mb-5">
           <Skeleton className="h-16 w-full rounded-xl" />
         </div>
+      ) : selectedCompany ? (
+        <SidebarCompanyCard
+          name={selectedCompany.name}
+          logoUrl={selectedCompany.logo}
+          planLabel={selectedCompany.countryName ?? null}
+          noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
+        />
       ) : (
         <SidebarCompanyCard
-          name={company?.name ?? t("sidebar.my_company")}
-          logoUrl={company?.logo ?? null}
+          name={t("sidebar.my_company")}
+          logoUrl={null}
           planLabel={null}
           noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
         />
       )}
-      <OwnerSidebarNav onClose={onClose} lng={lng} t={t} />
+      <OwnerSidebarNav
+        onClose={onClose}
+        lng={lng}
+        t={t}
+        roles={appUser.roles}
+        isSuperAdmin={appUser.isSuperAdmin}
+      />
     </div>
   );
 }
@@ -224,20 +230,37 @@ function OwnerSidebarNav({
   onClose,
   lng,
   t,
+  roles,
+  isSuperAdmin,
 }: {
   onClose?: () => void;
   lng?: string;
   t: (key: string, options?: Record<string, string>) => string;
+  roles?: string[];
+  isSuperAdmin?: boolean;
 }) {
+  const canSeeGuaranteeFund =
+    roles && isSuperAdmin !== undefined
+      ? canAccessGuaranteeFund(roles, isSuperAdmin)
+      : true;
+
   return (
     <nav className="flex-1 px-3 space-y-5 overflow-y-auto">
-      {getNavSections().map((section) => (
+      {getNavSections().map((section) => {
+        const items = section.items.filter((item) => {
+          if (item.toSuffix === "/owner/guarantee-fund") return canSeeGuaranteeFund;
+          if (item.toSuffix === "/owner/cash-register") return canSeeGuaranteeFund;
+          return true;
+        });
+        if (items.length === 0) return null;
+
+        return (
         <div key={section.titleKey}>
           <p className="text-[10px] uppercase font-bold tracking-wider text-sidebar-foreground/40 px-3 mb-1.5">
             {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
           </p>
           <div className="space-y-0.5">
-            {section.items.map(({ toSuffix, labelKey, icon: Icon, end }) => (
+            {items.map(({ toSuffix, labelKey, icon: Icon, end }) => (
               <NavLink
                 key={toSuffix}
                 to={`/${lng}${toSuffix}`}
@@ -272,7 +295,8 @@ function OwnerSidebarNav({
             ))}
           </div>
         </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
@@ -379,9 +403,11 @@ function SupabaseOwnerLayout() {
   }
 
   return (
-    <OwnerLayoutShell>
-      <Outlet />
-    </OwnerLayoutShell>
+    <OwnerCompanyProvider>
+      <OwnerLayoutShell>
+        <Outlet />
+      </OwnerLayoutShell>
+    </OwnerCompanyProvider>
   );
 }
 

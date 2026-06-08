@@ -118,11 +118,12 @@ async function companyTrajetIds(companyId: string): Promise<string[]> {
 
 export async function listOwnerRoutesSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerRouteOption[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
-  const trajetIds = await companyTrajetIds(companyId);
+  const trajetIds = await companyTrajetIds(resolvedCompanyId);
   if (!trajetIds.length) return [];
 
   const { data: trajets, error: trajetsError } = await supabase
@@ -157,7 +158,7 @@ export async function listOwnerRoutesSupabase(
   const { data: company, error: companyError } = await supabase
     .from("Companies")
     .select("countryId")
-    .eq("id", companyId)
+    .eq("id", resolvedCompanyId)
     .single();
 
   if (companyError) throw companyError;
@@ -202,14 +203,15 @@ export async function listOwnerRoutesSupabase(
 
 export async function listOwnerRouteStationsSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerStationOption[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
   const { data, error } = await supabase
     .from("Gares")
     .select("id, name")
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .order("name");
 
   if (error) throw error;
@@ -243,14 +245,15 @@ export async function createOwnerRouteSupabase(input: {
 
 export async function listOwnerBusesSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerBusOption[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
   const { data, error } = await supabase
     .from("Bus")
     .select("id, model, registrationNumber, capacity")
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .eq("isActive", true)
     .order("registrationNumber");
 
@@ -266,11 +269,14 @@ export async function listOwnerBusesSupabase(
 
 export async function listOwnerDeparturesSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerDeparture[]> {
-  const companyId = await resolveCompanyStaffCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId =
+    (await resolveOwnerCompanyId(appUserId, companyId))
+    ?? (await resolveCompanyStaffCompanyId(appUserId));
+  if (!resolvedCompanyId) return [];
 
-  const trajetIds = await companyTrajetIds(companyId);
+  const trajetIds = await companyTrajetIds(resolvedCompanyId);
   if (!trajetIds.length) return [];
 
   const { data: reservations, error: resError } = await supabase
@@ -346,7 +352,7 @@ export async function listOwnerDeparturesSupabase(
   const { data: company, error: companyError } = await supabase
     .from("Companies")
     .select("countryId")
-    .eq("id", companyId)
+    .eq("id", resolvedCompanyId)
     .single();
 
   if (companyError) throw companyError;
@@ -446,12 +452,13 @@ export async function listOwnerDeparturesSupabase(
 
 export async function createOwnerDepartureSupabase(input: {
   appUserId: string;
+  companyId?: string | null;
   trajetId: string;
   busId: string;
   departureIso: string;
   capacity: number;
 }): Promise<string> {
-  const companyId = await resolveOwnerCompanyId(input.appUserId);
+  const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
   const trajetIds = await companyTrajetIds(companyId);
@@ -503,13 +510,14 @@ export async function createOwnerDepartureSupabase(input: {
 
 export async function updateOwnerDepartureSupabase(input: {
   appUserId: string;
+  companyId?: string | null;
   reservationId: string;
   departureIso: string;
   capacity: number;
   busId?: string;
   trajetId?: string;
 }): Promise<void> {
-  const companyId = await resolveOwnerCompanyId(input.appUserId);
+  const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
   const booked = await countIssuedSeats(input.reservationId);
@@ -550,14 +558,15 @@ export async function updateOwnerDepartureSupabase(input: {
 export async function deleteOwnerDepartureSupabase(
   appUserId: string,
   reservationId: string,
+  companyId?: string | null,
 ): Promise<void> {
   const booked = await countIssuedSeats(reservationId);
   if (booked > 0) {
     throw new Error("Impossible de supprimer un départ avec des billets payés");
   }
 
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) throw new Error("Compagnie introuvable");
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) throw new Error("Compagnie introuvable");
 
   const { error } = await supabase
     .from("Reservations")

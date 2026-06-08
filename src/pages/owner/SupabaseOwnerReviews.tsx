@@ -17,6 +17,7 @@ import {
 import StarRating from "@/components/ui/star-rating.tsx";
 import { toast } from "sonner";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerReviewsSupabase,
   replyToReviewSupabase,
@@ -27,6 +28,7 @@ export default function SupabaseOwnerReviews() {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const dateLocale = lng === "fr" ? fr : enUS;
   const [reviews, setReviews] = useState<OwnerReviewRow[] | undefined>(undefined);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -34,18 +36,24 @@ export default function SupabaseOwnerReviews() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadReviews = useCallback(async () => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     setReviews(undefined);
     try {
-      setReviews(await listOwnerReviewsSupabase(appUserId));
+      setReviews(await listOwnerReviewsSupabase(appUserId, companyId));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("reviews.reply_error"));
       setReviews([]);
     }
-  }, [appUserId, t]);
+  }, [appUserId, companyId, t]);
 
   useEffect(() => {
     void loadReviews();
+  }, [loadReviews]);
+
+  useEffect(() => {
+    const onRefresh = () => void loadReviews();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadReviews]);
 
   const handleReply = async (reviewId: string) => {

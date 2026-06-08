@@ -14,6 +14,7 @@ import {
   MapPinIcon,
 } from "lucide-react";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -56,6 +57,7 @@ function fmt(iso: string, pattern: string) {
 export default function SupabasePromoCodesPage() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [codes, setCodes] = useState<OwnerPromoCode[] | undefined>(undefined);
   const [routes, setRoutes] = useState<{ id: string; originName: string; destName: string }[]>([]);
 
@@ -70,6 +72,10 @@ export default function SupabasePromoCodesPage() {
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(() => {
+    if (!companyId) {
+      setCodes([]);
+      return;
+    }
     setCodes(undefined);
     void listOwnerPromoCodesSupabase()
       .then(setCodes)
@@ -77,20 +83,26 @@ export default function SupabasePromoCodesPage() {
         toast.error(err instanceof Error ? err.message : t("promo.load_error", { defaultValue: "Chargement impossible" }));
         setCodes([]);
       });
-  }, [t]);
+  }, [companyId, t]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    if (!appUserId) return;
-    void listOwnerRoutesSupabase(appUserId)
+    const onRefresh = () => load();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+  }, [load]);
+
+  useEffect(() => {
+    if (!appUserId || !companyId) return;
+    void listOwnerRoutesSupabase(appUserId, companyId)
       .then((rows) =>
         setRoutes(rows.map((r) => ({ id: r.id, originName: r.originName, destName: r.destName }))),
       )
       .catch(() => setRoutes([]));
-  }, [appUserId]);
+  }, [appUserId, companyId]);
 
   const resetForm = () => {
     setNewCode("");

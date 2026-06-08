@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/empty.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerFleetBusesSupabase,
   createOwnerBusSupabase,
@@ -64,11 +65,13 @@ type BusFormData = z.infer<typeof busSchema>;
 function BusFormDialog({
   bus,
   appUserId,
+  companyId,
   onClose,
   onSaved,
 }: {
   bus?: SupabaseOwnerBus;
   appUserId: string;
+  companyId: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -95,13 +98,14 @@ function BusFormDialog({
       if (bus) {
         await updateOwnerBusSupabase({
           appUserId,
+          companyId,
           busId: bus.id,
           ...data,
           isActive,
         });
         toast.success(t("fleet.updated"));
       } else {
-        await createOwnerBusSupabase({ appUserId, ...data });
+        await createOwnerBusSupabase({ appUserId, companyId, ...data });
         toast.success(t("fleet.added"));
       }
       onSaved();
@@ -170,30 +174,37 @@ function BusFormDialog({
 export default function SupabaseFleetManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [buses, setBuses] = useState<SupabaseOwnerBus[] | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
   const [editBus, setEditBus] = useState<SupabaseOwnerBus | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     setBuses(undefined);
     try {
-      setBuses(await listOwnerFleetBusesSupabase(appUserId));
+      setBuses(await listOwnerFleetBusesSupabase(appUserId, companyId));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("fleet.save_error"));
       setBuses([]);
     }
-  }, [appUserId, t]);
+  }, [appUserId, companyId, t]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const onRefresh = () => void loadData();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+  }, [loadData]);
+
   const handleDelete = async () => {
     if (!deleteId || !appUserId) return;
     try {
-      await deleteOwnerBusSupabase(appUserId, deleteId);
+      await deleteOwnerBusSupabase(appUserId, deleteId, companyId);
       toast.success(t("fleet.removed"));
       void loadData();
     } catch (err) {
@@ -288,10 +299,11 @@ export default function SupabaseFleetManager() {
         </div>
       )}
 
-      {(showForm || editBus) && appUserId && (
+      {(showForm || editBus) && appUserId && companyId && (
         <BusFormDialog
           bus={editBus ?? undefined}
           appUserId={appUserId}
+          companyId={companyId}
           onClose={() => {
             setShowForm(false);
             setEditBus(null);

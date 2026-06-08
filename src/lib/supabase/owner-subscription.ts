@@ -25,14 +25,15 @@ function joinedOne<T>(value: T | T[] | null | undefined): T | null {
 
 export async function listOwnerSubscriptionPlansSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerSubscriptionPlan[]> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return [];
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
 
   const { data: company, error: companyError } = await supabase
     .from("Companies")
     .select("countryId")
-    .eq("id", companyId)
+    .eq("id", resolvedCompanyId)
     .maybeSingle();
 
   if (companyError) throw companyError;
@@ -83,16 +84,17 @@ export async function listOwnerSubscriptionPlansSupabase(
 
 export async function getOwnerActiveSubscriptionSupabase(
   appUserId: string,
+  companyId?: string | null,
 ): Promise<OwnerActiveSubscription | null> {
-  const companyId = await resolveOwnerCompanyId(appUserId);
-  if (!companyId) return null;
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return null;
 
   const { data, error } = await supabase
     .from("Subscriptions")
     .select(
       "id, endDate, SubscriptionPlans(name), SubscriptionPlanDurations(price, duration)",
     )
-    .eq("companyId", companyId)
+    .eq("companyId", resolvedCompanyId)
     .order("endDate", { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -48,6 +48,7 @@ import {
   EmptyContent,
 } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerSellersSupabase,
   findAssignableCompanyUserByEmailSupabase,
@@ -185,23 +186,30 @@ function AddSellerDialog({
 export default function SupabaseSellersManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
+  const { companyId } = useOwnerCompany();
   const [sellers, setSellers] = useState<SupabaseOwnerSeller[] | undefined>(undefined);
   const [showAdd, setShowAdd] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<SupabaseOwnerSeller | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!appUserId) return;
+    if (!appUserId || !companyId) return;
     setSellers(undefined);
     try {
-      setSellers(await listOwnerSellersSupabase(appUserId));
+      setSellers(await listOwnerSellersSupabase(appUserId, companyId));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("sellers.remove_error"));
       setSellers([]);
     }
-  }, [appUserId, t]);
+  }, [appUserId, companyId, t]);
 
   useEffect(() => {
     void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onRefresh = () => void loadData();
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);
 
   const handleRemove = async () => {
@@ -211,6 +219,7 @@ export default function SupabaseSellersManager() {
         appUserId,
         removeTarget.id,
         removeTarget.roleName,
+        companyId,
       );
       toast.success(t("sellers.removed"));
       void loadData();

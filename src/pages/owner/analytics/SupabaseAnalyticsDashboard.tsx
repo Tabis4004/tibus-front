@@ -32,6 +32,7 @@ import {
   type CompanyAccountingDashboard,
   type CompanyRecentBooking,
 } from "@/lib/supabase/accounting";
+import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 
 function statusVariant(status: string) {
   switch (status) {
@@ -172,17 +173,27 @@ function RecentBookingsTable({ bookings }: { bookings: CompanyRecentBooking[] })
 export default function SupabaseAnalyticsDashboard() {
   const { t } = useTranslation("analytics");
   const { lng } = useParams<{ lng: string }>();
+  const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
   const [dashboard, setDashboard] = useState<CompanyAccountingDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isReady) return;
+
+    if (!companyId) {
+      setDashboard(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
       try {
         setLoading(true);
-        const data = await getCompanyAccountingDashboardSupabase();
+        const data = await getCompanyAccountingDashboardSupabase(companyId);
         if (!cancelled) {
           setDashboard(data);
           setError(null);
@@ -200,7 +211,26 @@ export default function SupabaseAnalyticsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [companyId, isReady]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    const onRefresh = () => {
+      setLoading(true);
+      void getCompanyAccountingDashboardSupabase(companyId)
+        .then((data) => {
+          setDashboard(data);
+          setError(null);
+        })
+        .catch((err) => {
+          setDashboard(null);
+          setError(err instanceof Error ? err.message : "Erreur de chargement");
+        })
+        .finally(() => setLoading(false));
+    };
+    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
+  }, [companyId, isReady]);
 
   if (loading) {
     return (

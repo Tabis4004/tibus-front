@@ -134,37 +134,104 @@ export async function getGuaranteeDepositReceiptUrl(path: string): Promise<strin
   return data.signedUrl;
 }
 
+function mapFundPayload(
+  payload: Record<string, unknown>,
+  companyId: string,
+): CompanyGuaranteeFund {
+  const recent = Array.isArray(payload.recent)
+    ? (payload.recent as Record<string, unknown>[]).map((row) => ({
+        id: String(row.id),
+        createdAt: String(row.createdAt ?? row.created_at ?? ""),
+        type: String(row.type) as GuaranteeLedgerType,
+        amount: num(row.amount),
+        balanceAfter: num(row.balanceAfter ?? row.balance_after),
+        reference: row.reference ? String(row.reference) : null,
+        bookingId: row.bookingId || row.booking_id ? String(row.bookingId ?? row.booking_id) : null,
+        note: row.note ? String(row.note) : null,
+        authorName: row.authorName || row.author_name ? String(row.authorName ?? row.author_name) : null,
+      }))
+    : [];
+
+  return {
+    companyId: String(payload.companyId ?? payload.company_id ?? companyId),
+    balance: num(payload.balance),
+    currency: String(payload.currency ?? "XOF"),
+    allowNegative: Boolean(payload.allowNegative ?? payload.allow_negative),
+    pendingDeposits: num(payload.pendingDeposits ?? payload.pending_deposits),
+    recent,
+  };
+}
+
+function countryFromJoin(
+  value:
+    | { currency?: string | null }
+    | { currency?: string | null }[]
+    | null
+    | undefined,
+): string {
+  if (!value) return "XOF";
+  const row = Array.isArray(value) ? value[0] : value;
+  return row?.currency ? String(row.currency) : "XOF";
+}
+
+async function fetchCompanyGuaranteeFundFallback(
+  companyId: string,
+): Promise<CompanyGuaranteeFund | null> {
+  const { data, error } = await supabase
+    .from("Companies")
+    .select("id, guaranteeBalance, guaranteeAllowNegative, Countries(currency)")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (!error && data) {
+    return {
+      companyId: String(data.id),
+      balance: num(data.guaranteeBalance),
+      currency: countryFromJoin(
+        data.Countries as { currency?: string | null } | { currency?: string | null }[] | null,
+      ),
+      allowNegative: Boolean(data.guaranteeAllowNegative),
+      pendingDeposits: 0,
+      recent: [],
+    };
+  }
+
+  const { data: companyOnly, error: companyError } = await supabase
+    .from("Companies")
+    .select("id, Countries(currency)")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (companyError || !companyOnly) return null;
+
+  return {
+    companyId: String(companyOnly.id),
+    balance: 0,
+    currency: countryFromJoin(
+      companyOnly.Countries as { currency?: string | null } | { currency?: string | null }[] | null,
+    ),
+    allowNegative: false,
+    pendingDeposits: 0,
+    recent: [],
+  };
+}
+
 export async function getCompanyGuaranteeFundSupabase(
   companyId: string,
 ): Promise<CompanyGuaranteeFund> {
   const { data, error } = await supabase.rpc("get_company_guarantee_fund", {
     p_company_id: companyId,
   });
+
+  if (!error && data) {
+    return mapFundPayload((data ?? {}) as Record<string, unknown>, companyId);
+  }
+
+  const fallback = await fetchCompanyGuaranteeFundFallback(companyId);
+  if (fallback) return fallback;
+
   if (error) throw error;
-
-  const payload = (data ?? {}) as Record<string, unknown>;
-  const recent = Array.isArray(payload.recent)
-    ? (payload.recent as Record<string, unknown>[]).map((row) => ({
-        id: String(row.id),
-        createdAt: String(row.createdAt ?? ""),
-        type: String(row.type) as GuaranteeLedgerType,
-        amount: num(row.amount),
-        balanceAfter: num(row.balanceAfter),
-        reference: row.reference ? String(row.reference) : null,
-        bookingId: row.bookingId ? String(row.bookingId) : null,
-        note: row.note ? String(row.note) : null,
-        authorName: row.authorName ? String(row.authorName) : null,
-      }))
-    : [];
-
-  return {
-    companyId: String(payload.companyId ?? companyId),
-    balance: num(payload.balance),
-    currency: String(payload.currency ?? "XOF"),
-    allowNegative: Boolean(payload.allowNegative),
-    pendingDeposits: num(payload.pendingDeposits),
-    recent,
-  };
+  throw new Error("Fond de garantie introuvable");
 }
 
 export async function listCompanyGuaranteeLedgerSupabase(

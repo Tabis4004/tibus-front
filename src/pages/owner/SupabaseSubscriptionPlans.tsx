@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import {
   getOwnerActiveSubscriptionSupabase,
   listOwnerSubscriptionPlansSupabase,
@@ -27,15 +28,25 @@ export default function SupabaseSubscriptionPlans() {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const { appUserId } = useSupabaseAuth();
+  const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
   const [active, setActive] = useState<OwnerActiveSubscription | null | undefined>(undefined);
   const [plans, setPlans] = useState<OwnerSubscriptionPlan[] | undefined>(undefined);
 
   useEffect(() => {
-    if (!appUserId) return;
+    if (!appUserId || !isReady) return;
+
+    if (!companyId) {
+      setActive(null);
+      setPlans([]);
+      return;
+    }
+
     let cancelled = false;
+    setActive(undefined);
+    setPlans(undefined);
     void Promise.all([
-      getOwnerActiveSubscriptionSupabase(appUserId),
-      listOwnerSubscriptionPlansSupabase(appUserId),
+      getOwnerActiveSubscriptionSupabase(appUserId, companyId),
+      listOwnerSubscriptionPlansSupabase(appUserId, companyId),
     ])
       .then(([sub, planList]) => {
         if (!cancelled) {
@@ -52,9 +63,9 @@ export default function SupabaseSubscriptionPlans() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId]);
+  }, [appUserId, companyId, isReady]);
 
-  if (active === undefined || plans === undefined) {
+  if (active === undefined || plans === undefined || !isReady || companyLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
         <Skeleton className="h-8 w-56" />
