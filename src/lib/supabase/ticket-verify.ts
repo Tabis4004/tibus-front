@@ -244,6 +244,22 @@ export async function verifyTicketQrSupabase(input: {
   }
 }
 
+export async function verifyTicketByReferenceSupabase(
+  reference: string,
+): Promise<VerifiedTicket | null> {
+  try {
+    const result = await verifyTicketQrSupabase({
+      reference,
+      manualReference: true,
+      recordBoarding: false,
+    });
+    if (result.result === "not_found" && !result.bookingReference) return null;
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 export async function confirmPassengerOnBoardSupabase(reference: string): Promise<VerifiedTicket> {
   const normalized = normalizeTicketReference(reference);
   const { data, error } = await supabase.rpc("confirm_passenger_on_board", {

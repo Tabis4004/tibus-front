@@ -129,7 +129,7 @@ export default function QrScanner({ onScan, paused = false }: QrScannerProps) {
             qrbox: { width: 260, height: 260 },
             aspectRatio: 1,
           },
-          (decoded) => {
+          (decoded: string) => {
             if (paused) return;
             if (!decoded || decoded === lastScanRef.current) return;
             lastScanRef.current = decoded;

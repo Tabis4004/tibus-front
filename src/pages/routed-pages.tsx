@@ -5,11 +5,14 @@ import { SupabaseMigrationNotice } from "@/components/SupabaseMigrationNotice.ts
 import AdminPanelPage from "./admin/AdminPanel.tsx";
 import SupabaseAdminPanel from "./admin/SupabaseAdminPanel.tsx";
 import AdminCompanyManagerPage from "./admin/AdminCompanyManager.tsx";
+import SupabaseAdminCompanyManager from "./admin/SupabaseAdminCompanyManager.tsx";
 import BecomeOwnerPage from "./BecomeOwner.tsx";
+import SupabaseBecomeOwner from "./SupabaseBecomeOwner.tsx";
 import ContactPageConvex from "./contact/page.tsx";
 import SupabaseContactPage from "./contact/SupabaseContactPage.tsx";
 import GuidePage from "./guide/page.tsx";
 import CompleteProfilePage from "./profile/CompleteProfile.tsx";
+import SupabaseCompleteProfile from "./profile/SupabaseCompleteProfile.tsx";
 import SellerDashboardPage from "./seller/SellerDashboard.tsx";
 import SupabaseSellerDashboard from "./seller/SupabaseSellerDashboard.tsx";
 import OwnerOverviewPage from "./owner/OwnerOverview.tsx";
@@ -17,19 +20,29 @@ import SupabaseOwnerOverview from "./owner/SupabaseOwnerOverview.tsx";
 import CompanySettingsPage from "./owner/CompanySettings.tsx";
 import SupabaseCompanySettings from "./owner/SupabaseCompanySettings.tsx";
 import FleetManagerPage from "./owner/FleetManager.tsx";
+import SupabaseFleetManager from "./owner/SupabaseFleetManager.tsx";
 import StationsManagerPage from "./owner/StationsManager.tsx";
+import SupabaseStationsManager from "./owner/SupabaseStationsManager.tsx";
 import RoutesManagerPage from "./owner/RoutesManager.tsx";
+import SupabaseRoutesManager from "./owner/SupabaseRoutesManager.tsx";
 import TripsManagerPage from "./owner/TripsManager.tsx";
 import SupabaseTripsManager from "./owner/SupabaseTripsManager.tsx";
 import SellersManagerPage from "./owner/SellersManager.tsx";
+import SupabaseSellersManager from "./owner/SupabaseSellersManager.tsx";
 import SubscriptionPlansPage from "./owner/SubscriptionPlans.tsx";
+import SupabaseSubscriptionPlans from "./owner/SupabaseSubscriptionPlans.tsx";
 import SubscriptionSuccessPage from "./owner/SubscriptionSuccess.tsx";
+import SupabaseSubscriptionSuccess from "./owner/SupabaseSubscriptionSuccess.tsx";
 import AnalyticsDashboardPage from "./owner/analytics/page.tsx";
 import SupabaseAnalyticsDashboard from "./owner/analytics/SupabaseAnalyticsDashboard.tsx";
 import TicketReportsPage from "./owner/analytics/tickets/page.tsx";
+import SupabaseTicketReports from "./owner/analytics/SupabaseTicketReports.tsx";
 import TripReportsPage from "./owner/analytics/trips/page.tsx";
+import SupabaseTripReports from "./owner/analytics/SupabaseTripReports.tsx";
 import TravelersPageConvex from "./owner/analytics/travelers/page.tsx";
+import SupabaseTravelersReport from "./owner/analytics/SupabaseTravelersReport.tsx";
 import OwnerReviewsPage from "./owner/OwnerReviews.tsx";
+import SupabaseOwnerReviews from "./owner/SupabaseOwnerReviews.tsx";
 import PromoCodesPageConvex from "./owner/promo-codes/page.tsx";
 import SupabasePromoCodesPage from "./owner/promo-codes/SupabasePromoCodesPage.tsx";
 import TravelerHomePage from "./traveler/TravelerHome.tsx";
@@ -44,7 +57,9 @@ import SupabaseBookingConfirmation from "./traveler/SupabaseBookingConfirmation.
 import PaymentVerifyPage from "./traveler/PaymentVerify.tsx";
 import SupabasePaymentVerify from "./traveler/SupabasePaymentVerify.tsx";
 import CompanyProfilePage from "./traveler/CompanyProfile.tsx";
+import SupabaseCompanyProfile from "./traveler/SupabaseCompanyProfile.tsx";
 import TicketVerifyPage from "./verify/TicketVerify.tsx";
+import SupabaseTicketVerify from "./verify/SupabaseTicketVerify.tsx";
 import TicketScannerPage from "./verify/TicketScannerPage.tsx";
 import ReferralPage from "./traveler/ReferralPage.tsx";
 import GuaranteeFundPage from "./owner/GuaranteeFundPage.tsx";
@@ -69,24 +84,14 @@ export function AdminPanel() {
 }
 
 export function AdminCompanyManager() {
-  if (isSupabaseAuth()) {
-    return (
-      <SupabaseMigrationNotice title="Gestion compagnie admin" />
-    );
-  }
-  return <AdminCompanyManagerPage />;
+  return useSupabaseBranch(
+    <SupabaseAdminCompanyManager />,
+    <AdminCompanyManagerPage />,
+  );
 }
 
 export function BecomeOwner() {
-  if (isSupabaseAuth()) {
-    return (
-      <SupabaseMigrationNotice
-        title="Devenir transporteur"
-        description="L'inscription compagnie via Supabase arrive bientôt. Contactez le support Tibus en attendant."
-      />
-    );
-  }
-  return <BecomeOwnerPage />;
+  return useSupabaseBranch(<SupabaseBecomeOwner />, <BecomeOwnerPage />);
 }
 
 export function ContactPage() {
@@ -98,15 +103,7 @@ export function GuidePageRoute() {
 }
 
 export function CompleteProfile() {
-  if (isSupabaseAuth()) {
-    return (
-      <SupabaseMigrationNotice
-        title="Compléter le profil"
-        description="Utilisez la page de connexion Supabase puis complétez votre profil depuis les paramètres utilisateur."
-      />
-    );
-  }
-  return <CompleteProfilePage />;
+  return useSupabaseBranch(<SupabaseCompleteProfile />, <CompleteProfilePage />);
 }
 
 export function SellerDashboard() {
@@ -122,24 +119,15 @@ export function CompanySettings() {
 }
 
 export function FleetManager() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Flotte / bus" />;
-  }
-  return <FleetManagerPage />;
+  return useSupabaseBranch(<SupabaseFleetManager />, <FleetManagerPage />);
 }
 
 export function StationsManager() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Gares et stations" />;
-  }
-  return <StationsManagerPage />;
+  return useSupabaseBranch(<SupabaseStationsManager />, <StationsManagerPage />);
 }
 
 export function RoutesManager() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Lignes et routes" />;
-  }
-  return <RoutesManagerPage />;
+  return useSupabaseBranch(<SupabaseRoutesManager />, <RoutesManagerPage />);
 }
 
 export function TripsManager() {
@@ -147,24 +135,18 @@ export function TripsManager() {
 }
 
 export function SellersManager() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Vendeurs et agents" />;
-  }
-  return <SellersManagerPage />;
+  return useSupabaseBranch(<SupabaseSellersManager />, <SellersManagerPage />);
 }
 
 export function SubscriptionPlans() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Abonnement compagnie" />;
-  }
-  return <SubscriptionPlansPage />;
+  return useSupabaseBranch(<SupabaseSubscriptionPlans />, <SubscriptionPlansPage />);
 }
 
 export function SubscriptionSuccess() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Abonnement confirmé" />;
-  }
-  return <SubscriptionSuccessPage />;
+  return useSupabaseBranch(
+    <SupabaseSubscriptionSuccess />,
+    <SubscriptionSuccessPage />,
+  );
 }
 
 export function AnalyticsDashboard() {
@@ -175,31 +157,19 @@ export function AnalyticsDashboard() {
 }
 
 export function TicketReports() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Rapports billets" />;
-  }
-  return <TicketReportsPage />;
+  return useSupabaseBranch(<SupabaseTicketReports />, <TicketReportsPage />);
 }
 
 export function TripReports() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Rapports trajets" />;
-  }
-  return <TripReportsPage />;
+  return useSupabaseBranch(<SupabaseTripReports />, <TripReportsPage />);
 }
 
 export function TravelersPage() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Rapports voyageurs" />;
-  }
-  return <TravelersPageConvex />;
+  return useSupabaseBranch(<SupabaseTravelersReport />, <TravelersPageConvex />);
 }
 
 export function OwnerReviews() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Avis clients" />;
-  }
-  return <OwnerReviewsPage />;
+  return useSupabaseBranch(<SupabaseOwnerReviews />, <OwnerReviewsPage />);
 }
 
 export function PromoCodesPage() {
@@ -237,14 +207,11 @@ export function PaymentVerify() {
 }
 
 export function CompanyProfile() {
-  if (isSupabaseAuth()) {
-    return <SupabaseMigrationNotice title="Profil compagnie voyageur" />;
-  }
-  return <CompanyProfilePage />;
+  return useSupabaseBranch(<SupabaseCompanyProfile />, <CompanyProfilePage />);
 }
 
 export function TicketVerify() {
-  return <TicketVerifyPage />;
+  return useSupabaseBranch(<SupabaseTicketVerify />, <TicketVerifyPage />);
 }
 
 export function ReferralPageRoute() {
