@@ -31,6 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import AdminAccessGate from "./_components/AdminAccessGate.tsx";
+import AdminAuditHub from "./_components/AdminAuditHub.tsx";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 
 type RoleRow = { id: string; name: string; scope: string | null; description: string | null };
 type CompanyRow = { id: string; name: string };
@@ -188,6 +191,12 @@ export default function AdminUserFormPage() {
         countryId: needsCountry ? countryId : undefined,
       });
       toast.success(t("users.created"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.users",
+        action: "create",
+        summary: `Utilisateur créé : ${email.trim()}`,
+        metadata: { roles: selectedRoles },
+      });
       navigate(`${base}/admin?tab=users`, { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("users.save_error"));
@@ -255,6 +264,12 @@ export default function AdminUserFormPage() {
       }
 
       toast.success(t("users.updated"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.users",
+        action: "update",
+        summary: `Utilisateur mis à jour : ${email.trim() || userId}`,
+        metadata: { userId, roles: selectedRoles },
+      });
       navigate(`${base}/admin?tab=users`, { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("users.save_error"));
@@ -263,7 +278,7 @@ export default function AdminUserFormPage() {
     }
   };
 
-  if (!appUser.isReady || !appUser.isSuperAdmin) {
+  if (!appUser.isReady || appUser.isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
         <Skeleton className="h-8 w-48" />
@@ -273,6 +288,7 @@ export default function AdminUserFormPage() {
   }
 
   return (
+    <AdminAccessGate requireSuperAdmin>
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
@@ -441,6 +457,9 @@ export default function AdminUserFormPage() {
           </div>
         </div>
       )}
+
+      <AdminAuditHub moduleKey="admin.users" />
     </div>
+    </AdminAccessGate>
   );
 }

@@ -13,6 +13,7 @@ import {
   setActivePaymentGatewaySupabase,
   type ActivePaymentGateway,
 } from "@/lib/supabase/payment-gateway.ts";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 
 export default function PaymentGatewaySettingsPanel({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation("admin");
@@ -45,6 +46,12 @@ export default function PaymentGatewaySettingsPanel({ embedded = false }: { embe
             gateway: t(`payment_gateway.options.${state.gateway}`),
           }),
         );
+        void recordPlatformAuditSupabase({
+          moduleKey: "admin.commissions.payment_gateway",
+          action: "toggle",
+          summary: `Passerelle active : ${state.gateway}`,
+          metadata: { gateway: state.gateway },
+        });
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : t("payment_gateway.save_error"));

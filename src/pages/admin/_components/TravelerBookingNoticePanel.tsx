@@ -23,6 +23,7 @@ import {
   type TravelerPaymentNotice,
   type TravelerPaymentNoticeHint,
 } from "@/lib/supabase/traveler-payment-notice.ts";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 
 type CountryOption = { id: string; name: string };
 
@@ -92,6 +93,11 @@ export default function TravelerBookingNoticePanel({
       const saved = await upsertTravelerPaymentNoticeSupabase(notice);
       setNotice(saved);
       toast.success(t("booking_notice.saved"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.booking_notice",
+        action: "update",
+        summary: `Message voyageur mis à jour : ${notice.title}`,
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("booking_notice.save_error"));
     } finally {

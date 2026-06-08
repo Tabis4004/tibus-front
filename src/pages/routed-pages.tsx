@@ -6,6 +6,7 @@ import AdminPanelPage from "./admin/AdminPanel.tsx";
 import SupabaseAdminPanel from "./admin/SupabaseAdminPanel.tsx";
 import AdminCompanyManagerPage from "./admin/AdminCompanyManager.tsx";
 import SupabaseAdminCompanyManager from "./admin/SupabaseAdminCompanyManager.tsx";
+import AdminGuaranteeFundPage from "./admin/AdminGuaranteeFundPage.tsx";
 import AdminUserFormPage from "./admin/AdminUserFormPage.tsx";
 import BecomeOwnerPage from "./BecomeOwner.tsx";
 import SupabaseBecomeOwner from "./SupabaseBecomeOwner.tsx";
@@ -98,6 +99,10 @@ export function AdminUserForm() {
     AdminUserFormPage,
     "La création et l'édition des rôles utilisateurs sont disponibles en mode Supabase.",
   );
+}
+
+export function AdminGuaranteeFund() {
+  return <AdminGuaranteeFundPage />;
 }
 
 export function BecomeOwner() {

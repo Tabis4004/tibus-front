@@ -34,6 +34,7 @@ import {
   type CommissionSetting,
   type SellerCommissionSummary,
 } from "@/lib/supabase/accounting.ts";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -61,6 +62,7 @@ import LegalPagesPanel from "./_components/LegalPagesPanel.tsx";
 import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPanel.tsx";
 import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
+import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import SupabasePlansTab from "./_components/SupabasePlansTab.tsx";
 import SupabaseSubscriptionsTab from "./_components/SupabaseSubscriptionsTab.tsx";
 
@@ -515,8 +517,6 @@ export default function SupabaseAdminPanel() {
     );
   }
 
-  if (!canAccessAdminPanel) return null;
-
   const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "users", label: t("tabs.users"), icon: UsersIcon },
     { id: "companies", label: t("tabs.companies"), icon: BuildingIcon },
@@ -538,6 +538,7 @@ export default function SupabaseAdminPanel() {
   const activeSubscriptions = data.subscriptions.filter((sub) => isActiveSubscription(sub.endDate));
 
   return (
+    <AdminAccessGate>
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -745,6 +746,7 @@ export default function SupabaseAdminPanel() {
                     <AdminCollapsibleSection
                       value="payment-gateway"
                       title={t("payment_gateway.title", { defaultValue: "Passerelle de paiement" })}
+                      auditModuleKey="admin.commissions.payment_gateway"
                     >
                       <PaymentGatewaySettingsPanel embedded />
                     </AdminCollapsibleSection>
@@ -752,6 +754,7 @@ export default function SupabaseAdminPanel() {
                   <AdminCollapsibleSection
                     value="gateway-fees"
                     title={t("gateway_fees.title", { defaultValue: "Frais passerelle" })}
+                    auditModuleKey="admin.commissions.gateway_fees"
                   >
                     <GatewayFeeSettingsPanel
                       embedded
@@ -765,6 +768,7 @@ export default function SupabaseAdminPanel() {
                     <AdminCollapsibleSection
                       value="booking-notice"
                       title={t("booking_notice.title", { defaultValue: "Message voyageur au paiement" })}
+                      auditModuleKey="admin.commissions.booking_notice"
                     >
                       <TravelerBookingNoticePanel
                         embedded
@@ -915,6 +919,7 @@ export default function SupabaseAdminPanel() {
         />
       )}
     </div>
+    </AdminAccessGate>
   );
 }
 
@@ -1036,6 +1041,15 @@ function CommissionSettingsManager({
         paidBy: draft.paidBy,
       });
       toast.success(t("commissions.updated"));
+      void recordPlatformAuditSupabase({
+        moduleKey:
+          setting.scope === "country"
+            ? "admin.commissions.country_rates"
+            : "admin.commissions.company_overrides",
+        action: "update",
+        summary: `Commission ${setting.countryName ?? setting.companyName ?? ""} → ${rate}% (${draft.paidBy})`,
+        metadata: { scope: setting.scope, rate, paidBy: draft.paidBy },
+      });
       setDrafts((current) => {
         const next = { ...current };
         delete next[key];
@@ -1057,6 +1071,15 @@ function CommissionSettingsManager({
     try {
       await deleteCommissionSettingSupabase(setting.id);
       toast.success(t("commissions.deleted", { defaultValue: "Commission supprimée." }));
+      void recordPlatformAuditSupabase({
+        moduleKey:
+          setting.scope === "country"
+            ? "admin.commissions.country_rates"
+            : "admin.commissions.company_overrides",
+        action: "delete",
+        summary: `Commission supprimée : ${setting.countryName ?? setting.companyName ?? ""}`,
+        metadata: { scope: setting.scope, settingId: setting.id },
+      });
       onChanged();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("commissions.update_error"));
@@ -1084,6 +1107,13 @@ function CommissionSettingsManager({
         paidBy: companyPaidBy,
       });
       toast.success(t("commissions.updated"));
+      const company = companies.find((row) => row.id === companyId);
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.company_overrides",
+        action: "create",
+        summary: `Exception compagnie ${company?.name ?? companyId} → ${rate}% (${companyPaidBy})`,
+        metadata: { companyId, rate, paidBy: companyPaidBy },
+      });
       setCompanyId("__none");
       setCompanyRate("0");
       setCompanyPaidBy("company");
@@ -1101,6 +1131,7 @@ function CommissionSettingsManager({
         value="commission-country-rates"
         title={t("commissions.country_settings", { defaultValue: "Taux par pays" })}
         count={countrySettings.length}
+        auditModuleKey="admin.commissions.country_rates"
       >
         <p className="text-xs text-muted-foreground">
           {t("commissions.country_settings_desc", {
@@ -1189,6 +1220,7 @@ function CommissionSettingsManager({
         value="commission-company-overrides"
         title={t("commissions.company_overrides", { defaultValue: "Exceptions par compagnie" })}
         count={companySettings.length}
+        auditModuleKey="admin.commissions.company_overrides"
       >
         <p className="text-xs text-muted-foreground">
             {t("commissions.company_overrides_desc", {

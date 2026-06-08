@@ -156,5 +156,41 @@
   "plans.default_trial": "Essai par défaut",
   "plans.inactive": "Inactif",
   "plans.free": "Gratuit",
-  "plans.days": "jours"
+  "plans.days": "jours",
+  "access_denied": {
+    "title": "Accès admin requis",
+    "desc": "Connectez-vous avec un compte plateforme (super admin ou admin pays) pour accéder à cette page."
+  },
+  "audit_hub": {
+    "title": "Journal HUB",
+    "empty": "Aucune action enregistrée pour cette section.",
+    "unavailable": "Journal indisponible. Appliquez le script 061_platform_audit_log.sql.",
+    "unknown_actor": "Utilisateur"
+  },
+  "users": {
+    "admin_section": "Administration utilisateurs",
+    "create_title": "Créer un utilisateur",
+    "edit_title": "Modifier l'utilisateur",
+    "create_banner": "Le compte reçoit un mot de passe temporaire. L'utilisateur pourra le changer après connexion.",
+    "first_name": "Prénom",
+    "last_name": "Nom",
+    "email": "Email",
+    "phone": "Téléphone",
+    "temp_password": "Mot de passe temporaire",
+    "password_hint": "Minimum 8 caractères recommandés.",
+    "roles_label": "Rôles",
+    "roles_multi_hint": "Cochez un ou plusieurs rôles. Les rôles compagnie exigent une entreprise.",
+    "company": "Entreprise",
+    "select_company": "Sélectionner une entreprise",
+    "country": "Pays",
+    "select_country": "Sélectionner un pays",
+    "create_btn": "Créer l'utilisateur",
+    "created": "Utilisateur créé",
+    "updated": "Utilisateur mis à jour",
+    "save_error": "Impossible d'enregistrer l'utilisateur",
+    "not_found": "Utilisateur introuvable",
+    "roles_required": "Sélectionnez au moins un rôle",
+    "company_required": "Sélectionnez une entreprise pour les rôles compagnie",
+    "country_required": "Sélectionnez un pays pour admin pays"
+  }
 }

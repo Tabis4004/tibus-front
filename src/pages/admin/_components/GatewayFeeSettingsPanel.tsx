@@ -9,6 +9,7 @@ import {
   upsertGatewayPaymentFeeSupabase,
   type GatewayPaymentFeeSetting,
 } from "@/lib/supabase/payment-fees.ts";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -111,6 +112,12 @@ export default function GatewayFeeSettingsPanel({
         fFixed: parseOptionalFeeInput(draft.fFixed),
       });
       toast.success(t("gateway_fees.saved"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.gateway_fees",
+        action: "create",
+        summary: `Frais ${draft.gateway} / ${draft.method} / ${draft.network}`,
+        metadata: { gateway: draft.gateway, countryId: draft.countryId },
+      });
       load();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("gateway_fees.save_error");
@@ -134,6 +141,12 @@ export default function GatewayFeeSettingsPanel({
         isActive: patch.isActive ?? row.isActive,
       });
       toast.success(t("gateway_fees.saved"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.gateway_fees",
+        action: "update",
+        summary: `Frais mis à jour ${row.gateway} / ${row.countryName ?? row.countryId}`,
+        metadata: { id: row.id, gateway: row.gateway },
+      });
       load();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("gateway_fees.save_error");
@@ -148,6 +161,12 @@ export default function GatewayFeeSettingsPanel({
     try {
       await deleteGatewayPaymentFeeSupabase(row.id);
       toast.success(t("gateway_fees.deleted"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.gateway_fees",
+        action: "delete",
+        summary: `Frais supprimé ${row.gateway} / ${row.countryName ?? row.countryId}`,
+        metadata: { id: row.id },
+      });
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("gateway_fees.save_error"));

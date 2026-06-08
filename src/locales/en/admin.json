@@ -156,5 +156,41 @@
   "plans.default_trial": "Default Trial",
   "plans.inactive": "Inactive",
   "plans.free": "Free",
-  "plans.days": "days"
+  "plans.days": "days",
+  "access_denied": {
+    "title": "Admin access required",
+    "desc": "Sign in with a platform account (super admin or country admin) to access this page."
+  },
+  "audit_hub": {
+    "title": "HUB log",
+    "empty": "No actions recorded for this section yet.",
+    "unavailable": "Log unavailable. Apply migration 061_platform_audit_log.sql.",
+    "unknown_actor": "User"
+  },
+  "users": {
+    "admin_section": "User administration",
+    "create_title": "Create user",
+    "edit_title": "Edit user",
+    "create_banner": "The account receives a temporary password. The user can change it after signing in.",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "email": "Email",
+    "phone": "Phone",
+    "temp_password": "Temporary password",
+    "password_hint": "At least 8 characters recommended.",
+    "roles_label": "Roles",
+    "roles_multi_hint": "Select one or more roles. Company roles require a company.",
+    "company": "Company",
+    "select_company": "Select a company",
+    "country": "Country",
+    "select_country": "Select a country",
+    "create_btn": "Create user",
+    "created": "User created",
+    "updated": "User updated",
+    "save_error": "Could not save user",
+    "not_found": "User not found",
+    "roles_required": "Select at least one role",
+    "company_required": "Select a company for company-scoped roles",
+    "country_required": "Select a country for country admin"
+  }
 }

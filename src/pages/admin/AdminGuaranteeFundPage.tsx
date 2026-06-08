@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import GuaranteeFundManager from "./_components/GuaranteeFundManager.tsx";
+import AdminAccessGate from "./_components/AdminAccessGate.tsx";
+import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 
 type CompanyRow = {
   id: string;
@@ -77,9 +79,8 @@ export default function AdminGuaranteeFundPage() {
     );
   }
 
-  if (!canAccess) return null;
-
   return (
+    <AdminAccessGate>
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -115,6 +116,8 @@ export default function AdminGuaranteeFundPage() {
       </div>
 
       <GuaranteeFundManager companies={companies} />
+      <AdminAuditHub moduleKey="admin.guarantee_fund" />
     </div>
+    </AdminAccessGate>
   );
 }

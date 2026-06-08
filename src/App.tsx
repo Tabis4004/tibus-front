@@ -16,6 +16,7 @@ import {
   AdminCompanyManager,
   AdminPanel,
   AdminUserForm,
+  AdminGuaranteeFund,
   AnalyticsDashboard,
   BecomeOwner,
   BookingConfirmation,
@@ -133,6 +134,7 @@ export default function App() {
                 <Route path="admin" element={<AdminPanel />} />
                 <Route path="admin/users/new" element={<AdminUserForm />} />
                 <Route path="admin/users/:userId/edit" element={<AdminUserForm />} />
+                <Route path="admin/guarantee-fund" element={<AdminGuaranteeFund />} />
                 <Route path="admin/company/:companyId" element={<AdminCompanyManager />} />
               </Route>
               <Route path="*" element={<NotFound />} />

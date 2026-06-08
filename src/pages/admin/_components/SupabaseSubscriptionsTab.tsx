@@ -31,6 +31,8 @@ import {
   type AdminCompanySubscriptionRow,
   type AdminSubscriptionPlan,
 } from "@/lib/supabase/admin-subscriptions.ts";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
+import AdminAuditHub from "./AdminAuditHub.tsx";
 
 type CompanyOption = {
   id: string;
@@ -134,6 +136,12 @@ export default function SupabaseSubscriptionsTab({
         durationId,
       });
       toast.success(t("sub_updated"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.subscriptions",
+        action: "assign",
+        summary: `Abonnement attribué à ${manageCompany.companyName}`,
+        metadata: { companyId: manageCompany.companyId, durationId },
+      });
       setManageCompany(null);
       await load(true);
       onDataChanged?.();
@@ -209,6 +217,9 @@ export default function SupabaseSubscriptionsTab({
             </div>
           )}
         </CardContent>
+        <div className="px-6 pb-6">
+          <AdminAuditHub moduleKey="admin.subscriptions" />
+        </div>
       </Card>
 
       <Dialog open={manageCompany !== null} onOpenChange={(open) => !open && setManageCompany(null)}>

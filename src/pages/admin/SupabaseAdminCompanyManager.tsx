@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { supabase } from "@/lib/supabase";
 import { useAppUser } from "@/hooks/use-app-user";
+import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 
 type CompanyOverview = {
   id: string;
@@ -114,6 +115,7 @@ export default function SupabaseAdminCompanyManager() {
   }
 
   return (
+    <AdminAccessGate requireSuperAdmin>
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
@@ -185,5 +187,6 @@ export default function SupabaseAdminCompanyManager() {
         </CardContent>
       </Card>
     </div>
+    </AdminAccessGate>
   );
 }

@@ -6,6 +6,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion.tsx";
 import { cn } from "@/lib/utils.ts";
+import AdminAuditHub from "./AdminAuditHub.tsx";
 
 export default function AdminCollapsibleSection({
   value,
@@ -13,12 +14,14 @@ export default function AdminCollapsibleSection({
   count,
   children,
   className,
+  auditModuleKey,
 }: {
   value: string;
   title: string;
   count?: number;
   children: ReactNode;
   className?: string;
+  auditModuleKey?: string;
 }) {
   return (
     <AccordionItem
@@ -44,7 +47,10 @@ export default function AdminCollapsibleSection({
           )}
         </span>
       </AccordionTrigger>
-      <AccordionContent className="space-y-3 border-t pb-3 pt-2">{children}</AccordionContent>
+      <AccordionContent className="space-y-3 border-t pb-3 pt-2">
+        {children}
+        {auditModuleKey ? <AdminAuditHub moduleKey={auditModuleKey} className="mt-1" /> : null}
+      </AccordionContent>
     </AccordionItem>
   );
 }
