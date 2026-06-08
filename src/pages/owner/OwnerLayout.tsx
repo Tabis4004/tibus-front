@@ -20,6 +20,12 @@ import {
   UserCheckIcon,
   MessageSquareIcon,
   TagIcon,
+  LandmarkIcon,
+  WalletIcon,
+  PackageIcon,
+  ReceiptTextIcon,
+  PercentIcon,
+  ScanLineIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -41,7 +47,7 @@ type NavSection = {
   items: NavItem[];
 };
 
-const NAV_SECTIONS: NavSection[] = [
+const CONVEX_NAV_SECTIONS: NavSection[] = [
   {
     titleKey: "sidebar.section_main",
     items: [
@@ -72,6 +78,50 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+const SUPABASE_NAV_SECTIONS: NavSection[] = [
+  {
+    titleKey: "sidebar.section_console",
+    items: [
+      { toSuffix: "/owner", labelKey: "sidebar.overview", icon: LayoutDashboardIcon, end: true },
+      { toSuffix: "/owner/sales", labelKey: "sidebar.sales", icon: ReceiptTextIcon },
+      { toSuffix: "/owner/guarantee-fund", labelKey: "sidebar.guarantee_fund", icon: LandmarkIcon },
+      { toSuffix: "/owner/cash-register", labelKey: "sidebar.cash_register", icon: WalletIcon },
+      { toSuffix: "/owner/colis", labelKey: "sidebar.colis", icon: PackageIcon },
+      { toSuffix: "/verify/scan", labelKey: "sidebar.scanner", icon: ScanLineIcon },
+    ],
+  },
+  {
+    titleKey: "sidebar.section_main",
+    items: [
+      { toSuffix: "/owner/company", labelKey: "sidebar.my_company", icon: BuildingIcon },
+      { toSuffix: "/owner/trips", labelKey: "sidebar.trips", icon: CalendarIcon },
+      { toSuffix: "/owner/promo-codes", labelKey: "sidebar.promo_codes", icon: TagIcon },
+      { toSuffix: "/owner/loyalty", labelKey: "sidebar.loyalty", icon: PercentIcon },
+      { toSuffix: "/owner/cancellation", labelKey: "sidebar.cancellation", icon: FileTextIcon },
+      { toSuffix: "/owner/messages", labelKey: "sidebar.messages", icon: MessageSquareIcon },
+    ],
+  },
+  {
+    titleKey: "sidebar.section_analytics",
+    items: [
+      { toSuffix: "/owner/analytics", labelKey: "sidebar.analytics", icon: BarChart3Icon, end: true },
+    ],
+  },
+  {
+    titleKey: "sidebar.section_operations",
+    items: [
+      { toSuffix: "/owner/buses", labelKey: "sidebar.fleet", icon: BusIcon },
+      { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
+      { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
+      { toSuffix: "/owner/sellers", labelKey: "sidebar.sellers", icon: UsersIcon },
+    ],
+  },
+];
+
+function getNavSections(): NavSection[] {
+  return isSupabaseAuth() ? SUPABASE_NAV_SECTIONS : CONVEX_NAV_SECTIONS;
+}
 
 function SidebarCompanyCard({
   name,
@@ -181,7 +231,7 @@ function OwnerSidebarNav({
 }) {
   return (
     <nav className="flex-1 px-3 space-y-5 overflow-y-auto">
-      {NAV_SECTIONS.map((section) => (
+      {getNavSections().map((section) => (
         <div key={section.titleKey}>
           <p className="text-[10px] uppercase font-bold tracking-wider text-sidebar-foreground/40 px-3 mb-1.5">
             {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
@@ -308,7 +358,9 @@ function SupabaseOwnerLayout() {
   const navigate = useNavigate();
   const appUser = useAppUser();
   const canAccess =
-    appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
+    appUser.roles.includes("owner") ||
+    appUser.roles.includes("super_admin") ||
+    appUser.roles.includes("comptable_compagnie");
 
   if (appUser.isLoading || !appUser.isReady) {
     return (

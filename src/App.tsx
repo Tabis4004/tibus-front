@@ -25,8 +25,15 @@ import {
   FleetManager,
   GuidePageRoute,
   MyBookings,
+  OwnerCancellationPolicy,
+  OwnerCashRegister,
+  OwnerColisSettings,
+  OwnerGuaranteeFund,
+  OwnerLoyalty,
+  OwnerMessages,
   OwnerOverview,
   OwnerReviews,
+  OwnerSalesLedger,
   PaymentVerify,
   PromoCodesPage,
   ReferralPageRoute,
@@ -37,6 +44,7 @@ import {
   SubscriptionPlans,
   SubscriptionSuccess,
   TicketReports,
+  TicketScanner,
   TicketVerify,
   TravelerHome,
   TravelersPage,
@@ -89,11 +97,19 @@ export default function App() {
                 <Route path="trip/:tripId" element={<TripDetail />} />
                 <Route path="booking/:bookingId" element={<BookingConfirmation />} />
                 <Route path="payment/verify" element={<PaymentVerify />} />
+                <Route path="verify/scan" element={<TicketScanner />} />
                 <Route path="verify/:reference" element={<TicketVerify />} />
                 <Route path="company/:companyId" element={<CompanyProfile />} />
                 <Route path="owner" element={<OwnerLayout />}>
                   <Route index element={<OwnerOverview />} />
                   <Route path="company" element={<CompanySettings />} />
+                  <Route path="sales" element={<OwnerSalesLedger />} />
+                  <Route path="guarantee-fund" element={<OwnerGuaranteeFund />} />
+                  <Route path="cash-register" element={<OwnerCashRegister />} />
+                  <Route path="colis" element={<OwnerColisSettings />} />
+                  <Route path="loyalty" element={<OwnerLoyalty />} />
+                  <Route path="cancellation" element={<OwnerCancellationPolicy />} />
+                  <Route path="messages" element={<OwnerMessages />} />
                   <Route path="buses" element={<FleetManager />} />
                   <Route path="stations" element={<StationsManager />} />
                   <Route path="routes" element={<RoutesManager />} />

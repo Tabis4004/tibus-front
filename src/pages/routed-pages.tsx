@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { SupabaseMigrationNotice } from "@/components/SupabaseMigrationNotice.tsx";
@@ -44,7 +45,15 @@ import PaymentVerifyPage from "./traveler/PaymentVerify.tsx";
 import SupabasePaymentVerify from "./traveler/SupabasePaymentVerify.tsx";
 import CompanyProfilePage from "./traveler/CompanyProfile.tsx";
 import TicketVerifyPage from "./verify/TicketVerify.tsx";
+import TicketScannerPage from "./verify/TicketScannerPage.tsx";
 import ReferralPage from "./traveler/ReferralPage.tsx";
+import GuaranteeFundPage from "./owner/GuaranteeFundPage.tsx";
+import CompanySalesPage from "./owner/CompanySalesPage.tsx";
+import CashRegisterPage from "./owner/CashRegisterPage.tsx";
+import ColisSettingsPage from "./owner/ColisSettingsPage.tsx";
+import LoyaltyPage from "./owner/LoyaltyPage.tsx";
+import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
+import OwnerMessagesPage from "./owner/OwnerMessagesPage.tsx";
 
 function useSupabaseBranch<T>(supabase: T, convex: T): T {
   return isSupabaseAuth() ? supabase : convex;
@@ -240,4 +249,55 @@ export function TicketVerify() {
 
 export function ReferralPageRoute() {
   return <ReferralPage />;
+}
+
+function supabaseOnlyPage(
+  title: string,
+  Page: ComponentType,
+  description?: string,
+) {
+  if (!isSupabaseAuth()) {
+    return <SupabaseMigrationNotice title={title} description={description} />;
+  }
+  return <Page />;
+}
+
+export function OwnerGuaranteeFund() {
+  return supabaseOnlyPage("Fond de garantie", GuaranteeFundPage);
+}
+
+export function OwnerSalesLedger() {
+  return supabaseOnlyPage("Journal des ventes", CompanySalesPage);
+}
+
+export function OwnerCashRegister() {
+  return supabaseOnlyPage("Caisse gare", CashRegisterPage);
+}
+
+export function OwnerColisSettings() {
+  return supabaseOnlyPage("Colis autonomes", ColisSettingsPage);
+}
+
+export function OwnerLoyalty() {
+  return supabaseOnlyPage("Fidélité compagnie", LoyaltyPage);
+}
+
+export function OwnerCancellationPolicy() {
+  return supabaseOnlyPage("Politique d'annulation", CancellationPolicyPage);
+}
+
+export function OwnerMessages() {
+  return supabaseOnlyPage("Messages & contact", OwnerMessagesPage);
+}
+
+export function TicketScanner() {
+  if (!isSupabaseAuth()) {
+    return (
+      <SupabaseMigrationNotice
+        title="Scanner billets"
+        description="Le scanner embarquement Supabase n'est pas disponible en mode Convex."
+      />
+    );
+  }
+  return <TicketScannerPage />;
 }
