@@ -52,6 +52,7 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "html-to-image": "^1.11.13",
+    "html5-qrcode": "^2.3.8",
     "i18next": "^26.0.10",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
