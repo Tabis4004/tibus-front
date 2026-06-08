@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { cn } from "@/lib/utils.ts";
 import { motion } from "motion/react";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useAppUser } from "@/hooks/use-app-user.ts";
@@ -24,6 +23,7 @@ import {
   type CompanyAccountingDashboard,
 } from "@/lib/supabase/accounting";
 import OwnerConsoleModules, {
+  OwnerCompanyBanner,
   OwnerProfileCard,
 } from "./_components/OwnerConsoleModules.tsx";
 
@@ -33,13 +33,16 @@ export default function SupabaseOwnerOverview() {
   const { appUserId } = useSupabaseAuth();
   const appUser = useAppUser();
   const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
-  const [company, setCompany] = useState<OwnerCompany | null | undefined>(
-    undefined,
-  );
+  const [company, setCompany] = useState<OwnerCompany | null | undefined>(undefined);
   const [dashboard, setDashboard] = useState<CompanyAccountingDashboard | null | undefined>(
     undefined,
   );
   const [error, setError] = useState<string | null>(null);
+
+  const firstName =
+    appUser.profile?.firstName ??
+    appUser.profile?.email?.split("@")[0] ??
+    t("console.default_user", { defaultValue: "Utilisateur Tibus" });
 
   useEffect(() => {
     if (!appUserId || !isReady) return;
@@ -88,19 +91,22 @@ export default function SupabaseOwnerOverview() {
     appUser.isLoading
   ) {
     return (
-      <div className="p-6 space-y-4 max-w-6xl mx-auto">
-        <Skeleton className="h-10 w-72" />
-        <div className="grid lg:grid-cols-[320px_1fr] gap-6">
-          <Skeleton className="h-80 w-full" />
-          <Skeleton className="h-80 w-full" />
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
+          ))}
         </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-12 text-center space-y-3">
+      <div className="max-w-2xl mx-auto px-4 py-12 text-center space-y-3">
         <p className="text-destructive text-sm">{error}</p>
         <Button variant="secondary" onClick={() => window.location.reload()}>
           {t("buttons.retry", { ns: "common", defaultValue: "Réessayer" })}
@@ -111,15 +117,13 @@ export default function SupabaseOwnerOverview() {
 
   if (!company) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-12 text-center space-y-5">
-        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto">
-          <BuildingIcon className="w-8 h-8 text-muted-foreground" />
+      <div className="max-w-2xl mx-auto px-4 py-12 text-center space-y-5">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+          <BuildingIcon className="w-8 h-8 text-primary" />
         </div>
         <div>
           <h2 className="text-xl font-bold">{t("overview.no_company")}</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            {t("overview.no_company_desc")}
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">{t("overview.no_company_desc")}</p>
         </div>
         <Button asChild>
           <Link to={`/${lng}/owner/company`}>{t("overview.create_company")}</Link>
@@ -138,70 +142,70 @@ export default function SupabaseOwnerOverview() {
       label: t("console.kpi_revenue", { defaultValue: "Revenus" }),
       value: formatMoney(kpis?.totalRevenue),
       icon: TrendingUpIcon,
-      color: "text-emerald-500",
     },
     {
       label: t("console.kpi_cash", { defaultValue: "Caisse" }),
       value: formatMoney(kpis?.caisseRevenue),
       icon: ReceiptTextIcon,
-      color: "text-amber-500",
     },
     {
       label: t("console.kpi_commissions", { defaultValue: "Commissions" }),
       value: formatMoney(kpis?.sellerCommissionsPending),
       icon: PercentIcon,
-      color: "text-rose-500",
     },
     {
       label: t("sidebar.trips"),
       value: String(kpis?.upcomingTrips ?? 0),
       icon: CalendarIcon,
-      color: "text-indigo-500",
     },
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className="space-y-1"
       >
-        <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-          Tibus Journey Planner
-        </p>
-        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-          {t("console.title", { defaultValue: "Console opérationnelle" })}
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {t("console.greeting", { name: firstName, defaultValue: `Bonjour, ${firstName}` })}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {company.name}
-          {company.managerName ? ` · ${company.managerName}` : ""}
+        <p className="text-muted-foreground text-sm mt-1">
+          {t("console.subtitle", {
+            defaultValue: "Console opérationnelle de votre compagnie.",
+          })}
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map(({ label, icon: Icon, value, color }, i) => (
-          <motion.div
-            key={label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 * i }}
-            className="rounded-xl border bg-card p-3"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className={cn("w-4 h-4", color)} />
-              <span className="text-[11px] text-muted-foreground">{label}</span>
-            </div>
-            <div className="text-lg font-bold truncate">{value}</div>
-          </motion.div>
-        ))}
+      <OwnerCompanyBanner company={company} />
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
+          {t("console.kpi_section", { defaultValue: "Indicateurs" })}
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
+          {stats.map(({ label, icon: Icon, value }, i) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.04 * i }}
+              className="rounded-xl border bg-card p-4 hover:border-primary/30 hover:bg-muted/30 transition-all"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-[11px] text-muted-foreground leading-tight">{label}</span>
+              </div>
+              <div className="text-base font-bold text-primary truncate">{value}</div>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(280px,320px)_1fr] gap-6 items-start">
-        <OwnerProfileCard company={company} />
-        <OwnerConsoleModules company={company} />
-      </div>
+      <OwnerProfileCard company={company} />
+      <OwnerConsoleModules company={company} />
     </div>
   );
 }

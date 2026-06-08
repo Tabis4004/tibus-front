@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeftIcon,
@@ -129,6 +129,26 @@ type TabId =
   | "scaling_metrics"
   | "landing";
 
+const TAB_IDS: TabId[] = [
+  "users",
+  "companies",
+  "subscriptions",
+  "plans",
+  "commissions",
+  "guarantee_fund",
+  "geography",
+  "roles",
+  "contact",
+  "loyalty",
+  "legal",
+  "scaling_metrics",
+  "landing",
+];
+
+function isTabId(value: string | null): value is TabId {
+  return value !== null && TAB_IDS.includes(value as TabId);
+}
+
 type AdminData = {
   users: SupabaseUserRow[];
   rolesByUser: Record<string, string[]>;
@@ -185,8 +205,12 @@ export default function SupabaseAdminPanel() {
   const { t } = useTranslation("admin");
   const { lng } = useParams<{ lng: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const appUser = useAppUser();
-  const [tab, setTab] = useState<TabId>("users");
+  const [tab, setTab] = useState<TabId>(() => {
+    const tabParam = searchParams.get("tab");
+    return isTabId(tabParam) ? tabParam : "users";
+  });
   const [data, setData] = useState<AdminData>(() => initialData());
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<ModuleErrorKey, string>>>({});
@@ -198,6 +222,27 @@ export default function SupabaseAdminPanel() {
       setTab("commissions");
     }
   }, [appUser.isReady, appUser.isSuperAdmin, appUser.roles]);
+
+  useEffect(() => {
+    if (!appUser.isReady) return;
+
+    const tabParam = searchParams.get("tab");
+    if (!isTabId(tabParam)) return;
+
+    if (!appUser.isSuperAdmin) {
+      if (tabParam === "commissions" || tabParam === "guarantee_fund") {
+        setTab(tabParam);
+      }
+      return;
+    }
+
+    setTab(tabParam);
+  }, [appUser.isReady, appUser.isSuperAdmin, searchParams]);
+
+  const selectTab = (id: TabId) => {
+    setTab(id);
+    setSearchParams({ tab: id }, { replace: true });
+  };
 
   useEffect(() => {
     if (!appUser.isReady) return;
@@ -525,7 +570,7 @@ export default function SupabaseAdminPanel() {
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => selectTab(id)}
               className={cn(
                 "flex min-w-max shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer",
                 tab === id

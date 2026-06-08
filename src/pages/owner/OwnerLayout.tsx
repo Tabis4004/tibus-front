@@ -139,22 +139,20 @@ function SidebarCompanyCard({
 }) {
   return (
     <div className="px-3 mb-5">
-      <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/80">
-        <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 p-3 rounded-xl border bg-muted/30">
+        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           {logoUrl ? (
             <img src={logoUrl} alt="logo" className="w-9 h-9 rounded-lg object-cover" />
           ) : (
-            <BuildingIcon className="w-4 h-4 text-sidebar-primary-foreground" />
+            <BuildingIcon className="w-4 h-4 text-primary" />
           )}
         </div>
         <div className="min-w-0">
-          <div className="font-semibold text-sm text-sidebar-foreground truncate">
-            {name ?? "—"}
-          </div>
+          <div className="font-semibold text-sm truncate">{name ?? "—"}</div>
           {planLabel ? (
             <Badge className="text-[9px] h-3.5 px-1 mt-0.5">{planLabel}</Badge>
           ) : (
-            <span className="text-[10px] text-sidebar-foreground/50">{noPlanLabel}</span>
+            <span className="text-[10px] text-muted-foreground">{noPlanLabel}</span>
           )}
         </div>
       </div>
@@ -256,7 +254,7 @@ function OwnerSidebarNav({
 
         return (
         <div key={section.titleKey}>
-          <p className="text-[10px] uppercase font-bold tracking-wider text-sidebar-foreground/40 px-3 mb-1.5">
+          <p className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground px-3 mb-1.5">
             {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
           </p>
           <div className="space-y-0.5">
@@ -270,8 +268,8 @@ function OwnerSidebarNav({
                   cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150",
                     isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                   )
                 }
               >
@@ -280,14 +278,14 @@ function OwnerSidebarNav({
                     <div
                       className={cn(
                         "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
-                        isActive ? "bg-white/15" : "bg-sidebar-accent/50",
+                        isActive ? "bg-primary-foreground/15" : "bg-primary/10",
                       )}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className={cn("w-3.5 h-3.5", isActive ? "" : "text-primary")} />
                     </div>
                     <span className="truncate">{t(labelKey)}</span>
                     {isActive && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-sidebar-primary-foreground/80" />
+                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground/80" />
                     )}
                   </>
                 )}
@@ -314,7 +312,7 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
-      <aside className="hidden md:flex flex-col w-60 bg-sidebar border-r border-sidebar-border shrink-0">
+      <aside className="hidden md:flex flex-col w-60 bg-background border-r border-border shrink-0">
         <SidebarContent />
       </aside>
 
@@ -324,10 +322,13 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-sidebar flex flex-col shadow-2xl">
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-background border-r border-border flex flex-col shadow-2xl">
             <div className="flex items-center justify-between px-4 pt-4">
-              <span className="text-sidebar-foreground font-bold text-sm">{t("header.menu", { ns: "common" })}</span>
-              <button onClick={() => setMobileOpen(false)} className="cursor-pointer text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors">
+              <span className="font-bold text-sm">{t("header.menu", { ns: "common" })}</span>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <XIcon className="w-5 h-5" />
               </button>
             </div>

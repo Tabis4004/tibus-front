@@ -1,7 +1,12 @@
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowRightIcon, IdCardIcon, LogOutIcon, PencilIcon } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import {
+  ArrowRightIcon,
+  BuildingIcon,
+  IdCardIcon,
+  LogOutIcon,
+  PencilIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
@@ -19,7 +24,7 @@ type Props = {
   company: OwnerCompany;
 };
 
-function ModuleCard({
+function ModuleBlock({
   module,
   lng,
   t,
@@ -31,26 +36,21 @@ function ModuleCard({
   const Icon = module.icon;
 
   return (
-    <Link to={`/${lng}${module.toSuffix}`} className="block h-full">
-      <Card className="h-full hover:border-primary/40 hover:shadow-md transition-all group">
-        <CardContent className="p-4 flex flex-col gap-3 h-full">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Icon className="w-5 h-5 text-primary" />
-          </div>
-          <div className="space-y-1 flex-1">
-            <h3 className="font-semibold text-sm leading-snug">
-              {t(module.titleKey, { defaultValue: module.titleDefault })}
-            </h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t(module.descKey, { defaultValue: module.descDefault })}
-            </p>
-          </div>
-          <span className="text-xs font-medium text-primary inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-            {t("console.open", { defaultValue: "Ouvrir" })}
-            <ArrowRightIcon className="w-3.5 h-3.5" />
-          </span>
-        </CardContent>
-      </Card>
+    <Link to={`/${lng}${module.toSuffix}`} className="block">
+      <div className="rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/40 hover:shadow-sm transition-all group">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Icon className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm leading-snug">
+            {t(module.titleKey, { defaultValue: module.titleDefault })}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+            {t(module.descKey, { defaultValue: module.descDefault })}
+          </p>
+        </div>
+        <ArrowRightIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+      </div>
     </Link>
   );
 }
@@ -66,14 +66,12 @@ export function OwnerProfileCard({ company }: { company: OwnerCompany }) {
     : user?.name ?? t("console.default_user", { defaultValue: "Utilisateur Tibus" });
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <IdCardIcon className="w-4 h-4 text-primary" />
-          {displayName}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
+        <IdCardIcon className="w-4 h-4 text-primary" />
+        <span className="font-semibold text-sm">{displayName}</span>
+      </div>
+      <div className="p-4 space-y-4">
         <div className="rounded-xl border bg-muted/30 p-3 space-y-2 text-sm">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">E-mail</div>
@@ -99,7 +97,9 @@ export function OwnerProfileCard({ company }: { company: OwnerCompany }) {
                   </Badge>
                 ))
               ) : (
-                <Badge variant="secondary" className="text-[10px]">traveler</Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  traveler
+                </Badge>
               )}
             </div>
           </div>
@@ -112,24 +112,44 @@ export function OwnerProfileCard({ company }: { company: OwnerCompany }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Button asChild variant="secondary" size="sm" className="w-full">
+          <Button asChild variant="secondary" size="sm" className="w-full border-2 border-primary/20">
             <Link to={`/${lng}/owner/company`}>
               <PencilIcon className="w-3.5 h-3.5 mr-1.5" />
               {t("buttons.edit", { ns: "common", defaultValue: "Modifier" })}
             </Link>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => void signout()}
-          >
+          <Button variant="outline" size="sm" className="w-full" onClick={() => void signout()}>
             <LogOutIcon className="w-3.5 h-3.5 mr-1.5" />
             {t("console.sign_out", { defaultValue: "Se déconnecter" })}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  );
+}
+
+export function OwnerCompanyBanner({ company }: { company: OwnerCompany }) {
+  return (
+    <div className="rounded-xl border bg-card p-4 flex items-center gap-4">
+      <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+        {company.logo ? (
+          <img src={company.logo} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <BuildingIcon className="w-6 h-6 text-primary" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h2 className="font-bold text-base truncate">{company.name}</h2>
+        {company.managerName && (
+          <p className="text-xs text-muted-foreground truncate">{company.managerName}</p>
+        )}
+        {company.currency && (
+          <Badge variant="secondary" className="text-[10px] mt-1.5">
+            {company.currency}
+          </Badge>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -145,16 +165,16 @@ export default function OwnerConsoleModules({ company }: Props) {
   return (
     <div className="space-y-6">
       {sections.map((section) => (
-        <div key={section.sectionKey} className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        <div key={section.sectionKey} className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
             {t(section.sectionKey, { defaultValue: section.sectionDefault })}
           </h2>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="space-y-3">
             {section.items.map((module) =>
               module.id === "guarantee" && showGuaranteeFund ? (
                 <GuaranteeFundOverviewCard key={module.id} companyId={company.id} />
               ) : (
-                <ModuleCard key={module.id} module={module} lng={lng ?? "fr"} t={t} />
+                <ModuleBlock key={module.id} module={module} lng={lng ?? "fr"} t={t} />
               ),
             )}
           </div>

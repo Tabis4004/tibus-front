@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   SearchIcon,
@@ -10,20 +10,24 @@ import {
   ScanLineIcon,
   MessageCircleIcon,
   GiftIcon,
+  ClipboardListIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { motion } from "motion/react";
 import AppHeader from "../layout/_components/AppHeader.tsx";
 import BottomNav from "../layout/_components/BottomNav.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
+import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
   const { t } = useTranslation("common");
+  const { t: ts } = useTranslation("seller");
   const { user } = useAuth();
   const appUser = useAppUser();
+  const locale = lng ?? "fr";
 
   const firstName =
     appUser.profile?.firstName ??
@@ -43,9 +47,10 @@ export default function SupabaseHome() {
       <div className="flex flex-col min-h-screen">
         <AppHeader />
         <main className="flex-1 pb-20 md:pb-0">
-          <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto mt-8">
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
             <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
           </div>
         </main>
         <BottomNav />
@@ -58,139 +63,144 @@ export default function SupabaseHome() {
       <OnboardingGate />
       <AppHeader />
       <main className="flex-1 pb-20 md:pb-0">
-        <div className="max-w-lg mx-auto px-4 py-10 space-y-8">
-          <div className="space-y-2">
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+          >
             <h1 className="text-2xl font-extrabold tracking-tight">
               {t("greeting", { defaultValue: "Welcome" })}, {firstName}!
             </h1>
-            <p className="text-sm text-muted-foreground">
-              {t("supabase_home.subtitle", {
-                defaultValue:
-                  "Connexion Supabase active. Les données métier migrent progressivement depuis Convex.",
+            <p className="text-muted-foreground text-sm mt-1">
+              {t("homepage_subtitle", {
+                defaultValue: "Book bus tickets or sell tickets for your company",
               })}
             </p>
-          </div>
+          </motion.div>
 
-          <div className="space-y-3">
-            <Link to={`/${lng}/traveler/search`} className="block" data-tour="travel-book">
-              <Button size="lg" className="w-full h-14 text-base gap-3">
-                <SearchIcon className="w-5 h-5" />
-                {t("book_reserve", { defaultValue: "Book / Reserve a Ticket" })}
-              </Button>
-            </Link>
+          <HomeBlockSection title={t("home.section_travel", { defaultValue: "Voyage" })}>
+            <HomeActionBlock
+              to={`/${locale}/traveler/search`}
+              title={t("book_reserve", { defaultValue: "Book / Reserve a Ticket" })}
+              description={t("home.book_desc", {
+                defaultValue: "Rechercher un trajet et réserver votre siège",
+              })}
+              icon={SearchIcon}
+              highlighted
+              tour="travel-book"
+            />
+            <HomeActionBlock
+              to={`/${locale}/traveler/bookings`}
+              title={t("my_bookings", { defaultValue: "My Bookings" })}
+              description={t("my_bookings_desc", { defaultValue: "View your tickets" })}
+              icon={ClipboardListIcon}
+            />
+            <HomeActionBlock
+              to={`/${locale}/traveler/referral`}
+              title={t("referral_cta", { defaultValue: "Parrainage & points Tibus" })}
+              description={t("home.referral_desc", {
+                defaultValue: "Parrainez vos proches et cumulez des points",
+              })}
+              icon={GiftIcon}
+              tour="travel-referral"
+            />
+          </HomeBlockSection>
 
-            {showTicketScanner && (
-              <Link to={`/${lng}/verify/scan`} className="block">
-                <Button
-                  size="lg"
-                  className="w-full h-14 text-base gap-3 shadow-md shadow-primary/20"
-                >
-                  <ScanLineIcon className="w-5 h-5" />
-                  {t("home.scan_tickets", { defaultValue: "Scanner les billets" })}
-                </Button>
-              </Link>
-            )}
+          {(showTicketScanner ||
+            !appUser.shouldHideMerchantAgentCta ||
+            showOwnerDashboard ||
+            showSellerDashboard ||
+            showThirdPartyBooking ||
+            appUser.isSuperAdmin) && (
+            <HomeBlockSection title={t("home.section_pro", { defaultValue: "Espace pro" })}>
+              {showTicketScanner && (
+                <HomeActionBlock
+                  to={`/${locale}/verify/scan`}
+                  title={t("home.scan_tickets", { defaultValue: "Scanner les billets" })}
+                  description={t("home.scan_desc", {
+                    defaultValue: "Contrôler les billets à l'embarquement",
+                  })}
+                  icon={ScanLineIcon}
+                />
+              )}
 
-            {!appUser.shouldHideMerchantAgentCta && (
-              <Link to={`/${lng}/agent-marchand`} className="block">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-14 text-base gap-3 border-2 border-primary/20"
-                >
-                  <StoreIcon className="w-5 h-5" />
-                  Devenir Agent Marchand
-                </Button>
-              </Link>
-            )}
+              {!appUser.shouldHideMerchantAgentCta && (
+                <HomeActionBlock
+                  to={`/${locale}/agent-marchand`}
+                  title={t("home.merchant_agent", { defaultValue: "Devenir Agent Marchand" })}
+                  description={t("home.merchant_desc", {
+                    defaultValue: "Rejoindre le réseau d'agents marchands Tibus",
+                  })}
+                  icon={StoreIcon}
+                />
+              )}
 
-            {showOwnerDashboard && (
-              <Link to={`/${lng}/owner`} className="block" data-tour="home-owner-dashboard">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-14 text-base gap-3 border-2 border-primary/20"
-                >
-                  <LayoutDashboardIcon className="w-5 h-5" />
-                  {t("owner_dashboard")}
-                </Button>
-              </Link>
-            )}
+              {showOwnerDashboard && (
+                <HomeActionBlock
+                  to={`/${locale}/owner`}
+                  title={t("owner_dashboard", { defaultValue: "Owner Dashboard" })}
+                  description={t("owner_dashboard_desc", { defaultValue: "Manage your company" })}
+                  icon={LayoutDashboardIcon}
+                  tour="home-owner-dashboard"
+                />
+              )}
 
-            {showSellerDashboard && (
-              <Link to={`/${lng}/seller`} className="block" data-tour="home-seller-dashboard">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-14 text-base gap-3 border-2 border-primary/20"
-                >
-                  <TicketIcon className="w-5 h-5" />
-                  {showThirdPartyBooking
-                    ? t("seller_dashboard", { ns: "seller" })
-                    : t("counter_sale", { ns: "seller" })}
-                </Button>
-              </Link>
-            )}
+              {showSellerDashboard && (
+                <HomeActionBlock
+                  to={`/${locale}/seller`}
+                  title={
+                    showThirdPartyBooking
+                      ? ts("seller_dashboard", { defaultValue: "Seller Dashboard" })
+                      : ts("counter_sale", { defaultValue: "Counter sale" })
+                  }
+                  description={t("home.seller_desc", {
+                    defaultValue: "Vendre des billets depuis votre guichet",
+                  })}
+                  icon={TicketIcon}
+                  tour="home-seller-dashboard"
+                />
+              )}
 
-            {showThirdPartyBooking && (
-              <Link to={`/${lng}/seller#third-party-booking`} className="block">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="w-full h-14 text-base gap-3 border-2 border-primary/20"
-                >
-                  <TicketIcon className="w-5 h-5" />
-                  {t("third_party_reservation", { ns: "seller" })}
-                </Button>
-              </Link>
-            )}
+              {showThirdPartyBooking && (
+                <HomeActionBlock
+                  to={`/${locale}/seller#third-party-booking`}
+                  title={ts("third_party_reservation", { defaultValue: "Third-party reservation" })}
+                  description={t("home.third_party_desc", {
+                    defaultValue: "Réserver pour le compte d'un voyageur",
+                  })}
+                  icon={TicketIcon}
+                />
+              )}
 
-            {appUser.isSuperAdmin && (
-              <Link to={`/${lng}/admin`} className="block">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-14 text-base gap-3"
-                >
-                  <ShieldIcon className="w-5 h-5" />
-                  {t("admin_panel", { defaultValue: "Admin Panel" })}
-                </Button>
-              </Link>
-            )}
+              {appUser.isSuperAdmin && (
+                <HomeActionBlock
+                  to={`/${locale}/admin`}
+                  title={t("admin_panel", { defaultValue: "Admin Panel" })}
+                  description={t("home.admin_desc", {
+                    defaultValue: "Administration de la plateforme Tibus",
+                  })}
+                  icon={ShieldIcon}
+                />
+              )}
+            </HomeBlockSection>
+          )}
 
-            <Link to={`/${lng}/guide`} className="block" data-tour="travel-guide">
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full h-14 text-base gap-3"
-              >
-                <BookOpenIcon className="w-5 h-5" />
-                {t("guide.nav_guide", { defaultValue: "User Guide" })}
-              </Button>
-            </Link>
-
-            <Link to={`/${lng}/contact`} className="block">
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full h-14 text-base gap-3"
-              >
-                <MessageCircleIcon className="w-5 h-5" />
-                {t("contact_us", { defaultValue: "Contact Us" })}
-              </Button>
-            </Link>
-
-            <Link to={`/${lng}/traveler/referral`} className="block" data-tour="travel-referral">
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full h-14 text-base gap-3"
-              >
-                <GiftIcon className="w-5 h-5" />
-                {t("referral_cta", { defaultValue: "Parrainage & points Tibus" })}
-              </Button>
-            </Link>
-          </div>
+          <HomeBlockSection title={t("home.section_help", { defaultValue: "Aide" })}>
+            <HomeActionBlock
+              to={`/${locale}/guide`}
+              title={t("guide.nav_guide", { defaultValue: "User Guide" })}
+              description={t("guide.nav_guide_desc", { defaultValue: "Learn how to use Tibus" })}
+              icon={BookOpenIcon}
+              tour="travel-guide"
+            />
+            <HomeActionBlock
+              to={`/${locale}/contact`}
+              title={t("contact_us", { defaultValue: "Contact Us" })}
+              description={t("contact_us_desc", { defaultValue: "Get help or send a message" })}
+              icon={MessageCircleIcon}
+            />
+          </HomeBlockSection>
         </div>
       </main>
       <BottomNav />

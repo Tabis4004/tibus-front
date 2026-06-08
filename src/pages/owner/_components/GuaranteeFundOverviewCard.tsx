@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowRightIcon, LandmarkIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
@@ -31,7 +30,7 @@ export default function GuaranteeFundOverviewCard({ companyId }: { companyId: st
   }, [companyId]);
 
   if (fund === undefined) {
-    return <Skeleton className="h-28 w-full rounded-xl" />;
+    return <Skeleton className="h-[4.5rem] w-full rounded-xl" />;
   }
 
   const balanceLabel =
@@ -42,45 +41,40 @@ export default function GuaranteeFundOverviewCard({ companyId }: { companyId: st
   return (
     <Link
       to={`/${lng ?? "fr"}/owner/guarantee-fund`}
-      className="block h-full"
+      className="block"
       data-tour="owner-guarantee-fund"
     >
-      <Card className="h-full hover:border-primary/40 hover:shadow-md transition-all group">
-        <CardContent className="p-4 flex flex-col gap-3 h-full">
-          <div className="flex items-start justify-between gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <LandmarkIcon className="w-5 h-5 text-primary" />
-            </div>
+      <div className="rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/40 hover:shadow-sm transition-all group">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <LandmarkIcon className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-sm">
+              {t("console.guarantee_title", { defaultValue: "Fond de garantie" })}
+            </h3>
             {fund != null && fund.pendingDeposits > 0 && (
-              <Badge variant="secondary" className="text-[10px] shrink-0">
+              <Badge variant="secondary" className="text-[10px]">
                 {fund.pendingDeposits}{" "}
                 {t("console.guarantee_pending", { defaultValue: "dépôt(s) en attente" })}
               </Badge>
             )}
           </div>
-          <div className="space-y-1 flex-1">
-            <h3 className="font-semibold text-sm leading-snug">
-              {t("console.guarantee_title", { defaultValue: "Fond de garantie" })}
-            </h3>
-            <p
-              className={`text-xl font-black tracking-tight ${
-                fund != null && fund.balance < 0 ? "text-destructive" : "text-foreground"
-              }`}
-            >
-              {balanceLabel}
-            </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t("console.guarantee_desc", {
-                defaultValue: "Solde, dépôts plateforme et validation comptable.",
-              })}
-            </p>
-          </div>
-          <span className="text-xs font-medium text-primary inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-            {t("console.open", { defaultValue: "Ouvrir" })}
-            <ArrowRightIcon className="w-3.5 h-3.5" />
-          </span>
-        </CardContent>
-      </Card>
+          <p
+            className={`text-sm font-bold mt-0.5 ${
+              fund != null && fund.balance < 0 ? "text-destructive" : "text-primary"
+            }`}
+          >
+            {balanceLabel}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+            {t("console.guarantee_desc", {
+              defaultValue: "Solde, dépôts plateforme et validation comptable.",
+            })}
+          </p>
+        </div>
+        <ArrowRightIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+      </div>
     </Link>
   );
 }
