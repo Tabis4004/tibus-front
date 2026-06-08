@@ -40,6 +40,7 @@ import ContactPage from "./pages/contact/page.tsx";
 import OwnerReviews from "./pages/owner/OwnerReviews.tsx";
 import PromoCodesPage from "./pages/owner/promo-codes/page.tsx";
 import GuidePage from "./pages/guide/page.tsx";
+import LoginPage from "./pages/auth/Login.tsx";
 
 export default function App() {
   useServiceWorker();
@@ -69,6 +70,7 @@ export default function App() {
             >
               {/* Profile completion — outside AppLayout to avoid nav */}
               <Route path="complete-profile" element={<CompleteProfile />} />
+              <Route path="auth/login" element={<LoginPage />} />
 
               {/* Index (landing) is outside AppLayout so unauthenticated users see full landing page */}
               <Route index element={<Index />} />

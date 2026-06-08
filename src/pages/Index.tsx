@@ -25,6 +25,9 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import LocaleSwitcher from "@/components/ui/locale-switcher.tsx";
+import { isSupabaseAuth } from "@/lib/auth/config";
+import { useAuth } from "@/hooks/use-auth.ts";
+import SupabaseHome from "./home/SupabaseHome.tsx";
 import HomeDashboard from "./home/Dashboard.tsx";
 
 // ─── Landing Page (public / unauthenticated) ─────────────────────────────────
@@ -556,9 +559,33 @@ function LandingPage() {
   );
 }
 
+function SupabaseIndex() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto mt-8">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-4 w-full" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <SupabaseHome />;
+  }
+
+  return <LandingPage />;
+}
+
+
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export default function Index() {
+  if (isSupabaseAuth()) {
+    return <SupabaseIndex />;
+  }
+
   return (
     <>
       <AuthLoading>
