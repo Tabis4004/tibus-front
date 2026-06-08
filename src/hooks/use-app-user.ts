@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isSupabaseAuth } from "@/lib/auth/config";
+import { resolveAdminSandboxRoles } from "@/lib/auth/admin-sandbox.ts";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { supabase } from "@/lib/supabase";
 
@@ -215,9 +216,14 @@ export function useAppUser() {
     };
   }, [appUserId, session, refreshKey]);
 
+  const { roles: effectiveRoles, isSandboxActive: isAdminSandbox } = resolveAdminSandboxRoles(
+    roles,
+    Boolean(session) && isReady,
+  );
+
   const primaryRole =
-    ROLE_PRIORITY.find((role) => roles.includes(role)) ??
-    roles[0] ??
+    ROLE_PRIORITY.find((role) => effectiveRoles.includes(role)) ??
+    effectiveRoles[0] ??
     "traveler";
 
   const primaryRoleUi = normalizeRoleForUi(primaryRole);
@@ -232,17 +238,18 @@ export function useAppUser() {
 
   return {
     profile,
-    roles,
-    hasSellerRole: hasAnyRole(roles, SELLER_ROLE_NAMES),
-    hasSellerAccess: hasAnyRole(roles, SELLER_ACCESS_ROLE_NAMES),
-    hasThirdPartySellerRole: hasAnyRole(roles, THIRD_PARTY_SELLER_ROLE_NAMES),
+    roles: effectiveRoles,
+    hasSellerRole: hasAnyRole(effectiveRoles, SELLER_ROLE_NAMES),
+    hasSellerAccess: hasAnyRole(effectiveRoles, SELLER_ACCESS_ROLE_NAMES),
+    hasThirdPartySellerRole: hasAnyRole(effectiveRoles, THIRD_PARTY_SELLER_ROLE_NAMES),
     hasMerchantAgentApplication,
     merchantAgentApplicationStatus,
     shouldHideMerchantAgentCta:
-      hasAnyRole(roles, MERCHANT_AGENT_CTA_BLOCKING_ROLES) || hasMerchantAgentApplication,
+      hasAnyRole(effectiveRoles, MERCHANT_AGENT_CTA_BLOCKING_ROLES) || hasMerchantAgentApplication,
     primaryRole,
     primaryRoleUi,
-    isSuperAdmin: roles.includes("super_admin"),
+    isSuperAdmin: effectiveRoles.includes("super_admin"),
+    isAdminSandbox,
     profileCompleted: profile?.profileCompleted ?? false,
     isReady,
     isLoading: waitingForProfile || isLoading,

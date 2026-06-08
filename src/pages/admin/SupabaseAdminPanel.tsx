@@ -549,6 +549,13 @@ export default function SupabaseAdminPanel() {
                 defaultValue: "Mode Supabase - modules migrés et modules en cours de migration.",
               })}
             </p>
+            {appUser.isAdminSandbox && (
+              <Badge variant="outline" className="mt-2 text-[10px] border-amber-500/40 text-amber-600">
+                {t("supabase_admin.sandbox_badge", {
+                  defaultValue: "Sandbox admin (utilisateur authentifié)",
+                })}
+              </Badge>
+            )}
           </div>
         </div>
         <Link to={`/${lng}`}>
