@@ -84,6 +84,7 @@
   "owner_dashboard": "Owner Dashboard",
   "owner_dashboard_desc": "Manage your company",
   "home.section_travel": "Travel",
+  "home.section_discover": "Discover",
   "home.section_pro": "Professional",
   "home.section_help": "Help",
   "home.book_desc": "Search for a trip and book your seat",
@@ -95,6 +96,7 @@
   "home.third_party_desc": "Book on behalf of a traveler",
   "home.admin_desc": "Tibus platform administration",
   "home.referral_desc": "Refer friends and earn Tibus points",
+  "home.explore_desc": "Guided tour of the tools available for your role",
   "referral_cta": "Referral & Tibus points",
   "contact_us_desc": "Get help or send a message",
   "upcoming_trips": "Upcoming Trips",
@@ -231,6 +233,7 @@
   "guide.prev": "Back",
   "guide.next": "Next",
   "guide.finish": "Got it!",
+  "guide.explore_features": "Explore features",
   "guide.view_full_guide": "View full guide",
   "guide.nav_guide": "User Guide",
   "guide.nav_guide_desc": "Learn how to use Tibus"

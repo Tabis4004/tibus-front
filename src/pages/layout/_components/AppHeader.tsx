@@ -19,6 +19,8 @@ import { useTranslation } from "react-i18next";
 import LocaleSwitcher from "@/components/ui/locale-switcher.tsx";
 import { toast } from "sonner";
 import NotificationCenter from "./NotificationCenter.tsx";
+import { isSupabaseAuth } from "@/lib/auth/config";
+import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
   const url = "https://tibus.onhercules.app";
@@ -102,6 +104,8 @@ function UserMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
+        <ExploreFeaturesButton variant="menu-item" />
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => shareApp(t)} className="cursor-pointer">
           <Share2Icon className="w-4 h-4 mr-2 text-primary" />
           {t("share.share_app", { defaultValue: "Share App" })}
@@ -134,6 +138,7 @@ export default function AppHeader() {
             <SignInButton />
           </Unauthenticated>
           <Authenticated>
+            {isSupabaseAuth() && <ExploreFeaturesButton variant="button" />}
             <NotificationCenter />
             <UserMenu />
           </Authenticated>

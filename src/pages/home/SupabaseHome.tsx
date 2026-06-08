@@ -19,6 +19,7 @@ import BottomNav from "../layout/_components/BottomNav.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
+import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
 
 export default function SupabaseHome() {
@@ -78,6 +79,10 @@ export default function SupabaseHome() {
               })}
             </p>
           </motion.div>
+
+          <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
+            <ExploreFeaturesButton variant="block" />
+          </HomeBlockSection>
 
           <HomeBlockSection title={t("home.section_travel", { defaultValue: "Voyage" })}>
             <HomeActionBlock

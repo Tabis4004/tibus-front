@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { CompassIcon } from "lucide-react";
+import { ArrowRightIcon, CompassIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
@@ -8,7 +8,7 @@ import { getOnboardingAudience } from "@/lib/onboarding-audience.ts";
 import { startExploreTour } from "@/lib/onboarding-events.ts";
 
 type ExploreFeaturesButtonProps = {
-  variant?: "button" | "menu-item" | "sidebar" | "icon";
+  variant?: "button" | "menu-item" | "sidebar" | "icon" | "block";
   onTriggered?: () => void;
 };
 
@@ -32,6 +32,9 @@ export default function ExploreFeaturesButton({
   }
 
   const label = t("guide.explore_features", { defaultValue: "Explorer les fonctionnalités" });
+  const description = t("home.explore_desc", {
+    defaultValue: "Visite guidée des outils disponibles pour votre rôle",
+  });
 
   const handleClick = () => {
     startExploreTour({
@@ -62,10 +65,32 @@ export default function ExploreFeaturesButton({
         type="button"
         onClick={handleClick}
         data-tour="owner-explore-features"
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-sidebar-primary/30 bg-sidebar-primary/10 px-3 py-2.5 text-sm font-semibold text-sidebar-primary transition-colors hover:bg-sidebar-primary/20"
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
       >
         <CompassIcon className="w-4 h-4" />
         {label}
+      </button>
+    );
+  }
+
+  if (variant === "block") {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        data-tour="owner-explore-features"
+        className="block w-full text-left cursor-pointer"
+      >
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-4 hover:border-primary/40 hover:shadow-sm transition-all group">
+          <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+            <CompassIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm leading-snug">{label}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
+          </div>
+          <ArrowRightIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+        </div>
       </button>
     );
   }

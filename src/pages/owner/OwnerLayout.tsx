@@ -37,6 +37,7 @@ import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getMyCompanySupabase, type OwnerCompany } from "@/lib/supabase/owner-company";
 import { OwnerCompanyProvider, useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import OwnerCompanySwitcher from "./_components/OwnerCompanySwitcher.tsx";
+import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 
 type NavItem = {
   toSuffix: string;
@@ -174,6 +175,9 @@ function ConvexSidebarContent({ onClose }: { onClose?: () => void }) {
         planLabel={company?.subscriptionStatus && company.subscriptionStatus !== "none" ? company.planId?.toUpperCase() ?? null : null}
         noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
       />
+      <div className="px-3 mb-4">
+        <ExploreFeaturesButton variant="sidebar" onTriggered={onClose} />
+      </div>
       <OwnerSidebarNav
         onClose={onClose}
         lng={lng}
@@ -213,6 +217,9 @@ function SupabaseSidebarContent({ onClose }: { onClose?: () => void }) {
           noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
         />
       )}
+      <div className="px-3 mb-4">
+        <ExploreFeaturesButton variant="sidebar" onTriggered={onClose} />
+      </div>
       <OwnerSidebarNav
         onClose={onClose}
         lng={lng}
