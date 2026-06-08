@@ -57,6 +57,8 @@ import PlatformLoyaltySettingsPanel from "./_components/PlatformLoyaltySettingsP
 import LegalPagesPanel from "./_components/LegalPagesPanel.tsx";
 import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPanel.tsx";
 import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
+import SupabasePlansTab from "./_components/SupabasePlansTab.tsx";
+import SupabaseSubscriptionsTab from "./_components/SupabaseSubscriptionsTab.tsx";
 
 type SupabaseUserRow = {
   id: string;
@@ -678,83 +680,22 @@ export default function SupabaseAdminPanel() {
       )}
 
       {tab === "subscriptions" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CreditCardIcon className="w-4 h-4" />
-              {t("company_subs")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <LoadingRows />
-            ) : errors.subscriptions ? (
-              <p className="text-sm text-destructive">{errors.subscriptions}</p>
-            ) : data.subscriptions.length === 0 ? (
-              <EmptyState icon={CreditCardIcon} title={t("no_companies")} description={t("no_subs_desc", { defaultValue: "Aucun abonnement Supabase trouvé." })} />
-            ) : (
-              <div className="divide-y">
-                {data.subscriptions.map((sub) => (
-                  <div key={sub.id} className="py-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{sub.companyName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {sub.planName}
-                        {sub.duration ? ` · ${sub.duration} ${t("plans.days")}` : ""}
-                        {sub.price !== null ? ` · ${sub.price.toLocaleString()}` : ""}
-                      </p>
-                    </div>
-                    <Badge variant={isActiveSubscription(sub.endDate) ? "default" : "secondary"}>
-                      {isActiveSubscription(sub.endDate) ? t("status_active") : t("plans.inactive")}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <SupabaseSubscriptionsTab
+          companies={data.companies.map((company) => ({
+            id: company.id,
+            name: company.name,
+            countryId: company.countryId,
+            countryName: company.countryName,
+          }))}
+          onDataChanged={() => setRefreshKey((key) => key + 1)}
+        />
       )}
 
       {tab === "plans" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <SettingsIcon className="w-4 h-4" />
-              {t("plans.title")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <LoadingRows />
-            ) : errors.plans ? (
-              <p className="text-sm text-destructive">{errors.plans}</p>
-            ) : data.plans.length === 0 ? (
-              <EmptyState icon={SettingsIcon} title={t("plans.no_plans")} description={t("plans.no_plans_desc", { defaultValue: "Aucun plan Supabase trouvé." })} />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {data.plans.map((plan) => (
-                  <div key={plan.id} className="rounded-xl border p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold">{plan.name}</p>
-                      <Badge variant="secondary">{plan.countryName ?? plan.currency ?? "Global"}</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {plan.durations.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">{t("plan_none")}</span>
-                      ) : (
-                        plan.durations.map((duration) => (
-                          <Badge key={duration.id} variant="outline">
-                            {duration.price.toLocaleString()} {plan.currency ?? ""} / {duration.duration} {t("plans.days")}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <SupabasePlansTab
+          countries={data.countries}
+          onDataChanged={() => setRefreshKey((key) => key + 1)}
+        />
       )}
 
       {tab === "commissions" && (
