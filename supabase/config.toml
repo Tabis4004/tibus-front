@@ -1,0 +1,17 @@
+[functions.fedapay-initialize]
+verify_jwt = false
+
+[functions.fedapay-verify]
+verify_jwt = false
+
+[functions.fedapay-webhook]
+verify_jwt = false
+
+[functions.payment-initialize]
+verify_jwt = false
+
+[functions.payment-verify]
+verify_jwt = false
+
+[functions.geniuspay-webhook]
+verify_jwt = false

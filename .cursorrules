@@ -1,0 +1,16 @@
+# Règles de réduction de contexte pour la migration Supabase
+
+## Gestion du contexte (Token Saving)
+- NE TOUCHEZ PAS et ne lisez pas les dossiers volumineux comme .next, node_modules, build ou dist.
+- N'analysez pas les fichiers d'assets (.png, .svg, .css, .json comme package-lock.json) sauf demande explicite.
+- Restez strictement focalisé sur le fichier ciblé (ex: TripDetail.tsx). Ne chargez pas d'autres composants du projet de manière préventive sans me demander.
+
+## Contexte Technologique Target
+- Framework: Next.js / React (TypeScript)
+- Migration: Depuis Hercules/Convex VERS Supabase PostgreSQL (pg)
+- Priorité: Remplacer les hooks Convex par les appels Supabase Client standard (@supabase/supabase-js)
+- Règle de sécurité: Utiliser les Row Level Security (RLS) de Supabase au lieu des règles Hercules.
+
+## Directives de réponse
+- Sois concis. Ne réécris pas tout le fichier si seulement 3 lignes changent. Utilise des blocs de code ciblés.
+- Si tu as besoin de lire un fichier externe pour comprendre un type, demande-moi d'abord la permission ou utilise le strict minimum.

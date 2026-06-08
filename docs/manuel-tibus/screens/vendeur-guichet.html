@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"/><title>Vendeur Guichet</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#0f172a;padding:20px}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.title{font-size:18px;font-weight:800}
+.btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}.card h4{font-size:10px;color:#64748b}.card .v{font-size:20px;font-weight:800;color:#2563eb;margin-top:4px}
+.caisse{border:2px solid #2563eb;background:#eff6ff;border-radius:14px;padding:16px;margin-bottom:16px}
+.caisse h3{font-size:14px;margin-bottom:8px}.caisse p{font-size:12px;color:#475569;line-height:1.5}
+.trip{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:10px}
+.trip .route{font-weight:700;font-size:15px}.trip .meta{font-size:11px;color:#64748b;margin:6px 0}.sell{width:100%;margin-top:8px;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700}
+.nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:#0f172a;display:flex;justify-content:space-around;align-items:center;color:#94a3b8;font-size:10px}
+.nav .on{color:#fff;font-weight:700}body{padding-bottom:80px}
+</style></head><body>
+<div class="hdr"><div class="title">Espace guichet</div><div><button class="btn">Scanner</button> <button class="btn" style="background:#fff;color:#2563eb;border:1px solid #2563eb">Explorer</button></div></div>
+<div class="grid4">
+<div class="card"><h4>Mode caisse</h4><div class="v">Guichet</div></div>
+<div class="card"><h4>Départs</h4><div class="v">12</div></div>
+<div class="card"><h4>Places</h4><div class="v">84</div></div>
+<div class="card"><h4>Commissions</h4><div class="v">15K</div></div>
+</div>
+<div class="caisse"><h3>💰 Session caisse journalière — OUVERTE</h3><p>Solde : 125 000 XOF · Fond de roulement : 0 XOF<br/>① Ouvrir chaque matin · ② Vendre des billets cash · ③ Reversement comptable en fin de service</p></div>
+<div class="trip"><div class="route">Abidjan → Bouaké</div><div class="meta">07 juin 2026 · 06:00 · 32/45 places · 3 500 XOF</div><button class="sell">Vente guichet</button></div>
+<div class="trip"><div class="route">Lomé → Kara</div><div class="meta">07 juin 2026 · 08:30 · 18/45 places · 5 000 XOF</div><button class="sell">Vente guichet</button></div>
+<div class="nav"><div>Accueil</div><div>Scanner</div><div class="on">Guichet</div></div>
+</body></html>

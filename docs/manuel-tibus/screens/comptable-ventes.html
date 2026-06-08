@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"/><title>Comptable Ventes</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;padding:20px;color:#0f172a}
+h1{font-size:22px} .sub{color:#64748b;font-size:13px;margin:8px 0 16px}
+.filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.f{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:12px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+th,td{padding:10px 12px;text-align:left;font-size:12px;border-bottom:1px solid #f1f5f9}th{background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.b-guichet{background:#dbeafe;color:#1d4ed8}.b-online{background:#dcfce7;color:#166534}
+.nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:#0f172a;display:flex;justify-content:space-around;align-items:center;color:#94a3b8;font-size:10px}
+.nav .on{color:#fff;font-weight:700}body{padding-bottom:80px}
+</style></head><body>
+<h1>Journal des ventes</h1>
+<p class="sub">Toutes les ventes de la compagnie — guichet et en ligne</p>
+<div class="filters"><div class="f">Période : 7 derniers jours</div><div class="f">Canal : Tous</div><div class="f">Export CSV</div></div>
+<table><thead><tr><th>Référence</th><th>Date</th><th>Trajet</th><th>Canal</th><th>Montant</th><th>Vendeur</th></tr></thead>
+<tbody>
+<tr><td>TB-A8F2K91L</td><td>07/06 06:12</td><td>Abidjan → Bouaké</td><td><span class="badge b-guichet">Guichet</span></td><td>3 500 XOF</td><td>Koffi A.</td></tr>
+<tr><td>TB-B3M7P02Q</td><td>07/06 07:45</td><td>Lomé → Kara</td><td><span class="badge b-online">En ligne</span></td><td>5 000 XOF</td><td>—</td></tr>
+<tr><td>TB-C9R1T88W</td><td>07/06 08:02</td><td>Abidjan → Yamoussoukro</td><td><span class="badge b-guichet">Guichet</span></td><td>4 000 XOF</td><td>Ama K.</td></tr>
+</tbody></table>
+<div class="nav"><div>Accueil</div><div>Scanner</div><div class="on">Ventes</div><div>Voyages</div><div>Caisse</div></div>
+</body></html>

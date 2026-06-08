@@ -1,0 +1,980 @@
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link, useParams } from "react-router-dom";
+import { format, parseISO } from "date-fns";
+import {
+  ArrowLeftIcon,
+  BusIcon,
+  CalendarIcon,
+  ClockIcon,
+  PackageIcon,
+  PercentIcon,
+  PlusIcon,
+  TicketIcon,
+  TrashIcon,
+  UsersIcon,
+  ListIcon,
+  ScanLineIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
+import SeatPicker from "@/components/seat-picker.tsx";
+import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
+import { useAppUser } from "@/hooks/use-app-user.ts";
+import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useSupabaseOccupiedSeats } from "@/hooks/use-supabase-trip-detail";
+import {
+  getSellerProfileSupabase,
+  getSellerCompanyReceiptInfoSupabase,
+  listSellerTripsSupabase,
+  sellCounterTicketSupabase,
+  type CounterSaleTicket,
+  type SellerCompanyReceiptInfo,
+  type SellerCounterTrip,
+  type SellerProfileSupabase,
+} from "@/lib/supabase/seller-counter";
+import { getActivePaymentGatewaySupabase } from "@/lib/supabase/payment-gateway.ts";
+import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
+import { calculateTravelerPaymentSupabase } from "@/lib/supabase/payment-fees";
+import { supabaseErrorMessage } from "@/lib/supabase/errors";
+import { getOpenStationCashSupabase } from "@/lib/supabase/station-cash";
+import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
+import {
+  inferCiNetworkFromPhone,
+  PAYMENT_NETWORK_OPTIONS,
+  paymentNetworkLabel,
+} from "@/lib/payment-networks.ts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
+import {
+  getSellerCommissionSummarySupabase,
+  type SellerCommissionSummary,
+} from "@/lib/supabase/accounting";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import CompanySalesLedger from "@/pages/owner/_components/CompanySalesLedger.tsx";
+import StationCashPanel from "@/pages/seller/_components/StationCashPanel.tsx";
+import ColisAutonomesPage from "@/pages/seller/ColisAutonomesPage.tsx";
+import { getCompanyColisSettingsSupabase } from "@/lib/supabase/colis-autonomes.ts";
+import SellerTicketReceiptPanel, {
+  counterTicketToReceiptInput,
+} from "@/components/seller/SellerTicketReceiptPanel.tsx";
+import type { TicketReceiptInput } from "@/lib/ticket-receipt-print.ts";
+import type { CompanyTicketSaleRow } from "@/lib/supabase/cancellation.ts";
+import CompanyLoyaltyUserLookup, {
+  type SelectedLoyaltyUser,
+} from "@/components/CompanyLoyaltyUserLookup.tsx";
+import { randomUUID } from "@/lib/random-id.ts";
+
+type TravelerForm = {
+  id: string;
+  passengerName: string;
+  passengerPhone: string;
+  seatNumber: string | null;
+  parcelCount: string;
+  parcelWeight: string;
+  parcelAmount: string;
+};
+
+function fmt(iso: string, pattern: string) {
+  try {
+    return format(parseISO(iso), pattern);
+  } catch {
+    return iso;
+  }
+}
+
+function newTravelerForm(): TravelerForm {
+  return {
+    id: randomUUID(),
+    passengerName: "",
+    passengerPhone: "",
+    seatNumber: null,
+    parcelCount: "0",
+    parcelWeight: "0",
+    parcelAmount: "0",
+  };
+}
+
+function toNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function SaleForm({
+  trip,
+  profile,
+  onBack,
+  onSold,
+}: {
+  trip: SellerCounterTrip;
+  profile: SellerProfileSupabase;
+  onBack: () => void;
+  onSold: (tickets: CounterSaleTicket[]) => void;
+}) {
+  const { t } = useTranslation("seller");
+  const { lng } = useParams<{ lng: string }>();
+  const occupiedSeats = useSupabaseOccupiedSeats(trip._id);
+  const isDirectSale = profile.canSellDirect;
+  const [travelers, setTravelers] = useState<TravelerForm[]>([newTravelerForm()]);
+  const [saving, setSaving] = useState(false);
+  const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
+  const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false);
+  const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
+  const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
+  const [networkManual, setNetworkManual] = useState(false);
+  const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
+  const [loyaltyLookupUser, setLoyaltyLookupUser] = useState<SelectedLoyaltyUser | null>(null);
+  const [cashOpen, setCashOpen] = useState<boolean | null>(null);
+  const [cashPendingReversal, setCashPendingReversal] = useState(false);
+
+  const selectedSeats = useMemo(
+    () => travelers.map((t) => t.seatNumber).filter((seat): seat is string => Boolean(seat)),
+    [travelers],
+  );
+
+  const actionLabel = isDirectSale ? "Vendre" : t("book_and_pay_online");
+  const loadingLabel = isDirectSale ? "Vente..." : "Redirection...";
+
+  const nominalAmount = useMemo(
+    () =>
+      travelers.reduce((sum, traveler) => {
+        return sum + trip.priceAmount + toNumber(traveler.parcelAmount);
+      }, 0),
+    [travelers, trip.priceAmount],
+  );
+
+  const companyId = trip.companyId ?? profile.company?.id ?? "";
+  const primaryPhone = travelers[0]?.passengerPhone ?? "";
+
+  useEffect(() => {
+    if (!isDirectSale) {
+      setCashOpen(null);
+      setCashPendingReversal(false);
+      return;
+    }
+
+    let cancelled = false;
+    void getOpenStationCashSupabase()
+      .then((cash) => {
+        if (cancelled) return;
+        setCashOpen(cash.open);
+        setCashPendingReversal(Boolean(cash.pendingReversal));
+      })
+      .catch(() => {
+        if (!cancelled) setCashOpen(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDirectSale]);
+
+  useEffect(() => {
+    void getActivePaymentGatewaySupabase()
+      .then((state) => setActiveGateway(state.gateway))
+      .catch(() => setActiveGateway("fedapay"));
+  }, []);
+
+  useEffect(() => {
+    if (isDirectSale || networkManual) return;
+    const inferred = inferCiNetworkFromPhone(primaryPhone);
+    if (inferred) setPaymentNetwork(inferred);
+  }, [isDirectSale, networkManual, primaryPhone]);
+
+  useEffect(() => {
+    if (isDirectSale || !companyId) {
+      setPaymentBreakdown(null);
+      setPaymentPreviewError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPaymentPreviewLoading(true);
+    setPaymentPreviewError(null);
+
+    calculateTravelerPaymentSupabase({
+      nominalAmount,
+      companyId,
+      gateway: activeGateway,
+      method: "mobile_money",
+      network: paymentNetwork,
+    })
+      .then((breakdown) => {
+        if (!cancelled) setPaymentBreakdown(breakdown);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setPaymentBreakdown(null);
+          setPaymentPreviewError(
+            err instanceof Error ? err.message : "Calcul du montant impossible",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, isDirectSale, nominalAmount, paymentNetwork, activeGateway]);
+
+  const setTraveler = (id: string, patch: Partial<TravelerForm>) => {
+    setTravelers((items) =>
+      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  };
+
+  const removeTraveler = (id: string) => {
+    setTravelers((items) => (items.length === 1 ? items : items.filter((item) => item.id !== id)));
+  };
+
+  const handleSell = async () => {
+    const normalized = travelers.map((traveler) => ({
+      ...traveler,
+      passengerName: traveler.passengerName.trim(),
+      passengerPhone: traveler.passengerPhone.trim(),
+    }));
+
+    if (normalized.some((traveler) => !traveler.passengerName)) {
+      toast.error("Nom complet requis pour chaque voyageur");
+      return;
+    }
+
+    if (trip.totalSeats > 0 && normalized.some((traveler) => !traveler.seatNumber)) {
+      toast.error("Choisissez un siege pour chaque voyageur");
+      return;
+    }
+
+    const uniqueSeats = new Set(selectedSeats);
+    if (uniqueSeats.size !== selectedSeats.length) {
+      toast.error("Deux voyageurs ne peuvent pas avoir le meme siege");
+      return;
+    }
+
+    const occupied = occupiedSeats ?? [];
+    if (selectedSeats.some((seat) => occupied.includes(seat))) {
+      toast.error("Un siege selectionne est deja occupe");
+      return;
+    }
+
+    if (!isDirectSale && normalized.some((traveler) => !traveler.passengerPhone)) {
+      toast.error("Téléphone requis pour chaque paiement en ligne");
+      return;
+    }
+
+    if (isDirectSale && cashOpen === false) {
+      toast.error("Ouvrez votre caisse avant toute vente guichet (onglet Guichet → Session caisse journalière)");
+      return;
+    }
+
+    if (isDirectSale && cashPendingReversal) {
+      toast.error("Vente bloquée : un reversement est en attente de validation comptable");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (!isDirectSale) {
+        const baseUrl = window.location.origin;
+        const successUrl = `${baseUrl}/${lng ?? "fr"}/payment/verify?reservationId=${trip._id}&source=seller&gateway=${activeGateway}`;
+        const errorUrl = `${baseUrl}/${lng ?? "fr"}/payment/verify?status=failed&reservationId=${trip._id}&source=seller&gateway=${activeGateway}`;
+        const firstTraveler = normalized[0];
+
+        const { checkoutUrl } = await initializePaymentSupabase({
+          reservationId: trip._id,
+          passengerName: firstTraveler.passengerName,
+          passengerPhone: firstTraveler.passengerPhone,
+          seatNumber: firstTraveler.seatNumber ?? undefined,
+          travelers: normalized.map((traveler) => ({
+            passengerName: traveler.passengerName,
+            passengerPhone: traveler.passengerPhone || undefined,
+            seatNumber: traveler.seatNumber ?? undefined,
+            parcelCount: toNumber(traveler.parcelCount),
+            parcelWeight: toNumber(traveler.parcelWeight),
+            parcelAmount: toNumber(traveler.parcelAmount),
+          })),
+          channel: "seller_reservation",
+          paymentNetwork,
+          successUrl,
+          errorUrl,
+        });
+
+        window.location.href = checkoutUrl;
+        return;
+      }
+
+      const tickets: CounterSaleTicket[] = [];
+      for (const traveler of normalized) {
+        const ticket = await sellCounterTicketSupabase({
+          reservationId: trip._id,
+          traveler: {
+            passengerName: traveler.passengerName,
+            passengerPhone: traveler.passengerPhone || undefined,
+            seatNumber: traveler.seatNumber ?? undefined,
+            parcelCount: toNumber(traveler.parcelCount),
+            parcelWeight: toNumber(traveler.parcelWeight),
+            parcelAmount: toNumber(traveler.parcelAmount),
+          },
+        });
+        tickets.push(ticket);
+      }
+
+      toast.success(`${tickets.length} ticket(s) vendu(s)`);
+      onSold(tickets);
+    } catch (err) {
+      toast.error(supabaseErrorMessage(err, "Vente impossible"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer"
+      >
+        <ArrowLeftIcon className="w-4 h-4" /> Retour
+      </button>
+
+      {isDirectSale && cashOpen === false ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+          Ouvrez votre session caisse journalière avant de vendre. Sans caisse ouverte, la vente guichet est refusée par le serveur.
+        </div>
+      ) : null}
+      {isDirectSale && cashPendingReversal ? (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-300">
+          Reversement en attente : les ventes cash sont suspendues jusqu&apos;à validation comptable.
+        </div>
+      ) : null}
+
+      <div className="rounded-xl border p-4 space-y-2 bg-muted/20">
+        <p className="font-bold">{isDirectSale ? "Vente guichet" : "Réservation tiers"}</p>
+        <p className="text-xs text-muted-foreground">
+          {profile.company?.name ?? trip.company?.name ?? "Compagnie"} · {trip.originLoc?.city ?? "?"} → {trip.destLoc?.city ?? "?"}
+        </p>
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><CalendarIcon className="w-3.5 h-3.5" />{fmt(trip.departureTime, "dd MMM yyyy")}</span>
+          <span className="flex items-center gap-1"><ClockIcon className="w-3.5 h-3.5" />{fmt(trip.departureTime, "HH:mm")}</span>
+          <span className="flex items-center gap-1"><UsersIcon className="w-3.5 h-3.5" />{trip.seatsAvailable}/{trip.totalSeats}</span>
+        </div>
+      </div>
+
+      {travelers.map((traveler, index) => {
+        const occupiedForTraveler = [
+          ...(occupiedSeats ?? []),
+          ...selectedSeats.filter((seat) => seat !== traveler.seatNumber),
+        ];
+
+        return (
+          <Card key={traveler.id}>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-sm">Voyageur {index + 1}</p>
+                {travelers.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={() => removeTraveler(traveler.id)}
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Nom complet *</Label>
+                  <Input
+                    value={traveler.passengerName}
+                    onChange={(event) => setTraveler(traveler.id, { passengerName: event.target.value })}
+                    placeholder="Nom du voyageur"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Telephone</Label>
+                  {isDirectSale && companyId && index === 0 ? (
+                    <>
+                      <CompanyLoyaltyUserLookup
+                        companyId={companyId}
+                        query={traveler.passengerPhone}
+                        onQueryChange={(value) => {
+                          setTraveler(traveler.id, { passengerPhone: value });
+                          if (!value.trim()) setLoyaltyLookupUser(null);
+                        }}
+                        onSelect={(user) => {
+                          setLoyaltyLookupUser(user);
+                          if (user?.phone) {
+                            setTraveler(traveler.id, { passengerPhone: user.phone });
+                          }
+                        }}
+                      />
+                      {loyaltyLookupUser?.companyLoyaltyActive ? (
+                        <p className="text-xs text-primary">
+                          Fidélité compagnie : {loyaltyLookupUser.companyPoints} pts pour {loyaltyLookupUser.displayName}
+                        </p>
+                      ) : loyaltyLookupUser ? (
+                        <p className="text-xs text-muted-foreground">
+                          Compte Tibus trouvé — la vente peut continuer. Aucun point fidélité compagnie (programme inactif).
+                        </p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Input
+                      value={traveler.passengerPhone}
+                      onChange={(event) => setTraveler(traveler.id, { passengerPhone: event.target.value })}
+                      placeholder="+228..."
+                    />
+                  )}
+                </div>
+              </div>
+
+              {trip.totalSeats > 0 && (
+                <div className="space-y-2">
+                  <Label>Siege</Label>
+                  <SeatPicker
+                    totalSeats={trip.totalSeats}
+                    occupiedSeats={occupiedForTraveler}
+                    selectedSeat={traveler.seatNumber}
+                    onSelect={(seat) => setTraveler(traveler.id, { seatNumber: seat })}
+                    busType={trip.bus?.busType}
+                  />
+                </div>
+              )}
+
+              <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <PackageIcon className="w-3.5 h-3.5" /> Colis
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Nombre</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={traveler.parcelCount}
+                      onChange={(event) => setTraveler(traveler.id, { parcelCount: event.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Poids (kg)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={traveler.parcelWeight}
+                      onChange={(event) => setTraveler(traveler.id, { parcelWeight: event.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Montant</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={traveler.parcelAmount}
+                      onChange={(event) => setTraveler(traveler.id, { parcelAmount: event.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      <Button
+        type="button"
+        variant="secondary"
+        className="w-full cursor-pointer"
+        onClick={() => setTravelers((items) => [...items, newTravelerForm()])}
+      >
+        <PlusIcon className="w-4 h-4 mr-1.5" /> Ajouter un voyageur
+      </Button>
+
+      {!isDirectSale && (
+        <div className="space-y-1.5">
+          <Label>Réseau Mobile Money</Label>
+          <Select
+            value={paymentNetwork}
+            onValueChange={(value) => {
+              setNetworkManual(true);
+              setPaymentNetwork(value as PaymentNetwork);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAYMENT_NETWORK_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {paymentNetworkLabel(option.value, lng ?? "fr")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {paymentBreakdown?.usedMaxFallback && (
+            <p className="text-xs text-muted-foreground">
+              Estimation avec le taux le plus élevé ({paymentBreakdown.network}).
+            </p>
+          )}
+        </div>
+      )}
+
+      <Separator />
+
+      <div className="rounded-xl border p-4 flex items-center justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">
+            {isDirectSale ? "Total guichet" : "Total à payer en ligne"}
+          </p>
+          {!isDirectSale && (
+            <p className="text-xs text-muted-foreground">
+              Billets + colis : {trip.currency} {nominalAmount.toLocaleString()}
+            </p>
+          )}
+          <p className="text-xl font-black text-primary">
+            {trip.currency}{" "}
+            {isDirectSale
+              ? nominalAmount.toLocaleString()
+              : paymentPreviewLoading
+                ? "..."
+                : (paymentBreakdown?.totalAmount ?? nominalAmount).toLocaleString()}
+          </p>
+          {paymentPreviewError && !isDirectSale && (
+            <p className="text-xs text-amber-700">
+              {paymentPreviewError.includes("Configuration frais gateway")
+                ? "Frais de paiement non configurés — le montant affiché est indicatif."
+                : paymentPreviewError}
+            </p>
+          )}
+        </div>
+        <Button onClick={handleSell} disabled={saving} className="cursor-pointer">
+          {saving ? loadingLabel : actionLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function saleRowToReceiptInput(
+  row: CompanyTicketSaleRow,
+  companyName: string,
+): TicketReceiptInput {
+  const parts = row.routeLabel.split(/\s*(?:→|->|—|-)\s*/);
+  return {
+    reference: row.reference,
+    passengerName: row.passengerName,
+    seatNumber: row.seatNumber,
+    totalPrice: row.ticketAmount,
+    companyName,
+    trip: {
+      originCity: parts[0]?.trim() || row.routeLabel,
+      destCity: parts[1]?.trim() || "?",
+      departureTime: row.departureTime,
+      priceAmount: row.ticketAmount,
+      currency: row.currency,
+    },
+  };
+}
+
+export default function SupabaseSellerDashboard() {
+  const { t } = useTranslation("seller");
+  const { lng } = useParams<{ lng: string }>();
+  const { appUserId } = useSupabaseAuth();
+  const appUser = useAppUser();
+  const [profile, setProfile] = useState<SellerProfileSupabase | null | undefined>(undefined);
+  const [trips, setTrips] = useState<SellerCounterTrip[] | undefined>(undefined);
+  const [commissions, setCommissions] = useState<SellerCommissionSummary | null>(null);
+  const [selectedTrip, setSelectedTrip] = useState<SellerCounterTrip | null>(null);
+  const [receiptTickets, setReceiptTickets] = useState<CounterSaleTicket[] | null>(null);
+  const [reprintInput, setReprintInput] = useState<TicketReceiptInput | null>(null);
+  const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(null);
+  const [colisModuleEnabled, setColisModuleEnabled] = useState(false);
+
+  const load = async () => {
+    if (!appUserId) return;
+    setProfile(undefined);
+    setTrips(undefined);
+    try {
+      const nextProfile = await getSellerProfileSupabase(appUserId);
+      setProfile(nextProfile);
+      if (!nextProfile) {
+        setTrips([]);
+        setCommissions(null);
+        return;
+      }
+      const [nextTrips, nextCommissions, colisSettings, receiptInfo] = await Promise.all([
+        listSellerTripsSupabase(nextProfile),
+        getSellerCommissionSummarySupabase().catch(() => null),
+        nextProfile.company
+          ? getCompanyColisSettingsSupabase(nextProfile.company.id).catch(() => null)
+          : Promise.resolve(null),
+        nextProfile.company
+          ? getSellerCompanyReceiptInfoSupabase(nextProfile.company.id).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      setTrips(nextTrips);
+      setCommissions(nextCommissions);
+      setColisModuleEnabled(Boolean(colisSettings?.colisAutonomeEnabled));
+      setCompanyReceiptInfo(receiptInfo);
+    } catch (err) {
+      toast.error(supabaseErrorMessage(err, "Chargement vendeur impossible"));
+      setProfile(null);
+      setTrips([]);
+      setCommissions(null);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appUserId]);
+
+  if (appUser.isLoading || profile === undefined || trips === undefined) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Skeleton key={index} className="h-24 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="rounded-xl border p-8 text-center text-muted-foreground space-y-2">
+        <TicketIcon className="w-10 h-10 mx-auto opacity-30" />
+        <p className="font-medium">Acces vendeur refuse</p>
+        <p className="text-sm">Votre compte n'a pas de role vendeur sur une compagnie.</p>
+      </div>
+    );
+  }
+
+  if (reprintInput) {
+    return (
+      <SellerTicketReceiptPanel
+        input={reprintInput}
+        companyInfo={companyReceiptInfo ?? undefined}
+        showSuccessHeader={false}
+        onBack={() => setReprintInput(null)}
+        onDone={() => setReprintInput(null)}
+      />
+    );
+  }
+
+  if (selectedTrip && receiptTickets) {
+    const companyName = profile.company?.name ?? selectedTrip.company?.name ?? "Tibus";
+    return (
+      <div className="space-y-6">
+        {receiptTickets.length > 1 && (
+          <p className="text-center text-xs text-muted-foreground print-hide">
+            {receiptTickets.length} tickets emis · impression POS ticket par ticket
+          </p>
+        )}
+        {receiptTickets.map((ticket, index) => (
+          <SellerTicketReceiptPanel
+            key={ticket.bookingId}
+            input={counterTicketToReceiptInput(ticket, selectedTrip, companyName)}
+            companyInfo={companyReceiptInfo ?? undefined}
+            showSuccessHeader={index === 0}
+            onBack={
+              index === receiptTickets.length - 1
+                ? () => {
+                    setReceiptTickets(null);
+                    setSelectedTrip(null);
+                    void load();
+                  }
+                : undefined
+            }
+            onNewSale={
+              index === receiptTickets.length - 1
+                ? () => {
+                    setReceiptTickets(null);
+                  }
+                : undefined
+            }
+            onDone={
+              index === receiptTickets.length - 1
+                ? () => {
+                    setReceiptTickets(null);
+                    setSelectedTrip(null);
+                    void load();
+                  }
+                : undefined
+            }
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (selectedTrip) {
+    return (
+      <SaleForm
+        trip={selectedTrip}
+        profile={profile}
+        onBack={() => setSelectedTrip(null)}
+        onSold={(tickets) => {
+          setReceiptTickets(tickets);
+        }}
+      />
+    );
+  }
+
+  const totalAvailableSeats = trips.reduce((sum, trip) => sum + trip.seatsAvailable, 0);
+  const canCancelTickets =
+    profile.company &&
+    (profile.roleNames.includes("vendeur") || profile.roleNames.includes("owner"));
+
+  const dashboardCards = [
+    {
+      label: profile.canSellDirect ? "Mode caisse" : "Mode réservation",
+      value: profile.canSellDirect ? "Guichet" : "Tiers",
+      icon: TicketIcon,
+    },
+    {
+      label: "Départs",
+      value: trips.length.toLocaleString(),
+      icon: BusIcon,
+    },
+    {
+      label: "Places",
+      value: totalAvailableSeats.toLocaleString(),
+      icon: UsersIcon,
+    },
+    {
+      label: "Commissions",
+      value: commissions
+        ? `${commissions.pendingTotal.toLocaleString()} ${commissions.currency}`
+        : "—",
+      icon: PercentIcon,
+    },
+  ];
+
+  const counterContent = (
+    <div className="space-y-4">
+      <div data-tour="seller-header" className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold">Espace guichet</p>
+        <div className="flex items-center gap-2">
+          <ExploreFeaturesButton variant="icon" />
+          <Button variant="outline" size="sm" className="h-8 cursor-pointer" asChild>
+            <Link to={`/${lng ?? "fr"}/verify/scan`} data-tour="seller-scan">
+              <ScanLineIcon className="w-4 h-4 mr-1.5" />
+              Scanner
+            </Link>
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <BusIcon className="w-5 h-5 text-primary" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-bold truncate">{profile.company?.name ?? "Agent marchand"}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {profile.user.name || profile.user.email || "Vendeur"}
+          </p>
+        </div>
+      </div>
+
+      <div data-tour="seller-kpis" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {dashboardCards.map(({ label, value, icon: Icon }) => (
+          <Card key={label}>
+            <CardContent className="p-4">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                <Icon className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="font-black text-lg truncate">{value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {commissions && (
+        <Card data-tour="seller-commissions">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <PercentIcon className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Commissions</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {commissions.totalTickets} vente(s) tiers
+                  </p>
+                </div>
+              </div>
+              <Badge variant="secondary">{commissions.currency}</Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-lg bg-muted p-3">
+                <p className="text-[10px] text-muted-foreground">En attente</p>
+                <p className="font-black">
+                  {commissions.pendingTotal.toLocaleString()} {commissions.currency}
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted p-3">
+                <p className="text-[10px] text-muted-foreground">Payees</p>
+                <p className="font-black">
+                  {commissions.paidTotal.toLocaleString()} {commissions.currency}
+                </p>
+              </div>
+            </div>
+            {commissions.entries.length > 0 ? (
+              <div className="space-y-2">
+                {commissions.entries.slice(0, 3).map((entry) => (
+                  <div key={entry.bookingId} className="flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{entry.companyName}</p>
+                      <p className="text-muted-foreground truncate">
+                        {entry.reference} · {entry.routeLabel}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold">
+                        {entry.commissionAmount.toLocaleString()} {entry.currency}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {entry.commissionRate}%
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Aucune commission tiers enregistrée pour le moment.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {profile.canSellDirect && profile.company ? (
+        <StationCashPanel
+          companyId={profile.company.id}
+          canOpen={profile.roleNames.includes("vendeur")}
+        />
+      ) : null}
+
+      <div id="third-party-booking" data-tour="seller-departures" className="scroll-mt-20">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Departs disponibles</h2>
+      </div>
+
+      {trips.length === 0 ? (
+        <div className="rounded-xl border p-8 text-center text-muted-foreground">
+          <BusIcon className="w-10 h-10 mx-auto opacity-30 mb-2" />
+          <p className="font-medium">Aucun depart disponible</p>
+        </div>
+      ) : (
+        trips.map((trip, tripIndex) => (
+          <Card key={trip._id}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-bold">{trip.originLoc?.city ?? "?"} → {trip.destLoc?.city ?? "?"}</p>
+                  <p className="text-xs text-muted-foreground">{trip.origin?.name} → {trip.destination?.name}</p>
+                </div>
+                <Badge variant={trip.seatsAvailable === 0 ? "destructive" : "secondary"}>
+                  {trip.seatsAvailable}/{trip.totalSeats}
+                </Badge>
+              </div>
+
+              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><CalendarIcon className="w-3.5 h-3.5" />{fmt(trip.departureTime, "dd MMM")}</span>
+                <span className="flex items-center gap-1"><ClockIcon className="w-3.5 h-3.5" />{fmt(trip.departureTime, "HH:mm")}</span>
+                <span className="font-semibold text-foreground ml-auto">{trip.currency} {trip.priceAmount.toLocaleString()}</span>
+              </div>
+
+              {trip.bus && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <BusIcon className="w-3 h-3" /> {trip.bus.name} · {trip.bus.busType}
+                </p>
+              )}
+
+              <Button
+                size="sm"
+                className="w-full cursor-pointer"
+                disabled={trip.seatsAvailable === 0}
+                data-tour={tripIndex === 0 ? "seller-sell-trip" : undefined}
+                onClick={() => setSelectedTrip(trip)}
+              >
+                <PlusIcon className="w-4 h-4 mr-1.5" /> {profile.canSellDirect ? t("counter_sale") : t("third_party_reservation")}
+              </Button>
+            </CardContent>
+          </Card>
+        ))
+      )}
+
+      <p className="text-[11px] text-muted-foreground">
+        {t("counter_sale_note", {
+          defaultValue:
+            profile.canSellDirect
+              ? "Chaque voyageur ajouté crée un ticket vendu distinct avec sa propre référence."
+              : "Les agents réseau font une réservation tiers puis passent par le paiement en ligne.",
+        })}
+      </p>
+    </div>
+  );
+
+  if (profile.company) {
+    return (
+      <Tabs defaultValue="counter">
+        <TabsList className="w-full">
+          <TabsTrigger value="counter" className="flex-1" data-tour="seller-tab-counter">
+            <BusIcon className="w-4 h-4 mr-1.5" />
+            Guichet
+          </TabsTrigger>
+          <TabsTrigger value="sales" className="flex-1" data-tour="seller-tab-sales">
+            <ListIcon className="w-4 h-4 mr-1.5" />
+            Ventes compagnie
+          </TabsTrigger>
+          {colisModuleEnabled && profile.canSellDirect ? (
+            <TabsTrigger value="colis" className="flex-1" data-tour="seller-colis">
+              <PackageIcon className="w-4 h-4 mr-1.5" />
+              Colis
+            </TabsTrigger>
+          ) : null}
+        </TabsList>
+        <TabsContent value="counter" className="mt-4">
+          {counterContent}
+        </TabsContent>
+        <TabsContent value="sales" className="mt-4">
+          <CompanySalesLedger
+            companyId={profile.company.id}
+            canCancel={Boolean(canCancelTickets)}
+            onReprint={(row) =>
+              setReprintInput(
+                saleRowToReceiptInput(row, profile.company?.name ?? companyReceiptInfo?.name ?? "Tibus"),
+              )
+            }
+          />
+        </TabsContent>
+        {colisModuleEnabled && profile.canSellDirect ? (
+          <TabsContent value="colis" className="mt-4">
+            <ColisAutonomesPage />
+          </TabsContent>
+        ) : null}
+      </Tabs>
+    );
+  }
+
+  return counterContent;
+}

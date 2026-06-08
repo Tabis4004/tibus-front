@@ -1,0 +1,13 @@
+# Bloquer le scan automatique de Cursor
+node_modules/
+.next/
+out/
+build/
+dist/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.svg
+*.png
+*.jpg
+*.sql

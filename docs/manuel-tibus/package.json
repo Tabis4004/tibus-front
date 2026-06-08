@@ -1,0 +1,13 @@
+{
+  "name": "manuel-tibus",
+  "version": "1.0.0",
+  "description": "Support de **formation** (pas une synthèse 5 slides). Couvre les 4 rôles, 22 menus Owner, flux caisse, cycle billet.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

@@ -1,0 +1,332 @@
+import { supabase } from "@/lib/supabase";
+
+export type OwnerCompany = {
+  id: string;
+  name: string;
+  logo: string | null;
+  managerName: string | null;
+  commissionRate: number;
+  isActive: boolean;
+  currency: string | null;
+};
+
+export type OwnerCompanyDetails = OwnerCompany & {
+  voyageColisMsg: string | null;
+  arretReservation: boolean;
+};
+
+export type OwnerKPIs = {
+  totalBuses: number;
+  upcomingTrips: number;
+  totalSellers: number;
+  totalBookings: number;
+};
+
+function roleNameFromJoin(
+  role: { name: string } | { name: string }[] | null | undefined,
+): string | null {
+  if (!role) return null;
+  if (Array.isArray(role)) return role[0]?.name ?? null;
+  return role.name ?? null;
+}
+
+export const COMPANY_STAFF_ROLE_NAMES = [
+  "owner",
+  "comptable_compagnie",
+  "controleur",
+  "vendeur",
+] as const;
+
+export type CompanyStaffRole = (typeof COMPANY_STAFF_ROLE_NAMES)[number];
+
+export async function resolveCompanyStaffCompanyId(
+  appUserId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("UserRoles")
+    .select("companyId, Role(name)")
+    .eq("userId", appUserId);
+
+  if (error) throw error;
+
+  const staffRow = (data ?? []).find((row) => {
+    const name = roleNameFromJoin(row.Role as { name: string } | { name: string }[]);
+    return Boolean(row.companyId) && COMPANY_STAFF_ROLE_NAMES.includes(name as CompanyStaffRole);
+  });
+
+  return (staffRow?.companyId as string) ?? null;
+}
+
+export type OwnerCompanyOption = {
+  id: string;
+  name: string;
+};
+
+export async function listOwnerCompaniesSupabase(
+  appUserId: string,
+): Promise<OwnerCompanyOption[]> {
+  const { data, error } = await supabase
+    .from("UserRoles")
+    .select("companyId, Role(name), Companies(id, name)")
+    .eq("userId", appUserId);
+
+  if (error) throw error;
+
+  const companies = new Map<string, OwnerCompanyOption>();
+  for (const row of data ?? []) {
+    if (roleNameFromJoin(row.Role as { name: string } | { name: string }[]) !== "owner") {
+      continue;
+    }
+    const companyId = row.companyId as string | null;
+    if (!companyId) continue;
+
+    const joined = Array.isArray(row.Companies) ? row.Companies[0] : row.Companies;
+    const name =
+      (joined as { name?: string } | null)?.name
+      ?? companies.get(companyId)?.name
+      ?? "Compagnie";
+
+    companies.set(companyId, { id: companyId, name });
+  }
+
+  return [...companies.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function resolveOwnerCompanyId(
+  appUserId: string,
+): Promise<string | null> {
+  const companies = await listOwnerCompaniesSupabase(appUserId);
+  return companies[0]?.id ?? null;
+}
+
+export async function getOwnerCompanyDetailsSupabase(
+  appUserId: string,
+): Promise<OwnerCompanyDetails | null> {
+  const companyId = await resolveOwnerCompanyId(appUserId);
+  if (!companyId) return null;
+
+  const { data, error } = await supabase
+    .from("Companies")
+    .select(
+      "id, name, logo, managerName, commissionRate, isActive, countryId, voyageColisMsg, arretReservation",
+    )
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: country, error: countryError } = await supabase
+    .from("Countries")
+    .select("currency")
+    .eq("id", data.countryId as string)
+    .maybeSingle();
+
+  if (countryError) throw countryError;
+
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    logo: (data.logo as string | null) ?? null,
+    managerName: (data.managerName as string | null) ?? null,
+    commissionRate: data.commissionRate as number,
+    isActive: data.isActive as boolean,
+    currency: (country?.currency as string | null) ?? "XOF",
+    voyageColisMsg: (data.voyageColisMsg as string | null) ?? null,
+    arretReservation: Boolean(data.arretReservation),
+  };
+}
+
+export async function updateOwnerCompanySupabase(
+  companyId: string,
+  patch: {
+    name?: string;
+    logo?: string | null;
+    managerName?: string | null;
+    voyageColisMsg?: string | null;
+    arretReservation?: boolean;
+  },
+): Promise<void> {
+  const { error } = await supabase.from("Companies").update(patch).eq("id", companyId);
+  if (error) throw error;
+}
+
+export async function getCompanyForAppUserSupabase(
+  appUserId: string,
+): Promise<OwnerCompany | null> {
+  const companyId = await resolveCompanyStaffCompanyId(appUserId);
+  if (!companyId) return null;
+
+  const { data, error } = await supabase
+    .from("Companies")
+    .select("id, name, logo, managerName, commissionRate, isActive, countryId")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: country, error: countryError } = await supabase
+    .from("Countries")
+    .select("currency")
+    .eq("id", data.countryId as string)
+    .maybeSingle();
+
+  if (countryError) throw countryError;
+
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    logo: (data.logo as string | null) ?? null,
+    managerName: (data.managerName as string | null) ?? null,
+    commissionRate: data.commissionRate as number,
+    isActive: data.isActive as boolean,
+    currency: (country?.currency as string | null) ?? "XOF",
+  };
+}
+
+export async function getMyCompanySupabase(
+  appUserId: string,
+): Promise<OwnerCompany | null> {
+  const companyId = await resolveOwnerCompanyId(appUserId);
+  if (!companyId) return null;
+
+  const { data, error } = await supabase
+    .from("Companies")
+    .select("id, name, logo, managerName, commissionRate, isActive, countryId")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: country, error: countryError } = await supabase
+    .from("Countries")
+    .select("currency")
+    .eq("id", data.countryId as string)
+    .maybeSingle();
+
+  if (countryError) throw countryError;
+
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    logo: (data.logo as string | null) ?? null,
+    managerName: (data.managerName as string | null) ?? null,
+    commissionRate: data.commissionRate as number,
+    isActive: data.isActive as boolean,
+    currency: (country?.currency as string | null) ?? "XOF",
+  };
+}
+
+export async function getOwnerKPIsSupabase(
+  appUserId: string,
+): Promise<OwnerKPIs | null> {
+  const companyId = await resolveOwnerCompanyId(appUserId);
+  if (!companyId) return null;
+
+  const now = new Date().toISOString();
+
+  const [
+    { count: busCount, error: busError },
+    { data: gares, error: garesError },
+    { data: sellerRoles, error: sellerError },
+  ] = await Promise.all([
+    supabase
+      .from("Bus")
+      .select("id", { count: "exact", head: true })
+      .eq("companyId", companyId)
+      .eq("isActive", true),
+    supabase.from("Gares").select("id").eq("companyId", companyId),
+    supabase
+      .from("UserRoles")
+      .select("Role(name)")
+      .eq("companyId", companyId),
+  ]);
+
+  if (busError) throw busError;
+  if (garesError) throw garesError;
+  if (sellerError) throw sellerError;
+
+  const totalSellers = (sellerRoles ?? []).filter((row) => {
+    const name = roleNameFromJoin(
+      row.Role as { name: string } | { name: string }[],
+    );
+    return name === "vendeur" || name === "controleur" || name === "comptable_compagnie";
+  }).length;
+
+  const gareIds = (gares ?? []).map((g) => g.id as string);
+  if (!gareIds.length) {
+    return {
+      totalBuses: busCount ?? 0,
+      upcomingTrips: 0,
+      totalSellers: 0,
+      totalBookings: 0,
+    };
+  }
+
+  const { data: trajets, error: trajetsError } = await supabase
+    .from("ProgrammationTrajets")
+    .select("id")
+    .in("depart", gareIds);
+
+  if (trajetsError) throw trajetsError;
+
+  const trajetIds = (trajets ?? []).map((t) => t.id as string);
+
+  let upcomingTrips = 0;
+  let reservationIds: string[] = [];
+
+  if (trajetIds.length > 0) {
+    const { data: reservations, error: resError } = await supabase
+      .from("Reservations")
+      .select("id, date")
+      .in("trajetId", trajetIds);
+
+    if (resError) throw resError;
+
+    reservationIds = (reservations ?? []).map((r) => r.id as string);
+    upcomingTrips = (reservations ?? []).filter(
+      (r) => (r.date as string) > now,
+    ).length;
+  }
+
+  let totalBookings = 0;
+  if (reservationIds.length > 0) {
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("ReservationBus")
+      .select("isReservation, paymentId")
+      .in("reservationId", reservationIds)
+      .eq("type", "voyage");
+
+    if (bookingsError) throw bookingsError;
+
+    const paymentIds = [
+      ...new Set((bookings ?? []).map((b) => b.paymentId as string)),
+    ];
+
+    const paymentTx = new Map<string, string | null>();
+    if (paymentIds.length > 0) {
+      const { data: payments, error: payError } = await supabase
+        .from("Payment")
+        .select("id, txID")
+        .in("id", paymentIds);
+      if (payError) throw payError;
+      for (const p of payments ?? []) {
+        paymentTx.set(p.id as string, p.txID as string | null);
+      }
+    }
+
+    totalBookings = (bookings ?? []).filter((b) => {
+      const tx = paymentTx.get(b.paymentId as string);
+      return !b.isReservation || Boolean(tx);
+    }).length;
+  }
+
+  return {
+    totalBuses: busCount ?? 0,
+    upcomingTrips,
+    totalSellers,
+    totalBookings,
+  };
+}
