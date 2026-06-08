@@ -1,14 +1,51 @@
 import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
-import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { SignInButton } from "@/components/ui/signin.tsx";
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+} from "@/components/auth/AuthBoundary.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import AppHeader from "./_components/AppHeader.tsx";
 import BottomNav from "./_components/BottomNav.tsx";
-import { useTranslation } from "react-i18next";
+import { isSupabaseAuth } from "@/lib/auth/config";
+import { useAppUser } from "@/hooks/use-app-user.ts";
 
-function ProfileGate({ children }: { children: React.ReactNode }) {
+function ProfileLoading() {
+  return (
+    <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto mt-8">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+    </div>
+  );
+}
+
+function SupabaseProfileGate({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const { lng } = useParams();
+  const appUser = useAppUser();
+
+  useEffect(() => {
+    if (appUser.isReady && !appUser.profileCompleted) {
+      navigate(`/${lng ?? "en"}/complete-profile`, { replace: true });
+    }
+  }, [appUser.isReady, appUser.profileCompleted, navigate, lng]);
+
+  if (appUser.isLoading || !appUser.isReady) {
+    return <ProfileLoading />;
+  }
+
+  if (!appUser.profileCompleted) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function ConvexProfileGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { lng } = useParams();
   const currentUser = useQuery(api.users.getCurrentUser);
@@ -19,18 +56,10 @@ function ProfileGate({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser, navigate, lng]);
 
-  // Still loading user
   if (currentUser === undefined) {
-    return (
-      <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto mt-8">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-    );
+    return <ProfileLoading />;
   }
 
-  // Profile not complete — redirecting
   if (!currentUser?.profileCompleted) {
     return null;
   }
@@ -38,19 +67,21 @@ function ProfileGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function AppLayout() {
-  const { t } = useTranslation("common");
+function ProfileGate({ children }: { children: React.ReactNode }) {
+  if (isSupabaseAuth()) {
+    return <SupabaseProfileGate>{children}</SupabaseProfileGate>;
+  }
 
+  return <ConvexProfileGate>{children}</ConvexProfileGate>;
+}
+
+export default function AppLayout() {
   return (
     <div className="flex flex-col min-h-screen">
       <AuthLoading>
         <AppHeader />
         <main className="flex-1 pb-20 md:pb-0">
-          <div className="flex flex-col gap-4 p-6 max-w-2xl mx-auto mt-8">
-            <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
+          <ProfileLoading />
         </main>
       </AuthLoading>
       <Unauthenticated>

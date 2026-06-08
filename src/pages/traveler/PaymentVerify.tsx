@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { CheckCircleIcon, XCircleIcon, Loader2Icon, TicketIcon, HomeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
-import { Authenticated, AuthLoading } from "convex/react";
+import { Authenticated, AuthLoading } from "@/components/auth/AuthBoundary.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useTranslation } from "react-i18next";
 

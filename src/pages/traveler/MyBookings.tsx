@@ -31,7 +31,7 @@ import {
 import { toast } from "sonner";
 import { ConvexError } from "convex/values";
 import { format, parseISO } from "date-fns";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/components/auth/AuthBoundary.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { useTranslation } from "react-i18next";
 import ReviewDialog from "./_components/ReviewDialog.tsx";

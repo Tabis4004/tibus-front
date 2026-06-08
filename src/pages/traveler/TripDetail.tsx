@@ -35,7 +35,7 @@ import {
 import { toast } from "sonner";
 import { ConvexError } from "convex/values";
 import { format, parseISO } from "date-fns";
-import { Authenticated, Unauthenticated } from "convex/react";
+import { Authenticated, Unauthenticated } from "@/components/auth/AuthBoundary.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { useTranslation } from "react-i18next";
 import SeatPicker from "@/components/seat-picker.tsx";

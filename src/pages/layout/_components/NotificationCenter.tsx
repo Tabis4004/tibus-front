@@ -16,6 +16,7 @@ import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { usePushNotifications } from "@/hooks/use-push-notifications.ts";
 import { toast } from "sonner";
+import { isSupabaseAuth } from "@/lib/auth/config";
 
 const NOTIFICATION_ICONS: Record<string, typeof BellIcon> = {
   booking_confirmed: TicketIcon,
@@ -34,6 +35,14 @@ const NOTIFICATION_COLORS: Record<string, string> = {
 };
 
 export default function NotificationCenter() {
+  if (isSupabaseAuth()) {
+    return null;
+  }
+
+  return <ConvexNotificationCenter />;
+}
+
+function ConvexNotificationCenter() {
   const { t } = useTranslation("common");
   const { lng } = useParams<{ lng: string }>();
   const [open, setOpen] = useState(false);

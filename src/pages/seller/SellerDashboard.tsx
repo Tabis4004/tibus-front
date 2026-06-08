@@ -43,7 +43,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/
 import { toast } from "sonner";
 import { ConvexError } from "convex/values";
 import { format, parseISO } from "date-fns";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/components/auth/AuthBoundary.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 
 function fmt(iso: string, pattern: string) {
