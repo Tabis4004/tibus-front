@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useTranslation } from "react-i18next";
@@ -21,9 +22,12 @@ import {
   TagIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { isSupabaseAuth } from "@/lib/auth/config";
+import { useAppUser } from "@/hooks/use-app-user.ts";
+import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { getMyCompanySupabase, type OwnerCompany } from "@/lib/supabase/owner-company";
 
 type NavItem = {
   toSuffix: string;
@@ -69,128 +73,177 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-function SidebarContent({ onClose }: { onClose?: () => void }) {
+function SidebarCompanyCard({
+  name,
+  logoUrl,
+  planLabel,
+  noPlanLabel,
+}: {
+  name?: string;
+  logoUrl?: string | null;
+  planLabel?: string | null;
+  noPlanLabel: string;
+}) {
+  return (
+    <div className="px-3 mb-5">
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/80">
+        <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
+          {logoUrl ? (
+            <img src={logoUrl} alt="logo" className="w-9 h-9 rounded-lg object-cover" />
+          ) : (
+            <BuildingIcon className="w-4 h-4 text-sidebar-primary-foreground" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="font-semibold text-sm text-sidebar-foreground truncate">
+            {name ?? "—"}
+          </div>
+          {planLabel ? (
+            <Badge className="text-[9px] h-3.5 px-1 mt-0.5">{planLabel}</Badge>
+          ) : (
+            <span className="text-[10px] text-sidebar-foreground/50">{noPlanLabel}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConvexSidebarContent({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const company = useQuery(api.companies.getMyCompany, {});
 
   return (
     <div className="flex flex-col h-full py-4">
-      {/* Company Info */}
-      <div className="px-3 mb-5">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/80">
-          <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-            {company?.logoUrl ? (
-              <img src={company.logoUrl} alt="logo" className="w-9 h-9 rounded-lg object-cover" />
-            ) : (
-              <BuildingIcon className="w-4 h-4 text-sidebar-primary-foreground" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-sm text-sidebar-foreground truncate">
-              {company?.name ?? t("sidebar.my_company")}
-            </div>
-            {company?.subscriptionStatus && company.subscriptionStatus !== "none" ? (
-              <Badge className="text-[9px] h-3.5 px-1 mt-0.5">{company.planId?.toUpperCase()}</Badge>
-            ) : (
-              <span className="text-[10px] text-sidebar-foreground/50">{t("labels.no_active_plan", { ns: "common" })}</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Nav sections */}
-      <nav className="flex-1 px-3 space-y-5 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.titleKey}>
-            <p className="text-[10px] uppercase font-bold tracking-wider text-sidebar-foreground/40 px-3 mb-1.5">
-              {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
-            </p>
-            <div className="space-y-0.5">
-              {section.items.map(({ toSuffix, labelKey, icon: Icon, end }) => (
-                <NavLink
-                  key={toSuffix}
-                  to={`/${lng}${toSuffix}`}
-                  end={end}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150",
-                      isActive
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                    )
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <div className={cn(
-                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
-                        isActive ? "bg-white/15" : "bg-sidebar-accent/50"
-                      )}>
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
-                      <span className="truncate">{t(labelKey)}</span>
-                      {isActive && (
-                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-sidebar-primary-foreground/80" />
-                      )}
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
+      <SidebarCompanyCard
+        name={company?.name ?? t("sidebar.my_company")}
+        logoUrl={company?.logoUrl}
+        planLabel={company?.subscriptionStatus && company.subscriptionStatus !== "none" ? company.planId?.toUpperCase() ?? null : null}
+        noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
+      />
+      <OwnerSidebarNav onClose={onClose} lng={lng} t={t} />
     </div>
   );
 }
 
-export default function OwnerLayout() {
+function SupabaseSidebarContent({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
-  const navigate = useNavigate();
-  const user = useQuery(api.users.getCurrentUser, {});
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { appUserId } = useSupabaseAuth();
+  const [company, setCompany] = useState<OwnerCompany | null | undefined>(undefined);
 
-  // Show loading skeleton while user role is being fetched
-  if (user === undefined) {
-    return (
-      <div className="flex h-[calc(100vh-3.5rem)]">
-        <aside className="hidden md:flex flex-col w-60 bg-sidebar border-r border-sidebar-border shrink-0">
-          <div className="flex flex-col h-full py-4 px-3 space-y-4">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full rounded-lg" />
-            ))}
-          </div>
-        </aside>
-        <div className="flex-1 overflow-auto p-6 space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-xl" />
+  useEffect(() => {
+    if (!appUserId) {
+      setCompany(null);
+      return;
+    }
+    let cancelled = false;
+    void getMyCompanySupabase(appUserId)
+      .then((result) => {
+        if (!cancelled) setCompany(result);
+      })
+      .catch(() => {
+        if (!cancelled) setCompany(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [appUserId]);
+
+  return (
+    <div className="flex flex-col h-full py-4">
+      {company === undefined ? (
+        <div className="px-3 mb-5">
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      ) : (
+        <SidebarCompanyCard
+          name={company?.name ?? t("sidebar.my_company")}
+          logoUrl={company?.logo ?? null}
+          planLabel={null}
+          noPlanLabel={t("labels.no_active_plan", { ns: "common" })}
+        />
+      )}
+      <OwnerSidebarNav onClose={onClose} lng={lng} t={t} />
+    </div>
+  );
+}
+
+function OwnerSidebarNav({
+  onClose,
+  lng,
+  t,
+}: {
+  onClose?: () => void;
+  lng?: string;
+  t: (key: string, options?: Record<string, string>) => string;
+}) {
+  return (
+    <nav className="flex-1 px-3 space-y-5 overflow-y-auto">
+      {NAV_SECTIONS.map((section) => (
+        <div key={section.titleKey}>
+          <p className="text-[10px] uppercase font-bold tracking-wider text-sidebar-foreground/40 px-3 mb-1.5">
+            {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
+          </p>
+          <div className="space-y-0.5">
+            {section.items.map(({ toSuffix, labelKey, icon: Icon, end }) => (
+              <NavLink
+                key={toSuffix}
+                to={`/${lng}${toSuffix}`}
+                end={end}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div
+                      className={cn(
+                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
+                        isActive ? "bg-white/15" : "bg-sidebar-accent/50",
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="truncate">{t(labelKey)}</span>
+                    {isActive && (
+                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-sidebar-primary-foreground/80" />
+                    )}
+                  </>
+                )}
+              </NavLink>
             ))}
           </div>
         </div>
-      </div>
-    );
-  }
+      ))}
+    </nav>
+  );
+}
 
-  if (user?.role !== "owner" && user?.role !== "superadmin") {
-    navigate(`/${lng}`, { replace: true });
-    return null;
+function SidebarContent({ onClose }: { onClose?: () => void }) {
+  if (isSupabaseAuth()) {
+    return <SupabaseSidebarContent onClose={onClose} />;
   }
+  return <ConvexSidebarContent onClose={onClose} />;
+}
+
+function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation("owner");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-60 bg-sidebar border-r border-sidebar-border shrink-0">
         <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
@@ -209,17 +262,80 @@ export default function OwnerLayout() {
         </div>
       )}
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Mobile top bar for sidebar toggle */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
           <button onClick={() => setMobileOpen(true)} className="cursor-pointer p-1.5 rounded-lg hover:bg-muted transition-colors">
             <MenuIcon className="w-5 h-5" />
           </button>
           <span className="font-semibold text-sm">{t("header.owner_dashboard", { ns: "common" })}</span>
         </div>
-        <Outlet />
+        {children}
       </div>
     </div>
   );
+}
+
+function ConvexOwnerLayout() {
+  const { lng } = useParams<{ lng: string }>();
+  const navigate = useNavigate();
+  const user = useQuery(api.users.getCurrentUser, {});
+
+  if (user === undefined) {
+    return (
+      <OwnerLayoutShell>
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+        </div>
+      </OwnerLayoutShell>
+    );
+  }
+
+  if (user?.role !== "owner" && user?.role !== "superadmin") {
+    navigate(`/${lng}`, { replace: true });
+    return null;
+  }
+
+  return (
+    <OwnerLayoutShell>
+      <Outlet />
+    </OwnerLayoutShell>
+  );
+}
+
+function SupabaseOwnerLayout() {
+  const { lng } = useParams<{ lng: string }>();
+  const navigate = useNavigate();
+  const appUser = useAppUser();
+  const canAccess =
+    appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
+
+  if (appUser.isLoading || !appUser.isReady) {
+    return (
+      <OwnerLayoutShell>
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+        </div>
+      </OwnerLayoutShell>
+    );
+  }
+
+  if (!canAccess) {
+    navigate(`/${lng}`, { replace: true });
+    return null;
+  }
+
+  return (
+    <OwnerLayoutShell>
+      <Outlet />
+    </OwnerLayoutShell>
+  );
+}
+
+export default function OwnerLayout() {
+  if (isSupabaseAuth()) {
+    return <SupabaseOwnerLayout />;
+  }
+  return <ConvexOwnerLayout />;
 }
