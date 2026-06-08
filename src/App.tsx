@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { AuthBridgeProvider } from "./components/providers/auth-bridge.tsx";
 import { DefaultProviders } from "./components/providers/default.tsx";
 import LocaleWrapper from "./components/providers/locale-wrapper.tsx";
 import { SAVED_OR_DEFAULT_LOCALE, setLocaleInPath } from "./i18n";
@@ -48,7 +49,14 @@ export default function App() {
   return (
     <DefaultProviders>
       <BrowserRouter>
-        <Suspense fallback={<div></div>}>
+        <AuthBridgeProvider>
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+              <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            </div>
+          }
+        >
           <Routes>
             {/* Root: redirect to saved/default locale */}
             <Route
@@ -113,6 +121,7 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
+        </AuthBridgeProvider>
       </BrowserRouter>
     </DefaultProviders>
   );

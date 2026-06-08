@@ -36,10 +36,14 @@ function LandingPage() {
   const { lng } = useParams<{ lng: string }>();
   const { t } = useTranslation("common");
   const locale = lng ?? "en";
+  const cmsEnabled = !isSupabaseAuth();
 
-  // CMS data
-  const cmsData = useQuery(api.landingContent.getAll, {});
-  const liveStats = useQuery(api.landingContent.getLiveStats, {});
+  // CMS data (Convex — skipped in Supabase production to avoid Suspense hang)
+  const cmsData = useQuery(api.landingContent.getAll, cmsEnabled ? {} : "skip");
+  const liveStats = useQuery(
+    api.landingContent.getLiveStats,
+    cmsEnabled ? {} : "skip",
+  );
 
   // Parse CMS content with fallback defaults
   const heroContent = cmsData?.hero
