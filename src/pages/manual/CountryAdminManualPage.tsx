@@ -7,21 +7,21 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
-  canAccessCompanyManual,
-  COMPANY_MANUAL_SECTIONS,
-  COMPANY_MANUAL_SUBTITLE,
-  COMPANY_MANUAL_TITLE,
-} from "@/data/company-manual-content.ts";
+  canAccessCountryAdminManual,
+  COUNTRY_ADMIN_MANUAL_SECTIONS,
+  COUNTRY_ADMIN_MANUAL_SUBTITLE,
+  COUNTRY_ADMIN_MANUAL_TITLE,
+} from "@/data/country-admin-manual-content.ts";
 import { ManualSectionBlock } from "./_components/manual-blocks.tsx";
 
-export default function CompanyManualPage() {
+export default function CountryAdminManualPage() {
   const { lng } = useParams<{ lng: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("common");
   const appUser = useAppUser();
   const locale = lng ?? "fr";
   const home = `/${locale}`;
-  const canAccess = canAccessCompanyManual(appUser.roles, appUser.isSuperAdmin);
+  const canAccess = canAccessCountryAdminManual(appUser.roles, appUser.isSuperAdmin);
 
   useEffect(() => {
     if (appUser.isReady && !canAccess) {
@@ -54,14 +54,14 @@ export default function CompanyManualPage() {
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                {t("manual.restricted_badge", { defaultValue: "Owner & Super admin" })}
+                {t("manual.country_admin_badge", { defaultValue: "Admin pays & Super admin" })}
               </Badge>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#1A5296]">
-              {t("manual.title", { defaultValue: COMPANY_MANUAL_TITLE })}
+              {t("manual.country_admin_title", { defaultValue: COUNTRY_ADMIN_MANUAL_TITLE })}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {t("manual.subtitle", { defaultValue: COMPANY_MANUAL_SUBTITLE })}
+              {t("manual.country_admin_subtitle", { defaultValue: COUNTRY_ADMIN_MANUAL_SUBTITLE })}
             </p>
           </div>
           <div className="hidden sm:flex w-11 h-11 rounded-xl bg-primary/10 items-center justify-center shrink-0">
@@ -70,9 +70,9 @@ export default function CompanyManualPage() {
         </div>
 
         <p className="text-sm leading-relaxed text-muted-foreground">
-          {t("manual.intro", {
+          {t("manual.country_admin_intro", {
             defaultValue:
-              "Ce document décrit les menus et les actions de chaque profil utilisateur sur Tibus. Il s'adresse aux gérants et super administrateurs pour former leurs équipes.",
+              "Ce document explique à quoi sert le rôle admin pays sur Tibus, quels écrans vous pouvez utiliser et comment paramétrer commissions et fond de garantie pour votre territoire.",
           })}
         </p>
 
@@ -81,7 +81,7 @@ export default function CompanyManualPage() {
             {t("manual.toc", { defaultValue: "Sommaire" })}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {COMPANY_MANUAL_SECTIONS.map((section) => (
+            {COUNTRY_ADMIN_MANUAL_SECTIONS.map((section) => (
               <a
                 key={section.id}
                 href={`#${section.id}`}
@@ -94,14 +94,14 @@ export default function CompanyManualPage() {
         </nav>
 
         <div className="space-y-10">
-          {COMPANY_MANUAL_SECTIONS.map((section) => (
+          {COUNTRY_ADMIN_MANUAL_SECTIONS.map((section) => (
             <ManualSectionBlock key={section.id} section={section} />
           ))}
         </div>
 
         <p className="text-center text-xs text-muted-foreground italic pt-4 border-t">
-          {t("manual.footer", {
-            defaultValue: "Document Tibus · Compagnie de transport · Compte démo : tabiscompany@gmail.com",
+          {t("manual.country_admin_footer", {
+            defaultValue: "Document Tibus · Administration pays · Accès restreint admin_pays / super_admin",
           })}
         </p>
       </div>

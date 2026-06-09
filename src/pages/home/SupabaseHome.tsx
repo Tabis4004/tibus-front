@@ -37,6 +37,8 @@ export default function SupabaseHome() {
     "Tibus";
 
   const showOwnerDashboard = appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
+  const showCountryAdminPanel =
+    appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
   const showSellerDashboard = appUser.hasSellerRole || appUser.hasMerchantAgentApplication;
   const showThirdPartyBooking = appUser.hasThirdPartySellerRole || appUser.hasMerchantAgentApplication;
   const showTicketScanner = ["owner", "controleur", "vendeur", "super_admin"].some((role) =>
@@ -117,6 +119,7 @@ export default function SupabaseHome() {
             showOwnerDashboard ||
             showSellerDashboard ||
             showThirdPartyBooking ||
+            showCountryAdminPanel ||
             appUser.isSuperAdmin) && (
             <HomeBlockSection title={t("home.section_pro", { defaultValue: "Espace pro" })}>
               {showTicketScanner && (
@@ -178,7 +181,7 @@ export default function SupabaseHome() {
                 />
               )}
 
-              {appUser.isSuperAdmin && (
+              {(appUser.isSuperAdmin || appUser.roles.includes("admin_pays")) && (
                 <HomeActionBlock
                   to={`/${locale}/admin`}
                   title={t("admin_panel", { defaultValue: "Admin Panel" })}
@@ -186,6 +189,19 @@ export default function SupabaseHome() {
                     defaultValue: "Administration de la plateforme Tibus",
                   })}
                   icon={ShieldIcon}
+                />
+              )}
+
+              {showCountryAdminPanel && (
+                <HomeActionBlock
+                  to={`/${locale}/manual/admin-pays`}
+                  title={t("manual.country_admin_nav_title", {
+                    defaultValue: "Manuel admin pays",
+                  })}
+                  description={t("manual.country_admin_nav_desc", {
+                    defaultValue: "Comprendre votre rôle, les commissions et le fond de garantie",
+                  })}
+                  icon={BookOpenIcon}
                 />
               )}
 

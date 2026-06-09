@@ -73,6 +73,7 @@ import LoyaltyPage from "./owner/LoyaltyPage.tsx";
 import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
 import OwnerMessagesPage from "./owner/OwnerMessagesPage.tsx";
 import CompanyManualPage from "./manual/CompanyManualPage.tsx";
+import CountryAdminManualPage from "./manual/CountryAdminManualPage.tsx";
 
 function useSupabaseBranch<T>(supabase: T, convex: T): T {
   return isSupabaseAuth() ? supabase : convex;
@@ -120,6 +121,10 @@ export function GuidePageRoute() {
 
 export function CompanyManual() {
   return <CompanyManualPage />;
+}
+
+export function CountryAdminManual() {
+  return <CountryAdminManualPage />;
 }
 
 export function CompleteProfile() {

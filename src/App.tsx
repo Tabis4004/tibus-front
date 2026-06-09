@@ -25,6 +25,7 @@ import {
   CompanySettings,
   CreateCompany,
   CompanyManual,
+  CountryAdminManual,
   CompleteProfile,
   ContactPage,
   FleetManager,
@@ -132,6 +133,7 @@ function AppShell() {
                 <Route path="contact" element={<ContactPage />} />
                 <Route path="guide" element={<GuidePageRoute />} />
                 <Route path="manual/compagnie" element={<CompanyManual />} />
+                <Route path="manual/admin-pays" element={<CountryAdminManual />} />
                 <Route path="admin" element={<AdminPanel />} />
                 <Route path="admin/users/new" element={<AdminUserForm />} />
                 <Route path="admin/users/:userId/edit" element={<AdminUserForm />} />

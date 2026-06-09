@@ -22,6 +22,7 @@ import {
   FileTextIcon,
   ActivityIcon,
   type LucideIcon,
+  BookOpenIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
@@ -564,12 +565,22 @@ export default function SupabaseAdminPanel() {
             )}
           </div>
         </div>
-        <Link to={`/${lng}`}>
-          <Button variant="outline" size="sm" className="gap-2">
-            <ArrowLeftIcon className="w-4 h-4" />
-            {tc("buttons.back", { defaultValue: "Back" })}
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {(appUser.isSuperAdmin || appUser.roles.includes("admin_pays")) && (
+            <Link to={`/${lng ?? "fr"}/manual/admin-pays`}>
+              <Button variant="outline" size="sm" className="gap-2">
+                <BookOpenIcon className="w-4 h-4" />
+                {tc("manual.country_admin_nav_title", { defaultValue: "Manuel admin pays" })}
+              </Button>
+            </Link>
+          )}
+          <Link to={`/${lng}`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <ArrowLeftIcon className="w-4 h-4" />
+              {tc("buttons.back", { defaultValue: "Back" })}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
