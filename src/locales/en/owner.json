@@ -54,6 +54,8 @@
   "company.active_label": "Active company",
   "company.switch_label": "Switch company",
   "company.select": "Select a company",
+  "company.add_company": "Create another company",
+  "company.no_company_sidebar": "No company yet. Create yours to access the console.",
   "company.save_error": "Failed to save company. Please try again.",
   "fleet.title": "Fleet",
   "fleet.desc": "Manage your buses",

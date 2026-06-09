@@ -54,6 +54,8 @@
   "company.active_label": "Compagnie active",
   "company.switch_label": "Changer de compagnie",
   "company.select": "Choisir une compagnie",
+  "company.add_company": "Créer une autre compagnie",
+  "company.no_company_sidebar": "Aucune compagnie pour le moment. Créez la vôtre pour accéder à la console.",
   "company.save_error": "Impossible d'enregistrer l'entreprise. Veuillez réessayer.",
   "fleet.title": "Flotte",
   "fleet.desc": "Gérez vos bus",

@@ -356,10 +356,14 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 overflow-auto">
         <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-          <button onClick={() => setMobileOpen(true)} className="cursor-pointer p-1.5 rounded-lg hover:bg-muted transition-colors">
+          <button onClick={() => setMobileOpen(true)} className="cursor-pointer p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0">
             <MenuIcon className="w-5 h-5" />
           </button>
-          <span className="font-semibold text-sm">{t("header.owner_dashboard", { ns: "common" })}</span>
+          {isSupabaseAuth() ? (
+            <OwnerCompanySwitcher compact />
+          ) : (
+            <span className="font-semibold text-sm">{t("header.owner_dashboard", { ns: "common" })}</span>
+          )}
         </div>
         {children}
       </div>
