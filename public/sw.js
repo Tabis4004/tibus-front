@@ -1,78 +1,71 @@
-const CACHE_NAME = "tibus-v1";
-const urlsToCache = ["/", "/icon/icon-192.png", "/icon/icon-512.png"];
+const CACHE_VERSION = "tibus-static-v3";
+const STATIC_ASSETS = ["/icon/icon-192.png", "/icon/icon-512.png"];
 
-// Install event - cache core assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+      .open(CACHE_VERSION)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting()),
   );
 });
 
-// Fetch event - network first, fall back to cache
-self.addEventListener("fetch", (event) => {
-  // Only handle GET requests - POST/PUT/DELETE cannot be cached
-  if (event.request.method !== "GET") {
-    return;
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    void self.skipWaiting();
   }
-
-  // Never intercept auth paths.
-  try {
-    const url = new URL(event.request.url);
-    if (url.pathname.startsWith("/auth")) {
-      return;
-    }
-    // Never intercept cross-origin requests
-    if (url.origin !== self.location.origin) {
-      return;
-    }
-  } catch {
-    // URL parsing failed, fall through to normal handling
-  }
-
-  // Handle navigation requests differently
-  if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match("/")));
-    return;
-  }
-
-  // Network-first for other GET requests
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Only cache successful responses (status 200-299)
-        if (!response.ok) {
-          return response;
-        }
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        return response;
-      })
-      .catch(() => caches.match(event.request)),
-  );
 });
 
-// Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((cacheNames) => {
-        return Promise.all(
+      .then((cacheNames) =>
+        Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME) {
+            if (cacheName !== CACHE_VERSION) {
               return caches.delete(cacheName);
             }
           }),
-        );
-      })
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
 
-// Handle push notifications - only show if app is not in focus
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+
+  let url;
+  try {
+    url = new URL(event.request.url);
+  } catch {
+    return;
+  }
+
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/auth")) return;
+
+  // Never cache the app shell or hashed bundles — stale files break SPA navigation in Chrome.
+  if (
+    event.request.mode === "navigate" ||
+    url.pathname.startsWith("/assets/") ||
+    url.pathname === "/" ||
+    url.pathname.endsWith(".html") ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css")
+  ) {
+    return;
+  }
+
+  // Offline fallback for icons only.
+  if (url.pathname.startsWith("/icon/")) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request).then((r) => r ?? caches.match("/icon/icon-192.png"))),
+    );
+  }
+});
+
 self.addEventListener("push", (event) => {
   const data = event.data?.json() ?? {};
 
@@ -80,7 +73,6 @@ self.addEventListener("push", (event) => {
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       const isAppInFocus = clientList.some((client) => client.focused);
 
-      // Only show notification if app is not in focus
       if (!isAppInFocus) {
         return self.registration.showNotification(data.title, data.options);
       }
@@ -88,17 +80,14 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Handle notification clicks - opens/focuses the app
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   event.waitUntil(
     clients.matchAll({ type: "window" }).then((clientList) => {
-      // Focus existing window if found
       for (const client of clientList) {
         if ("focus" in client) return client.focus();
       }
-      // Open new window if none exists
       if (clients.openWindow) return clients.openWindow("/");
     }),
   );

@@ -7,39 +7,51 @@ export function useServiceWorker() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
-    const showUpdateToast = () => {
+    const showUpdateToast = (registration: ServiceWorkerRegistration) => {
       if (toastShown.current) return;
       toastShown.current = true;
 
-      toast("A new version is available!", {
+      toast("Une nouvelle version de Tibus est disponible.", {
         duration: Infinity,
-        action: { label: "Refresh", onClick: () => window.location.reload() },
+        action: {
+          label: "Recharger",
+          onClick: () => {
+            registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+            window.location.reload();
+          },
+        },
       });
     };
 
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("/sw.js", { updateViaCache: "none" })
       .then((registration) => {
-        console.log("Service Worker registered:", registration);
+        void registration.update();
 
-        // Check if update is already waiting
         if (registration.waiting) {
-          showUpdateToast();
-          return;
+          showUpdateToast(registration);
         }
 
-        // Listen for new updates
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;
           if (!newWorker) return;
 
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              showUpdateToast();
+              showUpdateToast(registration);
             }
           });
         });
       })
-      .catch((err) => console.log("Service Worker registration failed:", err));
+      .catch((err) => console.warn("Service Worker registration failed:", err));
+
+    const onControllerChange = () => {
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    };
   }, []);
 }
