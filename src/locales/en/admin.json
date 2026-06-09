@@ -259,6 +259,12 @@
   "stakeholder_commissions.preview_done": "Simulation updated.",
   "stakeholder_commissions.roles.seller_hint": "Share for platform sellers (independent, network, third-party) — excludes company owner, seller, accountant and controller.",
   "stakeholder_commissions.preview_seller_note": "No share for the company or any user linked to the company on the sale.",
+  "stakeholder_commissions.info_line_title": "Attribution rule",
+  "stakeholder_commissions.info_line_edit": "Information line (super admin)",
+  "stakeholder_commissions.info_line_save": "Save information",
+  "stakeholder_commissions.info_line_saved": "Information saved.",
+  "stakeholder_commissions.info_line_required": "Information line cannot be empty.",
+  "stakeholder_commissions.info_line_save_error": "Unable to save information.",
   "stakeholder_commissions.settings_load_error": "Unable to load stakeholder rates.",
   "stakeholder_commissions.balances_load_error": "Unable to load stakeholder balances."
 }

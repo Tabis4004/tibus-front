@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   CheckIcon,
   HistoryIcon,
+  InfoIcon,
   PercentIcon,
   RefreshCwIcon,
   WalletIcon,
@@ -25,12 +26,19 @@ import {
   type StakeholderCommissionSettlement,
   type StakeholderRole,
 } from "@/lib/supabase/stakeholder-commissions.ts";
+import {
+  DEFAULT_STAKEHOLDER_COMMISSION_INFO_LINE,
+  getStakeholderCommissionInfoSupabase,
+  upsertStakeholderCommissionInfoSupabase,
+} from "@/lib/supabase/stakeholder-commission-info.ts";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import { parseFeeInputOrZero } from "@/lib/fee-input.ts";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import {
   Select,
   SelectContent,
@@ -95,6 +103,9 @@ export default function StakeholderCommissionPanel({
   > | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [infoLine, setInfoLine] = useState<string | undefined>(undefined);
+  const [infoDraft, setInfoDraft] = useState(DEFAULT_STAKEHOLDER_COMMISSION_INFO_LINE);
+  const [savingInfoLine, setSavingInfoLine] = useState(false);
 
   useEffect(() => {
     if (defaultCountryId) setCountryId(defaultCountryId);
@@ -102,6 +113,19 @@ export default function StakeholderCommissionPanel({
 
   const effectiveSettingsCountryId =
     settingsScope === "global" && isSuperAdmin ? null : activeCountryId || null;
+
+  const loadInfoLine = useCallback(() => {
+    setInfoLine(undefined);
+    void getStakeholderCommissionInfoSupabase()
+      .then((row) => {
+        setInfoLine(row.infoLine);
+        setInfoDraft(row.infoLine);
+      })
+      .catch(() => {
+        setInfoLine(DEFAULT_STAKEHOLDER_COMMISSION_INFO_LINE);
+        setInfoDraft(DEFAULT_STAKEHOLDER_COMMISSION_INFO_LINE);
+      });
+  }, []);
 
   const loadSettings = useCallback(() => {
     setSettings(undefined);
@@ -155,10 +179,11 @@ export default function StakeholderCommissionPanel({
   }, [activeCountryId, t]);
 
   const reloadAll = useCallback(() => {
+    loadInfoLine();
     loadSettings();
     loadBalances();
     loadHistory();
-  }, [loadBalances, loadHistory, loadSettings]);
+  }, [loadBalances, loadHistory, loadInfoLine, loadSettings]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -178,6 +203,32 @@ export default function StakeholderCommissionPanel({
     () => (history ?? []).filter((row) => row.status === "pending_confirmation"),
     [history],
   );
+
+  const handleSaveInfoLine = async () => {
+    const trimmed = infoDraft.trim();
+    if (!trimmed) {
+      toast.error(t("stakeholder_commissions.info_line_required"));
+      return;
+    }
+
+    setSavingInfoLine(true);
+    try {
+      const saved = await upsertStakeholderCommissionInfoSupabase(trimmed);
+      setInfoLine(saved.infoLine);
+      setInfoDraft(saved.infoLine);
+      toast.success(t("stakeholder_commissions.info_line_saved"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.stakeholder_attribution",
+        action: "update",
+        summary: "Ligne d'information stakeholders mise à jour",
+        metadata: { infoLine: saved.infoLine },
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.info_line_save_error"));
+    } finally {
+      setSavingInfoLine(false);
+    }
+  };
 
   const handleSaveSetting = async (role: StakeholderRole) => {
     const rate = parseFeeInputOrZero(rateDrafts[role] ?? "0");
@@ -321,6 +372,31 @@ export default function StakeholderCommissionPanel({
 
   return (
     <div className={cn("space-y-4", embedded && "p-0")}>
+      {infoLine === undefined ? (
+        <Skeleton className="h-16 w-full" />
+      ) : (
+        <Alert className="border-blue-200/80 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20">
+          <InfoIcon />
+          <AlertTitle>{t("stakeholder_commissions.info_line_title")}</AlertTitle>
+          <AlertDescription>{infoLine}</AlertDescription>
+        </Alert>
+      )}
+
+      {isSuperAdmin && infoLine !== undefined && (
+        <div className="rounded-lg border border-dashed p-3 space-y-2">
+          <Label htmlFor="stakeholder-info-line">{t("stakeholder_commissions.info_line_edit")}</Label>
+          <Textarea
+            id="stakeholder-info-line"
+            rows={3}
+            value={infoDraft}
+            onChange={(e) => setInfoDraft(e.target.value)}
+          />
+          <Button size="sm" onClick={() => void handleSaveInfoLine()} disabled={savingInfoLine}>
+            {savingInfoLine ? tc("buttons.saving") : t("stakeholder_commissions.info_line_save")}
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5 min-w-[200px]">
           <Label>{t("stakeholder_commissions.country")}</Label>
