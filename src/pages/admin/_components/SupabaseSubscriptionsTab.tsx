@@ -32,7 +32,6 @@ import {
   type AdminSubscriptionPlan,
 } from "@/lib/supabase/admin-subscriptions.ts";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
-import AdminAuditHub from "./AdminAuditHub.tsx";
 
 type CompanyOption = {
   id: string;
@@ -217,9 +216,6 @@ export default function SupabaseSubscriptionsTab({
             </div>
           )}
         </CardContent>
-        <div className="px-6 pb-6">
-          <AdminAuditHub moduleKey="admin.subscriptions" />
-        </div>
       </Card>
 
       <Dialog open={manageCompany !== null} onOpenChange={(open) => !open && setManageCompany(null)}>

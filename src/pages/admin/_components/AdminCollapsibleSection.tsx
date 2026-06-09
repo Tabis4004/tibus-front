@@ -49,7 +49,9 @@ export default function AdminCollapsibleSection({
       </AccordionTrigger>
       <AccordionContent className="space-y-3 border-t pb-3 pt-2">
         {children}
-        {auditModuleKey ? <AdminAuditHub moduleKey={auditModuleKey} className="mt-1" /> : null}
+        {auditModuleKey ? (
+          <AdminAuditHub moduleKey={auditModuleKey} className="mt-2" compact />
+        ) : null}
       </AccordionContent>
     </AccordionItem>
   );

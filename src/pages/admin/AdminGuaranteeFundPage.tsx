@@ -116,7 +116,7 @@ export default function AdminGuaranteeFundPage() {
       </div>
 
       <GuaranteeFundManager companies={companies} />
-      <AdminAuditHub moduleKey="admin.guarantee_fund" />
+      <AdminAuditHub moduleKey="admin.guarantee_fund" scopeLabel="guarantee_fund" />
     </div>
     </AdminAccessGate>
   );

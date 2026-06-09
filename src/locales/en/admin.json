@@ -163,8 +163,10 @@
   },
   "audit_hub": {
     "title": "HUB log",
-    "empty": "No actions recorded for this section yet.",
+    "page_desc": "Actions recorded on this page only.",
+    "empty": "No actions recorded on this page yet. Changes will appear here.",
     "unavailable": "Log unavailable. Apply migration 061_platform_audit_log.sql.",
+    "sandbox_db_role": "Admin sandbox mode is UI-only: your account also needs a platform role in the database (super_admin, admin_pays…).",
     "unknown_actor": "User"
   },
   "users": {

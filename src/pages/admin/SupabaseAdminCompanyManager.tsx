@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { supabase } from "@/lib/supabase";
 import { useAppUser } from "@/hooks/use-app-user";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
+import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 
 type CompanyOverview = {
   id: string;
@@ -186,6 +187,8 @@ export default function SupabaseAdminCompanyManager() {
           </Button>
         </CardContent>
       </Card>
+
+      <AdminAuditHub moduleKey="admin.companies" scopeLabel="companies" className="mt-2" />
     </div>
     </AdminAccessGate>
   );

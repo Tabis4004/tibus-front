@@ -34,7 +34,6 @@ import {
   type AdminSubscriptionPlan,
 } from "@/lib/supabase/admin-subscriptions.ts";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
-import AdminAuditHub from "./AdminAuditHub.tsx";
 
 type CountryOption = { id: string; name: string; currency: string | null };
 
@@ -320,9 +319,6 @@ export default function SupabasePlansTab({
           ))
         )}
       </CardContent>
-      <div className="px-6 pb-6">
-        <AdminAuditHub moduleKey="admin.plans" />
-      </div>
 
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="max-w-md">

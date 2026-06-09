@@ -458,7 +458,7 @@ export default function AdminUserFormPage() {
         </div>
       )}
 
-      <AdminAuditHub moduleKey="admin.users" />
+      <AdminAuditHub moduleKey="admin.users" scopeLabel="users" />
     </div>
     </AdminAccessGate>
   );

@@ -163,8 +163,10 @@
   },
   "audit_hub": {
     "title": "Journal HUB",
-    "empty": "Aucune action enregistrée pour cette section.",
+    "page_desc": "Actions enregistrées sur cette page uniquement.",
+    "empty": "Aucune action enregistrée pour cette page. Les modifications apparaîtront ici.",
     "unavailable": "Journal indisponible. Appliquez le script 061_platform_audit_log.sql.",
+    "sandbox_db_role": "Le mode sandbox admin est UI seulement : votre compte doit aussi avoir un rôle plateforme en base (super_admin, admin_pays…).",
     "unknown_actor": "Utilisateur"
   },
   "users": {

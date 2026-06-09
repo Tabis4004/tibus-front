@@ -63,6 +63,7 @@ import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPan
 import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
+import AdminTabAuditHub from "./_components/AdminTabAuditHub.tsx";
 import SupabasePlansTab from "./_components/SupabasePlansTab.tsx";
 import SupabaseSubscriptionsTab from "./_components/SupabaseSubscriptionsTab.tsx";
 
@@ -652,6 +653,8 @@ export default function SupabaseAdminPanel() {
         </Card>
       )}
 
+      {tab === "users" && <AdminTabAuditHub tab="users" />}
+
       {tab === "companies" && (
         <Card>
           <CardHeader>
@@ -691,7 +694,10 @@ export default function SupabaseAdminPanel() {
         </Card>
       )}
 
+      {tab === "companies" && <AdminTabAuditHub tab="companies" />}
+
       {tab === "subscriptions" && (
+        <>
         <SupabaseSubscriptionsTab
           companies={data.companies.map((company) => ({
             id: company.id,
@@ -701,13 +707,18 @@ export default function SupabaseAdminPanel() {
           }))}
           onDataChanged={() => setRefreshKey((key) => key + 1)}
         />
+        <AdminTabAuditHub tab="subscriptions" />
+        </>
       )}
 
       {tab === "plans" && (
+        <>
         <SupabasePlansTab
           countries={data.countries}
           onDataChanged={() => setRefreshKey((key) => key + 1)}
         />
+        <AdminTabAuditHub tab="plans" />
+        </>
       )}
 
       {tab === "commissions" && (
@@ -780,6 +791,7 @@ export default function SupabaseAdminPanel() {
                     </AdminCollapsibleSection>
                   )}
                 </Accordion>
+                <AdminTabAuditHub tab="commissions" />
               </>
             )}
           </CardContent>
@@ -804,6 +816,7 @@ export default function SupabaseAdminPanel() {
               countryName: company.countryName,
             }))}
           />
+          <AdminTabAuditHub tab="guarantee_fund" />
         </div>
       )}
 
@@ -854,6 +867,8 @@ export default function SupabaseAdminPanel() {
         </div>
       )}
 
+      {tab === "geography" && <AdminTabAuditHub tab="geography" />}
+
       {tab === "roles" && (
         <Card>
           <CardHeader>
@@ -892,24 +907,43 @@ export default function SupabaseAdminPanel() {
         </Card>
       )}
 
+      {tab === "roles" && <AdminTabAuditHub tab="roles" />}
+
       {tab === "contact" && (
+        <>
         <ContactSettingsPanel
           companies={data.companies.map((company) => ({ id: company.id, name: company.name }))}
         />
+        <AdminTabAuditHub tab="contact" />
+        </>
       )}
 
-      {tab === "loyalty" && <PlatformLoyaltySettingsPanel />}
+      {tab === "loyalty" && (
+        <>
+          <PlatformLoyaltySettingsPanel />
+          <AdminTabAuditHub tab="loyalty" />
+        </>
+      )}
 
-      {tab === "legal" && appUser.isSuperAdmin && <LegalPagesPanel />}
+      {tab === "legal" && appUser.isSuperAdmin && (
+        <>
+          <LegalPagesPanel />
+          <AdminTabAuditHub tab="legal" />
+        </>
+      )}
 
       {tab === "scaling_metrics" && appUser.isSuperAdmin && (
+        <>
         <div className="space-y-6">
           <TpePosDiagnosticsPanel />
           <PlatformScalingMetricsPanel />
         </div>
+        <AdminTabAuditHub tab="scaling_metrics" />
+        </>
       )}
 
       {tab === "landing" && (
+        <>
         <ComingSoon
           icon={PencilIcon}
           title={t("tabs.landing", { defaultValue: "Landing Page" })}
@@ -917,6 +951,8 @@ export default function SupabaseAdminPanel() {
             defaultValue: "Le CMS Landing Page est encore branché sur Convex. Le panneau Supabase affiche ce statut au lieu d'un onglet vide.",
           })}
         />
+        <AdminTabAuditHub tab="landing" />
+        </>
       )}
     </div>
     </AdminAccessGate>
