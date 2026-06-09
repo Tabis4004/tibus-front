@@ -250,5 +250,8 @@
   "stakeholder_commissions.status.pending_confirmation": "In progress",
   "stakeholder_commissions.status.confirmed": "Paid",
   "stakeholder_commissions.status.rejected": "Rejected",
-  "stakeholder_commissions.status.cancelled": "Cancelled"
+  "stakeholder_commissions.status.cancelled": "Cancelled",
+  "stakeholder_commissions.invalid_gateway": "Invalid gateway amount.",
+  "stakeholder_commissions.country_required": "Select a country.",
+  "stakeholder_commissions.preview_total_rate": "Total rate: {{total}}%"
 }

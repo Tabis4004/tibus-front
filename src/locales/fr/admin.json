@@ -250,5 +250,8 @@
   "stakeholder_commissions.status.pending_confirmation": "En cours",
   "stakeholder_commissions.status.confirmed": "Payé",
   "stakeholder_commissions.status.rejected": "Refusé",
-  "stakeholder_commissions.status.cancelled": "Annulé"
+  "stakeholder_commissions.status.cancelled": "Annulé",
+  "stakeholder_commissions.invalid_gateway": "Montant passerelle invalide.",
+  "stakeholder_commissions.country_required": "Sélectionnez un pays.",
+  "stakeholder_commissions.preview_total_rate": "Total taux : {{total}}%"
 }

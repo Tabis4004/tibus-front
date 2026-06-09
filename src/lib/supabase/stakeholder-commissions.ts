@@ -166,6 +166,68 @@ export const STAKEHOLDER_ROLE_ORDER: StakeholderRole[] = [
   "company",
 ];
 
+function resolvePreviewBaseAmount(
+  baseType: StakeholderCommissionBaseType,
+  gatewayAmount: number,
+  totalAmount?: number | null,
+  platformNetAmount?: number | null,
+): number {
+  if (baseType === "total_amount") return totalAmount ?? gatewayAmount;
+  if (baseType === "platform_net") return platformNetAmount ?? gatewayAmount;
+  return gatewayAmount;
+}
+
+/** Simulation locale à partir des taux saisis (sans RPC). */
+export function previewStakeholderCommissionAttributionLocal(input: {
+  gatewayAmount: number;
+  totalAmount?: number | null;
+  platformNetAmount?: number | null;
+  countryId?: string | null;
+  roles?: StakeholderRole[];
+  rateDrafts: Record<string, string>;
+  baseDrafts: Record<string, StakeholderCommissionBaseType>;
+  settings?: StakeholderCommissionSetting[];
+}): StakeholderAttributionPreview {
+  const roles = input.roles ?? STAKEHOLDER_ROLE_ORDER;
+  const settingsByRole = new Map(
+    (input.settings ?? []).map((row) => [row.stakeholderRole, row]),
+  );
+
+  let totalRatePercent = 0;
+  const items: StakeholderAttributionPreviewItem[] = roles.map((role) => {
+    const saved = settingsByRole.get(role);
+    const parsedRate = Number(String(input.rateDrafts[role] ?? saved?.rate ?? 0).replace(",", "."));
+    const rate = Number.isFinite(parsedRate) ? parsedRate : 0;
+    const baseType = input.baseDrafts[role] ?? saved?.baseType ?? "gateway_amount";
+    const baseAmount = resolvePreviewBaseAmount(
+      baseType,
+      input.gatewayAmount,
+      input.totalAmount,
+      input.platformNetAmount,
+    );
+    const amount = Math.round((baseAmount * rate) / 100 * 100) / 100;
+    totalRatePercent += rate;
+
+    return {
+      stakeholderRole: role,
+      rate,
+      baseType,
+      baseAmount,
+      amount,
+      source: saved?.source ?? "draft",
+    };
+  });
+
+  return {
+    gatewayAmount: input.gatewayAmount,
+    totalAmount: input.totalAmount ?? null,
+    platformNetAmount: input.platformNetAmount ?? null,
+    countryId: input.countryId ?? null,
+    totalRatePercent,
+    items,
+  };
+}
+
 export type StakeholderCommissionBalance = {
   countryId: string;
   countryName: string;

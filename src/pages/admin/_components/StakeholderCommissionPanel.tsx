@@ -17,7 +17,7 @@ import {
   listStakeholderCommissionBalancesSupabase,
   listStakeholderCommissionSettlementHistorySupabase,
   listStakeholderCommissionSettingsSupabase,
-  previewStakeholderCommissionAttributionSupabase,
+  previewStakeholderCommissionAttributionLocal,
   rejectStakeholderCommissionSettlementSupabase,
   upsertStakeholderCommissionSettingSupabase,
   type StakeholderCommissionBalance,
@@ -89,8 +89,8 @@ export default function StakeholderCommissionPanel({
   const [balances, setBalances] = useState<StakeholderCommissionBalance[] | undefined>(undefined);
   const [history, setHistory] = useState<StakeholderCommissionSettlement[] | undefined>(undefined);
   const [previewGateway, setPreviewGateway] = useState("10000");
-  const [preview, setPreview] = useState<Awaited<
-    ReturnType<typeof previewStakeholderCommissionAttributionSupabase>
+  const [preview, setPreview] = useState<ReturnType<
+    typeof previewStakeholderCommissionAttributionLocal
   > | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -204,18 +204,29 @@ export default function StakeholderCommissionPanel({
     }
   };
 
-  const handlePreview = async () => {
+  const handlePreview = () => {
     const gatewayAmount = parseFeeInputOrZero(previewGateway);
-    if (gatewayAmount == null || !countryId) return;
-    try {
-      const result = await previewStakeholderCommissionAttributionSupabase({
-        gatewayAmount,
-        countryId,
-      });
-      setPreview(result);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.preview_error"));
+    if (gatewayAmount == null || gatewayAmount < 0) {
+      toast.error(t("stakeholder_commissions.invalid_gateway", { defaultValue: "Montant passerelle invalide." }));
+      return;
     }
+
+    const previewCountryId =
+      settingsScope === "global" && isSuperAdmin ? null : countryId || null;
+    if (previewCountryId == null && settingsScope !== "global") {
+      toast.error(t("stakeholder_commissions.country_required", { defaultValue: "Sélectionnez un pays." }));
+      return;
+    }
+
+    setPreview(
+      previewStakeholderCommissionAttributionLocal({
+        gatewayAmount,
+        countryId: previewCountryId,
+        rateDrafts,
+        baseDrafts,
+        settings: settings ?? [],
+      }),
+    );
   };
 
   const handleInitiatePayment = async (row: StakeholderCommissionBalance) => {
@@ -428,17 +439,27 @@ export default function StakeholderCommissionPanel({
                 onChange={(e) => setPreviewGateway(e.target.value)}
               />
             </div>
-            <Button size="sm" variant="outline" onClick={() => void handlePreview()}>
+            <Button size="sm" variant="outline" onClick={handlePreview}>
               {t("stakeholder_commissions.preview")}
             </Button>
           </div>
           {preview && (
-            <div className="text-xs text-muted-foreground grid gap-1 md:grid-cols-2">
-              {preview.items.map((item) => (
-                <div key={item.stakeholderRole}>
-                  {t(`stakeholder_commissions.roles.${item.stakeholderRole}`)}: {formatMoney(item.amount, "XOF")} ({item.rate}%)
-                </div>
-              ))}
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <p>
+                {t("stakeholder_commissions.preview_total_rate", {
+                  defaultValue: "Total taux : {{total}}%",
+                  total: preview.totalRatePercent.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+                })}
+              </p>
+              <div className="grid gap-1 md:grid-cols-2">
+                {preview.items.map((item) => (
+                  <div key={item.stakeholderRole}>
+                    {t(`stakeholder_commissions.roles.${item.stakeholderRole}`)}:{" "}
+                    {formatMoney(item.amount, "XOF")} ({item.rate}% ·{" "}
+                    {t(`stakeholder_commissions.base_types.${item.baseType}`)})
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
