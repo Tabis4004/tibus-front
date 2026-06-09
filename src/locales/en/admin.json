@@ -253,5 +253,6 @@
   "stakeholder_commissions.status.cancelled": "Cancelled",
   "stakeholder_commissions.invalid_gateway": "Invalid gateway amount.",
   "stakeholder_commissions.country_required": "Select a country.",
-  "stakeholder_commissions.preview_total_rate": "Total rate: {{total}}%"
+  "stakeholder_commissions.preview_total_rate": "Total rate: {{total}}%",
+  "stakeholder_commissions.preview_done": "Simulation updated."
 }

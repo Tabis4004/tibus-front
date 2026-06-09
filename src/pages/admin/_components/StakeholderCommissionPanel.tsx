@@ -44,6 +44,16 @@ import { cn } from "@/lib/utils.ts";
 
 type CountryOption = { id: string; name: string };
 
+function buildEmptyRateDrafts(): Record<string, string> {
+  return Object.fromEntries(STAKEHOLDER_ROLE_ORDER.map((role) => [role, "0"]));
+}
+
+function buildEmptyBaseDrafts(): Record<string, StakeholderCommissionBaseType> {
+  return Object.fromEntries(
+    STAKEHOLDER_ROLE_ORDER.map((role) => [role, "gateway_amount" as StakeholderCommissionBaseType]),
+  );
+}
+
 const BASE_TYPES: StakeholderCommissionBaseType[] = [
   "gateway_amount",
   "total_amount",
@@ -84,8 +94,13 @@ export default function StakeholderCommissionPanel({
   const [countryId, setCountryId] = useState(defaultCountryId);
   const [settingsScope, setSettingsScope] = useState<"global" | "country">("country");
   const [settings, setSettings] = useState<StakeholderCommissionSetting[] | undefined>(undefined);
-  const [rateDrafts, setRateDrafts] = useState<Record<string, string>>({});
-  const [baseDrafts, setBaseDrafts] = useState<Record<string, StakeholderCommissionBaseType>>({});
+  const [rateDrafts, setRateDrafts] = useState<Record<string, string>>(buildEmptyRateDrafts);
+  const [baseDrafts, setBaseDrafts] = useState<Record<string, StakeholderCommissionBaseType>>(buildEmptyBaseDrafts);
+
+  const activeCountryId = useMemo(
+    () => countryId || defaultCountryId || countries[0]?.id || "",
+    [countryId, defaultCountryId, countries],
+  );
   const [balances, setBalances] = useState<StakeholderCommissionBalance[] | undefined>(undefined);
   const [history, setHistory] = useState<StakeholderCommissionSettlement[] | undefined>(undefined);
   const [previewGateway, setPreviewGateway] = useState("10000");
@@ -100,7 +115,7 @@ export default function StakeholderCommissionPanel({
   }, [defaultCountryId]);
 
   const effectiveSettingsCountryId =
-    settingsScope === "global" && isSuperAdmin ? null : countryId || null;
+    settingsScope === "global" && isSuperAdmin ? null : activeCountryId || null;
 
   const loadSettings = useCallback(() => {
     setSettings(undefined);
@@ -118,28 +133,30 @@ export default function StakeholderCommissionPanel({
       })
       .catch((err) => {
         setSettings([]);
+        setRateDrafts(buildEmptyRateDrafts());
+        setBaseDrafts(buildEmptyBaseDrafts());
         toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.load_error"));
       });
   }, [effectiveSettingsCountryId, t]);
 
   const loadBalances = useCallback(() => {
-    if (!countryId && !isCountryAdmin) {
+    if (!activeCountryId && !isCountryAdmin) {
       setBalances([]);
       return;
     }
     setBalances(undefined);
-    void listStakeholderCommissionBalancesSupabase(countryId || null)
+    void listStakeholderCommissionBalancesSupabase(activeCountryId || null)
       .then(setBalances)
       .catch((err) => {
         setBalances([]);
         toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.load_error"));
       });
-  }, [countryId, isCountryAdmin, t]);
+  }, [activeCountryId, isCountryAdmin, t]);
 
   const loadHistory = useCallback(() => {
     setHistory(undefined);
     void listStakeholderCommissionSettlementHistorySupabase({
-      countryId: countryId || null,
+      countryId: activeCountryId || null,
       limit: 50,
     })
       .then(setHistory)
@@ -147,7 +164,7 @@ export default function StakeholderCommissionPanel({
         setHistory([]);
         toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.history_error"));
       });
-  }, [countryId, t]);
+  }, [activeCountryId, t]);
 
   const reloadAll = useCallback(() => {
     loadSettings();
@@ -157,9 +174,9 @@ export default function StakeholderCommissionPanel({
 
   useEffect(() => {
     if (!enabled) return;
-    if (!countryId && countries.length === 0) return;
+    if (!activeCountryId && countries.length === 0) return;
     reloadAll();
-  }, [reloadAll, countryId, settingsScope, enabled, countries.length]);
+  }, [reloadAll, activeCountryId, settingsScope, enabled, countries.length]);
 
   const totalRate = useMemo(
     () => (settings ?? []).reduce((sum, row) => sum + (row.isActive ? row.rate : 0), 0),
@@ -183,7 +200,7 @@ export default function StakeholderCommissionPanel({
       const scope = settingsScope === "global" && isSuperAdmin ? "global" : "country";
       await upsertStakeholderCommissionSettingSupabase({
         scope,
-        countryId: scope === "country" ? countryId : null,
+        countryId: scope === "country" ? activeCountryId : null,
         stakeholderRole: role,
         rate,
         baseType: baseDrafts[role] ?? "gateway_amount",
@@ -212,7 +229,7 @@ export default function StakeholderCommissionPanel({
     }
 
     const previewCountryId =
-      settingsScope === "global" && isSuperAdmin ? null : countryId || null;
+      settingsScope === "global" && isSuperAdmin ? null : activeCountryId || null;
     if (previewCountryId == null && settingsScope !== "global") {
       toast.error(t("stakeholder_commissions.country_required", { defaultValue: "Sélectionnez un pays." }));
       return;
@@ -317,7 +334,7 @@ export default function StakeholderCommissionPanel({
         <div className="space-y-1.5 min-w-[200px]">
           <Label>{t("stakeholder_commissions.country")}</Label>
           <Select
-            value={countryId || countries[0]?.id}
+            value={activeCountryId}
             onValueChange={setCountryId}
             disabled={!isSuperAdmin}
           >

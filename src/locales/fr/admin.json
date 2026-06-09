@@ -253,5 +253,6 @@
   "stakeholder_commissions.status.cancelled": "Annulé",
   "stakeholder_commissions.invalid_gateway": "Montant passerelle invalide.",
   "stakeholder_commissions.country_required": "Sélectionnez un pays.",
-  "stakeholder_commissions.preview_total_rate": "Total taux : {{total}}%"
+  "stakeholder_commissions.preview_total_rate": "Total taux : {{total}}%",
+  "stakeholder_commissions.preview_done": "Simulation mise à jour."
 }
