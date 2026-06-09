@@ -64,9 +64,11 @@ function statusVariant(status: StakeholderCommissionSettlement["status"]) {
 export default function StakeholderCommissionPanel({
   countries,
   embedded = false,
+  enabled = true,
 }: {
   countries: CountryOption[];
   embedded?: boolean;
+  enabled?: boolean;
 }) {
   const { t } = useTranslation("admin");
   const { t: tc } = useTranslation("common");
@@ -94,8 +96,8 @@ export default function StakeholderCommissionPanel({
   const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
-    if (defaultCountryId && !countryId) setCountryId(defaultCountryId);
-  }, [countryId, defaultCountryId]);
+    if (defaultCountryId) setCountryId(defaultCountryId);
+  }, [defaultCountryId]);
 
   const effectiveSettingsCountryId =
     settingsScope === "global" && isSuperAdmin ? null : countryId || null;
@@ -154,8 +156,10 @@ export default function StakeholderCommissionPanel({
   }, [loadBalances, loadHistory, loadSettings]);
 
   useEffect(() => {
+    if (!enabled) return;
+    if (!countryId && countries.length === 0) return;
     reloadAll();
-  }, [reloadAll, countryId, settingsScope]);
+  }, [reloadAll, countryId, settingsScope, enabled, countries.length]);
 
   const totalRate = useMemo(
     () => (settings ?? []).reduce((sum, row) => sum + (row.isActive ? row.rate : 0), 0),
@@ -284,13 +288,25 @@ export default function StakeholderCommissionPanel({
     return settlement.beneficiaryUserId === appUser.profile?.id;
   };
 
+  if (!enabled) {
+    return null;
+  }
+
+  if (countries.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("stakeholder_commissions.load_error")}
+      </p>
+    );
+  }
+
   return (
     <div className={cn("space-y-4", embedded && "p-0")}>
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5 min-w-[200px]">
           <Label>{t("stakeholder_commissions.country")}</Label>
           <Select
-            value={countryId}
+            value={countryId || countries[0]?.id}
             onValueChange={setCountryId}
             disabled={!isSuperAdmin}
           >

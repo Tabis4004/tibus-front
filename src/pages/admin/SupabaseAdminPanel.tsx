@@ -226,6 +226,7 @@ export default function SupabaseAdminPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<ModuleErrorKey, string>>>({});
   const [refreshKey, setRefreshKey] = useState(0);
+  const [commissionAccordionSections, setCommissionAccordionSections] = useState<string[]>([]);
   const canAccessAdminPanel = appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
 
   useEffect(() => {
@@ -759,7 +760,7 @@ export default function SupabaseAdminPanel() {
                     <span className="text-destructive">{errors.commissions}</span>
                   </p>
                 )}
-                <Accordion type="multiple" defaultValue={[]} className="flex flex-col gap-2">
+                <Accordion type="multiple" value={commissionAccordionSections} onValueChange={setCommissionAccordionSections} className="flex flex-col gap-2">
                   <CommissionSettingsManager
                     settings={data.commissionSettings}
                     companies={data.companies}
@@ -779,13 +780,20 @@ export default function SupabaseAdminPanel() {
                     title={t("stakeholder_commissions.title", { defaultValue: "Attribution stakeholders" })}
                     auditModuleKey="admin.commissions.stakeholder_attribution"
                   >
-                    <StakeholderCommissionPanel
-                      embedded
-                      countries={data.countries.map((country) => ({
-                        id: country.id,
-                        name: country.name,
-                      }))}
-                    />
+                    {commissionAccordionSections.includes("stakeholder-commissions") ? (
+                      <StakeholderCommissionPanel
+                        embedded
+                        enabled
+                        countries={data.countries.map((country) => ({
+                          id: country.id,
+                          name: country.name,
+                        }))}
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {t("stakeholder_commissions.realtime_hint")}
+                      </p>
+                    )}
                   </AdminCollapsibleSection>
                   <AdminCollapsibleSection
                     value="gateway-fees"
