@@ -4,7 +4,7 @@ import { Authenticated, Unauthenticated } from "@/components/auth/AuthBoundary.t
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Link, useParams } from "react-router-dom";
-import { BusIcon, LogOutIcon, UserIcon, ShieldIcon, Share2Icon } from "lucide-react";
+import { BusIcon, LogOutIcon, UserIcon, ShieldIcon, Share2Icon, PlusIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import NotificationCenter from "./NotificationCenter.tsx";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
+import { useAppUser } from "@/hooks/use-app-user.ts";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
   const url = "https://tibus.onhercules.app";
@@ -55,12 +56,19 @@ async function shareApp(t: (key: string, opts?: Record<string, string>) => strin
 
 function UserMenu() {
   const { signout, user } = useAuth();
-  const dbUser = useQuery(api.users.getCurrentUser, {});
+  const dbUser = useQuery(api.users.getCurrentUser, isSupabaseAuth() ? "skip" : {});
+  const appUser = useAppUser();
   const { t } = useTranslation("common");
   const { lng } = useParams<{ lng: string }>();
 
-  const role = dbUser?.role ?? "traveler";
+  const role = isSupabaseAuth()
+    ? appUser.primaryRoleUi
+    : (dbUser?.role ?? "traveler");
   const roleLabel = t(`roles.${role}`);
+  const canCreateCompany =
+    isSupabaseAuth() &&
+    appUser.isReady &&
+    (appUser.roles.includes("traveler") || appUser.roles.includes("owner"));
 
   return (
     <DropdownMenu>
@@ -95,11 +103,28 @@ function UserMenu() {
             </Link>
           </DropdownMenuItem>
         )}
-        {role === "traveler" && (
+        {role === "traveler" && !isSupabaseAuth() && (
           <DropdownMenuItem asChild>
             <Link to={`/${lng}/become-owner`} className="cursor-pointer">
               <UserIcon className="w-4 h-4 mr-2" />
               {t("header.become_owner")}
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {canCreateCompany && (
+          <DropdownMenuItem asChild>
+            <Link
+              to={
+                appUser.roles.includes("owner")
+                  ? `/${lng}/owner/company?new=1`
+                  : `/${lng}/create-company`
+              }
+              className="cursor-pointer"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              {appUser.roles.includes("owner")
+                ? t("header.create_company", { defaultValue: "Créer une compagnie" })
+                : t("header.become_owner")}
             </Link>
           </DropdownMenuItem>
         )}

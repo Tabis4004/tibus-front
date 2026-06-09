@@ -21,6 +21,7 @@ import OwnerOverviewPage from "./owner/OwnerOverview.tsx";
 import SupabaseOwnerOverview from "./owner/SupabaseOwnerOverview.tsx";
 import CompanySettingsPage from "./owner/CompanySettings.tsx";
 import SupabaseCompanySettings from "./owner/SupabaseCompanySettings.tsx";
+import SupabaseCreateCompanyPage from "./owner/SupabaseCreateCompanyPage.tsx";
 import FleetManagerPage from "./owner/FleetManager.tsx";
 import SupabaseFleetManager from "./owner/SupabaseFleetManager.tsx";
 import StationsManagerPage from "./owner/StationsManager.tsx";
@@ -135,6 +136,10 @@ export function OwnerOverview() {
 
 export function CompanySettings() {
   return useSupabaseBranch(<SupabaseCompanySettings />, <CompanySettingsPage />);
+}
+
+export function CreateCompany() {
+  return useSupabaseBranch(<SupabaseCreateCompanyPage />, <CompanySettingsPage />);
 }
 
 export function FleetManager() {

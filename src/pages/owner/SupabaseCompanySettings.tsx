@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { BuildingIcon, ImageIcon, SaveIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -12,16 +13,27 @@ import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { refreshAppUser } from "@/hooks/use-app-user.ts";
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import {
+  createOwnerCompanySupabase,
   getOwnerCompanyDetailsSupabase,
   updateOwnerCompanySupabase,
   type OwnerCompanyDetails,
 } from "@/lib/supabase/owner-company";
+import { listCountriesSupabase, type CountryRow } from "@/lib/supabase/geography";
 
 const companySchema = z.object({
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  countryId: z.string().optional(),
   logo: z.string().optional(),
   managerName: z.string().optional(),
   voyageColisMsg: z.string().max(500).optional(),
@@ -32,9 +44,18 @@ type CompanyFormData = z.infer<typeof companySchema>;
 
 export default function SupabaseCompanySettings() {
   const { t } = useTranslation("owner");
+  const { lng } = useParams<{ lng: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { appUserId } = useSupabaseAuth();
-  const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
+  const { companyId, isReady, isLoading: companyLoading, refresh, setSelectedCompanyId } =
+    useOwnerCompany();
+  const isStandaloneCreate = /\/create-company\/?$/.test(location.pathname);
+  const isCreateMode =
+    isStandaloneCreate || searchParams.get("new") === "1" || !companyId;
   const [company, setCompany] = useState<OwnerCompanyDetails | null | undefined>(undefined);
+  const [countries, setCountries] = useState<CountryRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   const {
@@ -48,6 +69,7 @@ export default function SupabaseCompanySettings() {
     resolver: zodResolver(companySchema),
     defaultValues: {
       name: "",
+      countryId: "",
       logo: "",
       managerName: "",
       voyageColisMsg: "",
@@ -57,14 +79,38 @@ export default function SupabaseCompanySettings() {
 
   const arretReservation = watch("arretReservation");
   const logoUrl = watch("logo");
+  const countryIdValue = watch("countryId");
+
+  useEffect(() => {
+    void listCountriesSupabase()
+      .then(setCountries)
+      .catch(() => setCountries([]));
+  }, []);
+
+  useEffect(() => {
+    if (!isCreateMode || !countries.length) return;
+    if (!countryIdValue) {
+      setValue("countryId", countries[0]._id, { shouldDirty: false });
+    }
+  }, [isCreateMode, countries, countryIdValue, setValue]);
 
   useEffect(() => {
     if (!appUserId || !isReady) return;
 
-    if (!companyId) {
+    if (isCreateMode) {
       setCompany(null);
+      reset({
+        name: "",
+        countryId: countries[0]?._id ?? "",
+        logo: "",
+        managerName: "",
+        voyageColisMsg: "",
+        arretReservation: true,
+      });
       return;
     }
+
+    if (!companyId) return;
 
     let cancelled = false;
     setCompany(undefined);
@@ -75,6 +121,7 @@ export default function SupabaseCompanySettings() {
         if (row) {
           reset({
             name: row.name,
+            countryId: "",
             logo: row.logo ?? "",
             managerName: row.managerName ?? "",
             voyageColisMsg: row.voyageColisMsg ?? "",
@@ -91,12 +138,33 @@ export default function SupabaseCompanySettings() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId, companyId, isReady, reset, t]);
+  }, [appUserId, companyId, isReady, isCreateMode, reset, t, countries]);
 
   const onSubmit = async (data: CompanyFormData) => {
-    if (!company || !companyId) return;
     setSaving(true);
     try {
+      if (isCreateMode) {
+        if (!data.countryId) {
+          toast.error(t("company.country_required", { defaultValue: "Sélectionnez un pays" }));
+          return;
+        }
+        const newCompanyId = await createOwnerCompanySupabase({
+          name: data.name,
+          countryId: data.countryId,
+          managerName: data.managerName,
+          logo: data.logo,
+          voyageColisMsg: data.voyageColisMsg,
+          arretReservation: data.arretReservation,
+        });
+        refreshAppUser();
+        refresh();
+        await setSelectedCompanyId(newCompanyId);
+        toast.success(t("company.created"));
+        navigate(`/${lng ?? "fr"}/owner`, { replace: true });
+        return;
+      }
+
+      if (!company || !companyId) return;
       await updateOwnerCompanySupabase(company.id, {
         name: data.name.trim(),
         logo: data.logo?.trim() || null,
@@ -109,6 +177,7 @@ export default function SupabaseCompanySettings() {
       if (refreshed) {
         reset({
           name: refreshed.name,
+          countryId: countryIdValue,
           logo: refreshed.logo ?? "",
           managerName: refreshed.managerName ?? "",
           voyageColisMsg: refreshed.voyageColisMsg ?? "",
@@ -123,7 +192,7 @@ export default function SupabaseCompanySettings() {
     }
   };
 
-  if (company === undefined || !isReady || companyLoading) {
+  if (!isCreateMode && (company === undefined || !isReady || companyLoading)) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
         <Skeleton className="h-8 w-48" />
@@ -132,7 +201,7 @@ export default function SupabaseCompanySettings() {
     );
   }
 
-  if (!company) {
+  if (!isCreateMode && !company) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6">
         <h1 className="text-2xl font-extrabold">{t("overview.no_company")}</h1>
@@ -144,8 +213,12 @@ export default function SupabaseCompanySettings() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">{t("company.settings_title")}</h1>
-        <p className="text-muted-foreground text-sm mt-1">{t("company.settings_desc")}</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {isCreateMode ? t("company.create_title") : t("company.settings_title")}
+        </h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          {isCreateMode ? t("company.create_desc") : t("company.settings_desc")}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -169,7 +242,6 @@ export default function SupabaseCompanySettings() {
             <div className="space-y-1.5">
               <Label htmlFor="logo">{t("company.logo_url")}</Label>
               <Input id="logo" placeholder="https://..." {...register("logo")} />
-              {errors.logo && <p className="text-xs text-destructive">{errors.logo.message}</p>}
             </div>
           </CardContent>
         </Card>
@@ -181,6 +253,34 @@ export default function SupabaseCompanySettings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isCreateMode ? (
+              <div className="space-y-1.5">
+                <Label>
+                  {t("stations.country", { defaultValue: "Pays" })}{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={countryIdValue || undefined}
+                  onValueChange={(value) =>
+                    setValue("countryId", value, { shouldDirty: true })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("stations.country", { defaultValue: "Pays" })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country._id} value={country._id}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.countryId && (
+                  <p className="text-xs text-destructive">{errors.countryId.message}</p>
+                )}
+              </div>
+            ) : null}
             <div className="space-y-1.5">
               <Label htmlFor="name">
                 {t("company.name")} <span className="text-destructive">*</span>
@@ -213,9 +313,13 @@ export default function SupabaseCompanySettings() {
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full" disabled={saving || !isDirty}>
+        <Button type="submit" className="w-full" disabled={saving || (!isCreateMode && !isDirty)}>
           <SaveIcon className="w-4 h-4 mr-2" />
-          {saving ? t("buttons.saving", { ns: "common" }) : t("company.save_btn")}
+          {saving
+            ? t("buttons.saving", { ns: "common" })
+            : isCreateMode
+              ? t("company.create_btn")
+              : t("company.save_btn")}
         </Button>
       </form>
     </div>

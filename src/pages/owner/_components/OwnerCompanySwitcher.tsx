@@ -1,5 +1,6 @@
+import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BuildingIcon, ChevronsUpDownIcon } from "lucide-react";
+import { BuildingIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,6 +12,7 @@ import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 
 export default function OwnerCompanySwitcher({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation("owner");
+  const { lng } = useParams<{ lng: string }>();
   const { companies, selectedCompanyId, setSelectedCompanyId, isLoading } = useOwnerCompany();
 
   if (isLoading || companies.length === 0) return null;
@@ -19,6 +21,16 @@ export default function OwnerCompanySwitcher({ compact = false }: { compact?: bo
     company.countryName
       ? `${company.name} — ${company.countryName}`
       : company.name;
+
+  const addCompanyLink = (
+    <Link
+      to={`/${lng ?? "fr"}/owner/company?new=1`}
+      className="mt-2 flex items-center gap-2 text-xs font-medium text-primary hover:underline px-1"
+    >
+      <PlusIcon className="w-3.5 h-3.5" />
+      {t("company.add_company", { defaultValue: "Créer une autre compagnie" })}
+    </Link>
+  );
 
   if (companies.length === 1) {
     const company = companies[0];
@@ -47,6 +59,7 @@ export default function OwnerCompanySwitcher({ compact = false }: { compact?: bo
             </div>
           </div>
         </div>
+        {addCompanyLink}
       </div>
     );
   }
@@ -78,6 +91,7 @@ export default function OwnerCompanySwitcher({ compact = false }: { compact?: bo
           ))}
         </SelectContent>
       </Select>
+      {addCompanyLink}
     </div>
   );
 }

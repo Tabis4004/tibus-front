@@ -50,12 +50,6 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const onRefresh = () => refresh();
-    window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
-    return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
-  }, [refresh]);
-
-  useEffect(() => {
     if (!appUserId) {
       setCompanies([]);
       setSelectedCompanyIdState(null);
@@ -66,7 +60,6 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     setIsLoading(true);
-    setIsReady(false);
 
     void (async () => {
       const rows = await listOwnerCompaniesSupabase(appUserId);
@@ -74,11 +67,18 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
 
       setCompanies(rows);
 
-      const stored = localStorage.getItem(storageKey(appUserId));
-      const preferred =
-        stored && rows.some((row) => row.id === stored) ? stored : rows[0]?.id ?? null;
+      setSelectedCompanyIdState((current) => {
+        const stored = localStorage.getItem(storageKey(appUserId));
+        if (stored && rows.some((row) => row.id === stored)) return stored;
+        if (current && rows.some((row) => row.id === current)) return current;
+        return rows[0]?.id ?? null;
+      });
 
-      setSelectedCompanyIdState(preferred);
+      const preferred =
+        localStorage.getItem(storageKey(appUserId)) &&
+        rows.some((row) => row.id === localStorage.getItem(storageKey(appUserId)))
+          ? (localStorage.getItem(storageKey(appUserId)) as string)
+          : rows[0]?.id ?? null;
 
       if (preferred) {
         try {
@@ -121,7 +121,7 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
         // Keep local selection even if RPC missing
       }
 
-      refreshOwnerCompanyContext();
+      window.dispatchEvent(new Event(OWNER_COMPANY_REFRESH_EVENT));
     },
     [appUserId, companies],
   );

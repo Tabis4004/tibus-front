@@ -1,7 +1,6 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useEffect } from "react";
-import { BuildingIcon, CheckCircleIcon, MailIcon } from "lucide-react";
+import { BuildingIcon, CheckCircleIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Card,
@@ -15,15 +14,9 @@ import { useAppUser } from "@/hooks/use-app-user";
 export default function SupabaseBecomeOwner() {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
-  const navigate = useNavigate();
   const { roles, isReady } = useAppUser();
   const isOwner = roles.includes("owner");
-
-  useEffect(() => {
-    if (isReady && isOwner) {
-      navigate(`/${lng ?? "fr"}/owner`, { replace: true });
-    }
-  }, [isReady, isOwner, lng, navigate]);
+  const locale = lng ?? "fr";
 
   const perks = [
     t("become_owner.perk1"),
@@ -33,6 +26,10 @@ export default function SupabaseBecomeOwner() {
     t("become_owner.perk5"),
   ];
 
+  const createHref = isOwner
+    ? `/${locale}/owner/company?new=1`
+    : `/${locale}/create-company`;
+
   return (
     <div className="max-w-md mx-auto px-4 py-10">
       <Card className="border-2 border-primary/20 shadow-lg">
@@ -40,8 +37,17 @@ export default function SupabaseBecomeOwner() {
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <BuildingIcon className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">{t("become_owner.title")}</CardTitle>
-          <CardDescription>{t("become_owner.desc")}</CardDescription>
+          <CardTitle className="text-2xl">
+            {isOwner ? t("become_owner.another_title", { defaultValue: "Créer une autre compagnie" }) : t("become_owner.title")}
+          </CardTitle>
+          <CardDescription>
+            {isOwner
+              ? t("become_owner.another_desc", {
+                  defaultValue:
+                    "Ajoutez une nouvelle entreprise de transport dans un autre pays ou sous un autre nom.",
+                })
+              : t("become_owner.desc")}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <ul className="space-y-3">
@@ -52,16 +58,22 @@ export default function SupabaseBecomeOwner() {
               </li>
             ))}
           </ul>
-          <Button asChild className="w-full" size="lg">
-            <Link to={`/${lng ?? "fr"}/contact`}>
-              <MailIcon className="w-4 h-4 mr-2" />
-              {t("become_owner.btn")}
+          <Button asChild className="w-full" size="lg" disabled={!isReady}>
+            <Link to={createHref}>
+              <PlusIcon className="w-4 h-4 mr-2" />
+              {isOwner
+                ? t("become_owner.another_btn", { defaultValue: "Créer une compagnie" })
+                : t("become_owner.btn")}
             </Link>
           </Button>
-          <p className="text-xs text-center text-muted-foreground">
-            {t("become_owner.note")} — un administrateur Tibus créera votre compagnie et
-            vous assignera le rôle transporteur.
-          </p>
+          {isOwner ? (
+            <Button asChild variant="secondary" className="w-full">
+              <Link to={`/${locale}/owner`}>
+                {t("become_owner.back_owner", { defaultValue: "Retour au tableau de bord" })}
+              </Link>
+            </Button>
+          ) : null}
+          <p className="text-xs text-center text-muted-foreground">{t("become_owner.note")}</p>
         </CardContent>
       </Card>
     </div>

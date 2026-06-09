@@ -126,7 +126,9 @@ export default function SupabaseOwnerOverview() {
           <p className="text-muted-foreground text-sm mt-1">{t("overview.no_company_desc")}</p>
         </div>
         <Button asChild>
-          <Link to={`/${lng}/owner/company`}>{t("overview.create_company")}</Link>
+          <Link to={`/${lng}/owner/company${company ? "?new=1" : ""}`}>
+            {t("overview.create_company")}
+          </Link>
         </Button>
       </div>
     );

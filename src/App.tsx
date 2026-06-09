@@ -23,6 +23,7 @@ import {
   BookingConfirmation,
   CompanyProfile,
   CompanySettings,
+  CreateCompany,
   CompanyManual,
   CompleteProfile,
   ContactPage,
@@ -92,6 +93,7 @@ function AppShell() {
 
               <Route element={<AppLayout />}>
                 <Route path="become-owner" element={<BecomeOwner />} />
+                <Route path="create-company" element={<CreateCompany />} />
                 <Route path="traveler" element={<TravelerHome />} />
                 <Route path="traveler/search" element={<TripSearch />} />
                 <Route path="traveler/bookings" element={<MyBookings />} />

@@ -404,8 +404,13 @@ function SupabaseOwnerLayout() {
     appUser.roles.includes("super_admin") ||
     appUser.roles.includes("comptable_compagnie");
 
+  useEffect(() => {
+    if (!appUser.isLoading && appUser.isReady && !canAccess) {
+      navigate(`/${lng}`, { replace: true });
+    }
+  }, [appUser.isLoading, appUser.isReady, canAccess, lng, navigate]);
+
   if (!appUser.isLoading && appUser.isReady && !canAccess) {
-    navigate(`/${lng}`, { replace: true });
     return null;
   }
 

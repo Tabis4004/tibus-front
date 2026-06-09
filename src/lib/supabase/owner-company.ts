@@ -172,6 +172,29 @@ export async function resolveOwnerCompanyId(
   return companies[0]?.id ?? null;
 }
 
+export async function createOwnerCompanySupabase(input: {
+  name: string;
+  countryId: string;
+  managerName?: string | null;
+  logo?: string | null;
+  voyageColisMsg?: string | null;
+  arretReservation?: boolean;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("create_owner_company", {
+    p_name: input.name.trim(),
+    p_country_id: input.countryId,
+    p_manager_name: input.managerName?.trim() || null,
+    p_logo: input.logo?.trim() || null,
+    p_voyage_colis_msg: input.voyageColisMsg?.trim() || null,
+    p_arret_reservation: input.arretReservation ?? true,
+  });
+
+  if (error) throw error;
+  if (!data) throw new Error("Création de compagnie impossible");
+
+  return data as string;
+}
+
 export async function setOwnerActiveCompanySupabase(
   companyId: string,
 ): Promise<void> {
