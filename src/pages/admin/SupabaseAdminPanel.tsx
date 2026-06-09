@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/accordion.tsx";
 import { cn } from "@/lib/utils.ts";
 import GatewayFeeSettingsPanel from "./_components/GatewayFeeSettingsPanel.tsx";
+import StakeholderCommissionPanel from "./_components/StakeholderCommissionPanel.tsx";
 import PaymentGatewaySettingsPanel from "./_components/PaymentGatewaySettingsPanel.tsx";
 import TravelerBookingNoticePanel from "./_components/TravelerBookingNoticePanel.tsx";
 import GuaranteeFundManager from "./_components/GuaranteeFundManager.tsx";
@@ -773,6 +774,19 @@ export default function SupabaseAdminPanel() {
                       <PaymentGatewaySettingsPanel embedded />
                     </AdminCollapsibleSection>
                   )}
+                  <AdminCollapsibleSection
+                    value="stakeholder-commissions"
+                    title={t("stakeholder_commissions.title", { defaultValue: "Attribution stakeholders" })}
+                    auditModuleKey="admin.commissions.stakeholder_attribution"
+                  >
+                    <StakeholderCommissionPanel
+                      embedded
+                      countries={data.countries.map((country) => ({
+                        id: country.id,
+                        name: country.name,
+                      }))}
+                    />
+                  </AdminCollapsibleSection>
                   <AdminCollapsibleSection
                     value="gateway-fees"
                     title={t("gateway_fees.title", { defaultValue: "Frais passerelle" })}
