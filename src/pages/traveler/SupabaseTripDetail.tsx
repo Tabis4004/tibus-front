@@ -77,6 +77,17 @@ import {
   getTravelerPaymentNoticeSupabase,
   type TravelerPaymentNotice,
 } from "@/lib/supabase/traveler-payment-notice.ts";
+
+function TravelerPaymentInfoBanner({ text }: { text: string }) {
+  const line = text.trim();
+  if (!line) return null;
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+      <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+      <p className="text-sm leading-snug text-foreground">{line}</p>
+    </div>
+  );
+}
 import {
   Select,
   SelectContent,
@@ -697,6 +708,8 @@ export default function SupabaseTripDetail() {
             </DialogDescription>
           </DialogHeader>
 
+          <TravelerPaymentInfoBanner text={paymentNotice.infoLine} />
+
           <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
             <div className="space-y-1.5">
               <Label htmlFor="pName">{t("passenger_name")}</Label>
@@ -921,16 +934,6 @@ export default function SupabaseTripDetail() {
                 </p>
               )}
             </div>
-
-            <div className="flex items-center gap-2 rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-2">
-              <ShieldCheckIcon className="w-4 h-4 text-amber-600 shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                {t("geniuspay_info", {
-                  defaultValue:
-                    "You will be redirected to GeniusPay secure checkout. No seat is held and no ticket is issued until payment is confirmed.",
-                })}
-              </p>
-            </div>
           </div>
 
           <DialogFooter className="pt-2 border-t">
@@ -965,7 +968,8 @@ export default function SupabaseTripDetail() {
       </AlertDialog>
 
       <AlertDialog open={continueLaterOpen} onOpenChange={setContinueLaterOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md gap-4">
+          <TravelerPaymentInfoBanner text={paymentNotice.infoLine} />
           <AlertDialogHeader>
             <AlertDialogTitle>{paymentNotice.title}</AlertDialogTitle>
             <AlertDialogDescription asChild>

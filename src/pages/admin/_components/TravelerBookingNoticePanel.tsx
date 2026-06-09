@@ -132,6 +132,15 @@ export default function TravelerBookingNoticePanel({
               />
             </div>
             <div className="space-y-1.5">
+              <Label>{t("booking_notice.field_info_line")}</Label>
+              <Textarea
+                rows={2}
+                value={notice.infoLine}
+                onChange={(e) => setNotice({ ...notice, infoLine: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">{t("booking_notice.field_info_line_hint")}</p>
+            </div>
+            <div className="space-y-1.5">
               <Label>{t("booking_notice.field_p1")}</Label>
               <Textarea
                 rows={3}

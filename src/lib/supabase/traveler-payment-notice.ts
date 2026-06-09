@@ -12,6 +12,7 @@ export type TravelerPaymentNoticeHint = {
 
 export type TravelerPaymentNotice = {
   title: string;
+  infoLine: string;
   paragraph1: string;
   paragraph2: string;
   networkIntro: string;
@@ -21,6 +22,8 @@ export type TravelerPaymentNotice = {
 
 export const DEFAULT_TRAVELER_PAYMENT_NOTICE: TravelerPaymentNotice = {
   title: "Confirmer avant paiement",
+  infoLine:
+    "Redirection vers le paiement sécurisé. Aucune place n'est réservée et aucun billet n'est émis tant que le paiement n'est pas confirmé.",
   paragraph1:
     "Des places sont encore disponibles, mais votre siège n'est pas garanti tant que le paiement n'est pas confirmé.",
   paragraph2:
@@ -36,6 +39,7 @@ export const DEFAULT_TRAVELER_PAYMENT_NOTICE: TravelerPaymentNotice = {
 
 type NoticeJson = {
   title?: unknown;
+  infoLine?: unknown;
   paragraph1?: unknown;
   paragraph2?: unknown;
   networkIntro?: unknown;
@@ -72,6 +76,7 @@ function normalizeNotice(payload: NoticeJson | null): TravelerPaymentNotice {
 
   return {
     title: String(payload.title ?? DEFAULT_TRAVELER_PAYMENT_NOTICE.title),
+    infoLine: String(payload.infoLine ?? DEFAULT_TRAVELER_PAYMENT_NOTICE.infoLine),
     paragraph1: String(payload.paragraph1 ?? DEFAULT_TRAVELER_PAYMENT_NOTICE.paragraph1),
     paragraph2: String(payload.paragraph2 ?? DEFAULT_TRAVELER_PAYMENT_NOTICE.paragraph2),
     networkIntro: String(payload.networkIntro ?? DEFAULT_TRAVELER_PAYMENT_NOTICE.networkIntro),
@@ -91,6 +96,7 @@ export async function upsertTravelerPaymentNoticeSupabase(
 ): Promise<TravelerPaymentNotice> {
   const { data, error } = await supabase.rpc("upsert_traveler_payment_notice", {
     p_title: notice.title,
+    p_info_line: notice.infoLine,
     p_paragraph1: notice.paragraph1,
     p_paragraph2: notice.paragraph2,
     p_network_intro: notice.networkIntro,
