@@ -8,6 +8,7 @@ export type StakeholderRole =
   | "company";
 
 export type StakeholderCommissionBaseType =
+  | "platform_commission"
   | "gateway_amount"
   | "total_amount"
   | "platform_net";
@@ -37,9 +38,7 @@ export type StakeholderAttributionPreviewItem = {
 };
 
 export type StakeholderAttributionPreview = {
-  gatewayAmount: number;
-  totalAmount: number | null;
-  platformNetAmount: number | null;
+  platformCommissionAmount: number;
   countryId: string | null;
   totalRatePercent: number;
   items: StakeholderAttributionPreviewItem[];
@@ -68,7 +67,7 @@ function mapRow(row: RpcRow): StakeholderCommissionSetting {
     countryName: row.country_name ? String(row.country_name) : null,
     stakeholderRole: String(row.stakeholder_role) as StakeholderRole,
     rate: Number(row.rate ?? 0),
-    baseType: String(row.base_type ?? "gateway_amount") as StakeholderCommissionBaseType,
+    baseType: String(row.base_type ?? "platform_commission") as StakeholderCommissionBaseType,
     sortOrder: Number(row.sort_order ?? 0),
     isActive: Boolean(row.is_active),
     source: String(row.source ?? "unset"),
@@ -102,7 +101,7 @@ export async function upsertStakeholderCommissionSettingSupabase(input: {
     p_country_id: input.scope === "country" ? input.countryId ?? null : null,
     p_stakeholder_role: input.stakeholderRole,
     p_rate: input.rate,
-    p_base_type: input.baseType ?? "gateway_amount",
+    p_base_type: input.baseType ?? "platform_commission",
     p_is_active: input.isActive ?? true,
   });
 
@@ -120,15 +119,11 @@ export async function deleteStakeholderCommissionSettingSupabase(
 }
 
 export async function previewStakeholderCommissionAttributionSupabase(input: {
-  gatewayAmount: number;
-  totalAmount?: number | null;
-  platformNetAmount?: number | null;
+  platformCommissionAmount: number;
   countryId?: string | null;
 }): Promise<StakeholderAttributionPreview> {
   const { data, error } = await supabase.rpc("preview_stakeholder_commission_attribution", {
-    p_gateway_amount: input.gatewayAmount,
-    p_total_amount: input.totalAmount ?? null,
-    p_platform_net_amount: input.platformNetAmount ?? null,
+    p_platform_commission_amount: input.platformCommissionAmount,
     p_country_id: input.countryId ?? null,
   });
 
@@ -138,10 +133,7 @@ export async function previewStakeholderCommissionAttributionSupabase(input: {
   const items = Array.isArray(payload.items) ? payload.items : [];
 
   return {
-    gatewayAmount: Number(payload.gatewayAmount ?? 0),
-    totalAmount: payload.totalAmount == null ? null : Number(payload.totalAmount),
-    platformNetAmount:
-      payload.platformNetAmount == null ? null : Number(payload.platformNetAmount),
+    platformCommissionAmount: Number(payload.platformCommissionAmount ?? 0),
     countryId: payload.countryId ? String(payload.countryId) : null,
     totalRatePercent: Number(payload.totalRatePercent ?? 0),
     items: items.map((item) => {
@@ -149,7 +141,7 @@ export async function previewStakeholderCommissionAttributionSupabase(input: {
       return {
         stakeholderRole: String(row.stakeholderRole) as StakeholderRole,
         rate: Number(row.rate ?? 0),
-        baseType: String(row.baseType ?? "gateway_amount") as StakeholderCommissionBaseType,
+        baseType: String(row.baseType ?? "platform_commission") as StakeholderCommissionBaseType,
         baseAmount: Number(row.baseAmount ?? 0),
         amount: Number(row.amount ?? 0),
         source: String(row.source ?? "unset"),
@@ -158,37 +150,28 @@ export async function previewStakeholderCommissionAttributionSupabase(input: {
   };
 }
 
-export const STAKEHOLDER_ROLE_ORDER: StakeholderRole[] = [
+/** Rôles éligibles à une part de la commission plateforme (hors compagnie). */
+export const STAKEHOLDER_SPLIT_ROLES: StakeholderRole[] = [
   "platform",
   "admin_pays",
   "master",
   "seller",
+];
+
+export const STAKEHOLDER_ROLE_ORDER: StakeholderRole[] = [
+  ...STAKEHOLDER_SPLIT_ROLES,
   "company",
 ];
 
-function resolvePreviewBaseAmount(
-  baseType: StakeholderCommissionBaseType,
-  gatewayAmount: number,
-  totalAmount?: number | null,
-  platformNetAmount?: number | null,
-): number {
-  if (baseType === "total_amount") return totalAmount ?? gatewayAmount;
-  if (baseType === "platform_net") return platformNetAmount ?? gatewayAmount;
-  return gatewayAmount;
-}
-
 /** Simulation locale à partir des taux saisis (sans RPC). */
 export function previewStakeholderCommissionAttributionLocal(input: {
-  gatewayAmount: number;
-  totalAmount?: number | null;
-  platformNetAmount?: number | null;
+  platformCommissionAmount: number;
   countryId?: string | null;
   roles?: StakeholderRole[];
   rateDrafts: Record<string, string>;
-  baseDrafts: Record<string, StakeholderCommissionBaseType>;
   settings?: StakeholderCommissionSetting[];
 }): StakeholderAttributionPreview {
-  const roles = input.roles ?? STAKEHOLDER_ROLE_ORDER;
+  const roles = input.roles ?? STAKEHOLDER_SPLIT_ROLES;
   const settingsByRole = new Map(
     (input.settings ?? []).map((row) => [row.stakeholderRole, row]),
   );
@@ -198,13 +181,8 @@ export function previewStakeholderCommissionAttributionLocal(input: {
     const saved = settingsByRole.get(role);
     const parsedRate = Number(String(input.rateDrafts[role] ?? saved?.rate ?? 0).replace(",", "."));
     const rate = Number.isFinite(parsedRate) ? parsedRate : 0;
-    const baseType = input.baseDrafts[role] ?? saved?.baseType ?? "gateway_amount";
-    const baseAmount = resolvePreviewBaseAmount(
-      baseType,
-      input.gatewayAmount,
-      input.totalAmount,
-      input.platformNetAmount,
-    );
+    const baseType = saved?.baseType ?? "platform_commission";
+    const baseAmount = input.platformCommissionAmount;
     const amount = Math.round((baseAmount * rate) / 100 * 100) / 100;
     totalRatePercent += rate;
 
@@ -219,9 +197,7 @@ export function previewStakeholderCommissionAttributionLocal(input: {
   });
 
   return {
-    gatewayAmount: input.gatewayAmount,
-    totalAmount: input.totalAmount ?? null,
-    platformNetAmount: input.platformNetAmount ?? null,
+    platformCommissionAmount: input.platformCommissionAmount,
     countryId: input.countryId ?? null,
     totalRatePercent,
     items,
@@ -314,7 +290,7 @@ function mapBalanceRow(row: BalanceRpcRow): StakeholderCommissionBalance {
     beneficiaryUserId: row.beneficiary_user_id ? String(row.beneficiary_user_id) : null,
     beneficiaryName: row.beneficiary_name ? String(row.beneficiary_name) : null,
     rate: Number(row.rate ?? 0),
-    baseType: String(row.base_type ?? "gateway_amount") as StakeholderCommissionBaseType,
+    baseType: String(row.base_type ?? "platform_commission") as StakeholderCommissionBaseType,
     earnedAmount: Number(row.earned_amount ?? 0),
     paidAmount: Number(row.paid_amount ?? 0),
     pendingAmount: Number(row.pending_amount ?? 0),

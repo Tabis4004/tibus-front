@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
-  STAKEHOLDER_ROLE_ORDER,
+  STAKEHOLDER_SPLIT_ROLES,
   confirmStakeholderCommissionSettlementSupabase,
   initiateStakeholderCommissionSettlementSupabase,
   listStakeholderCommissionBalancesSupabase,
@@ -21,7 +21,6 @@ import {
   rejectStakeholderCommissionSettlementSupabase,
   upsertStakeholderCommissionSettingSupabase,
   type StakeholderCommissionBalance,
-  type StakeholderCommissionBaseType,
   type StakeholderCommissionSetting,
   type StakeholderCommissionSettlement,
   type StakeholderRole,
@@ -45,20 +44,8 @@ import { cn } from "@/lib/utils.ts";
 type CountryOption = { id: string; name: string };
 
 function buildEmptyRateDrafts(): Record<string, string> {
-  return Object.fromEntries(STAKEHOLDER_ROLE_ORDER.map((role) => [role, "0"]));
+  return Object.fromEntries(STAKEHOLDER_SPLIT_ROLES.map((role) => [role, "0"]));
 }
-
-function buildEmptyBaseDrafts(): Record<string, StakeholderCommissionBaseType> {
-  return Object.fromEntries(
-    STAKEHOLDER_ROLE_ORDER.map((role) => [role, "gateway_amount" as StakeholderCommissionBaseType]),
-  );
-}
-
-const BASE_TYPES: StakeholderCommissionBaseType[] = [
-  "gateway_amount",
-  "total_amount",
-  "platform_net",
-];
 
 function formatMoney(value: number, currency: string) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${currency}`;
@@ -95,7 +82,6 @@ export default function StakeholderCommissionPanel({
   const [settingsScope, setSettingsScope] = useState<"global" | "country">("country");
   const [settings, setSettings] = useState<StakeholderCommissionSetting[] | undefined>(undefined);
   const [rateDrafts, setRateDrafts] = useState<Record<string, string>>(buildEmptyRateDrafts);
-  const [baseDrafts, setBaseDrafts] = useState<Record<string, StakeholderCommissionBaseType>>(buildEmptyBaseDrafts);
 
   const activeCountryId = useMemo(
     () => countryId || defaultCountryId || countries[0]?.id || "",
@@ -103,7 +89,7 @@ export default function StakeholderCommissionPanel({
   );
   const [balances, setBalances] = useState<StakeholderCommissionBalance[] | undefined>(undefined);
   const [history, setHistory] = useState<StakeholderCommissionSettlement[] | undefined>(undefined);
-  const [previewGateway, setPreviewGateway] = useState("10000");
+  const [previewPool, setPreviewPool] = useState("1500");
   const [preview, setPreview] = useState<ReturnType<
     typeof previewStakeholderCommissionAttributionLocal
   > | null>(null);
@@ -123,13 +109,11 @@ export default function StakeholderCommissionPanel({
       .then((rows) => {
         setSettings(rows);
         const rates: Record<string, string> = {};
-        const bases: Record<string, StakeholderCommissionBaseType> = {};
         for (const row of rows) {
+          if (row.stakeholderRole === "company") continue;
           rates[row.stakeholderRole] = String(row.rate);
-          bases[row.stakeholderRole] = row.baseType;
         }
         setRateDrafts(rates);
-        setBaseDrafts(bases);
       })
       .catch((err) => {
         setSettings([]);
@@ -183,7 +167,10 @@ export default function StakeholderCommissionPanel({
   }, [reloadAll, activeCountryId, settingsScope, enabled, countries.length]);
 
   const totalRate = useMemo(
-    () => (settings ?? []).reduce((sum, row) => sum + (row.isActive ? row.rate : 0), 0),
+    () =>
+      (settings ?? [])
+        .filter((row) => row.stakeholderRole !== "company")
+        .reduce((sum, row) => sum + (row.isActive ? row.rate : 0), 0),
     [settings],
   );
 
@@ -207,13 +194,9 @@ export default function StakeholderCommissionPanel({
         countryId: scope === "country" ? activeCountryId : null,
         stakeholderRole: role,
         rate,
-        baseType: baseDrafts[role] ?? "gateway_amount",
+        baseType: "platform_commission",
       });
       setRateDrafts((current) => ({ ...current, [role]: String(rate) }));
-      setBaseDrafts((current) => ({
-        ...current,
-        [role]: baseDrafts[role] ?? "gateway_amount",
-      }));
       toast.success(t("stakeholder_commissions.settings_saved"));
       void recordPlatformAuditSupabase({
         moduleKey: "admin.commissions.stakeholder_attribution",
@@ -231,9 +214,9 @@ export default function StakeholderCommissionPanel({
   };
 
   const handlePreview = () => {
-    const gatewayAmount = parseFeeInputOrZero(previewGateway);
-    if (gatewayAmount == null || gatewayAmount < 0) {
-      toast.error(t("stakeholder_commissions.invalid_gateway", { defaultValue: "Montant passerelle invalide." }));
+    const platformCommissionAmount = parseFeeInputOrZero(previewPool);
+    if (platformCommissionAmount == null || platformCommissionAmount < 0) {
+      toast.error(t("stakeholder_commissions.invalid_platform_commission"));
       return;
     }
 
@@ -246,10 +229,9 @@ export default function StakeholderCommissionPanel({
 
     setPreview(
       previewStakeholderCommissionAttributionLocal({
-        gatewayAmount,
+        platformCommissionAmount,
         countryId: previewCountryId,
         rateDrafts,
-        baseDrafts,
         settings: settings ?? [],
       }),
     );
@@ -400,12 +382,11 @@ export default function StakeholderCommissionPanel({
                   <tr>
                     <th className="px-3 py-2">{t("stakeholder_commissions.col_role")}</th>
                     <th className="px-3 py-2">{t("stakeholder_commissions.col_rate")}</th>
-                    <th className="px-3 py-2">{t("stakeholder_commissions.col_base")}</th>
                     <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {STAKEHOLDER_ROLE_ORDER.map((role) => (
+                  {STAKEHOLDER_SPLIT_ROLES.map((role) => (
                     <tr key={role}>
                       <td className="px-3 py-2">
                         <div>{t(`stakeholder_commissions.roles.${role}`)}</div>
@@ -423,28 +404,6 @@ export default function StakeholderCommissionPanel({
                             setRateDrafts((current) => ({ ...current, [role]: e.target.value }))
                           }
                         />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Select
-                          value={baseDrafts[role] ?? "gateway_amount"}
-                          onValueChange={(value) =>
-                            setBaseDrafts((current) => ({
-                              ...current,
-                              [role]: value as StakeholderCommissionBaseType,
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BASE_TYPES.map((baseType) => (
-                              <SelectItem key={baseType} value={baseType}>
-                                {t(`stakeholder_commissions.base_types.${baseType}`)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       </td>
                       <td className="px-3 py-2">
                         <Button
@@ -465,11 +424,11 @@ export default function StakeholderCommissionPanel({
 
           <div className="flex flex-wrap items-end gap-2 pt-1">
             <div className="space-y-1">
-              <Label>{t("stakeholder_commissions.preview_gateway")}</Label>
+              <Label>{t("stakeholder_commissions.preview_pool")}</Label>
               <Input
                 className="h-8 w-32"
-                value={previewGateway}
-                onChange={(e) => setPreviewGateway(e.target.value)}
+                value={previewPool}
+                onChange={(e) => setPreviewPool(e.target.value)}
               />
             </div>
             <Button size="sm" variant="outline" onClick={handlePreview}>
@@ -478,6 +437,11 @@ export default function StakeholderCommissionPanel({
           </div>
           {preview && (
             <div className="space-y-2 text-xs text-muted-foreground">
+              <p>
+                {t("stakeholder_commissions.preview_pool_base", {
+                  amount: formatMoney(preview.platformCommissionAmount, "XOF"),
+                })}
+              </p>
               <p>
                 {t("stakeholder_commissions.preview_total_rate", {
                   defaultValue: "Total taux : {{total}}%",
@@ -488,8 +452,7 @@ export default function StakeholderCommissionPanel({
                 {preview.items.map((item) => (
                   <div key={item.stakeholderRole}>
                     {t(`stakeholder_commissions.roles.${item.stakeholderRole}`)}:{" "}
-                    {formatMoney(item.amount, "XOF")} ({item.rate}% ·{" "}
-                    {t(`stakeholder_commissions.base_types.${item.baseType}`)})
+                    {formatMoney(item.amount, "XOF")} ({item.rate}%)
                   </div>
                 ))}
               </div>
