@@ -404,27 +404,25 @@ function SupabaseOwnerLayout() {
     appUser.roles.includes("super_admin") ||
     appUser.roles.includes("comptable_compagnie");
 
-  if (appUser.isLoading || !appUser.isReady) {
-    return (
-      <OwnerLayoutShell>
-        <div className="p-6 space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-28 w-full rounded-xl" />
-        </div>
-      </OwnerLayoutShell>
-    );
-  }
-
-  if (!canAccess) {
+  if (!appUser.isLoading && appUser.isReady && !canAccess) {
     navigate(`/${lng}`, { replace: true });
     return null;
   }
 
   return (
     <OwnerCompanyProvider>
-      <OwnerLayoutShell>
-        <Outlet />
-      </OwnerLayoutShell>
+      {appUser.isLoading || !appUser.isReady ? (
+        <OwnerLayoutShell>
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+          </div>
+        </OwnerLayoutShell>
+      ) : (
+        <OwnerLayoutShell>
+          <Outlet />
+        </OwnerLayoutShell>
+      )}
     </OwnerCompanyProvider>
   );
 }
