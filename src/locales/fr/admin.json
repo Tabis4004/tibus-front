@@ -256,5 +256,7 @@
   "stakeholder_commissions.preview_total_rate": "Total taux : {{total}}%",
   "stakeholder_commissions.preview_done": "Simulation mise à jour.",
   "stakeholder_commissions.roles.seller_hint": "Part réservée aux vendeurs indépendants, réseau, master vendeur et ventes seller_reservation (hors staff compagnie).",
-  "stakeholder_commissions.preview_seller_note": "La ligne Vendeur regroupe tous les vendeurs tiers et les rôles vendeur du réseau."
+  "stakeholder_commissions.preview_seller_note": "La ligne Vendeur regroupe tous les vendeurs tiers et les rôles vendeur du réseau.",
+  "stakeholder_commissions.settings_load_error": "Impossible de charger les taux stakeholders.",
+  "stakeholder_commissions.balances_load_error": "Impossible de charger les soldes stakeholders."
 }

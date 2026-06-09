@@ -133,9 +133,9 @@ export default function StakeholderCommissionPanel({
       })
       .catch((err) => {
         setSettings([]);
-        setRateDrafts(buildEmptyRateDrafts());
-        setBaseDrafts(buildEmptyBaseDrafts());
-        toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.load_error"));
+        toast.error(
+          err instanceof Error ? err.message : t("stakeholder_commissions.settings_load_error", { defaultValue: "Impossible de charger les taux stakeholders." }),
+        );
       });
   }, [effectiveSettingsCountryId, t]);
 
@@ -149,7 +149,9 @@ export default function StakeholderCommissionPanel({
       .then(setBalances)
       .catch((err) => {
         setBalances([]);
-        toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.load_error"));
+        toast.error(
+          err instanceof Error ? err.message : t("stakeholder_commissions.balances_load_error", { defaultValue: "Impossible de charger les soldes stakeholders." }),
+        );
       });
   }, [activeCountryId, isCountryAdmin, t]);
 
@@ -162,7 +164,9 @@ export default function StakeholderCommissionPanel({
       .then(setHistory)
       .catch((err) => {
         setHistory([]);
-        toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.history_error"));
+        toast.error(
+          err instanceof Error ? err.message : t("stakeholder_commissions.history_error", { defaultValue: "Impossible de charger l'historique des règlements." }),
+        );
       });
   }, [activeCountryId, t]);
 
@@ -205,15 +209,20 @@ export default function StakeholderCommissionPanel({
         rate,
         baseType: baseDrafts[role] ?? "gateway_amount",
       });
+      setRateDrafts((current) => ({ ...current, [role]: String(rate) }));
+      setBaseDrafts((current) => ({
+        ...current,
+        [role]: baseDrafts[role] ?? "gateway_amount",
+      }));
       toast.success(t("stakeholder_commissions.settings_saved"));
       void recordPlatformAuditSupabase({
         moduleKey: "admin.commissions.stakeholder_attribution",
         action: "update",
         summary: `Taux ${role} → ${rate}% (${scope})`,
-        metadata: { role, rate, scope, countryId },
+        metadata: { role, rate, scope, countryId: activeCountryId },
       });
-      loadSettings();
-      loadBalances();
+      void loadSettings();
+      void loadBalances();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.save_error"));
     } finally {

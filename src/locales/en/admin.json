@@ -256,5 +256,7 @@
   "stakeholder_commissions.preview_total_rate": "Total rate: {{total}}%",
   "stakeholder_commissions.preview_done": "Simulation updated.",
   "stakeholder_commissions.roles.seller_hint": "Share for independent sellers, network sellers, seller masters, and seller_reservation sales (excluding company staff).",
-  "stakeholder_commissions.preview_seller_note": "The Seller line covers all third-party sellers and network seller roles."
+  "stakeholder_commissions.preview_seller_note": "The Seller line covers all third-party sellers and network seller roles.",
+  "stakeholder_commissions.settings_load_error": "Unable to load stakeholder rates.",
+  "stakeholder_commissions.balances_load_error": "Unable to load stakeholder balances."
 }
