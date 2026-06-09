@@ -242,7 +242,7 @@
   "stakeholder_commissions.roles.platform": "Plateforme",
   "stakeholder_commissions.roles.admin_pays": "Admin pays",
   "stakeholder_commissions.roles.master": "Master",
-  "stakeholder_commissions.roles.seller": "Vendeur",
+  "stakeholder_commissions.roles.seller": "Vendeur (réseau & tiers)",
   "stakeholder_commissions.roles.company": "Compagnie",
   "stakeholder_commissions.base_types.gateway_amount": "Montant passerelle",
   "stakeholder_commissions.base_types.total_amount": "Montant total voyageur",
@@ -254,5 +254,7 @@
   "stakeholder_commissions.invalid_gateway": "Montant passerelle invalide.",
   "stakeholder_commissions.country_required": "Sélectionnez un pays.",
   "stakeholder_commissions.preview_total_rate": "Total taux : {{total}}%",
-  "stakeholder_commissions.preview_done": "Simulation mise à jour."
+  "stakeholder_commissions.preview_done": "Simulation mise à jour.",
+  "stakeholder_commissions.roles.seller_hint": "Part réservée aux vendeurs indépendants, réseau, master vendeur et ventes seller_reservation (hors staff compagnie).",
+  "stakeholder_commissions.preview_seller_note": "La ligne Vendeur regroupe tous les vendeurs tiers et les rôles vendeur du réseau."
 }

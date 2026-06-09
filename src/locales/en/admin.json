@@ -242,7 +242,7 @@
   "stakeholder_commissions.roles.platform": "Platform",
   "stakeholder_commissions.roles.admin_pays": "Country admin",
   "stakeholder_commissions.roles.master": "Master",
-  "stakeholder_commissions.roles.seller": "Seller",
+  "stakeholder_commissions.roles.seller": "Seller (network & third-party)",
   "stakeholder_commissions.roles.company": "Company",
   "stakeholder_commissions.base_types.gateway_amount": "Gateway amount",
   "stakeholder_commissions.base_types.total_amount": "Traveler total",
@@ -254,5 +254,7 @@
   "stakeholder_commissions.invalid_gateway": "Invalid gateway amount.",
   "stakeholder_commissions.country_required": "Select a country.",
   "stakeholder_commissions.preview_total_rate": "Total rate: {{total}}%",
-  "stakeholder_commissions.preview_done": "Simulation updated."
+  "stakeholder_commissions.preview_done": "Simulation updated.",
+  "stakeholder_commissions.roles.seller_hint": "Share for independent sellers, network sellers, seller masters, and seller_reservation sales (excluding company staff).",
+  "stakeholder_commissions.preview_seller_note": "The Seller line covers all third-party sellers and network seller roles."
 }

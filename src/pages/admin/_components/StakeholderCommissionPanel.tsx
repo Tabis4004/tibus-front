@@ -398,7 +398,14 @@ export default function StakeholderCommissionPanel({
                 <tbody className="divide-y">
                   {STAKEHOLDER_ROLE_ORDER.map((role) => (
                     <tr key={role}>
-                      <td className="px-3 py-2">{t(`stakeholder_commissions.roles.${role}`)}</td>
+                      <td className="px-3 py-2">
+                        <div>{t(`stakeholder_commissions.roles.${role}`)}</div>
+                        {role === "seller" && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 max-w-xs">
+                            {t("stakeholder_commissions.roles.seller_hint")}
+                          </p>
+                        )}
+                      </td>
                       <td className="px-3 py-2">
                         <Input
                           className="h-8 w-24"
@@ -477,6 +484,11 @@ export default function StakeholderCommissionPanel({
                   </div>
                 ))}
               </div>
+              {preview.items.some((item) => item.stakeholderRole === "seller" && item.rate > 0) && (
+                <p className="text-[10px] text-muted-foreground">
+                  {t("stakeholder_commissions.preview_seller_note")}
+                </p>
+              )}
             </div>
           )}
         </div>
