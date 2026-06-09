@@ -1,11 +1,22 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { isTibusPosWebView } from "@/lib/webview-bridge.ts";
 
 export function useServiceWorker() {
   const toastShown = useRef(false);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+
+    // Service worker breaks Android TPE WebViews (stale bundles + reload loops).
+    if (isTibusPosWebView()) {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          void registration.unregister();
+        }
+      });
+      return;
+    }
 
     const showUpdateToast = (registration: ServiceWorkerRegistration) => {
       if (toastShown.current) return;
@@ -26,8 +37,6 @@ export function useServiceWorker() {
     navigator.serviceWorker
       .register("/sw.js", { updateViaCache: "none" })
       .then((registration) => {
-        void registration.update();
-
         if (registration.waiting) {
           showUpdateToast(registration);
         }
@@ -44,14 +53,5 @@ export function useServiceWorker() {
         });
       })
       .catch((err) => console.warn("Service Worker registration failed:", err));
-
-    const onControllerChange = () => {
-      window.location.reload();
-    };
-
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-    return () => {
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-    };
   }, []);
 }

@@ -1,50 +1,30 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CopyIcon, PrinterIcon, ScanLineIcon, SmartphoneIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import {
+  readTibusBridgeFlags,
+  subscribeTibusBridges,
+  type TibusBridgeFlags,
+} from "@/lib/webview-bridge.ts";
 
 const DEFAULT_TPE_PATH = "/fr/seller";
 
-type BridgeFlags = {
-  tibusP3: boolean;
-  tibusScanner: boolean;
-  wisePrinter: boolean;
-  tibusAuth: boolean;
-  posWebView: boolean;
-};
-
-function readBridgeFlags(): BridgeFlags {
-  if (typeof window === "undefined") {
-    return { tibusP3: false, tibusScanner: false, wisePrinter: false, tibusAuth: false, posWebView: false };
-  }
-  const w = window as Window & {
-    TibusP3?: unknown;
-    TibusScanner?: { isAvailable?: () => boolean };
-    WisePrinter?: { isNative?: boolean };
-    TibusAuth?: unknown;
-  };
-  return {
-    tibusP3: Boolean(w.TibusP3),
-    tibusScanner: Boolean(w.TibusScanner?.isAvailable?.() ?? w.TibusScanner),
-    wisePrinter: Boolean(w.WisePrinter?.isNative),
-    tibusAuth: Boolean(w.TibusAuth),
-    posWebView: Boolean(w.TibusP3 || w.WisePrinter || w.TibusScanner),
-  };
-}
-
 export default function TpePosDiagnosticsPanel() {
   const { t } = useTranslation("admin");
-  const [bridges, setBridges] = useState<BridgeFlags>(() => readBridgeFlags());
+  const [bridges, setBridges] = useState<TibusBridgeFlags>(() => readTibusBridgeFlags());
+
+  useEffect(() => subscribeTibusBridges(setBridges), []);
 
   const tpeUrl = useMemo(() => {
     if (typeof window === "undefined") return `https://tibus-front.vercel.app${DEFAULT_TPE_PATH}`;
     return `${window.location.origin}${DEFAULT_TPE_PATH}`;
   }, []);
 
-  const refresh = () => setBridges(readBridgeFlags());
+  const refresh = () => setBridges(readTibusBridgeFlags());
 
   const copyUrl = async () => {
     try {

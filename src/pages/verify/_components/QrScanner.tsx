@@ -2,6 +2,12 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { CameraIcon, CameraOffIcon, SwitchCameraIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  getNativeScanner,
+  isTibusPosWebView,
+  subscribeTibusBridges,
+  TIBUS_BRIDGES_READY_EVENT,
+} from "@/lib/webview-bridge.ts";
 
 type QrScannerProps = {
   onScan: (payload: string) => void;
@@ -9,24 +15,6 @@ type QrScannerProps = {
 };
 
 type CameraFacing = "environment" | "user";
-
-type TibusScannerApi = {
-  isAvailable?: () => boolean;
-  scan?: () => Promise<string>;
-};
-
-function getNativeScanner(): TibusScannerApi | null {
-  if (typeof window === "undefined") return null;
-  const scanner = (window as Window & { TibusScanner?: TibusScannerApi }).TibusScanner;
-  if (scanner?.scan) return scanner;
-  return null;
-}
-
-function isTibusPosWebView(): boolean {
-  if (typeof window === "undefined") return false;
-  const w = window as Window & { TibusP3?: unknown; WisePrinter?: unknown; TibusScanner?: unknown };
-  return Boolean(w.TibusP3 || w.WisePrinter || w.TibusScanner);
-}
 
 function cameraErrorMessage(err: unknown): string {
   const name = err instanceof DOMException ? err.name : "";
@@ -63,11 +51,27 @@ export default function QrScanner({ onScan, paused = false }: QrScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nativeScanner] = useState(() => Boolean(getNativeScanner()) || isTibusPosWebView());
+  const [nativeScanner, setNativeScanner] = useState(
+    () => Boolean(getNativeScanner()) || isTibusPosWebView(),
+  );
   const [facingMode, setFacingMode] = useState<CameraFacing>(
     isTibusPosWebView() ? "user" : "environment",
   );
   const lastScanRef = useRef("");
+
+  useEffect(() => {
+    return subscribeTibusBridges((flags) => {
+      setNativeScanner(flags.tibusScanner || flags.tibusP3 || flags.posWebView);
+    });
+  }, []);
+
+  useEffect(() => {
+    const onReady = () => {
+      setNativeScanner(Boolean(getNativeScanner()) || isTibusPosWebView());
+    };
+    window.addEventListener(TIBUS_BRIDGES_READY_EVENT, onReady);
+    return () => window.removeEventListener(TIBUS_BRIDGES_READY_EVENT, onReady);
+  }, []);
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current;

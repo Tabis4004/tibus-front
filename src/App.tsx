@@ -6,6 +6,7 @@ import LocaleWrapper from "./components/providers/locale-wrapper.tsx";
 import { SAVED_OR_DEFAULT_LOCALE, setLocaleInPath } from "./i18n";
 import "./i18n";
 import { useServiceWorker } from "@/hooks/use-service-worker.ts";
+import { useTibusWebViewBootstrap } from "@/hooks/use-tibus-webview.ts";
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -57,13 +58,11 @@ import {
   TripsManager,
 } from "./pages/routed-pages.tsx";
 
-export default function App() {
+function AppShell() {
+  useTibusWebViewBootstrap();
   useServiceWorker();
 
   return (
-    <DefaultProviders>
-      <BrowserRouter>
-        <AuthBridgeProvider>
         <Suspense
           fallback={
             <div className="min-h-screen flex items-center justify-center bg-background">
@@ -141,6 +140,15 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
+  );
+}
+
+export default function App() {
+  return (
+    <DefaultProviders>
+      <BrowserRouter>
+        <AuthBridgeProvider>
+          <AppShell />
         </AuthBridgeProvider>
       </BrowserRouter>
     </DefaultProviders>

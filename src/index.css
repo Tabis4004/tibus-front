@@ -293,3 +293,17 @@
     border-style: dashed !important;
   }
 }
+
+html.tibus-pos-webview,
+html.tibus-pos-webview body {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+html.tibus-pos-webview main {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+html.tibus-pos-webview nav.fixed.bottom-0 {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
