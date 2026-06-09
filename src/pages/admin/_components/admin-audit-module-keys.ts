@@ -11,6 +11,7 @@ export type AdminPanelTabId =
   | "loyalty"
   | "legal"
   | "scaling_metrics"
+  | "investor_plan"
   | "landing";
 
 /** Suffix `.*` loads logs whose moduleKey starts with the prefix (commissions sub-modules). */
@@ -27,6 +28,7 @@ export const ADMIN_TAB_AUDIT_MODULE_KEYS: Record<AdminPanelTabId, string> = {
   loyalty: "admin.loyalty",
   legal: "admin.legal",
   scaling_metrics: "admin.scaling_metrics",
+  investor_plan: "admin.investor_plan",
   landing: "admin.landing",
 };
 

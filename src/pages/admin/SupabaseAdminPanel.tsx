@@ -21,6 +21,7 @@ import {
   GiftIcon,
   FileTextIcon,
   ActivityIcon,
+  TrendingUpIcon,
   type LucideIcon,
   BookOpenIcon,
 } from "lucide-react";
@@ -62,6 +63,7 @@ import ContactSettingsPanel from "./_components/ContactSettingsPanel.tsx";
 import PlatformLoyaltySettingsPanel from "./_components/PlatformLoyaltySettingsPanel.tsx";
 import LegalPagesPanel from "./_components/LegalPagesPanel.tsx";
 import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPanel.tsx";
+import InvestorPlanPanel from "./_components/InvestorPlanPanel.tsx";
 import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
@@ -138,6 +140,7 @@ type TabId =
   | "loyalty"
   | "legal"
   | "scaling_metrics"
+  | "investor_plan"
   | "landing";
 
 const TAB_IDS: TabId[] = [
@@ -153,6 +156,7 @@ const TAB_IDS: TabId[] = [
   "loyalty",
   "legal",
   "scaling_metrics",
+  "investor_plan",
   "landing",
 ];
 
@@ -534,6 +538,7 @@ export default function SupabaseAdminPanel() {
     { id: "loyalty", label: t("tabs.loyalty", { defaultValue: "Fidélité" }), icon: GiftIcon },
     { id: "legal", label: t("tabs.legal", { defaultValue: "CGU" }), icon: FileTextIcon },
     { id: "scaling_metrics", label: t("tabs.scaling_metrics"), icon: ActivityIcon },
+    { id: "investor_plan", label: t("tabs.investor_plan"), icon: TrendingUpIcon },
     { id: "landing", label: t("tabs.landing", { defaultValue: "Landing Page" }), icon: PencilIcon },
   ];
   const visibleTabs = appUser.isSuperAdmin
@@ -972,6 +977,13 @@ export default function SupabaseAdminPanel() {
           <PlatformScalingMetricsPanel />
         </div>
         <AdminTabAuditHub tab="scaling_metrics" />
+        </>
+      )}
+
+      {tab === "investor_plan" && appUser.isSuperAdmin && (
+        <>
+          <InvestorPlanPanel />
+          <AdminTabAuditHub tab="investor_plan" />
         </>
       )}
 

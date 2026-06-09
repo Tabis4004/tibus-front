@@ -280,10 +280,7 @@ export default function PlatformScalingMetricsPanel() {
           <CardTitle className="text-base">{t("scaling_metrics.canvas_export_title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>{t("scaling_metrics.canvas_export_step1")}</p>
-          <p>{t("scaling_metrics.canvas_export_step2")}</p>
-          <p>{t("scaling_metrics.canvas_export_step3")}</p>
-          <p>{t("scaling_metrics.canvas_export_step4")}</p>
+          <p>{t("scaling_metrics.investor_plan_hint")}</p>
         </CardContent>
       </Card>
     </div>
