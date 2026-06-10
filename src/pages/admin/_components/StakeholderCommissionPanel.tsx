@@ -17,7 +17,7 @@ import {
   listStakeholderCommissionBalancesSupabase,
   listStakeholderCommissionSettlementHistorySupabase,
   listStakeholderCommissionSettingsSupabase,
-  previewStakeholderCommissionAttributionLocal,
+  computeStakeholderTicketSimulation,
   rejectStakeholderCommissionSettlementSupabase,
   upsertStakeholderCommissionSettingSupabase,
   type StakeholderCommissionBalance,
@@ -90,10 +90,9 @@ export default function StakeholderCommissionPanel({
   const [balances, setBalances] = useState<StakeholderCommissionBalance[] | undefined>(undefined);
   const [balancesError, setBalancesError] = useState<string | null>(null);
   const [history, setHistory] = useState<StakeholderCommissionSettlement[] | undefined>(undefined);
-  const [previewPool, setPreviewPool] = useState("1500");
-  const [preview, setPreview] = useState<ReturnType<
-    typeof previewStakeholderCommissionAttributionLocal
-  > | null>(null);
+  const [previewTickets, setPreviewTickets] = useState("100");
+  const [previewAvgTicket, setPreviewAvgTicket] = useState("8000");
+  const [previewCommissionRate, setPreviewCommissionRate] = useState("8.5");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -189,6 +188,36 @@ export default function StakeholderCommissionPanel({
     [history],
   );
 
+  const ticketSimulation = useMemo(() => {
+    const ticketCount = parseFeeInputOrZero(previewTickets);
+    const avgTicketAmount = parseFeeInputOrZero(previewAvgTicket);
+    const commissionRatePct = parseFeeInputOrZero(previewCommissionRate);
+    if (ticketCount == null || avgTicketAmount == null || commissionRatePct == null) {
+      return null;
+    }
+
+    const previewCountryId =
+      settingsScope === "global" && isSuperAdmin ? null : activeCountryId || null;
+
+    return computeStakeholderTicketSimulation({
+      ticketCount,
+      avgTicketAmount,
+      commissionRatePct,
+      countryId: previewCountryId,
+      rateDrafts,
+      settings: settings ?? [],
+    });
+  }, [
+    activeCountryId,
+    isSuperAdmin,
+    previewAvgTicket,
+    previewCommissionRate,
+    previewTickets,
+    rateDrafts,
+    settings,
+    settingsScope,
+  ]);
+
   const handleSaveSetting = async (role: StakeholderRole) => {
     const rate = parseFeeInputOrZero(rateDrafts[role] ?? "0");
     if (rate == null) {
@@ -221,30 +250,6 @@ export default function StakeholderCommissionPanel({
     } finally {
       setSavingSettings(false);
     }
-  };
-
-  const handlePreview = () => {
-    const platformCommissionAmount = parseFeeInputOrZero(previewPool);
-    if (platformCommissionAmount == null || platformCommissionAmount < 0) {
-      toast.error(t("stakeholder_commissions.invalid_platform_commission"));
-      return;
-    }
-
-    const previewCountryId =
-      settingsScope === "global" && isSuperAdmin ? null : activeCountryId || null;
-    if (previewCountryId == null && settingsScope !== "global") {
-      toast.error(t("stakeholder_commissions.country_required", { defaultValue: "Sélectionnez un pays." }));
-      return;
-    }
-
-    setPreview(
-      previewStakeholderCommissionAttributionLocal({
-        platformCommissionAmount,
-        countryId: previewCountryId,
-        rateDrafts,
-        settings: settings ?? [],
-      }),
-    );
   };
 
   const handleInitiatePayment = async (row: StakeholderCommissionBalance) => {
@@ -431,50 +436,129 @@ export default function StakeholderCommissionPanel({
               </table>
             </div>
           )}
-
-          <div className="flex flex-wrap items-end gap-2 pt-1">
-            <div className="space-y-1">
-              <Label>{t("stakeholder_commissions.preview_pool")}</Label>
-              <Input
-                className="h-8 w-32"
-                value={previewPool}
-                onChange={(e) => setPreviewPool(e.target.value)}
-              />
-            </div>
-            <Button size="sm" variant="outline" onClick={handlePreview}>
-              {t("stakeholder_commissions.preview")}
-            </Button>
-          </div>
-          {preview && (
-            <div className="space-y-2 text-xs text-muted-foreground">
-              <p>
-                {t("stakeholder_commissions.preview_pool_base", {
-                  amount: formatMoney(preview.platformCommissionAmount, "XOF"),
-                })}
-              </p>
-              <p>
-                {t("stakeholder_commissions.preview_total_rate", {
-                  defaultValue: "Total taux : {{total}}%",
-                  total: preview.totalRatePercent.toLocaleString(undefined, { maximumFractionDigits: 2 }),
-                })}
-              </p>
-              <div className="grid gap-1 md:grid-cols-2">
-                {preview.items.map((item) => (
-                  <div key={item.stakeholderRole}>
-                    {t(`stakeholder_commissions.roles.${item.stakeholderRole}`)}:{" "}
-                    {formatMoney(item.amount, "XOF")} ({item.rate}%)
-                  </div>
-                ))}
-              </div>
-              {preview.items.some((item) => item.stakeholderRole === "seller" && item.rate > 0) && (
-                <p className="text-[10px] text-muted-foreground">
-                  {t("stakeholder_commissions.preview_seller_note")}
-                </p>
-              )}
-            </div>
-          )}
         </div>
       )}
+
+      <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium">{t("stakeholder_commissions.simulator_title")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t("stakeholder_commissions.simulator_desc")}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>{t("stakeholder_commissions.sim_tickets")}</Label>
+                <Input
+                  className="h-8"
+                  value={previewTickets}
+                  onChange={(e) => setPreviewTickets(e.target.value)}
+                  placeholder="100"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{t("stakeholder_commissions.sim_avg_ticket")}</Label>
+                <Input
+                  className="h-8"
+                  value={previewAvgTicket}
+                  onChange={(e) => setPreviewAvgTicket(e.target.value)}
+                  placeholder="8000"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{t("stakeholder_commissions.sim_commission_rate")}</Label>
+                <Input
+                  className="h-8"
+                  value={previewCommissionRate}
+                  onChange={(e) => setPreviewCommissionRate(e.target.value)}
+                  placeholder="8.5"
+                />
+              </div>
+            </div>
+            {ticketSimulation ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div className="rounded-md border bg-background px-2 py-1.5">
+                    <div className="text-muted-foreground">{t("stakeholder_commissions.sim_gmv")}</div>
+                    <div className="font-semibold tabular-nums">
+                      {formatMoney(ticketSimulation.gmv, "XOF")}
+                    </div>
+                  </div>
+                  <div className="rounded-md border bg-background px-2 py-1.5">
+                    <div className="text-muted-foreground">{t("stakeholder_commissions.sim_pool_ticket")}</div>
+                    <div className="font-semibold tabular-nums">
+                      {formatMoney(ticketSimulation.poolPerTicket, "XOF")}
+                    </div>
+                  </div>
+                  <div className="rounded-md border bg-background px-2 py-1.5">
+                    <div className="text-muted-foreground">{t("stakeholder_commissions.sim_pool_total")}</div>
+                    <div className="font-semibold tabular-nums">
+                      {formatMoney(ticketSimulation.platformCommissionAmount, "XOF")}
+                    </div>
+                  </div>
+                  <div className="rounded-md border bg-background px-2 py-1.5">
+                    <div className="text-muted-foreground">{t("stakeholder_commissions.preview_total_rate")}</div>
+                    <div className="font-semibold tabular-nums">
+                      {ticketSimulation.totalRatePercent.toLocaleString(undefined, {
+                        maximumFractionDigits: 2,
+                      })}
+                      %
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("stakeholder_commissions.sim_formula", {
+                    tickets: ticketSimulation.ticketCount.toLocaleString("fr-FR"),
+                    avg: ticketSimulation.avgTicketAmount.toLocaleString("fr-FR"),
+                    rate: ticketSimulation.commissionRatePct,
+                    pool: formatMoney(ticketSimulation.platformCommissionAmount, "XOF"),
+                  })}
+                </p>
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-muted/60 text-left">
+                      <tr>
+                        <th className="px-3 py-2">{t("stakeholder_commissions.col_role")}</th>
+                        <th className="px-3 py-2">{t("stakeholder_commissions.col_rate")}</th>
+                        <th className="px-3 py-2">{t("stakeholder_commissions.sim_col_per_ticket")}</th>
+                        <th className="px-3 py-2">{t("stakeholder_commissions.sim_col_total")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {ticketSimulation.items.map((item) => (
+                        <tr key={item.stakeholderRole}>
+                          <td className="px-3 py-2">
+                            {t(`stakeholder_commissions.roles.${item.stakeholderRole}`)}
+                          </td>
+                          <td className="px-3 py-2 tabular-nums">{item.rate} %</td>
+                          <td className="px-3 py-2 tabular-nums">
+                            {formatMoney(
+                              Math.round((ticketSimulation.poolPerTicket * item.rate) / 100),
+                              "XOF",
+                            )}
+                          </td>
+                          <td className="px-3 py-2 tabular-nums font-medium">
+                            {formatMoney(item.amount, "XOF")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {ticketSimulation.items.some(
+                  (item) => item.stakeholderRole === "seller" && item.rate > 0,
+                ) && (
+                  <p className="text-[10px] text-muted-foreground">
+                    {t("stakeholder_commissions.preview_seller_note")}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {t("stakeholder_commissions.sim_invalid")}
+              </p>
+            )}
+      </div>
 
       <div className="rounded-lg border p-3 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium">

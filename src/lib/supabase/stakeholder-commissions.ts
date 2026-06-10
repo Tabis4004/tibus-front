@@ -204,6 +204,50 @@ export function previewStakeholderCommissionAttributionLocal(input: {
   };
 }
 
+export type StakeholderTicketSimulation = StakeholderAttributionPreview & {
+  ticketCount: number;
+  avgTicketAmount: number;
+  commissionRatePct: number;
+  gmv: number;
+  poolPerTicket: number;
+};
+
+export function computeStakeholderTicketSimulation(input: {
+  ticketCount: number;
+  avgTicketAmount: number;
+  commissionRatePct: number;
+  countryId?: string | null;
+  rateDrafts: Record<string, string>;
+  settings?: StakeholderCommissionSetting[];
+}): StakeholderTicketSimulation | null {
+  const { ticketCount, avgTicketAmount, commissionRatePct } = input;
+  if (!Number.isFinite(ticketCount) || ticketCount <= 0) return null;
+  if (!Number.isFinite(avgTicketAmount) || avgTicketAmount <= 0) return null;
+  if (!Number.isFinite(commissionRatePct) || commissionRatePct < 0) return null;
+
+  const gmv = ticketCount * avgTicketAmount;
+  const platformCommissionAmount =
+    Math.round(((gmv * commissionRatePct) / 100) * 100) / 100;
+  const poolPerTicket =
+    Math.round(((avgTicketAmount * commissionRatePct) / 100) * 100) / 100;
+
+  const attribution = previewStakeholderCommissionAttributionLocal({
+    platformCommissionAmount,
+    countryId: input.countryId,
+    rateDrafts: input.rateDrafts,
+    settings: input.settings,
+  });
+
+  return {
+    ...attribution,
+    ticketCount,
+    avgTicketAmount,
+    commissionRatePct,
+    gmv,
+    poolPerTicket,
+  };
+}
+
 export type StakeholderCommissionBalance = {
   countryId: string;
   countryName: string;
