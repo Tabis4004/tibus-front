@@ -88,6 +88,7 @@ export default function StakeholderCommissionPanel({
     [countryId, defaultCountryId, countries],
   );
   const [balances, setBalances] = useState<StakeholderCommissionBalance[] | undefined>(undefined);
+  const [balancesError, setBalancesError] = useState<string | null>(null);
   const [history, setHistory] = useState<StakeholderCommissionSettlement[] | undefined>(undefined);
   const [previewPool, setPreviewPool] = useState("1500");
   const [preview, setPreview] = useState<ReturnType<
@@ -129,13 +130,22 @@ export default function StakeholderCommissionPanel({
       return;
     }
     setBalances(undefined);
+    setBalancesError(null);
     void listStakeholderCommissionBalancesSupabase(activeCountryId || null)
-      .then(setBalances)
+      .then((rows) => {
+        setBalances(rows);
+        setBalancesError(null);
+      })
       .catch((err) => {
+        const message =
+          err instanceof Error
+            ? err.message
+            : t("stakeholder_commissions.balances_load_error", {
+                defaultValue: "Impossible de charger les soldes stakeholders.",
+              });
         setBalances([]);
-        toast.error(
-          err instanceof Error ? err.message : t("stakeholder_commissions.balances_load_error", { defaultValue: "Impossible de charger les soldes stakeholders." }),
-        );
+        setBalancesError(message);
+        toast.error(message);
       });
   }, [activeCountryId, isCountryAdmin, t]);
 
@@ -471,7 +481,17 @@ export default function StakeholderCommissionPanel({
           <WalletIcon className="w-4 h-4" />
           {t("stakeholder_commissions.balances_title")}
         </div>
-        {balances === undefined ? (
+        {balancesError ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+            <p className="text-sm text-destructive">{balancesError}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("stakeholder_commissions.balances_migration_hint", {
+                defaultValue:
+                  "Exécutez la migration SQL 069_stakeholder_commission_balances_hotfix.sql sur Supabase (après 064–066), puis cliquez Actualiser.",
+              })}
+            </p>
+          </div>
+        ) : balances === undefined ? (
           <Skeleton className="h-40 w-full" />
         ) : balances.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("stakeholder_commissions.no_balances")}</p>

@@ -261,6 +261,7 @@
   "stakeholder_commissions.preview_seller_note": "No share for the company or any user linked to the company on the sale.",
   "stakeholder_commissions.settings_load_error": "Unable to load stakeholder rates.",
   "stakeholder_commissions.balances_load_error": "Unable to load stakeholder balances.",
+  "stakeholder_commissions.balances_migration_hint": "Run SQL migration 069_stakeholder_commission_balances_hotfix.sql on Supabase (after 064–066), then click Refresh.",
   "booking_notice.title": "Traveler payment message",
   "booking_notice.desc": "Copy shown to travelers before payment and in the continue-later popup.",
   "booking_notice.field_title": "Popup title",

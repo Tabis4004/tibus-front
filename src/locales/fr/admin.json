@@ -261,6 +261,7 @@
   "stakeholder_commissions.preview_seller_note": "Aucune part pour la compagnie ni pour un utilisateur lié à une compagnie sur la vente.",
   "stakeholder_commissions.settings_load_error": "Impossible de charger les taux stakeholders.",
   "stakeholder_commissions.balances_load_error": "Impossible de charger les soldes stakeholders.",
+  "stakeholder_commissions.balances_migration_hint": "Exécutez la migration SQL 069_stakeholder_commission_balances_hotfix.sql sur Supabase (après 064–066), puis cliquez Actualiser.",
   "booking_notice.title": "Message voyageur au paiement",
   "booking_notice.desc": "Textes affichés au voyageur avant paiement et dans le popup « continuer plus tard ».",
   "booking_notice.field_title": "Titre du popup",
