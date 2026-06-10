@@ -30,14 +30,14 @@ BEGIN
     u."firstName",
     u."lastName",
     u.username,
-    COALESCE(
-      ARRAY_AGG(DISTINCT r.name ORDER BY r.name) FILTER (WHERE r.name IS NOT NULL),
-      ARRAY[]::text[]
-    ) AS roles
+    COALESCE(role_names.roles, ARRAY[]::text[]) AS roles
   FROM "Users" u
-  LEFT JOIN "UserRoles" ur ON ur."userId" = u.id
-  LEFT JOIN "Role" r ON r.id = ur."roleId"
-  GROUP BY u.id, u.email, u."firstName", u."lastName", u.username
+  LEFT JOIN LATERAL (
+    SELECT ARRAY_AGG(DISTINCT r.name ORDER BY r.name) AS roles
+    FROM "UserRoles" ur
+    JOIN "Role" r ON r.id = ur."roleId"
+    WHERE ur."userId" = u.id
+  ) role_names ON true
   ORDER BY u."createdAt" DESC NULLS LAST, u.email ASC NULLS LAST
   LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 200), 500))
   OFFSET GREATEST(COALESCE(p_offset, 0), 0);

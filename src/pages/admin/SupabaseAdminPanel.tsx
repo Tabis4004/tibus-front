@@ -198,7 +198,7 @@ export default function SupabaseAdminPanel() {
     let cancelled = false;
     setIsLoading(true);
 
-    void loadAdminTabData(tab, appUser.isSuperAdmin)
+    void loadAdminTabData(tab, appUser.isSuperAdmin, appUser.hasDbSuperAdmin)
       .then((result) => {
         if (cancelled) return;
         setData((current) => ({ ...current, ...result.data }));
@@ -212,6 +212,7 @@ export default function SupabaseAdminPanel() {
       cancelled = true;
     };
   }, [
+    appUser.hasDbSuperAdmin,
     appUser.isReady,
     appUser.isSuperAdmin,
     canAccessAdminPanel,

@@ -133,7 +133,7 @@ export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminD
 
   switch (tab) {
     case "users":
-      return ["users", "rolesByUser"];
+      return ["users"];
     case "companies":
       return ["companies"];
     case "subscriptions":
@@ -194,33 +194,15 @@ export async function loadAdminStats(
   };
 }
 
-async function loadUsers(): Promise<Pick<AdminDataSlice, "users" | "rolesByUser">> {
-  try {
-    const platformUsers = await listPlatformUsersForAdminSupabase(500);
-    const rolesByUser: Record<string, string[]> = {};
-    const users: SupabaseUserRow[] = platformUsers.map((row: PlatformAdminUserRow) => {
-      rolesByUser[row.id] = row.roles;
-      return {
-        id: row.id,
-        email: row.email,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        username: row.username,
-      };
-    });
-    return { users, rolesByUser };
-  } catch (rpcError) {
-    const message = rpcError instanceof Error ? rpcError.message : String(rpcError);
-    if (isAdminUsersPermissionError(message)) {
-      throw new Error(
-        "Rôle super_admin manquant en base. Exécutez 071_grant_super_admin_accounts.sql dans Supabase, puis reconnectez-vous.",
-      );
-    }
-    if (!isAdminUsersRpcMissingError(message)) {
-      throw rpcError;
-    }
+function extractErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as { message: unknown }).message);
   }
+  return "Erreur chargement";
+}
 
+async function loadUsersDirect(): Promise<Pick<AdminDataSlice, "users" | "rolesByUser">> {
   const { data: rows, error } = await supabase
     .from("Users")
     .select("id, email, firstName, lastName, username")
@@ -252,6 +234,39 @@ async function loadUsers(): Promise<Pick<AdminDataSlice, "users" | "rolesByUser"
   }
 
   return { users, rolesByUser };
+}
+
+async function loadUsers(hasDbSuperAdmin: boolean): Promise<Pick<AdminDataSlice, "users" | "rolesByUser">> {
+  if (!hasDbSuperAdmin) {
+    return loadUsersDirect();
+  }
+
+  try {
+    const platformUsers = await listPlatformUsersForAdminSupabase(500);
+    const rolesByUser: Record<string, string[]> = {};
+    const users: SupabaseUserRow[] = platformUsers.map((row: PlatformAdminUserRow) => {
+      rolesByUser[row.id] = row.roles;
+      return {
+        id: row.id,
+        email: row.email,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        username: row.username,
+      };
+    });
+    return { users, rolesByUser };
+  } catch (rpcError) {
+    const message = extractErrorMessage(rpcError);
+    if (isAdminUsersPermissionError(message)) {
+      throw new Error(
+        "Rôle super_admin manquant en base. Exécutez 071_grant_super_admin_accounts.sql dans Supabase, puis reconnectez-vous.",
+      );
+    }
+    if (isAdminUsersRpcMissingError(message)) {
+      return loadUsersDirect();
+    }
+    throw rpcError;
+  }
 }
 
 async function loadCompanies(): Promise<Pick<AdminDataSlice, "companies">> {
@@ -420,37 +435,43 @@ async function loadCommissions(): Promise<
   return { commissions, commissionSettings };
 }
 
+type LoaderContext = {
+  hasDbSuperAdmin: boolean;
+};
+
 const LOADER_BY_KEY: Record<
   AdminDataKey,
-  () => Promise<Partial<AdminDataSlice>>
+  (context: LoaderContext) => Promise<Partial<AdminDataSlice>>
 > = {
-  users: loadUsers,
-  rolesByUser: loadUsers,
-  companies: loadCompanies,
-  countries: loadCountries,
-  cities: loadCities,
-  roles: loadRoles,
-  plans: loadPlans,
-  subscriptions: loadSubscriptions,
-  commissions: loadCommissions,
-  commissionSettings: loadCommissions,
+  users: (context) => loadUsers(context.hasDbSuperAdmin),
+  rolesByUser: (context) => loadUsers(context.hasDbSuperAdmin),
+  companies: () => loadCompanies(),
+  countries: () => loadCountries(),
+  cities: () => loadCities(),
+  roles: () => loadRoles(),
+  plans: () => loadPlans(),
+  subscriptions: () => loadSubscriptions(),
+  commissions: () => loadCommissions(),
+  commissionSettings: () => loadCommissions(),
 };
 
 export async function loadAdminTabData(
   tab: AdminTabId,
   isSuperAdmin: boolean,
+  hasDbSuperAdmin: boolean,
 ): Promise<{ data: Partial<AdminDataSlice>; errors: Partial<Record<AdminDataKey, string>> }> {
   const keys = [...new Set(adminTabDataKeys(tab, isSuperAdmin))];
   const data: Partial<AdminDataSlice> = {};
   const errors: Partial<Record<AdminDataKey, string>> = {};
+  const context: LoaderContext = { hasDbSuperAdmin };
 
   await Promise.all(
     keys.map(async (key) => {
       try {
-        const slice = await LOADER_BY_KEY[key]();
+        const slice = await LOADER_BY_KEY[key](context);
         Object.assign(data, slice);
       } catch (err) {
-        errors[key] = err instanceof Error ? err.message : "Erreur chargement";
+        errors[key] = extractErrorMessage(err);
       }
     }),
   );
