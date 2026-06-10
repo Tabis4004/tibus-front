@@ -35,6 +35,7 @@ export type InvestorRoiInputs = {
   aboMonth: number;
   investmentXof: number | null;
   equityPct: number;
+  revenueSharePct: number;
   exitMultiple: number;
   horizonYears: number;
 };
@@ -45,11 +46,67 @@ export const DEFAULT_INVESTOR_ROI_INPUTS: InvestorRoiInputs = {
   avgTicket: 8000,
   takeRatePct: 5,
   aboMonth: 0,
-  investmentXof: null,
+  investmentXof: 5_000_000,
   equityPct: 20,
+  revenueSharePct: 15,
   exitMultiple: 5,
   horizonYears: 3,
 };
+
+export type InvestorRevenueShareRow = {
+  label: string;
+  platformRevenue: number;
+  annualPayout: number;
+  cumulativePayout: number;
+  cumulativeNet: number | null;
+  recoveryPct: number | null;
+};
+
+export function computeInvestorRevenueSharing(inputs: InvestorRoiInputs) {
+  const financials = computeInvestorFinancials().slice(1, 1 + Math.max(1, inputs.horizonYears));
+  const investment = inputs.investmentXof;
+  let cumulative = 0;
+
+  const years: InvestorRevenueShareRow[] = financials.map((row) => {
+    const annualPayout = row.revTotal * (inputs.revenueSharePct / 100);
+    cumulative += annualPayout;
+    return {
+      label: row.year,
+      platformRevenue: row.revTotal,
+      annualPayout,
+      cumulativePayout: cumulative,
+      cumulativeNet:
+        investment != null ? cumulative - investment : null,
+      recoveryPct:
+        investment != null && investment > 0 ? (cumulative / investment) * 100 : null,
+    };
+  });
+
+  const lastYear = financials[financials.length - 1];
+  const exitStake =
+    lastYear != null
+      ? lastYear.revTotal * inputs.exitMultiple * (inputs.equityPct / 100)
+      : 0;
+  const totalRevenueShare = cumulative;
+  const totalReturn = totalRevenueShare + exitStake;
+  const totalRoi =
+    investment != null && investment > 0 ? totalReturn / investment : null;
+  const revenueShareOnlyRoi =
+    investment != null && investment > 0 ? totalRevenueShare / investment : null;
+
+  return {
+    years,
+    exitStake,
+    totalRevenueShare,
+    totalReturn,
+    totalRoi,
+    revenueShareOnlyRoi,
+    investment,
+    revenueSharePct: inputs.revenueSharePct,
+    equityPct: inputs.equityPct,
+    exitMultiple: inputs.exitMultiple,
+  };
+}
 
 export function fmtInvestorXof(value: number | null, suffix = " XOF") {
   if (value == null) return "—";

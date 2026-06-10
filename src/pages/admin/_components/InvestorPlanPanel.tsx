@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   buildInvestorRoiScenarioRows,
   computeInvestorFinancials,
+  computeInvestorRevenueSharing,
   computeInvestorRoi,
   DEFAULT_INVESTOR_ROI_INPUTS,
   fmtInvestorMultiple,
@@ -80,6 +81,7 @@ export default function InvestorPlanPanel() {
   const financials = useMemo(() => computeInvestorFinancials(), []);
   const base = financials[3];
   const roi = useMemo(() => computeInvestorRoi(inputs), [inputs]);
+  const revenueSharing = useMemo(() => computeInvestorRevenueSharing(inputs), [inputs]);
   const scenarios = useMemo(() => buildInvestorRoiScenarioRows(), []);
   const roiReady = roi.roi != null;
 
@@ -229,11 +231,16 @@ export default function InvestorPlanPanel() {
                 label={t("investor_plan.fields.investment")}
                 value={inputs.investmentXof == null ? "" : String(inputs.investmentXof)}
                 onChange={(v) => updateField("investmentXof", v)}
-                placeholder="250000000"
+                placeholder="5000000"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("investor_plan.fields.equity")} value={String(inputs.equityPct)} onChange={(v) => updateField("equityPct", v)} />
+              <Field
+                label={t("investor_plan.fields.revenue_share")}
+                value={String(inputs.revenueSharePct)}
+                onChange={(v) => updateField("revenueSharePct", v)}
+              />
               <Field label={t("investor_plan.fields.exit_multiple")} value={String(inputs.exitMultiple)} onChange={(v) => updateField("exitMultiple", v)} />
               <Field label={t("investor_plan.fields.horizon")} value={String(inputs.horizonYears)} onChange={(v) => updateField("horizonYears", v)} />
               <div className="col-span-2 flex items-end">
@@ -250,6 +257,83 @@ export default function InvestorPlanPanel() {
           </div>
         </CardContent>
       </Card>
+
+      <Collapsible defaultOpen>
+        <SectionShell title={t("investor_plan.sections.revenue_sharing")}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">{t("investor_plan.revenue_sharing_desc")}</p>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatTile
+                label={t("investor_plan.revenue_sharing.investment")}
+                value={fmtInvestorXof(revenueSharing.investment)}
+              />
+              <StatTile
+                label={t("investor_plan.revenue_sharing.cumul")}
+                value={fmtInvestorXof(revenueSharing.totalRevenueShare)}
+              />
+              <StatTile
+                label={t("investor_plan.revenue_sharing.exit")}
+                value={fmtInvestorXof(revenueSharing.exitStake)}
+              />
+              <StatTile
+                label={t("investor_plan.revenue_sharing.total_roi")}
+                value={fmtInvestorMultiple(revenueSharing.totalRoi)}
+              />
+            </div>
+            <PlanTable
+              headers={[
+                t("investor_plan.revenue_sharing.col.period"),
+                t("investor_plan.revenue_sharing.col.platform_revenue"),
+                t("investor_plan.revenue_sharing.col.share_rate"),
+                t("investor_plan.revenue_sharing.col.annual_payout"),
+                t("investor_plan.revenue_sharing.col.cumulative"),
+                t("investor_plan.revenue_sharing.col.recovery"),
+              ]}
+              rows={[
+                [
+                  t("investor_plan.revenue_sharing.row_investment"),
+                  "—",
+                  "—",
+                  fmtInvestorXof(-(revenueSharing.investment ?? 0)),
+                  fmtInvestorXof(-(revenueSharing.investment ?? 0)),
+                  "0 %",
+                ],
+                ...revenueSharing.years.map((row) => [
+                  row.label,
+                  fmtInvestorXof(row.platformRevenue),
+                  `${revenueSharing.revenueSharePct} %`,
+                  fmtInvestorXof(row.annualPayout),
+                  fmtInvestorXof(row.cumulativeNet),
+                  row.recoveryPct != null ? `${row.recoveryPct.toFixed(1)} %` : "—",
+                ]),
+                [
+                  t("investor_plan.revenue_sharing.row_exit", {
+                    equity: revenueSharing.equityPct,
+                    multiple: revenueSharing.exitMultiple,
+                  }),
+                  fmtInvestorXof(revenueSharing.years.at(-1)?.platformRevenue ?? 0),
+                  `${revenueSharing.equityPct} % × ${revenueSharing.exitMultiple}×`,
+                  fmtInvestorXof(revenueSharing.exitStake),
+                  fmtInvestorXof(
+                    revenueSharing.totalReturn - (revenueSharing.investment ?? 0),
+                  ),
+                  revenueSharing.totalRoi != null
+                    ? fmtInvestorMultiple(revenueSharing.totalRoi)
+                    : "—",
+                ],
+              ]}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("investor_plan.revenue_sharing.footer", {
+                share: revenueSharing.revenueSharePct,
+                horizon: inputs.horizonYears,
+                revenueOnly: fmtInvestorMultiple(revenueSharing.revenueShareOnlyRoi),
+                total: fmtInvestorMultiple(revenueSharing.totalRoi),
+              })}
+            </p>
+          </div>
+        </SectionShell>
+      </Collapsible>
 
       <Collapsible defaultOpen>
         <SectionShell title={t("investor_plan.sections.financials")}>

@@ -4,6 +4,7 @@ import autoTable from "jspdf-autotable";
 import {
   buildInvestorRoiScenarioRows,
   computeInvestorFinancials,
+  computeInvestorRevenueSharing,
   computeInvestorRoi,
   fmtInvestorMultiple,
   fmtInvestorPercent,
@@ -27,6 +28,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
   const financials = computeInvestorFinancials();
   const base = financials[3];
   const roi = computeInvestorRoi(roiInputs);
+  const revenueSharing = computeInvestorRevenueSharing(roiInputs);
   const scenarios = buildInvestorRoiScenarioRows();
   let y = 14;
 
@@ -87,6 +89,59 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
   y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
+  if (y > 220) {
+    doc.addPage();
+    y = 20;
+  }
+
+  y = addSectionTitle(doc, "Revenue sharing (3 ans)", y);
+  autoTable(doc, {
+    startY: y,
+    head: [
+      [
+        "Période",
+        "Revenu plateforme",
+        "Taux share",
+        "Versement",
+        "Cumulé",
+        "Récup. invest.",
+      ],
+    ],
+    body: [
+      [
+        "Investissement (T0)",
+        "—",
+        "—",
+        fmtInvestorXof(-(revenueSharing.investment ?? 0)),
+        fmtInvestorXof(-(revenueSharing.investment ?? 0)),
+        "—",
+      ],
+      ...revenueSharing.years.map((row) => [
+        row.label,
+        fmtInvestorXof(row.platformRevenue),
+        `${revenueSharing.revenueSharePct} %`,
+        fmtInvestorXof(row.annualPayout),
+        fmtInvestorXof(row.cumulativeNet),
+        row.recoveryPct != null ? `${row.recoveryPct.toFixed(1)} %` : "—",
+      ]),
+      [
+        `Sortie (${revenueSharing.equityPct} % × ${revenueSharing.exitMultiple}×)`,
+        fmtInvestorXof(revenueSharing.years.at(-1)?.platformRevenue ?? 0),
+        `${revenueSharing.equityPct} %`,
+        fmtInvestorXof(revenueSharing.exitStake),
+        fmtInvestorXof(
+          revenueSharing.totalReturn - (revenueSharing.investment ?? 0),
+        ),
+        fmtInvestorMultiple(revenueSharing.totalRoi),
+      ],
+    ],
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [26, 82, 150] },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  y += 8;
+
   if (y > 250) {
     doc.addPage();
     y = 20;
@@ -104,6 +159,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
       ["Abonnement / compagnie / mois", fmtInvestorXof(roiInputs.aboMonth)],
       ["Montant investi", fmtInvestorXof(roiInputs.investmentXof)],
       ["Part capital", `${roiInputs.equityPct} %`],
+      ["Revenue share", `${roiInputs.revenueSharePct} %`],
       ["Multiple de sortie", fmtInvestorMultiple(roiInputs.exitMultiple)],
       ["Horizon", `${roiInputs.horizonYears} an(s)`],
       ["GMV annuel", fmtInvestorXof(roi.gmvYear)],
@@ -133,6 +189,7 @@ export function downloadInvestorPlanJson(roiInputs: InvestorRoiInputs) {
     simulator: {
       inputs: roiInputs,
       results: computeInvestorRoi(roiInputs),
+      revenueSharing: computeInvestorRevenueSharing(roiInputs),
     },
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
