@@ -2,6 +2,7 @@ import { isSupabaseAuth } from "@/lib/auth/config";
 import { AuthProvider as HerculesAuthProvider } from "./auth.tsx";
 import { ConvexProvider } from "./convex.tsx";
 import { QueryClientProvider } from "./query-client.tsx";
+import { AppUserProvider } from "./app-user-provider.tsx";
 import { SupabaseAuthProvider } from "./supabase-auth.tsx";
 import { ThemeProvider } from "./theme.tsx";
 import { Toaster } from "../ui/sonner.tsx";
@@ -26,7 +27,9 @@ export function DefaultProviders({ children }: { children: React.ReactNode }) {
   if (isSupabaseAuth()) {
     return (
       <SupabaseAuthProvider>
-        <AppShell>{children}</AppShell>
+        <AppUserProvider>
+          <AppShell>{children}</AppShell>
+        </AppUserProvider>
       </SupabaseAuthProvider>
     );
   }

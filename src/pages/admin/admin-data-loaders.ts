@@ -1,0 +1,411 @@
+import { supabase } from "@/lib/supabase";
+import {
+  getSellerCommissionSummarySupabase,
+  listCommissionSettingsSupabase,
+  type CommissionSetting,
+  type SellerCommissionSummary,
+} from "@/lib/supabase/accounting.ts";
+
+export type SupabaseUserRow = {
+  id: string;
+  email: string | null;
+  firstName: string;
+  lastName: string;
+  username: string;
+};
+
+export type SupabaseCompanyRow = {
+  id: string;
+  name: string;
+  countryId: string | null;
+  countryName: string | null;
+  isActive: boolean;
+  commissionRate: number;
+  managerName: string | null;
+  currency: string | null;
+};
+
+export type SupabaseCountryRow = {
+  id: string;
+  name: string;
+  currency: string | null;
+};
+
+export type SupabaseCityRow = {
+  id: string;
+  name: string;
+  countryName: string | null;
+};
+
+export type SupabaseRoleRow = {
+  id: string;
+  name: string;
+  scope: string | null;
+  description: string | null;
+  droits: string[];
+};
+
+export type SupabasePlanRow = {
+  id: string;
+  name: string;
+  countryName: string | null;
+  currency: string | null;
+  durations: { id: string; price: number; duration: number }[];
+};
+
+export type SupabaseSubscriptionRow = {
+  id: string;
+  companyName: string;
+  planName: string;
+  price: number | null;
+  duration: number | null;
+  endDate: string;
+};
+
+export type AdminTabId =
+  | "users"
+  | "companies"
+  | "subscriptions"
+  | "plans"
+  | "commissions"
+  | "guarantee_fund"
+  | "geography"
+  | "roles"
+  | "contact"
+  | "loyalty"
+  | "legal"
+  | "scaling_metrics"
+  | "investor_plan"
+  | "landing";
+
+export type AdminDataSlice = {
+  users: SupabaseUserRow[];
+  rolesByUser: Record<string, string[]>;
+  companies: SupabaseCompanyRow[];
+  countries: SupabaseCountryRow[];
+  cities: SupabaseCityRow[];
+  roles: SupabaseRoleRow[];
+  plans: SupabasePlanRow[];
+  subscriptions: SupabaseSubscriptionRow[];
+  commissions: SellerCommissionSummary | null;
+  commissionSettings: CommissionSetting[];
+};
+
+export type AdminStats = {
+  users: number;
+  companies: number;
+  activeSubscriptions: number;
+  cities: number;
+};
+
+export type AdminDataKey = Exclude<keyof AdminDataSlice, "rolesByUser"> | "rolesByUser";
+
+function roleNameFromJoin(
+  role: { name: string } | { name: string }[] | null | undefined,
+): string | null {
+  if (!role) return null;
+  if (Array.isArray(role)) return role[0]?.name ?? null;
+  return role.name ?? null;
+}
+
+function joinedOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminDataKey[] {
+  if (!isSuperAdmin) {
+    if (tab === "commissions") {
+      return ["countries", "companies", "commissions", "commissionSettings"];
+    }
+    if (tab === "guarantee_fund") {
+      return ["companies"];
+    }
+    return [];
+  }
+
+  switch (tab) {
+    case "users":
+      return ["users", "rolesByUser"];
+    case "companies":
+      return ["companies"];
+    case "subscriptions":
+      return ["subscriptions"];
+    case "plans":
+      return ["plans", "countries"];
+    case "commissions":
+      return ["countries", "companies", "commissions", "commissionSettings"];
+    case "guarantee_fund":
+      return ["companies"];
+    case "geography":
+      return ["countries", "cities"];
+    case "roles":
+      return ["roles"];
+    case "contact":
+      return ["companies"];
+    default:
+      return [];
+  }
+}
+
+export async function loadAdminStats(isSuperAdmin: boolean): Promise<AdminStats> {
+  if (!isSuperAdmin) {
+    return { users: 0, companies: 0, activeSubscriptions: 0, cities: 0 };
+  }
+
+  const now = new Date().toISOString();
+  const [usersRes, companiesRes, subsRes, citiesRes] = await Promise.all([
+    supabase.from("Users").select("id", { count: "exact", head: true }),
+    supabase.from("Companies").select("id", { count: "exact", head: true }),
+    supabase
+      .from("Subscriptions")
+      .select("id", { count: "exact", head: true })
+      .gte("endDate", now),
+    supabase.from("Cities").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    users: usersRes.count ?? 0,
+    companies: companiesRes.count ?? 0,
+    activeSubscriptions: subsRes.count ?? 0,
+    cities: citiesRes.count ?? 0,
+  };
+}
+
+async function loadUsers(): Promise<Pick<AdminDataSlice, "users" | "rolesByUser">> {
+  const { data: rows, error } = await supabase
+    .from("Users")
+    .select("id, email, firstName, lastName, username")
+    .order("createdAt", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+  const users = (rows ?? []) as SupabaseUserRow[];
+  const userIds = users.map((user) => user.id);
+
+  if (userIds.length === 0) {
+    return { users, rolesByUser: {} };
+  }
+
+  const { data: roleRows, error: rolesError } = await supabase
+    .from("UserRoles")
+    .select("userId, roleId, Role(name)")
+    .in("userId", userIds);
+
+  if (rolesError) throw rolesError;
+
+  const rolesByUser: Record<string, string[]> = {};
+  for (const row of roleRows ?? []) {
+    const name = roleNameFromJoin(row.Role as { name: string } | { name: string }[] | null);
+    if (!name) continue;
+    const userId = row.userId as string;
+    rolesByUser[userId] ??= [];
+    rolesByUser[userId].push(name);
+  }
+
+  return { users, rolesByUser };
+}
+
+async function loadCompanies(): Promise<Pick<AdminDataSlice, "companies">> {
+  const { data: rows, error } = await supabase
+    .from("Companies")
+    .select("id, name, countryId, isActive, commissionRate, managerName, Countries(name, currency)")
+    .order("createdAt", { ascending: false });
+
+  if (error) throw error;
+
+  return {
+    companies: (rows ?? []).map((row) => {
+      const country = joinedOne(
+        row.Countries as
+          | { name: string; currency: string | null }
+          | { name: string; currency: string | null }[]
+          | null,
+      );
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        countryId: (row.countryId as string | null) ?? null,
+        countryName: country?.name ?? null,
+        isActive: Boolean(row.isActive),
+        commissionRate: Number(row.commissionRate ?? 0),
+        managerName: (row.managerName as string | null) ?? null,
+        currency: country?.currency ?? null,
+      };
+    }),
+  };
+}
+
+async function loadCountries(): Promise<Pick<AdminDataSlice, "countries">> {
+  const { data: rows, error } = await supabase
+    .from("Countries")
+    .select("id, name, currency")
+    .order("name");
+
+  if (error) throw error;
+  return { countries: (rows ?? []) as SupabaseCountryRow[] };
+}
+
+async function loadCities(): Promise<Pick<AdminDataSlice, "cities">> {
+  const { data: rows, error } = await supabase
+    .from("Cities")
+    .select("id, name, Countries(name)")
+    .order("name");
+
+  if (error) throw error;
+
+  return {
+    cities: (rows ?? []).map((row) => {
+      const country = joinedOne(row.Countries as { name: string } | { name: string }[] | null);
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        countryName: country?.name ?? null,
+      };
+    }),
+  };
+}
+
+async function loadRoles(): Promise<Pick<AdminDataSlice, "roles">> {
+  const { data: rows, error } = await supabase
+    .from("Role")
+    .select("id, name, scope, level, isSystem, description, droits")
+    .order("level", { ascending: false });
+
+  if (error) throw error;
+
+  return {
+    roles: (rows ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      scope: (row.scope as string | null) ?? null,
+      description: (row.description as string | null) ?? null,
+      droits: (row.droits as string[] | null) ?? [],
+    })),
+  };
+}
+
+async function loadPlans(): Promise<Pick<AdminDataSlice, "plans">> {
+  const [plansResult, durationsResult] = await Promise.all([
+    supabase
+      .from("SubscriptionPlans")
+      .select("id, name, countryId, features, Countries(name, currency)")
+      .order("createdAt", { ascending: false }),
+    supabase.from("SubscriptionPlanDurations").select("id, planId, price, duration").order("duration"),
+  ]);
+
+  if (plansResult.error) throw plansResult.error;
+  if (durationsResult.error) throw durationsResult.error;
+
+  const durationsByPlan = new Map<string, { id: string; price: number; duration: number }[]>();
+  for (const duration of durationsResult.data ?? []) {
+    const planId = duration.planId as string;
+    durationsByPlan.set(planId, [
+      ...(durationsByPlan.get(planId) ?? []),
+      {
+        id: duration.id as string,
+        price: Number(duration.price ?? 0),
+        duration: Number(duration.duration ?? 0),
+      },
+    ]);
+  }
+
+  return {
+    plans: (plansResult.data ?? []).map((plan) => {
+      const country = joinedOne(
+        plan.Countries as
+          | { name: string; currency: string | null }
+          | { name: string; currency: string | null }[]
+          | null,
+      );
+      return {
+        id: plan.id as string,
+        name: plan.name as string,
+        countryName: country?.name ?? null,
+        currency: country?.currency ?? null,
+        durations: durationsByPlan.get(plan.id as string) ?? [],
+      };
+    }),
+  };
+}
+
+async function loadSubscriptions(): Promise<Pick<AdminDataSlice, "subscriptions">> {
+  const { data: rows, error } = await supabase
+    .from("Subscriptions")
+    .select(
+      "id, endDate, Companies(name), SubscriptionPlans(name), SubscriptionPlanDurations(price, duration)",
+    )
+    .order("createdAt", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+
+  return {
+    subscriptions: (rows ?? []).map((row) => {
+      const company = joinedOne(row.Companies as { name: string } | { name: string }[] | null);
+      const plan = joinedOne(row.SubscriptionPlans as { name: string } | { name: string }[] | null);
+      const duration = joinedOne(
+        row.SubscriptionPlanDurations as
+          | { price: number; duration: number }
+          | { price: number; duration: number }[]
+          | null,
+      );
+      return {
+        id: row.id as string,
+        companyName: company?.name ?? "Company",
+        planName: plan?.name ?? "Plan",
+        price: duration ? Number(duration.price ?? 0) : null,
+        duration: duration ? Number(duration.duration ?? 0) : null,
+        endDate: row.endDate as string,
+      };
+    }),
+  };
+}
+
+async function loadCommissions(): Promise<
+  Pick<AdminDataSlice, "commissions" | "commissionSettings">
+> {
+  const [commissions, commissionSettings] = await Promise.all([
+    getSellerCommissionSummarySupabase(),
+    listCommissionSettingsSupabase(),
+  ]);
+  return { commissions, commissionSettings };
+}
+
+const LOADER_BY_KEY: Record<
+  AdminDataKey,
+  () => Promise<Partial<AdminDataSlice>>
+> = {
+  users: loadUsers,
+  rolesByUser: loadUsers,
+  companies: loadCompanies,
+  countries: loadCountries,
+  cities: loadCities,
+  roles: loadRoles,
+  plans: loadPlans,
+  subscriptions: loadSubscriptions,
+  commissions: loadCommissions,
+  commissionSettings: loadCommissions,
+};
+
+export async function loadAdminTabData(
+  tab: AdminTabId,
+  isSuperAdmin: boolean,
+): Promise<{ data: Partial<AdminDataSlice>; errors: Partial<Record<AdminDataKey, string>> }> {
+  const keys = [...new Set(adminTabDataKeys(tab, isSuperAdmin))];
+  const data: Partial<AdminDataSlice> = {};
+  const errors: Partial<Record<AdminDataKey, string>> = {};
+
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        const slice = await LOADER_BY_KEY[key]();
+        Object.assign(data, slice);
+      } catch (err) {
+        errors[key] = err instanceof Error ? err.message : "Erreur chargement";
+      }
+    }),
+  );
+
+  return { data, errors };
+}

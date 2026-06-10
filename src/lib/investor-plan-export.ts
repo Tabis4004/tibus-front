@@ -1,6 +1,4 @@
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import {
   buildInvestorRoiScenarioRows,
   computeInvestorRevenueSharing,
@@ -17,7 +15,7 @@ import {
   type InvestorRoiInputs,
 } from "@/data/investor-plan-content.ts";
 
-function addSectionTitle(doc: jsPDF, title: string, y: number) {
+function addSectionTitle(doc: import("jspdf").jsPDF, title: string, y: number) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.text(title, 14, y);
@@ -25,7 +23,11 @@ function addSectionTitle(doc: jsPDF, title: string, y: number) {
   return y + 6;
 }
 
-export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
+export async function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const stamp = format(new Date(), "yyyy-MM-dd");
   const projection = computeInvestorScenarioProjection(roiInputs);
@@ -70,7 +72,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
     headStyles: { fillColor: [26, 82, 150] },
     margin: { left: 14, right: 14 },
   });
-  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  y = (doc as import("jspdf").jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
   y = addSectionTitle(doc, `Projection financière — ${projection.scenario.label}`, y);
@@ -102,7 +104,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
     headStyles: { fillColor: [26, 82, 150] },
     margin: { left: 14, right: 14 },
   });
-  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  y = (doc as import("jspdf").jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
   if (y > 220) {
@@ -151,7 +153,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
     headStyles: { fillColor: [26, 82, 150] },
     margin: { left: 14, right: 14 },
   });
-  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  y = (doc as import("jspdf").jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
   if (y > 250) {
@@ -168,7 +170,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
     headStyles: { fillColor: [26, 82, 150] },
     margin: { left: 14, right: 14 },
   });
-  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  y = (doc as import("jspdf").jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
   if (y > 250) {

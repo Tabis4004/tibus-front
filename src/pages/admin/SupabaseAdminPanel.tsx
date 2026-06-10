@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -27,15 +27,35 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
-import { supabase } from "@/lib/supabase";
 import {
   deleteCommissionSettingSupabase,
-  getSellerCommissionSummarySupabase,
-  listCommissionSettingsSupabase,
   upsertCommissionSettingSupabase,
   type CommissionSetting,
-  type SellerCommissionSummary,
 } from "@/lib/supabase/accounting.ts";
+import {
+  loadAdminStats,
+  loadAdminTabData,
+  type AdminDataKey,
+  type AdminDataSlice,
+  type AdminStats,
+  type AdminTabId,
+  type SupabaseCompanyRow,
+} from "./admin-data-loaders.ts";
+import {
+  ContactSettingsPanel,
+  GatewayFeeSettingsPanel,
+  GuaranteeFundManager,
+  InvestorPlanPanel,
+  LegalPagesPanel,
+  PaymentGatewaySettingsPanel,
+  PlatformLoyaltySettingsPanel,
+  PlatformScalingMetricsPanel,
+  StakeholderCommissionPanel,
+  SupabasePlansTab,
+  SupabaseSubscriptionsTab,
+  TpePosDiagnosticsPanel,
+  TravelerBookingNoticePanel,
+} from "./admin-lazy-panels.tsx";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -54,94 +74,11 @@ import {
   Accordion,
 } from "@/components/ui/accordion.tsx";
 import { cn } from "@/lib/utils.ts";
-import GatewayFeeSettingsPanel from "./_components/GatewayFeeSettingsPanel.tsx";
-import StakeholderCommissionPanel from "./_components/StakeholderCommissionPanel.tsx";
-import PaymentGatewaySettingsPanel from "./_components/PaymentGatewaySettingsPanel.tsx";
-import TravelerBookingNoticePanel from "./_components/TravelerBookingNoticePanel.tsx";
-import GuaranteeFundManager from "./_components/GuaranteeFundManager.tsx";
-import ContactSettingsPanel from "./_components/ContactSettingsPanel.tsx";
-import PlatformLoyaltySettingsPanel from "./_components/PlatformLoyaltySettingsPanel.tsx";
-import LegalPagesPanel from "./_components/LegalPagesPanel.tsx";
-import PlatformScalingMetricsPanel from "./_components/PlatformScalingMetricsPanel.tsx";
-import InvestorPlanPanel from "./_components/InvestorPlanPanel.tsx";
-import TpePosDiagnosticsPanel from "./_components/TpePosDiagnosticsPanel.tsx";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminTabAuditHub from "./_components/AdminTabAuditHub.tsx";
-import SupabasePlansTab from "./_components/SupabasePlansTab.tsx";
-import SupabaseSubscriptionsTab from "./_components/SupabaseSubscriptionsTab.tsx";
 
-type SupabaseUserRow = {
-  id: string;
-  email: string | null;
-  firstName: string;
-  lastName: string;
-  username: string;
-};
-
-type SupabaseCompanyRow = {
-  id: string;
-  name: string;
-  countryId: string | null;
-  countryName: string | null;
-  isActive: boolean;
-  commissionRate: number;
-  managerName: string | null;
-  currency: string | null;
-};
-
-type SupabaseCountryRow = {
-  id: string;
-  name: string;
-  currency: string | null;
-};
-
-type SupabaseCityRow = {
-  id: string;
-  name: string;
-  countryName: string | null;
-};
-
-type SupabaseRoleRow = {
-  id: string;
-  name: string;
-  scope: string | null;
-  description: string | null;
-  droits: string[];
-};
-
-type SupabasePlanRow = {
-  id: string;
-  name: string;
-  countryName: string | null;
-  currency: string | null;
-  durations: { id: string; price: number; duration: number }[];
-};
-
-type SupabaseSubscriptionRow = {
-  id: string;
-  companyName: string;
-  planName: string;
-  price: number | null;
-  duration: number | null;
-  endDate: string;
-};
-
-type TabId =
-  | "users"
-  | "companies"
-  | "subscriptions"
-  | "plans"
-  | "commissions"
-  | "guarantee_fund"
-  | "geography"
-  | "roles"
-  | "contact"
-  | "loyalty"
-  | "legal"
-  | "scaling_metrics"
-  | "investor_plan"
-  | "landing";
+type TabId = AdminTabId;
 
 const TAB_IDS: TabId[] = [
   "users",
@@ -164,41 +101,7 @@ function isTabId(value: string | null): value is TabId {
   return value !== null && TAB_IDS.includes(value as TabId);
 }
 
-type AdminData = {
-  users: SupabaseUserRow[];
-  rolesByUser: Record<string, string[]>;
-  companies: SupabaseCompanyRow[];
-  countries: SupabaseCountryRow[];
-  cities: SupabaseCityRow[];
-  roles: SupabaseRoleRow[];
-  plans: SupabasePlanRow[];
-  subscriptions: SupabaseSubscriptionRow[];
-  commissions: SellerCommissionSummary | null;
-  commissionSettings: CommissionSetting[];
-};
-
-type ModuleErrorKey = Exclude<keyof AdminData, "rolesByUser">;
-
-function roleNameFromJoin(
-  role: { name: string } | { name: string }[] | null | undefined,
-): string | null {
-  if (!role) return null;
-  if (Array.isArray(role)) return role[0]?.name ?? null;
-  return role.name ?? null;
-}
-
-function joinedOne<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
-
-function errorMessage(err: unknown) {
-  return err instanceof Error ? err.message : "Erreur chargement";
-}
-
-function isActiveSubscription(endDate: string) {
-  return new Date(endDate).getTime() >= Date.now();
-}
+type AdminData = AdminDataSlice;
 
 function initialData(): AdminData {
   return {
@@ -228,8 +131,17 @@ export default function SupabaseAdminPanel() {
   });
   const [data, setData] = useState<AdminData>(() => initialData());
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Partial<Record<ModuleErrorKey, string>>>({});
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [errors, setErrors] = useState<Partial<Record<AdminDataKey, string>>>({});
+  const [stats, setStats] = useState<AdminStats>({
+    users: 0,
+    companies: 0,
+    activeSubscriptions: 0,
+    cities: 0,
+  });
+  const [tabRefreshNonce, setTabRefreshNonce] = useState(0);
+  const reloadCurrentTab = useCallback(() => {
+    setTabRefreshNonce((nonce) => nonce + 1);
+  }, []);
   const [commissionAccordionSections, setCommissionAccordionSections] = useState<string[]>([]);
   const canAccessAdminPanel = appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
 
@@ -261,6 +173,21 @@ export default function SupabaseAdminPanel() {
   };
 
   useEffect(() => {
+    if (!appUser.isReady || !canAccessAdminPanel) return;
+
+    let cancelled = false;
+    void loadAdminStats(appUser.isSuperAdmin)
+      .then((nextStats) => {
+        if (!cancelled) setStats(nextStats);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appUser.isReady, appUser.isSuperAdmin, canAccessAdminPanel, tabRefreshNonce]);
+
+  useEffect(() => {
     if (!appUser.isReady) return;
 
     if (!canAccessAdminPanel) {
@@ -269,243 +196,13 @@ export default function SupabaseAdminPanel() {
     }
 
     let cancelled = false;
+    setIsLoading(true);
 
-    void (async () => {
-      setIsLoading(true);
-      setErrors({});
-
-      const loadFullAdmin = appUser.isSuperAdmin;
-
-      const usersPromise = loadFullAdmin ? supabase
-        .from("Users")
-        .select("id, email, firstName, lastName, username")
-        .order("createdAt", { ascending: false })
-        .limit(50)
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          return (rows ?? []) as SupabaseUserRow[];
-        }) : Promise.resolve([] as SupabaseUserRow[]);
-
-      const userRolesPromise = loadFullAdmin ? supabase
-        .from("UserRoles")
-        .select("userId, roleId, Role(name)")
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          const grouped: Record<string, string[]> = {};
-          for (const row of rows ?? []) {
-            const name = roleNameFromJoin(
-              row.Role as { name: string } | { name: string }[] | null,
-            );
-            if (!name) continue;
-            const userId = row.userId as string;
-            grouped[userId] ??= [];
-            grouped[userId].push(name);
-          }
-          return grouped;
-        }) : Promise.resolve({} as Record<string, string[]>);
-
-      const companiesPromise = supabase
-        .from("Companies")
-        .select("id, name, countryId, isActive, commissionRate, managerName, Countries(name, currency)")
-        .order("createdAt", { ascending: false })
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          return (rows ?? []).map((row) => {
-            const country = joinedOne(
-              row.Countries as
-                | { name: string; currency: string | null }
-                | { name: string; currency: string | null }[]
-                | null,
-            );
-            return {
-              id: row.id as string,
-              name: row.name as string,
-              countryId: (row.countryId as string | null) ?? null,
-              countryName: country?.name ?? null,
-              isActive: Boolean(row.isActive),
-              commissionRate: Number(row.commissionRate ?? 0),
-              managerName: (row.managerName as string | null) ?? null,
-              currency: country?.currency ?? null,
-            };
-          });
-        });
-
-      const countriesPromise = supabase
-        .from("Countries")
-        .select("id, name, currency")
-        .order("name")
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          return (rows ?? []) as SupabaseCountryRow[];
-        });
-
-      const citiesPromise = loadFullAdmin ? supabase
-        .from("Cities")
-        .select("id, name, Countries(name)")
-        .order("name")
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          return (rows ?? []).map((row) => {
-            const country = joinedOne(row.Countries as { name: string } | { name: string }[] | null);
-            return {
-              id: row.id as string,
-              name: row.name as string,
-              countryName: country?.name ?? null,
-            };
-          });
-        }) : Promise.resolve([] as SupabaseCityRow[]);
-
-      const rolesPromise = loadFullAdmin ? supabase
-        .from("Role")
-        .select("id, name, scope, level, isSystem, description, droits")
-        .order("level", { ascending: false })
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          return (rows ?? []).map((row) => ({
-            id: row.id as string,
-            name: row.name as string,
-            scope: (row.scope as string | null) ?? null,
-            description: (row.description as string | null) ?? null,
-            droits: (row.droits as string[] | null) ?? [],
-          }));
-        }) : Promise.resolve([] as SupabaseRoleRow[]);
-
-      const plansPromise = loadFullAdmin ? Promise.all([
-        supabase
-          .from("SubscriptionPlans")
-          .select("id, name, countryId, features, Countries(name, currency)")
-          .order("createdAt", { ascending: false }),
-        supabase
-          .from("SubscriptionPlanDurations")
-          .select("id, planId, price, duration")
-          .order("duration"),
-      ]).then(([plansResult, durationsResult]) => {
-        if (plansResult.error) throw plansResult.error;
-        if (durationsResult.error) throw durationsResult.error;
-
-        const durationsByPlan = new Map<string, { id: string; price: number; duration: number }[]>();
-        for (const duration of durationsResult.data ?? []) {
-          const planId = duration.planId as string;
-          durationsByPlan.set(planId, [
-            ...(durationsByPlan.get(planId) ?? []),
-            {
-              id: duration.id as string,
-              price: Number(duration.price ?? 0),
-              duration: Number(duration.duration ?? 0),
-            },
-          ]);
-        }
-
-        return (plansResult.data ?? []).map((plan) => {
-          const country = joinedOne(
-            plan.Countries as
-              | { name: string; currency: string | null }
-              | { name: string; currency: string | null }[]
-              | null,
-          );
-          return {
-            id: plan.id as string,
-            name: plan.name as string,
-            countryName: country?.name ?? null,
-            currency: country?.currency ?? null,
-            durations: durationsByPlan.get(plan.id as string) ?? [],
-          };
-        });
-      }) : Promise.resolve([] as SupabasePlanRow[]);
-
-      const subscriptionsPromise = loadFullAdmin ? supabase
-        .from("Subscriptions")
-        .select(
-          "id, endDate, Companies(name), SubscriptionPlans(name), SubscriptionPlanDurations(price, duration)",
-        )
-        .order("createdAt", { ascending: false })
-        .limit(50)
-        .then(({ data: rows, error }) => {
-          if (error) throw error;
-          return (rows ?? []).map((row) => {
-            const company = joinedOne(row.Companies as { name: string } | { name: string }[] | null);
-            const plan = joinedOne(row.SubscriptionPlans as { name: string } | { name: string }[] | null);
-            const duration = joinedOne(
-              row.SubscriptionPlanDurations as
-                | { price: number; duration: number }
-                | { price: number; duration: number }[]
-                | null,
-            );
-            return {
-              id: row.id as string,
-              companyName: company?.name ?? "Company",
-              planName: plan?.name ?? "Plan",
-              price: duration ? Number(duration.price ?? 0) : null,
-              duration: duration ? Number(duration.duration ?? 0) : null,
-              endDate: row.endDate as string,
-            };
-          });
-        }) : Promise.resolve([] as SupabaseSubscriptionRow[]);
-
-      const commissionSettingsPromise = listCommissionSettingsSupabase();
-
-      const results = await Promise.allSettled([
-        usersPromise,
-        userRolesPromise,
-        companiesPromise,
-        countriesPromise,
-        citiesPromise,
-        rolesPromise,
-        plansPromise,
-        subscriptionsPromise,
-        getSellerCommissionSummarySupabase(),
-        commissionSettingsPromise,
-      ]);
-
-      const nextErrors: Partial<Record<ModuleErrorKey, string>> = {};
-      const [
-        usersResult,
-        userRolesResult,
-        companiesResult,
-        countriesResult,
-        citiesResult,
-        rolesResult,
-        plansResult,
-        subscriptionsResult,
-        commissionsResult,
-        commissionSettingsResult,
-      ] = results;
-
-      if (usersResult.status === "rejected") nextErrors.users = errorMessage(usersResult.reason);
-      if (userRolesResult.status === "rejected") nextErrors.users = errorMessage(userRolesResult.reason);
-      if (companiesResult.status === "rejected") nextErrors.companies = errorMessage(companiesResult.reason);
-      if (countriesResult.status === "rejected") nextErrors.countries = errorMessage(countriesResult.reason);
-      if (citiesResult.status === "rejected") nextErrors.cities = errorMessage(citiesResult.reason);
-      if (rolesResult.status === "rejected") nextErrors.roles = errorMessage(rolesResult.reason);
-      if (plansResult.status === "rejected") nextErrors.plans = errorMessage(plansResult.reason);
-      if (subscriptionsResult.status === "rejected") {
-        nextErrors.subscriptions = errorMessage(subscriptionsResult.reason);
-      }
-      if (commissionsResult.status === "rejected") {
-        nextErrors.commissions = errorMessage(commissionsResult.reason);
-      }
-      if (commissionSettingsResult.status === "rejected") {
-        nextErrors.commissions = errorMessage(commissionSettingsResult.reason);
-      }
-
-      if (!cancelled) {
-        setData({
-          users: usersResult.status === "fulfilled" ? usersResult.value : [],
-          rolesByUser: userRolesResult.status === "fulfilled" ? userRolesResult.value : {},
-          companies: companiesResult.status === "fulfilled" ? companiesResult.value : [],
-          countries: countriesResult.status === "fulfilled" ? countriesResult.value : [],
-          cities: citiesResult.status === "fulfilled" ? citiesResult.value : [],
-          roles: rolesResult.status === "fulfilled" ? rolesResult.value : [],
-          plans: plansResult.status === "fulfilled" ? plansResult.value : [],
-          subscriptions: subscriptionsResult.status === "fulfilled" ? subscriptionsResult.value : [],
-          commissions: commissionsResult.status === "fulfilled" ? commissionsResult.value : null,
-          commissionSettings: commissionSettingsResult.status === "fulfilled" ? commissionSettingsResult.value : [],
-        });
-        setErrors(nextErrors);
-      }
-    })()
-      .catch((err) => {
-        if (!cancelled) setErrors({ users: errorMessage(err) });
+    void loadAdminTabData(tab, appUser.isSuperAdmin)
+      .then((result) => {
+        if (cancelled) return;
+        setData((current) => ({ ...current, ...result.data }));
+        setErrors((current) => ({ ...current, ...result.errors }));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -514,16 +211,15 @@ export default function SupabaseAdminPanel() {
     return () => {
       cancelled = true;
     };
-  }, [appUser.isReady, appUser.isSuperAdmin, appUser.roles, canAccessAdminPanel, lng, navigate, refreshKey]);
-
-  if (!appUser.isReady || appUser.isLoading) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
-  }
+  }, [
+    appUser.isReady,
+    appUser.isSuperAdmin,
+    canAccessAdminPanel,
+    lng,
+    navigate,
+    tab,
+    tabRefreshNonce,
+  ]);
 
   const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "users", label: t("tabs.users"), icon: UsersIcon },
@@ -544,8 +240,6 @@ export default function SupabaseAdminPanel() {
   const visibleTabs = appUser.isSuperAdmin
     ? tabs
     : tabs.filter((item) => item.id === "commissions" || item.id === "guarantee_fund");
-  const activeSubscriptions = data.subscriptions.filter((sub) => isActiveSubscription(sub.endDate));
-
   return (
     <AdminAccessGate>
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -590,12 +284,14 @@ export default function SupabaseAdminPanel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard icon={UsersIcon} label={t("total_users")} value={data.users.length} />
-        <StatCard icon={BuildingIcon} label={t("total_companies")} value={data.companies.length} />
-        <StatCard icon={CreditCardIcon} label={t("active_subs")} value={activeSubscriptions.length} />
-        <StatCard icon={GlobeIcon} label={t("geo.cities", { defaultValue: "Villes" })} value={data.cities.length} />
-      </div>
+      {appUser.isSuperAdmin ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard icon={UsersIcon} label={t("total_users")} value={stats.users} />
+          <StatCard icon={BuildingIcon} label={t("total_companies")} value={stats.companies} />
+          <StatCard icon={CreditCardIcon} label={t("active_subs")} value={stats.activeSubscriptions} />
+          <StatCard icon={GlobeIcon} label={t("geo.cities", { defaultValue: "Villes" })} value={stats.cities} />
+        </div>
+      ) : null}
 
       <div className="rounded-xl bg-muted p-1">
         <div className="flex gap-1 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
@@ -716,6 +412,7 @@ export default function SupabaseAdminPanel() {
 
       {tab === "subscriptions" && (
         <>
+        <AdminTabSuspense>
         <SupabaseSubscriptionsTab
           companies={data.companies.map((company) => ({
             id: company.id,
@@ -723,18 +420,21 @@ export default function SupabaseAdminPanel() {
             countryId: company.countryId,
             countryName: company.countryName,
           }))}
-          onDataChanged={() => setRefreshKey((key) => key + 1)}
+          onDataChanged={reloadCurrentTab}
         />
+        </AdminTabSuspense>
         <AdminTabAuditHub tab="subscriptions" />
         </>
       )}
 
       {tab === "plans" && (
         <>
+        <AdminTabSuspense>
         <SupabasePlansTab
           countries={data.countries}
-          onDataChanged={() => setRefreshKey((key) => key + 1)}
+          onDataChanged={reloadCurrentTab}
         />
+        </AdminTabSuspense>
         <AdminTabAuditHub tab="plans" />
         </>
       )}
@@ -769,7 +469,7 @@ export default function SupabaseAdminPanel() {
                   <CommissionSettingsManager
                     settings={data.commissionSettings}
                     companies={data.companies}
-                    onChanged={() => setRefreshKey((key) => key + 1)}
+                    onChanged={reloadCurrentTab}
                   />
                   {appUser.isSuperAdmin && (
                     <AdminCollapsibleSection
@@ -777,7 +477,11 @@ export default function SupabaseAdminPanel() {
                       title={t("payment_gateway.title", { defaultValue: "Passerelle de paiement" })}
                       auditModuleKey="admin.commissions.payment_gateway"
                     >
-                      <PaymentGatewaySettingsPanel embedded />
+                      {commissionAccordionSections.includes("payment-gateway") ? (
+                        <AdminTabSuspense>
+                          <PaymentGatewaySettingsPanel embedded />
+                        </AdminTabSuspense>
+                      ) : null}
                     </AdminCollapsibleSection>
                   )}
                   <AdminCollapsibleSection
@@ -786,14 +490,16 @@ export default function SupabaseAdminPanel() {
                     auditModuleKey="admin.commissions.stakeholder_attribution"
                   >
                     {commissionAccordionSections.includes("stakeholder-commissions") ? (
-                      <StakeholderCommissionPanel
-                        embedded
-                        enabled
-                        countries={data.countries.map((country) => ({
-                          id: country.id,
-                          name: country.name,
-                        }))}
-                      />
+                      <AdminTabSuspense>
+                        <StakeholderCommissionPanel
+                          embedded
+                          enabled
+                          countries={data.countries.map((country) => ({
+                            id: country.id,
+                            name: country.name,
+                          }))}
+                        />
+                      </AdminTabSuspense>
                     ) : (
                       <p className="text-xs text-muted-foreground">
                         {t("stakeholder_commissions.realtime_hint")}
@@ -805,13 +511,17 @@ export default function SupabaseAdminPanel() {
                     title={t("gateway_fees.title", { defaultValue: "Frais passerelle" })}
                     auditModuleKey="admin.commissions.gateway_fees"
                   >
-                    <GatewayFeeSettingsPanel
-                      embedded
-                      countries={data.countries.map((country) => ({
-                        id: country.id,
-                        name: country.name,
-                      }))}
-                    />
+                    {commissionAccordionSections.includes("gateway-fees") ? (
+                      <AdminTabSuspense>
+                        <GatewayFeeSettingsPanel
+                          embedded
+                          countries={data.countries.map((country) => ({
+                            id: country.id,
+                            name: country.name,
+                          }))}
+                        />
+                      </AdminTabSuspense>
+                    ) : null}
                   </AdminCollapsibleSection>
                   {appUser.isSuperAdmin && (
                     <AdminCollapsibleSection
@@ -819,13 +529,17 @@ export default function SupabaseAdminPanel() {
                       title={t("booking_notice.title", { defaultValue: "Message voyageur au paiement" })}
                       auditModuleKey="admin.commissions.booking_notice"
                     >
-                      <TravelerBookingNoticePanel
-                        embedded
-                        countries={data.countries.map((country) => ({
-                          id: country.id,
-                          name: country.name,
-                        }))}
-                      />
+                      {commissionAccordionSections.includes("booking-notice") ? (
+                        <AdminTabSuspense>
+                          <TravelerBookingNoticePanel
+                            embedded
+                            countries={data.countries.map((country) => ({
+                              id: country.id,
+                              name: country.name,
+                            }))}
+                          />
+                        </AdminTabSuspense>
+                      ) : null}
                     </AdminCollapsibleSection>
                   )}
                 </Accordion>
@@ -846,14 +560,16 @@ export default function SupabaseAdminPanel() {
               </Button>
             </Link>
           </div>
-          <GuaranteeFundManager
-            companies={data.companies.map((company) => ({
-              id: company.id,
-              name: company.name,
-              currency: company.currency,
-              countryName: company.countryName,
-            }))}
-          />
+          <AdminTabSuspense>
+            <GuaranteeFundManager
+              companies={data.companies.map((company) => ({
+                id: company.id,
+                name: company.name,
+                currency: company.currency,
+                countryName: company.countryName,
+              }))}
+            />
+          </AdminTabSuspense>
           <AdminTabAuditHub tab="guarantee_fund" />
         </div>
       )}
@@ -949,40 +665,50 @@ export default function SupabaseAdminPanel() {
 
       {tab === "contact" && (
         <>
-        <ContactSettingsPanel
-          companies={data.companies.map((company) => ({ id: company.id, name: company.name }))}
-        />
+        <AdminTabSuspense>
+          <ContactSettingsPanel
+            companies={data.companies.map((company) => ({ id: company.id, name: company.name }))}
+          />
+        </AdminTabSuspense>
         <AdminTabAuditHub tab="contact" />
         </>
       )}
 
       {tab === "loyalty" && (
         <>
-          <PlatformLoyaltySettingsPanel />
+          <AdminTabSuspense>
+            <PlatformLoyaltySettingsPanel />
+          </AdminTabSuspense>
           <AdminTabAuditHub tab="loyalty" />
         </>
       )}
 
       {tab === "legal" && appUser.isSuperAdmin && (
         <>
-          <LegalPagesPanel />
+          <AdminTabSuspense>
+            <LegalPagesPanel />
+          </AdminTabSuspense>
           <AdminTabAuditHub tab="legal" />
         </>
       )}
 
       {tab === "scaling_metrics" && appUser.isSuperAdmin && (
         <>
-        <div className="space-y-6">
-          <TpePosDiagnosticsPanel />
-          <PlatformScalingMetricsPanel />
-        </div>
+        <AdminTabSuspense>
+          <div className="space-y-6">
+            <TpePosDiagnosticsPanel />
+            <PlatformScalingMetricsPanel />
+          </div>
+        </AdminTabSuspense>
         <AdminTabAuditHub tab="scaling_metrics" />
         </>
       )}
 
       {tab === "investor_plan" && appUser.isSuperAdmin && (
         <>
-          <InvestorPlanPanel />
+          <AdminTabSuspense>
+            <InvestorPlanPanel />
+          </AdminTabSuspense>
           <AdminTabAuditHub tab="investor_plan" />
         </>
       )}
@@ -1002,6 +728,10 @@ export default function SupabaseAdminPanel() {
     </div>
     </AdminAccessGate>
   );
+}
+
+function AdminTabSuspense({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<LoadingRows />}>{children}</Suspense>;
 }
 
 function LoadingRows() {

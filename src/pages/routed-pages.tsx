@@ -2,8 +2,7 @@ import type { ComponentType } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { SupabaseMigrationNotice } from "@/components/SupabaseMigrationNotice.tsx";
-import AdminPanelPage from "./admin/AdminPanel.tsx";
-import SupabaseAdminPanel from "./admin/SupabaseAdminPanel.tsx";
+import AdminPanelRoute from "./admin/AdminPanelRoute.tsx";
 import AdminCompanyManagerPage from "./admin/AdminCompanyManager.tsx";
 import SupabaseAdminCompanyManager from "./admin/SupabaseAdminCompanyManager.tsx";
 import AdminGuaranteeFundPage from "./admin/AdminGuaranteeFundPage.tsx";
@@ -85,7 +84,7 @@ function SupabaseTravelerHomeRedirect() {
 }
 
 export function AdminPanel() {
-  return useSupabaseBranch(<SupabaseAdminPanel />, <AdminPanelPage />);
+  return <AdminPanelRoute />;
 }
 
 export function AdminCompanyManager() {

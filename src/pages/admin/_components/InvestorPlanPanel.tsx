@@ -35,10 +35,6 @@ import {
   type InvestorRoiInputs,
   type InvestorScenarioId,
 } from "@/data/investor-plan-content.ts";
-import {
-  downloadInvestorPlanJson,
-  downloadInvestorPlanPdf,
-} from "@/lib/investor-plan-export.ts";
 import { getPlatformScalingMetricsSupabase } from "@/lib/supabase/platform-metrics.ts";
 
 function parseOptionalNumber(raw: string): number | null {
@@ -134,13 +130,17 @@ export default function InvestorPlanPanel() {
   };
 
   const handlePdf = () => {
-    downloadInvestorPlanPdf(inputs);
-    toast.success(t("investor_plan.export_pdf_done"));
+    void import("@/lib/investor-plan-export.ts").then(({ downloadInvestorPlanPdf }) => {
+      downloadInvestorPlanPdf(inputs);
+      toast.success(t("investor_plan.export_pdf_done"));
+    });
   };
 
   const handleJson = () => {
-    downloadInvestorPlanJson(inputs);
-    toast.success(t("investor_plan.export_json_done"));
+    void import("@/lib/investor-plan-export.ts").then(({ downloadInvestorPlanJson }) => {
+      downloadInvestorPlanJson(inputs);
+      toast.success(t("investor_plan.export_json_done"));
+    });
   };
 
   const leveeEur = Math.round(INVESTOR_PLAN_LEVEE.amountXof / INVESTOR_PLAN_META.eurRate);
