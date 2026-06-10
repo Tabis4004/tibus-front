@@ -3,6 +3,7 @@ import {
   countPlatformUsersForAdminSupabase,
   isAdminUsersPermissionError,
   isAdminUsersRpcMissingError,
+  isAdminUsersRpcTypeError,
   listPlatformUsersForAdminSupabase,
   type PlatformAdminUserRow,
 } from "@/lib/supabase/admin-users.ts";
@@ -169,7 +170,7 @@ export async function loadAdminStats(
         .then((count) => ({ count, error: null as null }))
         .catch(async (err) => {
           const message = err instanceof Error ? err.message : String(err);
-          if (isAdminUsersRpcMissingError(message)) {
+          if (isAdminUsersRpcMissingError(message) || isAdminUsersRpcTypeError(message)) {
             return supabase.from("Users").select("id", { count: "exact", head: true });
           }
           return { count: 0, error: err };
@@ -262,7 +263,7 @@ async function loadUsers(hasDbSuperAdmin: boolean): Promise<Pick<AdminDataSlice,
         "Rôle super_admin manquant en base. Exécutez 071_grant_super_admin_accounts.sql dans Supabase, puis reconnectez-vous.",
       );
     }
-    if (isAdminUsersRpcMissingError(message)) {
+    if (isAdminUsersRpcMissingError(message) || isAdminUsersRpcTypeError(message)) {
       return loadUsersDirect();
     }
     throw rpcError;
