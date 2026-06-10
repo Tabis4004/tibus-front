@@ -1,7 +1,7 @@
 {
   "name": "Tibus — Bus Transportation",
   "short_name": "Tibus",
-  "description": "Manage and book bus trips with ease",
+  "description": "Réservez vos billets de bus interurbains — www.tibusafrica.com",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

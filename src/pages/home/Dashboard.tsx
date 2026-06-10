@@ -231,7 +231,7 @@ export default function HomeDashboard() {
               variant="ghost"
               className="w-full h-14 text-base cursor-pointer gap-3 border border-dashed border-primary/30 text-primary hover:bg-primary/5"
               onClick={async () => {
-                const url = "https://tibus.onhercules.app";
+                const url = "https://www.tibusafrica.com";
                 const shareData = {
                   title: "Tibus",
                   text: t("share.message", { defaultValue: "Download Tibus — book bus tickets easily!" }),

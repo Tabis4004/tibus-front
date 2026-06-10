@@ -24,7 +24,7 @@ import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton
 import { useAppUser } from "@/hooks/use-app-user.ts";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
-  const url = "https://tibus.onhercules.app";
+  const url = "https://www.tibusafrica.com";
   const shareData = {
     title: "Tibus",
     text: t("share.message", { defaultValue: "Download Tibus — book bus tickets easily!" }),
