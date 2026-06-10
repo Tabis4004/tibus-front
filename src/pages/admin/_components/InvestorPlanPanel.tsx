@@ -12,15 +12,18 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
   buildInvestorRoiScenarioRows,
-  computeInvestorFinancials,
   computeInvestorRevenueSharing,
   computeInvestorRoi,
+  computeInvestorScenarioProjection,
   DEFAULT_INVESTOR_ROI_INPUTS,
   fmtInvestorMultiple,
   fmtInvestorPercent,
   fmtInvestorXof,
+  INVESTOR_CAPITAL,
+  INVESTOR_CAPITAL_TABLE,
   INVESTOR_PLAN_ADVANTAGES,
   INVESTOR_PLAN_LEVEE,
   INVESTOR_PLAN_MARKET,
@@ -28,7 +31,9 @@ import {
   INVESTOR_PLAN_REVENUE_MODEL,
   INVESTOR_PLAN_RISKS,
   INVESTOR_PLAN_ROADMAP,
+  INVESTOR_SCENARIOS,
   type InvestorRoiInputs,
+  type InvestorScenarioId,
 } from "@/data/investor-plan-content.ts";
 import {
   downloadInvestorPlanJson,
@@ -50,7 +55,7 @@ function PlanTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
         <thead>
           <tr className="border-b bg-muted/40 text-left text-muted-foreground">
             {headers.map((header) => (
-              <th key={header} className="px-3 py-2 font-medium">
+              <th key={header} className="px-3 py-2 font-medium whitespace-nowrap">
                 {header}
               </th>
             ))}
@@ -60,7 +65,7 @@ function PlanTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
           {rows.map((row, index) => (
             <tr key={index} className="border-b last:border-0">
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="px-3 py-2 align-top">
+                <td key={cellIndex} className="px-3 py-2 align-top tabular-nums">
                   {cell}
                 </td>
               ))}
@@ -72,31 +77,32 @@ function PlanTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
   );
 }
 
+const SCENARIO_IDS: InvestorScenarioId[] = ["pessimistic", "realistic", "optimistic"];
+
 export default function InvestorPlanPanel() {
   const { t } = useTranslation("admin");
   const printRef = useRef<HTMLDivElement>(null);
   const [inputs, setInputs] = useState<InvestorRoiInputs>(DEFAULT_INVESTOR_ROI_INPUTS);
   const [loadingLive, setLoadingLive] = useState(true);
 
-  const financials = useMemo(() => computeInvestorFinancials(), []);
-  const base = financials[3];
+  const projection = useMemo(() => computeInvestorScenarioProjection(inputs), [inputs]);
   const roi = useMemo(() => computeInvestorRoi(inputs), [inputs]);
   const revenueSharing = useMemo(() => computeInvestorRevenueSharing(inputs), [inputs]);
   const scenarios = useMemo(() => buildInvestorRoiScenarioRows(), []);
   const roiReady = roi.roi != null;
+  const ownerPct = 100 - inputs.investorEquityPct;
 
   const applyLiveMetrics = useCallback(() => {
     setLoadingLive(true);
     void getPlatformScalingMetricsSupabase()
       .then((metrics) => {
-        setInputs((current) => ({
-          ...current,
-          companies: metrics.companiesActive || current.companies,
-          ticketsMonth: Math.max(
-            1,
-            Math.round(metrics.avgTicketsPerDay30d * 30) || current.ticketsMonth,
-          ),
-        }));
+        setInputs((current) => {
+          const baseline = INVESTOR_SCENARIOS[current.scenarioId].ticketsMonth[0];
+          const liveMonth = Math.max(1, Math.round(metrics.avgTicketsPerDay30d * 30));
+          const volumeMultiplierPct =
+            baseline > 0 ? Math.round((liveMonth / baseline) * 100) : current.volumeMultiplierPct;
+          return { ...current, volumeMultiplierPct };
+        });
         toast.success(t("investor_plan.live_sync_done"));
       })
       .catch(() => {
@@ -119,6 +125,10 @@ export default function InvestorPlanPanel() {
     setInputs((current) => ({ ...current, [key]: value }));
   };
 
+  const setScenario = (scenarioId: InvestorScenarioId) => {
+    setInputs((current) => ({ ...current, scenarioId }));
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -134,6 +144,7 @@ export default function InvestorPlanPanel() {
   };
 
   const leveeEur = Math.round(INVESTOR_PLAN_LEVEE.amountXof / INVESTOR_PLAN_META.eurRate);
+  const year5 = projection.years[projection.years.length - 1];
 
   return (
     <div ref={printRef} className="space-y-6 print:space-y-4">
@@ -178,19 +189,26 @@ export default function InvestorPlanPanel() {
         <CardContent className="space-y-4">
           <div className="rounded-lg border bg-muted/40 p-4 text-sm leading-relaxed">
             {t("investor_plan.summary", {
+              capital: fmtInvestorXof(INVESTOR_CAPITAL.totalXof),
               levee: fmtInvestorXof(INVESTOR_PLAN_LEVEE.amountXof),
-              gmv: fmtInvestorXof(base.gmvYear),
-              revenue: fmtInvestorXof(base.revTotal),
-              roi: fmtInvestorMultiple(base.revTotal / INVESTOR_PLAN_LEVEE.amountXof),
+              cumul: fmtInvestorXof(projection.cumulativeNet),
+              investorShare: fmtInvestorXof(projection.cumulativeInvestorShare),
+              scenario: projection.scenario.label,
             })}
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatTile label={t("investor_plan.stats.levee")} value={fmtInvestorXof(INVESTOR_PLAN_LEVEE.amountXof)} />
-            <StatTile label={t("investor_plan.stats.gmv")} value={fmtInvestorXof(base.gmvYear)} />
-            <StatTile label={t("investor_plan.stats.revenue")} value={fmtInvestorXof(base.revTotal)} />
             <StatTile
-              label={t("investor_plan.stats.roi_base")}
-              value={`${fmtInvestorMultiple(base.revTotal / INVESTOR_PLAN_LEVEE.amountXof)} · TRI ~38 %`}
+              label={t("investor_plan.stats.capital")}
+              value={fmtInvestorXof(INVESTOR_CAPITAL.totalXof)}
+            />
+            <StatTile label={t("investor_plan.stats.levee")} value={fmtInvestorXof(INVESTOR_PLAN_LEVEE.amountXof)} />
+            <StatTile
+              label={t("investor_plan.stats.cumul_net")}
+              value={fmtInvestorXof(projection.cumulativeNet)}
+            />
+            <StatTile
+              label={t("investor_plan.stats.investor_share")}
+              value={fmtInvestorXof(projection.cumulativeInvestorShare)}
             />
           </div>
         </CardContent>
@@ -201,7 +219,26 @@ export default function InvestorPlanPanel() {
           <CardTitle className="text-base">{t("investor_plan.simulator_title")}</CardTitle>
           <p className="text-xs text-muted-foreground">{t("investor_plan.simulator_desc")}</p>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
+          <div className="print:hidden space-y-2">
+            <Label className="text-xs">{t("investor_plan.fields.scenario")}</Label>
+            <div className="flex flex-wrap gap-2">
+              {SCENARIO_IDS.map((id) => (
+                <Button
+                  key={id}
+                  type="button"
+                  size="sm"
+                  variant={inputs.scenarioId === id ? "default" : "outline"}
+                  onClick={() => setScenario(id)}
+                  className={cn("text-xs", inputs.scenarioId === id && "shadow-sm")}
+                >
+                  {INVESTOR_SCENARIOS[id].label.replace(" — ", " · ")}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">{projection.scenario.description}</p>
+          </div>
+
           {!roiReady ? (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               {t("investor_plan.roi_empty")}
@@ -216,33 +253,54 @@ export default function InvestorPlanPanel() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="ROI" value={fmtInvestorMultiple(roi.roi)} />
             <StatTile label="TRI" value={fmtInvestorPercent(roi.irr)} />
-            <StatTile label={t("investor_plan.stats.revenue")} value={fmtInvestorXof(roi.revTotal)} />
-            <StatTile label="GMV" value={fmtInvestorXof(roi.gmvYear)} />
+            <StatTile
+              label={t("investor_plan.stats.platform_revenue")}
+              value={fmtInvestorXof(year5?.tibusRevenue ?? 0)}
+            />
+            <StatTile label="GMV An 5" value={fmtInvestorXof(year5?.gmv ?? 0)} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:hidden">
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t("investor_plan.fields.companies")} value={String(inputs.companies)} onChange={(v) => updateField("companies", v)} />
-              <Field label={t("investor_plan.fields.tickets")} value={String(inputs.ticketsMonth)} onChange={(v) => updateField("ticketsMonth", v)} />
-              <Field label={t("investor_plan.fields.ticket_avg")} value={String(inputs.avgTicket)} onChange={(v) => updateField("avgTicket", v)} />
-              <Field label={t("investor_plan.fields.take_rate")} value={String(inputs.takeRatePct)} onChange={(v) => updateField("takeRatePct", v)} />
-              <Field label={t("investor_plan.fields.abo")} value={String(inputs.aboMonth)} onChange={(v) => updateField("aboMonth", v)} />
+              <Field
+                label={t("investor_plan.fields.ticket_avg")}
+                value={String(inputs.avgTicket)}
+                onChange={(v) => updateField("avgTicket", v)}
+              />
+              <Field
+                label={t("investor_plan.fields.take_rate")}
+                value={String(inputs.tibusTakeRatePct)}
+                onChange={(v) => updateField("tibusTakeRatePct", v)}
+              />
+              <Field
+                label={t("investor_plan.fields.volume_multiplier")}
+                value={String(inputs.volumeMultiplierPct)}
+                onChange={(v) => updateField("volumeMultiplierPct", v)}
+              />
               <Field
                 label={t("investor_plan.fields.investment")}
                 value={inputs.investmentXof == null ? "" : String(inputs.investmentXof)}
                 onChange={(v) => updateField("investmentXof", v)}
-                placeholder="5000000"
+                placeholder="6000000"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t("investor_plan.fields.equity")} value={String(inputs.equityPct)} onChange={(v) => updateField("equityPct", v)} />
               <Field
-                label={t("investor_plan.fields.revenue_share")}
-                value={String(inputs.revenueSharePct)}
-                onChange={(v) => updateField("revenueSharePct", v)}
+                label={t("investor_plan.fields.equity")}
+                value={String(inputs.investorEquityPct)}
+                onChange={(v) => updateField("investorEquityPct", v)}
               />
-              <Field label={t("investor_plan.fields.exit_multiple")} value={String(inputs.exitMultiple)} onChange={(v) => updateField("exitMultiple", v)} />
-              <Field label={t("investor_plan.fields.horizon")} value={String(inputs.horizonYears)} onChange={(v) => updateField("horizonYears", v)} />
+              <Field
+                label={t("investor_plan.fields.owner_equity")}
+                value={String(ownerPct)}
+                onChange={() => undefined}
+                readOnly
+              />
+              <Field
+                label={t("investor_plan.fields.horizon")}
+                value={String(inputs.horizonYears)}
+                onChange={(v) => updateField("horizonYears", v)}
+              />
               <div className="col-span-2 flex items-end">
                 <Button
                   type="button"
@@ -255,25 +313,98 @@ export default function InvestorPlanPanel() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Collapsible defaultOpen>
-        <SectionShell title={t("investor_plan.sections.revenue_sharing")}>
-          <div className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-sm font-medium">{t("investor_plan.sections.projection")}</h3>
+              <p className="text-xs text-muted-foreground">{t("investor_plan.projection_driver")}</p>
+            </div>
+            <PlanTable
+              headers={[
+                t("investor_plan.projection.col.year"),
+                t("investor_plan.projection.col.tickets_month"),
+                t("investor_plan.projection.col.annual_tickets"),
+                t("investor_plan.projection.col.gmv"),
+                t("investor_plan.projection.col.platform_revenue"),
+                "OPEX",
+                t("investor_plan.projection.col.net"),
+                t("investor_plan.projection.col.investor_share", { pct: inputs.investorEquityPct }),
+                t("investor_plan.projection.col.owner_share", { pct: ownerPct }),
+                t("investor_plan.projection.col.note"),
+              ]}
+              rows={projection.years.map((row) => [
+                row.yearLabel,
+                row.ticketsMonth.toLocaleString("fr-FR"),
+                row.annualTickets.toLocaleString("fr-FR"),
+                fmtInvestorXof(row.gmv),
+                fmtInvestorXof(row.tibusRevenue),
+                fmtInvestorXof(row.opex),
+                fmtInvestorXof(row.netResult),
+                fmtInvestorXof(row.investorShare),
+                fmtInvestorXof(row.ownerShare),
+                row.investorNote,
+              ])}
+            />
+          </div>
+
+          <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+            <h3 className="text-sm font-medium">{t("investor_plan.sections.revenue_sharing")}</h3>
             <p className="text-xs text-muted-foreground">{t("investor_plan.revenue_sharing_desc")}</p>
+            <p className="text-xs text-muted-foreground italic">{t("investor_plan.stakeholders_note")}</p>
+
+            {projection.years[0] ? (
+              <div className="rounded-lg border bg-background p-4 space-y-3">
+                <p className="text-xs font-medium">{t("investor_plan.revenue_sharing.example_title")}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {t("investor_plan.revenue_sharing.col.platform_revenue")} ({projection.years[0].yearLabel})
+                    </p>
+                    <p className="font-bold tabular-nums mt-1">
+                      {fmtInvestorXof(projection.years[0].tibusRevenue)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      GMV {fmtInvestorXof(projection.years[0].gmv)} × {inputs.tibusTakeRatePct} %
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {t("investor_plan.revenue_sharing.investor_block", { pct: inputs.investorEquityPct })}
+                    </p>
+                    <p className="font-bold tabular-nums mt-1 text-blue-900">
+                      {fmtInvestorXof(projection.years[0].investorShare)}
+                    </p>
+                    <p className="text-xs text-blue-800/80 mt-1">
+                      {inputs.investorEquityPct} % × {fmtInvestorXof(projection.years[0].tibusRevenue, "")}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {t("investor_plan.revenue_sharing.owner_block", { pct: ownerPct })}
+                    </p>
+                    <p className="font-bold tabular-nums mt-1 text-emerald-900">
+                      {fmtInvestorXof(projection.years[0].ownerShare)}
+                    </p>
+                    <p className="text-xs text-emerald-800/80 mt-1">
+                      {ownerPct} % × {fmtInvestorXof(projection.years[0].tibusRevenue, "")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <StatTile
                 label={t("investor_plan.revenue_sharing.investment")}
                 value={fmtInvestorXof(revenueSharing.investment)}
               />
               <StatTile
-                label={t("investor_plan.revenue_sharing.cumul")}
+                label={t("investor_plan.revenue_sharing.cumul_investor")}
                 value={fmtInvestorXof(revenueSharing.totalRevenueShare)}
               />
               <StatTile
-                label={t("investor_plan.revenue_sharing.exit")}
-                value={fmtInvestorXof(revenueSharing.exitStake)}
+                label={t("investor_plan.revenue_sharing.cumul_owner")}
+                value={fmtInvestorXof(revenueSharing.totalOwnerShare)}
               />
               <StatTile
                 label={t("investor_plan.revenue_sharing.total_roi")}
@@ -284,8 +415,10 @@ export default function InvestorPlanPanel() {
               headers={[
                 t("investor_plan.revenue_sharing.col.period"),
                 t("investor_plan.revenue_sharing.col.platform_revenue"),
-                t("investor_plan.revenue_sharing.col.share_rate"),
-                t("investor_plan.revenue_sharing.col.annual_payout"),
+                t("investor_plan.revenue_sharing.col.investor_rate"),
+                t("investor_plan.revenue_sharing.col.investor_payout"),
+                t("investor_plan.revenue_sharing.col.owner_rate"),
+                t("investor_plan.revenue_sharing.col.owner_payout"),
                 t("investor_plan.revenue_sharing.col.cumulative"),
                 t("investor_plan.revenue_sharing.col.recovery"),
               ]}
@@ -295,61 +428,40 @@ export default function InvestorPlanPanel() {
                   "—",
                   "—",
                   fmtInvestorXof(-(revenueSharing.investment ?? 0)),
+                  "—",
+                  "—",
                   fmtInvestorXof(-(revenueSharing.investment ?? 0)),
                   "0 %",
                 ],
                 ...revenueSharing.years.map((row) => [
                   row.label,
                   fmtInvestorXof(row.platformRevenue),
-                  `${revenueSharing.revenueSharePct} %`,
+                  `${row.investorShareRate} %`,
                   fmtInvestorXof(row.annualPayout),
+                  `${row.ownerShareRate} %`,
+                  fmtInvestorXof(row.ownerPayout),
                   fmtInvestorXof(row.cumulativeNet),
                   row.recoveryPct != null ? `${row.recoveryPct.toFixed(1)} %` : "—",
                 ]),
-                [
-                  t("investor_plan.revenue_sharing.row_exit", {
-                    equity: revenueSharing.equityPct,
-                    multiple: revenueSharing.exitMultiple,
-                  }),
-                  fmtInvestorXof(revenueSharing.years.at(-1)?.platformRevenue ?? 0),
-                  `${revenueSharing.equityPct} % × ${revenueSharing.exitMultiple}×`,
-                  fmtInvestorXof(revenueSharing.exitStake),
-                  fmtInvestorXof(
-                    revenueSharing.totalReturn - (revenueSharing.investment ?? 0),
-                  ),
-                  revenueSharing.totalRoi != null
-                    ? fmtInvestorMultiple(revenueSharing.totalRoi)
-                    : "—",
-                ],
               ]}
             />
             <p className="text-xs text-muted-foreground">
               {t("investor_plan.revenue_sharing.footer", {
-                share: revenueSharing.revenueSharePct,
+                investor: inputs.investorEquityPct,
+                owner: ownerPct,
+                takeRate: inputs.tibusTakeRatePct,
                 horizon: inputs.horizonYears,
-                revenueOnly: fmtInvestorMultiple(revenueSharing.revenueShareOnlyRoi),
-                total: fmtInvestorMultiple(revenueSharing.totalRoi),
+                roi: fmtInvestorMultiple(revenueSharing.totalRoi),
               })}
             </p>
           </div>
-        </SectionShell>
-      </Collapsible>
+        </CardContent>
+      </Card>
 
       <Collapsible defaultOpen>
-        <SectionShell title={t("investor_plan.sections.financials")}>
-          <PlanTable
-            headers={["Année", "Compagnies", "Billets/mois", "GMV annuel", "Rev. commission", "Rev. abo", "Rev. total", "EBITDA"]}
-            rows={financials.map((row) => [
-              row.year,
-              String(row.companies),
-              fmtInvestorXof(row.ticketsMonth, ""),
-              fmtInvestorXof(row.gmvYear),
-              fmtInvestorXof(row.revCommission),
-              fmtInvestorXof(row.revAbo),
-              fmtInvestorXof(row.revTotal),
-              fmtInvestorXof(row.ebitda),
-            ])}
-          />
+        <SectionShell title={t("investor_plan.sections.capital")}>
+          <p className="text-xs text-muted-foreground mb-3">{INVESTOR_CAPITAL.financingNote}</p>
+          <PlanTable headers={INVESTOR_CAPITAL_TABLE.headers} rows={INVESTOR_CAPITAL_TABLE.rows} />
         </SectionShell>
       </Collapsible>
 
@@ -432,16 +544,24 @@ function Field({
   value,
   onChange,
   placeholder,
+  readOnly,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
-      <Input value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        value={value}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        className={readOnly ? "bg-muted/50" : undefined}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }

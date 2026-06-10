@@ -3,14 +3,17 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   buildInvestorRoiScenarioRows,
-  computeInvestorFinancials,
   computeInvestorRevenueSharing,
   computeInvestorRoi,
+  computeInvestorScenarioProjection,
   fmtInvestorMultiple,
   fmtInvestorPercent,
   fmtInvestorXof,
+  INVESTOR_CAPITAL,
+  INVESTOR_CAPITAL_TABLE,
   INVESTOR_PLAN_LEVEE,
   INVESTOR_PLAN_META,
+  INVESTOR_SCENARIOS,
   type InvestorRoiInputs,
 } from "@/data/investor-plan-content.ts";
 
@@ -25,11 +28,11 @@ function addSectionTitle(doc: jsPDF, title: string, y: number) {
 export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const stamp = format(new Date(), "yyyy-MM-dd");
-  const financials = computeInvestorFinancials();
-  const base = financials[3];
+  const projection = computeInvestorScenarioProjection(roiInputs);
   const roi = computeInvestorRoi(roiInputs);
   const revenueSharing = computeInvestorRevenueSharing(roiInputs);
   const scenarios = buildInvestorRoiScenarioRows();
+  const ownerPct = 100 - roiInputs.investorEquityPct;
   let y = 14;
 
   doc.setFillColor(26, 82, 150);
@@ -46,7 +49,7 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
   y = 32;
   doc.setFontSize(10);
   doc.text(
-    `Levée cible : ${fmtInvestorXof(INVESTOR_PLAN_LEVEE.amountXof)} · GMV An 3 : ${fmtInvestorXof(base.gmvYear)} · Revenu An 3 : ${fmtInvestorXof(base.revTotal)}`,
+    `Capital ${fmtInvestorXof(INVESTOR_CAPITAL.totalXof)} · Apport investisseur ${fmtInvestorXof(INVESTOR_PLAN_LEVEE.amountXof)} · ${projection.scenario.label}`,
     14,
     y,
   );
@@ -58,18 +61,11 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
   );
   y += 10;
 
-  y = addSectionTitle(doc, "Projections financières (scénario base)", y);
+  y = addSectionTitle(doc, "Actionnariat", y);
   autoTable(doc, {
     startY: y,
-    head: [["Année", "Compagnies", "Billets/mois", "GMV annuel", "Rev. total", "EBITDA"]],
-    body: financials.map((row) => [
-      row.year,
-      String(row.companies),
-      fmtInvestorXof(row.ticketsMonth, ""),
-      fmtInvestorXof(row.gmvYear),
-      fmtInvestorXof(row.revTotal),
-      fmtInvestorXof(row.ebitda),
-    ]),
+    head: [INVESTOR_CAPITAL_TABLE.headers],
+    body: INVESTOR_CAPITAL_TABLE.rows,
     styles: { fontSize: 8 },
     headStyles: { fillColor: [26, 82, 150] },
     margin: { left: 14, right: 14 },
@@ -77,12 +73,32 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
   y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
-  y = addSectionTitle(doc, "ROI investisseur (scénarios)", y);
+  y = addSectionTitle(doc, `Projection financière — ${projection.scenario.label}`, y);
   autoTable(doc, {
     startY: y,
-    head: [scenarios.headers],
-    body: scenarios.rows,
-    styles: { fontSize: 8 },
+    head: [
+      [
+        "Année",
+        "Billets/mois",
+        "GMV",
+        `Rev. plateforme (${roiInputs.tibusTakeRatePct} %)`,
+        "OPEX",
+        "Résultat net",
+        `Invest. ${roiInputs.investorEquityPct} %`,
+        `Porteur ${ownerPct} %`,
+      ],
+    ],
+    body: projection.years.map((row) => [
+      row.yearLabel,
+      row.ticketsMonth.toLocaleString("fr-FR"),
+      fmtInvestorXof(row.gmv),
+      fmtInvestorXof(row.tibusRevenue),
+      fmtInvestorXof(row.opex),
+      fmtInvestorXof(row.netResult),
+      fmtInvestorXof(row.investorShare),
+      fmtInvestorXof(row.ownerShare),
+    ]),
+    styles: { fontSize: 7 },
     headStyles: { fillColor: [26, 82, 150] },
     margin: { left: 14, right: 14 },
   });
@@ -94,17 +110,19 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
     y = 20;
   }
 
-  y = addSectionTitle(doc, "Revenue sharing (3 ans)", y);
+  y = addSectionTitle(doc, "Revenue sharing associés — 40 % / 60 % du revenu plateforme", y);
   autoTable(doc, {
     startY: y,
     head: [
       [
         "Période",
-        "Revenu plateforme",
-        "Taux share",
-        "Versement",
-        "Cumulé",
-        "Récup. invest.",
+        "Revenu plateforme (100 %)",
+        "Taux invest.",
+        "Versement invest.",
+        "Taux porteur",
+        "Versement porteur",
+        "Cumulé invest.",
+        "Récup.",
       ],
     ],
     body: [
@@ -113,27 +131,21 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
         "—",
         "—",
         fmtInvestorXof(-(revenueSharing.investment ?? 0)),
+        "—",
+        "—",
         fmtInvestorXof(-(revenueSharing.investment ?? 0)),
         "—",
       ],
       ...revenueSharing.years.map((row) => [
         row.label,
         fmtInvestorXof(row.platformRevenue),
-        `${revenueSharing.revenueSharePct} %`,
+        `${row.investorShareRate} %`,
         fmtInvestorXof(row.annualPayout),
+        `${row.ownerShareRate} %`,
+        fmtInvestorXof(row.ownerPayout),
         fmtInvestorXof(row.cumulativeNet),
         row.recoveryPct != null ? `${row.recoveryPct.toFixed(1)} %` : "—",
       ]),
-      [
-        `Sortie (${revenueSharing.equityPct} % × ${revenueSharing.exitMultiple}×)`,
-        fmtInvestorXof(revenueSharing.years.at(-1)?.platformRevenue ?? 0),
-        `${revenueSharing.equityPct} %`,
-        fmtInvestorXof(revenueSharing.exitStake),
-        fmtInvestorXof(
-          revenueSharing.totalReturn - (revenueSharing.investment ?? 0),
-        ),
-        fmtInvestorMultiple(revenueSharing.totalRoi),
-      ],
     ],
     styles: { fontSize: 8 },
     headStyles: { fillColor: [26, 82, 150] },
@@ -147,25 +159,40 @@ export function downloadInvestorPlanPdf(roiInputs: InvestorRoiInputs) {
     y = 20;
   }
 
-  y = addSectionTitle(doc, "Simulateur ROI (hypothèses saisies)", y);
+  y = addSectionTitle(doc, "Comparaison scénarios (5 ans)", y);
+  autoTable(doc, {
+    startY: y,
+    head: [scenarios.headers],
+    body: scenarios.rows,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [26, 82, 150] },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  y += 8;
+
+  if (y > 250) {
+    doc.addPage();
+    y = 20;
+  }
+
+  y = addSectionTitle(doc, "Simulateur — hypothèses saisies", y);
   autoTable(doc, {
     startY: y,
     head: [["Indicateur", "Valeur"]],
     body: [
-      ["Compagnies actives", String(roiInputs.companies)],
-      ["Billets / mois", String(roiInputs.ticketsMonth)],
+      ["Scénario", INVESTOR_SCENARIOS[roiInputs.scenarioId].label],
       ["Panier moyen", fmtInvestorXof(roiInputs.avgTicket)],
-      ["Take rate net", `${roiInputs.takeRatePct} %`],
-      ["Abonnement / compagnie / mois", fmtInvestorXof(roiInputs.aboMonth)],
+      ["Take rate plateforme", `${roiInputs.tibusTakeRatePct} %`],
+      ["Multiplicateur volume", `${roiInputs.volumeMultiplierPct} %`],
       ["Montant investi", fmtInvestorXof(roiInputs.investmentXof)],
-      ["Part capital", `${roiInputs.equityPct} %`],
-      ["Revenue share", `${roiInputs.revenueSharePct} %`],
-      ["Multiple de sortie", fmtInvestorMultiple(roiInputs.exitMultiple)],
+      ["Part investisseur", `${roiInputs.investorEquityPct} %`],
+      ["Part porteur", `${ownerPct} %`],
       ["Horizon", `${roiInputs.horizonYears} an(s)`],
-      ["GMV annuel", fmtInvestorXof(roi.gmvYear)],
-      ["Revenu total", fmtInvestorXof(roi.revTotal)],
-      ["Valorisation sortie", fmtInvestorXof(roi.exitValuation)],
-      ["Valeur part", fmtInvestorXof(roi.stakeValue)],
+      ["GMV dernière année", fmtInvestorXof(roi.gmvYear)],
+      ["Revenu plateforme dernière année", fmtInvestorXof(roi.revTotal)],
+      ["Résultat net dernière année", fmtInvestorXof(roi.netYear)],
+      ["Cumul part investisseur", fmtInvestorXof(roi.cumulativeInvestorShare)],
       ["ROI", fmtInvestorMultiple(roi.roi)],
       ["TRI annualisé", fmtInvestorPercent(roi.irr)],
       ["Gain net", fmtInvestorXof(roi.gain)],
@@ -183,11 +210,13 @@ export function downloadInvestorPlanJson(roiInputs: InvestorRoiInputs) {
   const payload = {
     generatedAt: new Date().toISOString(),
     meta: INVESTOR_PLAN_META,
+    capital: INVESTOR_CAPITAL,
     levee: INVESTOR_PLAN_LEVEE,
-    financials: computeInvestorFinancials(),
+    scenarios: INVESTOR_SCENARIOS,
     roiScenarios: buildInvestorRoiScenarioRows(),
     simulator: {
       inputs: roiInputs,
+      projection: computeInvestorScenarioProjection(roiInputs),
       results: computeInvestorRoi(roiInputs),
       revenueSharing: computeInvestorRevenueSharing(roiInputs),
     },
