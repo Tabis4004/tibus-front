@@ -307,6 +307,7 @@
   "investor_plan.roi_empty": "Enter an investment amount (> 0 XOF) to compute ROI, IRR and net gain.",
   "investor_plan.reset": "Reset",
   "investor_plan.footer": "Tibus document · super admin · network commissions simulated in the Stakeholder commissions tab.",
+  "supabase_admin.sandbox_users_hint": "UI sandbox mode: the admin panel is visible but PostgreSQL does not recognize you as super_admin. Run 071_grant_super_admin_accounts.sql (then 070_platform_admin_users.sql) in Supabase, sign out and sign back in to list all users.",
   "investor_plan.stats.capital": "Total capital",
   "investor_plan.stats.levee": "Investor cash",
   "investor_plan.stats.cumul_net": "Cumulative net result",

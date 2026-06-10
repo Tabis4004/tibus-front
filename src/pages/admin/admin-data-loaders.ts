@@ -1,5 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import {
+  countPlatformUsersForAdminSupabase,
+  isAdminUsersPermissionError,
+  isAdminUsersRpcMissingError,
+  listPlatformUsersForAdminSupabase,
+  type PlatformAdminUserRow,
+} from "@/lib/supabase/admin-users.ts";
+import {
   getSellerCommissionSummarySupabase,
   listCommissionSettingsSupabase,
   type CommissionSetting,
@@ -148,14 +155,29 @@ export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminD
   }
 }
 
-export async function loadAdminStats(isSuperAdmin: boolean): Promise<AdminStats> {
+export async function loadAdminStats(
+  isSuperAdmin: boolean,
+  hasDbSuperAdmin: boolean,
+): Promise<AdminStats> {
   if (!isSuperAdmin) {
     return { users: 0, companies: 0, activeSubscriptions: 0, cities: 0 };
   }
 
   const now = new Date().toISOString();
+  const usersCountPromise = hasDbSuperAdmin
+    ? countPlatformUsersForAdminSupabase()
+        .then((count) => ({ count, error: null as null }))
+        .catch(async (err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          if (isAdminUsersRpcMissingError(message)) {
+            return supabase.from("Users").select("id", { count: "exact", head: true });
+          }
+          return { count: 0, error: err };
+        })
+    : supabase.from("Users").select("id", { count: "exact", head: true });
+
   const [usersRes, companiesRes, subsRes, citiesRes] = await Promise.all([
-    supabase.from("Users").select("id", { count: "exact", head: true }),
+    usersCountPromise,
     supabase.from("Companies").select("id", { count: "exact", head: true }),
     supabase
       .from("Subscriptions")
@@ -173,11 +195,37 @@ export async function loadAdminStats(isSuperAdmin: boolean): Promise<AdminStats>
 }
 
 async function loadUsers(): Promise<Pick<AdminDataSlice, "users" | "rolesByUser">> {
+  try {
+    const platformUsers = await listPlatformUsersForAdminSupabase(500);
+    const rolesByUser: Record<string, string[]> = {};
+    const users: SupabaseUserRow[] = platformUsers.map((row: PlatformAdminUserRow) => {
+      rolesByUser[row.id] = row.roles;
+      return {
+        id: row.id,
+        email: row.email,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        username: row.username,
+      };
+    });
+    return { users, rolesByUser };
+  } catch (rpcError) {
+    const message = rpcError instanceof Error ? rpcError.message : String(rpcError);
+    if (isAdminUsersPermissionError(message)) {
+      throw new Error(
+        "Rôle super_admin manquant en base. Exécutez 071_grant_super_admin_accounts.sql dans Supabase, puis reconnectez-vous.",
+      );
+    }
+    if (!isAdminUsersRpcMissingError(message)) {
+      throw rpcError;
+    }
+  }
+
   const { data: rows, error } = await supabase
     .from("Users")
     .select("id, email, firstName, lastName, username")
     .order("createdAt", { ascending: false })
-    .limit(50);
+    .limit(200);
 
   if (error) throw error;
   const users = (rows ?? []) as SupabaseUserRow[];

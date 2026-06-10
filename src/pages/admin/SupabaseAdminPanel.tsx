@@ -176,7 +176,7 @@ export default function SupabaseAdminPanel() {
     if (!appUser.isReady || !canAccessAdminPanel) return;
 
     let cancelled = false;
-    void loadAdminStats(appUser.isSuperAdmin)
+    void loadAdminStats(appUser.isSuperAdmin, appUser.hasDbSuperAdmin)
       .then((nextStats) => {
         if (!cancelled) setStats(nextStats);
       })
@@ -185,7 +185,7 @@ export default function SupabaseAdminPanel() {
     return () => {
       cancelled = true;
     };
-  }, [appUser.isReady, appUser.isSuperAdmin, canAccessAdminPanel, tabRefreshNonce]);
+  }, [appUser.hasDbSuperAdmin, appUser.isReady, appUser.isSuperAdmin, canAccessAdminPanel, tabRefreshNonce]);
 
   useEffect(() => {
     if (!appUser.isReady) return;
@@ -331,6 +331,14 @@ export default function SupabaseAdminPanel() {
             )}
           </CardHeader>
           <CardContent>
+            {appUser.isAdminSandbox && (
+              <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {t("supabase_admin.sandbox_users_hint", {
+                  defaultValue:
+                    "Mode sandbox UI : vous voyez l'admin sans super_admin en base. Pour lister tous les utilisateurs, exécutez 071_grant_super_admin_accounts.sql dans Supabase SQL Editor, puis déconnectez-vous et reconnectez-vous.",
+                })}
+              </p>
+            )}
             {isLoading ? (
               <LoadingRows />
             ) : errors.users ? (

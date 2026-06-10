@@ -214,6 +214,7 @@ export function useAppUserState() {
     MERCHANT_AGENT_CTA_BLOCKING_APPLICATION_STATUSES.includes(
       merchantAgentApplicationStatus as (typeof MERCHANT_AGENT_CTA_BLOCKING_APPLICATION_STATUSES)[number],
     );
+  const hasDbSuperAdmin = roles.includes("super_admin");
 
   return useMemo(
     () => ({
@@ -228,6 +229,7 @@ export function useAppUserState() {
         hasAnyRole(effectiveRoles, MERCHANT_AGENT_CTA_BLOCKING_ROLES) || hasMerchantAgentApplication,
       primaryRole,
       primaryRoleUi,
+      hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
       profileCompleted: profile?.profileCompleted ?? false,
@@ -239,6 +241,7 @@ export function useAppUserState() {
     [
       effectiveRoles,
       error,
+      hasDbSuperAdmin,
       hasMerchantAgentApplication,
       isAdminSandbox,
       isLoading,
