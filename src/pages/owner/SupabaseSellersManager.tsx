@@ -63,6 +63,17 @@ import { provisionUserSupabase } from "@/lib/supabase/user-management.ts";
 import { OWNER_ASSIGNABLE_TEAM_ROLES } from "@/lib/owner-team-roles.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { AlertCircleIcon } from "lucide-react";
+
+function resolveErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message.trim()) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
 
 const ROLE_I18N_KEYS: Record<OwnerTeamRoleName, string> = {
   vendeur: "sellers.role_vendeur",
@@ -103,7 +114,7 @@ function AddTeamMemberDialog({
 }: {
   companyId: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: () => Promise<void> | void;
 }) {
   const { t } = useTranslation("owner");
   const [mode, setMode] = useState<"create" | "assign">("create");
@@ -144,10 +155,10 @@ function AddTeamMemberDialog({
     try {
       await assignCompanySellerByEmailSupabase({ email: emailInput, roleName, companyId });
       toast.success(t("sellers.assigned", { name: found.name ?? found.email }));
-      onSaved();
+      await onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("sellers.assign_error"));
+      toast.error(resolveErrorMessage(err, t("sellers.assign_error")));
     } finally {
       setSaving(false);
     }
@@ -172,10 +183,10 @@ function AddTeamMemberDialog({
           name: `${result.user.firstName} ${result.user.lastName}`.trim(),
         }),
       );
-      onSaved();
+      await onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("sellers.create_error"));
+      toast.error(resolveErrorMessage(err, t("sellers.create_error")));
     } finally {
       setSaving(false);
     }
@@ -302,19 +313,28 @@ export default function SupabaseSellersManager() {
   const { companyId, isReady: companyReady } = useOwnerCompany();
   const canManageTeam = appUser.roles.includes("owner") || appUser.isSuperAdmin;
   const [sellers, setSellers] = useState<SupabaseOwnerSeller[] | undefined>(undefined);
+  const [listError, setListError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<SupabaseOwnerSeller | null>(null);
 
-  const loadData = useCallback(async () => {
-    if (!appUserId || !companyId || !companyReady) return;
-    setSellers(undefined);
-    try {
-      setSellers(await listOwnerSellersSupabase(appUserId, companyId));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("sellers.load_error"));
-      setSellers([]);
-    }
-  }, [appUserId, companyId, companyReady, t]);
+  const loadData = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!appUserId || !companyId || !companyReady) return;
+      if (!options?.silent) {
+        setSellers(undefined);
+      }
+      try {
+        const rows = await listOwnerSellersSupabase(appUserId, companyId);
+        setSellers(rows);
+        setListError(null);
+      } catch (err) {
+        const message = resolveErrorMessage(err, t("sellers.load_error"));
+        setListError(message);
+        setSellers([]);
+      }
+    },
+    [appUserId, companyId, companyReady, t],
+  );
 
   useEffect(() => {
     void loadData();
@@ -336,9 +356,9 @@ export default function SupabaseSellersManager() {
         companyId,
       );
       toast.success(t("sellers.removed"));
-      void loadData();
+      void loadData({ silent: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("sellers.remove_error"));
+      toast.error(resolveErrorMessage(err, t("sellers.remove_error")));
     } finally {
       setRemoveTarget(null);
     }
@@ -357,6 +377,13 @@ export default function SupabaseSellersManager() {
           </Button>
         ) : null}
       </div>
+
+      {listError ? (
+        <Alert variant="destructive">
+          <AlertCircleIcon className="h-4 w-4" />
+          <AlertDescription>{listError}</AlertDescription>
+        </Alert>
+      ) : null}
 
       {sellers === undefined ? (
         <div className="space-y-3">
@@ -418,7 +445,7 @@ export default function SupabaseSellersManager() {
         <AddTeamMemberDialog
           companyId={companyId}
           onClose={() => setShowAdd(false)}
-          onSaved={() => void loadData()}
+          onSaved={() => loadData({ silent: true })}
         />
       ) : null}
 
