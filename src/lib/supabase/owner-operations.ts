@@ -349,6 +349,10 @@ function isRpcSignatureMismatch(message: string) {
   return /function|schema cache|could not find|p_company_id|arguments/i.test(message);
 }
 
+function isRpcResultTypeMismatch(message: string) {
+  return /structure of query does not match function result type/i.test(message);
+}
+
 export async function syncOwnerTeamCompanyContext(companyId: string) {
   try {
     await setOwnerActiveCompanySupabase(companyId);
@@ -427,11 +431,19 @@ export async function listOwnerSellersSupabase(
     return mapTeamRows((data ?? []) as TeamRow[]);
   }
 
-  try {
-    return await listOwnerTeamDirectSupabase(resolvedCompanyId);
-  } catch {
-    throw error;
+  const useDirectFallback =
+    isRpcResultTypeMismatch(error.message) || isRpcSignatureMismatch(error.message);
+
+  if (useDirectFallback) {
+    try {
+      return await listOwnerTeamDirectSupabase(resolvedCompanyId);
+    } catch (directError) {
+      if (isRpcResultTypeMismatch(error.message)) throw directError;
+      throw error;
+    }
   }
+
+  throw error;
 }
 
 export async function findAssignableCompanyUserByEmailSupabase(
@@ -442,20 +454,37 @@ export async function findAssignableCompanyUserByEmailSupabase(
     await syncOwnerTeamCompanyContext(companyId);
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
   const { data, error } = await supabase.rpc(
     "find_assignable_company_user_by_email",
-    { p_email: email.trim().toLowerCase() },
+    { p_email: normalizedEmail },
   );
 
-  if (error) throw error;
+  if (!error) {
+    const row = Array.isArray(data) ? data[0] : null;
+    if (!row) return null;
+    return {
+      id: row.id as string,
+      name: fullName(row),
+      email: (row.email as string | null) ?? null,
+    };
+  }
 
-  const row = Array.isArray(data) ? data[0] : null;
-  if (!row) return null;
+  if (!isRpcResultTypeMismatch(error.message)) throw error;
+
+  const { data: userRow, error: directError } = await supabase
+    .from("Users")
+    .select("id, firstName, lastName, email")
+    .ilike("email", normalizedEmail)
+    .maybeSingle();
+
+  if (directError) throw directError;
+  if (!userRow) return null;
 
   return {
-    id: row.id as string,
-    name: fullName(row),
-    email: (row.email as string | null) ?? null,
+    id: userRow.id,
+    name: fullName(userRow),
+    email: userRow.email ?? null,
   };
 }
 
@@ -503,13 +532,48 @@ export async function assignCompanySellerByEmailSupabase(input: {
     p_company_id: companyId ?? null,
   });
 
-  const result =
-    withCompany.error && isRpcSignatureMismatch(withCompany.error.message)
-      ? await supabase.rpc("assign_company_user_role_by_email", {
-          p_email: email,
-          p_role_name: roleName,
-        })
-      : withCompany;
+  let result = withCompany;
+  if (withCompany.error && isRpcSignatureMismatch(withCompany.error.message)) {
+    result = await supabase.rpc("assign_company_user_role_by_email", {
+      p_email: email,
+      p_role_name: roleName,
+    });
+  }
+
+  if (result.error && isRpcResultTypeMismatch(result.error.message)) {
+    const { data: userRow, error: lookupError } = await supabase
+      .from("Users")
+      .select("id, firstName, lastName, email")
+      .ilike("email", email)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!userRow) throw new Error("Aucun utilisateur inscrit avec cet email");
+
+    const roleRow = await supabase
+      .from("Role")
+      .select("id")
+      .eq("name", roleName)
+      .eq("scope", "company")
+      .maybeSingle();
+    if (roleRow.error) throw roleRow.error;
+    if (!roleRow.data?.id) throw new Error(`Rôle introuvable : ${roleName}`);
+
+    const { error: insertError } = await supabase.from("UserRoles").insert({
+      roleId: roleRow.data.id,
+      userId: userRow.id,
+      companyId,
+      countryId: null,
+    });
+    if (insertError && !/duplicate|unique|already exists/i.test(insertError.message)) {
+      throw insertError;
+    }
+
+    return {
+      id: userRow.id,
+      name: fullName(userRow),
+      email: userRow.email ?? null,
+    };
+  }
 
   if (result.error) throw result.error;
 
