@@ -67,6 +67,7 @@ import ReferralPage from "./traveler/ReferralPage.tsx";
 import GuaranteeFundPage from "./owner/GuaranteeFundPage.tsx";
 import CompanySalesPage from "./owner/CompanySalesPage.tsx";
 import CashRegisterPage from "./owner/CashRegisterPage.tsx";
+import GareManagerCommissionsPage from "./owner/GareManagerCommissionsPage.tsx";
 import ColisSettingsPage from "./owner/ColisSettingsPage.tsx";
 import LoyaltyPage from "./owner/LoyaltyPage.tsx";
 import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
@@ -267,6 +268,10 @@ export function OwnerSalesLedger() {
 
 export function OwnerCashRegister() {
   return supabaseOnlyPage("Caisse gare", CashRegisterPage);
+}
+
+export function OwnerGareManagerCommissions() {
+  return supabaseOnlyPage("Commissions gestionnaires gare", GareManagerCommissionsPage);
 }
 
 export function OwnerColisSettings() {

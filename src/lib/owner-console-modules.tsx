@@ -14,6 +14,7 @@ import {
   TagIcon,
   TicketIcon,
   WalletIcon,
+  HandCoinsIcon,
 } from "lucide-react";
 
 export const GUARANTEE_FUND_ACCESS_ROLES = [
@@ -111,6 +112,18 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Caisses ouvertes, mouvements et reversements.",
     toSuffix: "/owner/cash-register",
     icon: WalletIcon,
+    roles: ["owner", "comptable_compagnie", "super_admin"],
+  },
+  {
+    id: "gare-manager-commissions",
+    sectionKey: "console.section_finance",
+    sectionDefault: "Finance & garantie",
+    titleKey: "console.gare_manager_commissions_title",
+    titleDefault: "Commissions gestionnaires",
+    descKey: "console.gare_manager_commissions_desc",
+    descDefault: "Parts des chefs de gare : perçu au guichet et réservations à reverser.",
+    toSuffix: "/owner/gare-manager-commissions",
+    icon: HandCoinsIcon,
     roles: ["owner", "comptable_compagnie", "super_admin"],
   },
   {

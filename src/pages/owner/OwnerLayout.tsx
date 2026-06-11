@@ -27,6 +27,7 @@ import {
   PercentIcon,
   ScanLineIcon,
   BookOpenIcon,
+  HandCoinsIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -92,6 +93,7 @@ const SUPABASE_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/sales", labelKey: "sidebar.sales", icon: ReceiptTextIcon },
       { toSuffix: "/owner/guarantee-fund", labelKey: "sidebar.guarantee_fund", icon: LandmarkIcon },
       { toSuffix: "/owner/cash-register", labelKey: "sidebar.cash_register", icon: WalletIcon },
+      { toSuffix: "/owner/gare-manager-commissions", labelKey: "sidebar.gare_manager_commissions", icon: HandCoinsIcon },
       { toSuffix: "/owner/colis", labelKey: "sidebar.colis", icon: PackageIcon },
       { toSuffix: "/verify/scan", labelKey: "sidebar.scanner", icon: ScanLineIcon },
     ],

@@ -33,6 +33,7 @@ import {
   MyBookings,
   OwnerCancellationPolicy,
   OwnerCashRegister,
+  OwnerGareManagerCommissions,
   OwnerColisSettings,
   OwnerGuaranteeFund,
   OwnerLoyalty,
@@ -111,6 +112,7 @@ function AppShell() {
                   <Route path="sales" element={<OwnerSalesLedger />} />
                   <Route path="guarantee-fund" element={<OwnerGuaranteeFund />} />
                   <Route path="cash-register" element={<OwnerCashRegister />} />
+                  <Route path="gare-manager-commissions" element={<OwnerGareManagerCommissions />} />
                   <Route path="colis" element={<OwnerColisSettings />} />
                   <Route path="loyalty" element={<OwnerLoyalty />} />
                   <Route path="cancellation" element={<OwnerCancellationPolicy />} />
