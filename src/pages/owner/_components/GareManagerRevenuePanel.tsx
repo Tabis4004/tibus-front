@@ -9,11 +9,25 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   getGareManagerCounterRevenueSummarySupabase,
   markGareManagerSharesPaidSupabase,
+  type GareManagerRevenueRow,
   type GareManagerRevenueSummary,
 } from "@/lib/supabase/gare-manager-revenue.ts";
 
+const POLL_MS = 20_000;
+
 function fmt(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`;
+}
+
+function amountCell(amount: number, currency: string, highlight?: "pending" | "paid") {
+  const className =
+    highlight === "pending"
+      ? "font-semibold text-amber-700 dark:text-amber-400"
+      : highlight === "paid"
+        ? "font-semibold text-emerald-700 dark:text-emerald-400"
+        : "font-medium";
+
+  return <span className={className}>{fmt(amount, currency)}</span>;
 }
 
 export default function GareManagerRevenuePanel({ companyId }: { companyId: string }) {
@@ -52,6 +66,11 @@ export default function GareManagerRevenuePanel({ companyId }: { companyId: stri
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => void load(true), POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
   const handleMarkPaid = async (gareId: string) => {
     setPayingGareId(gareId);
     try {
@@ -66,115 +85,136 @@ export default function GareManagerRevenuePanel({ companyId }: { companyId: stri
   };
 
   if (!summary) {
-    return <Skeleton className="h-48 w-full rounded-xl" />;
+    return <Skeleton className="h-56 w-full rounded-xl" />;
   }
 
   const { totals, currency, rows } = summary;
-  const activeRows = rows.filter(
+  const visibleRows = rows.filter(
     (row) =>
       row.sharePct > 0
+      || row.managerUserId
       || row.counterSalesGmv > 0
       || row.reservationShareTotal > 0,
   );
 
   return (
     <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-            <HandCoinsIcon className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <CardTitle className="text-base">{t("gare_revenue.title")}</CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">{t("gare_revenue.subtitle")}</p>
-          </div>
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <HandCoinsIcon className="w-4 h-4" />
+            {t("gare_revenue.title")}
+            {totals.pendingTotal > 0 ? (
+              <Badge variant="outline" className="text-amber-700 border-amber-300">
+                {fmt(totals.pendingTotal, currency)} {t("gare_revenue.to_pay")}
+              </Badge>
+            ) : null}
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 cursor-pointer"
+            disabled={refreshing}
+            onClick={() => void load(true)}
+          >
+            <RefreshCwIcon className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
+            {t("gare_revenue.refresh")}
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          disabled={refreshing}
-          onClick={() => void load(true)}
-        >
-          <RefreshCwIcon className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
+        <p className="text-xs text-muted-foreground mt-1">{t("gare_revenue.logic_hint")}</p>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <div className="rounded-lg border bg-muted/40 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-              {t("gare_revenue.counter_gmv")}
-            </p>
-            <p className="font-black text-sm mt-1">{fmt(totals.counterSalesGmv, currency)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {t("gare_revenue.counter_collected")}: {fmt(totals.counterShareCollected, currency)}
-            </p>
-          </div>
-          <div className="rounded-lg border bg-muted/40 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-              {t("gare_revenue.reservation_commission")}
-            </p>
-            <p className="font-black text-sm mt-1">{fmt(totals.reservationShareTotal, currency)}</p>
-          </div>
-          <div className="rounded-lg border bg-emerald-500/10 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-              {t("gare_revenue.already_paid")}
-            </p>
-            <p className="font-black text-sm mt-1 text-emerald-700 dark:text-emerald-400">
-              {fmt(totals.paidTotal, currency)}
-            </p>
-          </div>
-          <div className="rounded-lg border bg-amber-500/10 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-              {t("gare_revenue.to_pay")}
-            </p>
-            <p className="font-black text-sm mt-1 text-amber-700 dark:text-amber-400">
-              {fmt(totals.pendingTotal, currency)}
-            </p>
-          </div>
-        </div>
-
-        <p className="text-xs text-muted-foreground">{t("gare_revenue.logic_hint")}</p>
-
-        {activeRows.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">{t("gare_revenue.empty")}</p>
+      <CardContent>
+        {visibleRows.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">{t("gare_revenue.empty")}</p>
         ) : (
-          <div className="space-y-2">
-            {activeRows.map((row) => (
-              <div
-                key={row.gareId}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm truncate">{row.gareName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {row.managerName ?? t("gare_revenue.no_manager")} · {row.sharePct}%
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("gare_revenue.row_counter")}: {fmt(row.counterShareCollected, currency)} ·{" "}
-                    {t("gare_revenue.row_reservation_due")}: {fmt(row.pendingTotal, currency)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary">
-                    {fmt(row.reservationShareTotal, currency)} {t("gare_revenue.reservation_badge")}
-                  </Badge>
-                  {row.pendingTotal > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={payingGareId === row.gareId}
-                      onClick={() => void handleMarkPaid(row.gareId)}
-                    >
-                      {t("gare_revenue.mark_paid")}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto rounded-xl border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/60 text-left">
+                <tr>
+                  <th className="px-3 py-2 whitespace-nowrap">{t("gare_revenue.col_station")}</th>
+                  <th className="px-3 py-2 whitespace-nowrap">{t("gare_revenue.col_manager")}</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">%</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_counter_gmv")}</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_counter_collected")}</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_reservation")}</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_paid")}</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_pending")}</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {visibleRows.map((row) => (
+                  <GareRevenueTableRow
+                    key={row.gareId}
+                    row={row}
+                    currency={currency}
+                    paying={payingGareId === row.gareId}
+                    onMarkPaid={() => void handleMarkPaid(row.gareId)}
+                    t={t}
+                  />
+                ))}
+              </tbody>
+              <tfoot className="bg-muted/30 font-semibold border-t">
+                <tr>
+                  <td className="px-3 py-2" colSpan={3}>
+                    {t("gare_revenue.total_row")}
+                  </td>
+                  <td className="px-3 py-2 text-right">{amountCell(totals.counterSalesGmv, currency)}</td>
+                  <td className="px-3 py-2 text-right">
+                    {amountCell(totals.counterShareCollected, currency)}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {amountCell(totals.reservationShareTotal, currency)}
+                  </td>
+                  <td className="px-3 py-2 text-right">{amountCell(totals.paidTotal, currency, "paid")}</td>
+                  <td className="px-3 py-2 text-right">
+                    {amountCell(totals.pendingTotal, currency, "pending")}
+                  </td>
+                  <td className="px-3 py-2" />
+                </tr>
+              </tfoot>
+            </table>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function GareRevenueTableRow({
+  row,
+  currency,
+  paying,
+  onMarkPaid,
+  t,
+}: {
+  row: GareManagerRevenueRow;
+  currency: string;
+  paying: boolean;
+  onMarkPaid: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <tr className="hover:bg-muted/30 transition-colors">
+      <td className="px-3 py-2 font-medium whitespace-nowrap">{row.gareName}</td>
+      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+        {row.managerName ?? t("gare_revenue.no_manager")}
+      </td>
+      <td className="px-3 py-2 text-right">{row.sharePct}%</td>
+      <td className="px-3 py-2 text-right">{amountCell(row.counterSalesGmv, currency)}</td>
+      <td className="px-3 py-2 text-right">{amountCell(row.counterShareCollected, currency)}</td>
+      <td className="px-3 py-2 text-right">{amountCell(row.reservationShareTotal, currency)}</td>
+      <td className="px-3 py-2 text-right">{amountCell(row.paidTotal, currency, "paid")}</td>
+      <td className="px-3 py-2 text-right">{amountCell(row.pendingTotal, currency, "pending")}</td>
+      <td className="px-3 py-2 whitespace-nowrap">
+        {row.pendingTotal > 0 ? (
+          <Button size="sm" variant="outline" className="h-8 cursor-pointer" disabled={paying} onClick={onMarkPaid}>
+            {t("gare_revenue.mark_paid")}
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </td>
+    </tr>
   );
 }
