@@ -26,7 +26,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
-import { useAppUser, refreshAppUser } from "@/hooks/use-app-user";
+import { useAppUser, refreshAppUserAsync } from "@/hooks/use-app-user";
 import { completeUserProfile } from "@/lib/auth/complete-profile";
 import { listCountriesSupabase, type CountryRow } from "@/lib/supabase/geography";
 
@@ -94,7 +94,7 @@ export default function SupabaseCompleteProfile() {
         email: data.email || undefined,
         countryId: data.countryId,
       });
-      refreshAppUser();
+      await refreshAppUserAsync();
       toast.success(t("profile.completed_success"));
       navigate("/", { replace: true });
     } catch (err) {

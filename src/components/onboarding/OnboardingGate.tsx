@@ -4,7 +4,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useQuery } from "convex/react";
 import { isSupabaseAuth } from "@/lib/auth/config";
-import { useAppUser, refreshAppUser } from "@/hooks/use-app-user.ts";
+import { useAppUser, refreshAppUserAsync } from "@/hooks/use-app-user.ts";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { markOnboardingCompleted } from "@/lib/supabase/onboarding.ts";
 import { getOnboardingAudience } from "@/lib/onboarding-audience.ts";
@@ -149,7 +149,7 @@ function SupabaseOnboardingGate() {
     appUser.isReady &&
     !appUser.isLoading &&
     appUser.profileCompleted &&
-    appUser.profile?.onboardingCompleted === false &&
+    !appUser.onboardingCompleted &&
     tour !== null;
 
   useEffect(() => {
@@ -184,9 +184,13 @@ function SupabaseOnboardingGate() {
 
   const handleComplete = async () => {
     const manual = isManualReplay();
-    if (!manual && appUserId && appUser.profile?.onboardingCompleted === false) {
-      await markOnboardingCompleted(appUserId);
-      refreshAppUser();
+    if (!manual && appUserId && !appUser.onboardingCompleted) {
+      try {
+        await markOnboardingCompleted(appUserId);
+        await refreshAppUserAsync();
+      } catch {
+        // localStorage déjà posé dans markOnboardingCompleted
+      }
     }
     setArmed(false);
   };

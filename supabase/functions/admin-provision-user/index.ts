@@ -207,7 +207,8 @@ Deno.serve(async (req) => {
         email,
         phone,
         countryId: resolvedCountryId,
-        onboardingCompleted: false,
+        profileCompleted: Boolean(phone),
+        onboardingCompleted: Boolean(phone),
       })
       .select("id, firstName, lastName, email")
       .single();

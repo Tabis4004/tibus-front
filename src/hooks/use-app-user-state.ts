@@ -3,9 +3,13 @@ import { isSupabaseAuth } from "@/lib/auth/config";
 import { resolveAdminSandboxRoles } from "@/lib/auth/admin-sandbox.ts";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { supabase } from "@/lib/supabase";
+import {
+  APP_USER_REFRESH_DONE_EVENT,
+  APP_USER_REFRESH_EVENT,
+} from "@/hooks/app-user-events.ts";
 import type { AppUserProfile } from "@/hooks/use-app-user.ts";
-
-export const APP_USER_REFRESH_EVENT = "tibus:app-user-refresh";
+import { hasCompletedOnboarding } from "@/lib/auth/onboarding-completion.ts";
+import { isProfileComplete } from "@/lib/auth/profile-completion.ts";
 
 const SELLER_ROLE_NAMES = [
   "vendeur",
@@ -187,7 +191,10 @@ export function useAppUserState() {
         }
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+          window.dispatchEvent(new Event(APP_USER_REFRESH_DONE_EVENT));
+        }
       });
 
     return () => {
@@ -232,13 +239,15 @@ export function useAppUserState() {
       hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
-      profileCompleted: profile?.profileCompleted ?? false,
+      profileCompleted: isProfileComplete(profile),
+      onboardingCompleted: hasCompletedOnboarding(profile, appUserId, effectiveRoles),
       isReady,
       isLoading: waitingForProfile || isLoading,
       error,
       refresh,
     }),
     [
+      appUserId,
       effectiveRoles,
       error,
       hasDbSuperAdmin,

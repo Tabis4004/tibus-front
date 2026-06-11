@@ -62,6 +62,7 @@ const ROLE_LABELS: Record<OwnerTeamRoleName, string> = {
   vendeur: "Vendeur",
   controleur: "Contrôleur",
   comptable_compagnie: "Comptable",
+  gestionnaire_gare: "Gestionnaire gare",
 };
 
 function AddSellerDialog({

@@ -1,6 +1,7 @@
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import GareManagerRevenuePanel from "./_components/GareManagerRevenuePanel.tsx";
 import StationCashOverviewPanel from "./_components/StationCashOverviewPanel.tsx";
 import StationCashReversalsPanel from "@/pages/company/_components/StationCashReversalsPanel.tsx";
 
@@ -32,6 +33,7 @@ export default function CashRegisterPage() {
           Suivi des espèces en gare, caisses ouvertes et validation des reversements comptables.
         </p>
       </div>
+      <GareManagerRevenuePanel key={`${selectedCompany.id}-gare-revenue`} companyId={selectedCompany.id} />
       <StationCashOverviewPanel key={selectedCompany.id} companyId={selectedCompany.id} />
       <StationCashReversalsPanel
         key={`${selectedCompany.id}-reversals`}

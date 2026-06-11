@@ -17,9 +17,16 @@ export type SupabaseOwnerStation = {
   address: string;
   isActive: boolean;
   location: { city: string; country: string } | null;
+  gestionnaireUserId: string | null;
+  gestionnaireSharePct: number;
+  gestionnaireName: string | null;
 };
 
-export type OwnerTeamRoleName = "vendeur" | "controleur" | "comptable_compagnie";
+export type OwnerTeamRoleName =
+  | "vendeur"
+  | "controleur"
+  | "comptable_compagnie"
+  | "gestionnaire_gare";
 
 export type SupabaseOwnerSeller = {
   id: string;
@@ -155,22 +162,49 @@ export async function listOwnerStationsSupabase(
 
   const { data, error } = await supabase
     .from("Gares")
-    .select("id, name, googleMapsLink")
+    .select("id, name, googleMapsLink, gestionnaireUserId, gestionnaireSharePct")
     .eq("companyId", resolvedCompanyId)
     .order("name");
 
   if (error) throw error;
 
-  return (data ?? []).map((station) => ({
-    id: station.id as string,
-    name: station.name as string,
-    address: (station.googleMapsLink as string | null) ?? "",
-    isActive: true,
-    location: {
-      city: cityFromGare(station.name as string),
-      country: "",
-    },
-  }));
+  const managerIds = [
+    ...new Set(
+      (data ?? [])
+        .map((station) => station.gestionnaireUserId as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const managerNameById = new Map<string, string>();
+  if (managerIds.length) {
+    const { data: managers } = await supabase
+      .from("Users")
+      .select("id, firstName, lastName, email")
+      .in("id", managerIds);
+    for (const manager of managers ?? []) {
+      managerNameById.set(manager.id as string, fullName(manager));
+    }
+  }
+
+  return (data ?? []).map((station) => {
+    const gestionnaireUserId = (station.gestionnaireUserId as string | null) ?? null;
+    return {
+      id: station.id as string,
+      name: station.name as string,
+      address: (station.googleMapsLink as string | null) ?? "",
+      isActive: true,
+      location: {
+        city: cityFromGare(station.name as string),
+        country: "",
+      },
+      gestionnaireUserId,
+      gestionnaireSharePct: Number(station.gestionnaireSharePct ?? 0),
+      gestionnaireName: gestionnaireUserId
+        ? (managerNameById.get(gestionnaireUserId) ?? null)
+        : null,
+    };
+  });
 }
 
 export async function createOwnerStationSupabase(input: {
@@ -197,6 +231,8 @@ export async function updateOwnerStationSupabase(input: {
   stationId: string;
   name: string;
   googleMapsLink?: string;
+  gestionnaireUserId?: string | null;
+  gestionnaireSharePct?: number;
 }): Promise<void> {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
@@ -211,6 +247,20 @@ export async function updateOwnerStationSupabase(input: {
     .eq("companyId", companyId);
 
   if (error) throw error;
+
+  if (
+    input.gestionnaireSharePct !== undefined ||
+    input.gestionnaireUserId !== undefined
+  ) {
+    const { setGareManagerRevenueShareSupabase } = await import(
+      "@/lib/supabase/gare-manager-revenue.ts"
+    );
+    await setGareManagerRevenueShareSupabase({
+      gareId: input.stationId,
+      sharePct: input.gestionnaireSharePct ?? 0,
+      gestionnaireUserId: input.gestionnaireUserId ?? null,
+    });
+  }
 }
 
 export async function deleteOwnerStationSupabase(
@@ -258,6 +308,7 @@ export async function listOwnerSellersSupabase(
         roleName !== "vendeur"
         && roleName !== "controleur"
         && roleName !== "comptable_compagnie"
+        && roleName !== "gestionnaire_gare"
       ) return null;
 
       const user = {

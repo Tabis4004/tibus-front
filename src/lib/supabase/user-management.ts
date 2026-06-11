@@ -7,6 +7,7 @@ export const OWNER_TEAM_ROLES = [
   "vendeur",
   "comptable_compagnie",
   "controleur",
+  "gestionnaire_gare",
 ] as const;
 
 export type OwnerTeamRole = (typeof OWNER_TEAM_ROLES)[number];

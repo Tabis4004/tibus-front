@@ -54,7 +54,6 @@ export async function completeUserProfile(input: CompleteProfileInput) {
       email: input.email?.trim() || null,
       countryId: input.countryId,
       profileCompleted: true,
-      onboardingCompleted: false,
     })
     .eq("id", input.userId);
 

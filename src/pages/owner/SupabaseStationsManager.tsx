@@ -46,15 +46,26 @@ import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listOwnerStationsSupabase,
+  listOwnerTeamSupabase,
   createOwnerStationSupabase,
   updateOwnerStationSupabase,
   deleteOwnerStationSupabase,
   type SupabaseOwnerStation,
+  type SupabaseOwnerTeamMember,
 } from "@/lib/supabase/owner-operations";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 
 const stationSchema = z.object({
   name: z.string().min(2, "Station name required"),
   googleMapsLink: z.string().optional(),
+  gestionnaireUserId: z.string().optional(),
+  gestionnaireSharePct: z.coerce.number().min(0).max(100),
 });
 type StationFormData = z.infer<typeof stationSchema>;
 
@@ -73,18 +84,30 @@ function StationDialog({
 }) {
   const { t } = useTranslation("owner");
   const [saving, setSaving] = useState(false);
+  const [team, setTeam] = useState<SupabaseOwnerTeamMember[]>([]);
 
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<StationFormData>({
     resolver: zodResolver(stationSchema),
     defaultValues: {
       name: station?.name ?? "",
       googleMapsLink: station?.address ?? "",
+      gestionnaireUserId: station?.gestionnaireUserId ?? "",
+      gestionnaireSharePct: station?.gestionnaireSharePct ?? 0,
     },
   });
+
+  useEffect(() => {
+    if (!station) return;
+    void listOwnerTeamSupabase(appUserId, companyId).then(setTeam).catch(() => setTeam([]));
+  }, [appUserId, companyId, station]);
+
+  const selectedManagerId = watch("gestionnaireUserId");
 
   const onSubmit = async (data: StationFormData) => {
     setSaving(true);
@@ -96,6 +119,8 @@ function StationDialog({
           stationId: station.id,
           name: data.name,
           googleMapsLink: data.googleMapsLink,
+          gestionnaireUserId: data.gestionnaireUserId || null,
+          gestionnaireSharePct: data.gestionnaireSharePct,
         });
         toast.success(t("stations.station_updated"));
       } else {
@@ -139,6 +164,43 @@ function StationDialog({
               {...register("googleMapsLink")}
             />
           </div>
+          {station && (
+            <>
+              <div className="space-y-1.5">
+                <Label>{t("stations.manager")}</Label>
+                <Select
+                  value={selectedManagerId || "__none__"}
+                  onValueChange={(value) =>
+                    setValue("gestionnaireUserId", value === "__none__" ? "" : value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("stations.manager_placeholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t("stations.no_manager")}</SelectItem>
+                    {team.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                        {member.email ? ` (${member.email})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("stations.share_pct")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  {...register("gestionnaireSharePct")}
+                />
+                <p className="text-xs text-muted-foreground">{t("stations.share_pct_hint")}</p>
+              </div>
+            </>
+          )}
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
               {t("buttons.cancel", { ns: "common" })}
@@ -269,6 +331,12 @@ export default function SupabaseStationsManager() {
                         <BuildingIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium">{station.name}</div>
+                          {station.gestionnaireSharePct > 0 && (
+                            <p className="text-[11px] text-muted-foreground">
+                              {station.gestionnaireName ?? t("stations.no_manager")} ·{" "}
+                              {station.gestionnaireSharePct}%
+                            </p>
+                          )}
                           {station.address && (
                             <a
                               href={station.address}

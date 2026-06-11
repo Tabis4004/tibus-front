@@ -1,8 +1,12 @@
 import { useContext } from "react";
 import { AppUserContext } from "@/components/providers/app-user-context.ts";
+import {
+  APP_USER_REFRESH_DONE_EVENT,
+  APP_USER_REFRESH_EVENT,
+} from "@/hooks/app-user-events.ts";
 import { useAppUserState, type AppUserState } from "@/hooks/use-app-user-state.ts";
 
-export const APP_USER_REFRESH_EVENT = "tibus:app-user-refresh";
+export { APP_USER_REFRESH_DONE_EVENT, APP_USER_REFRESH_EVENT } from "@/hooks/app-user-events.ts";
 
 export const SELLER_ROLE_NAMES = [
   "vendeur",
@@ -57,6 +61,28 @@ export function normalizeRoleForUi(role: string): string {
 
 export function refreshAppUser() {
   window.dispatchEvent(new Event(APP_USER_REFRESH_EVENT));
+}
+
+export function refreshAppUserAsync(timeoutMs = 10_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Profile refresh timeout"));
+    }, timeoutMs);
+
+    const onDone = () => {
+      cleanup();
+      resolve();
+    };
+
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(APP_USER_REFRESH_DONE_EVENT, onDone);
+    };
+
+    window.addEventListener(APP_USER_REFRESH_DONE_EVENT, onDone);
+    window.dispatchEvent(new Event(APP_USER_REFRESH_EVENT));
+  });
 }
 
 export type { AppUserState };
