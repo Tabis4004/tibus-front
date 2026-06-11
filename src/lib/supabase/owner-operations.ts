@@ -41,6 +41,23 @@ export type SupabaseAssignableUser = {
   email: string | null;
 };
 
+const OWNER_TEAM_ROLE_NAMES = ["vendeur", "controleur", "comptable_compagnie"] as const;
+
+function isOwnerTeamRpcBroken(message: string) {
+  return (
+    message.includes("structure of query does not match function result type") ||
+    message.includes("Could not find the function")
+  );
+}
+
+function roleNameFromJoin(
+  role: { name: string } | { name: string }[] | null | undefined,
+): string | null {
+  if (!role) return null;
+  if (Array.isArray(role)) return role[0]?.name ?? null;
+  return role.name ?? null;
+}
+
 function cityFromGare(gareName: string): string {
   const parts = gareName.split("—");
   if (parts.length > 1) return parts[parts.length - 1].trim();
@@ -230,6 +247,65 @@ export async function deleteOwnerStationSupabase(
   if (error) throw error;
 }
 
+async function listOwnerSellersDirect(
+  companyId: string,
+): Promise<SupabaseOwnerSeller[]> {
+  const { data: roleRows, error } = await supabase
+    .from("UserRoles")
+    .select("userId, Role(name)")
+    .eq("companyId", companyId);
+
+  if (error) throw error;
+
+  const sellers: SupabaseOwnerSeller[] = [];
+  const userIds = new Set<string>();
+
+  for (const row of roleRows ?? []) {
+    const roleName = roleNameFromJoin(
+      row.Role as { name: string } | { name: string }[] | null,
+    );
+    if (
+      !roleName ||
+      !OWNER_TEAM_ROLE_NAMES.includes(roleName as OwnerTeamRoleName)
+    ) {
+      continue;
+    }
+    userIds.add(row.userId as string);
+    sellers.push({
+      id: row.userId as string,
+      name: "",
+      email: null,
+      roleName: roleName as OwnerTeamRoleName,
+    });
+  }
+
+  if (!userIds.size) return [];
+
+  const { data: users, error: usersError } = await supabase
+    .from("Users")
+    .select("id, firstName, lastName, email")
+    .in("id", [...userIds]);
+
+  if (usersError) throw usersError;
+
+  const usersById = new Map(
+    (users ?? []).map((user) => [user.id as string, user]),
+  );
+
+  return sellers
+    .map((seller) => {
+      const user = usersById.get(seller.id);
+      if (!user) return null;
+      return {
+        ...seller,
+        name: fullName(user),
+        email: (user.email as string | null) ?? null,
+      };
+    })
+    .filter((seller): seller is SupabaseOwnerSeller => Boolean(seller))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function listOwnerSellersSupabase(
   appUserId: string,
   companyId?: string | null,
@@ -241,7 +317,12 @@ export async function listOwnerSellersSupabase(
     p_company_id: resolvedCompanyId,
   });
 
-  if (error) throw error;
+  if (error) {
+    if (isOwnerTeamRpcBroken(error.message)) {
+      return listOwnerSellersDirect(resolvedCompanyId);
+    }
+    throw error;
+  }
 
   type TeamRow = {
     user_id: string;
@@ -279,10 +360,14 @@ export async function listOwnerSellersSupabase(
 
 export async function findAssignableCompanyUserByEmailSupabase(
   email: string,
+  companyId?: string | null,
 ): Promise<SupabaseAssignableUser | null> {
   const { data, error } = await supabase.rpc(
     "find_assignable_company_user_by_email",
-    { p_email: email.trim().toLowerCase() },
+    {
+      p_email: email.trim().toLowerCase(),
+      ...(companyId ? { p_company_id: companyId } : {}),
+    },
   );
 
   if (error) throw error;
@@ -326,10 +411,12 @@ export async function listOwnerTeamSupabase(
 export async function assignCompanySellerByEmailSupabase(input: {
   email: string;
   roleName?: OwnerTeamRoleName;
+  companyId?: string | null;
 }): Promise<SupabaseAssignableUser> {
   const { data, error } = await supabase.rpc("assign_company_user_role_by_email", {
     p_email: input.email.trim().toLowerCase(),
     p_role_name: input.roleName ?? "vendeur",
+    ...(input.companyId ? { p_company_id: input.companyId } : {}),
   });
 
   if (error) throw error;
@@ -350,16 +437,18 @@ export async function removeCompanySellerSupabase(
   roleName?: OwnerTeamRoleName,
   companyId?: string | null,
 ): Promise<void> {
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+
   if (roleName) {
     const { error } = await supabase.rpc("remove_company_user_role", {
       p_user_id: userId,
       p_role_name: roleName,
+      ...(resolvedCompanyId ? { p_company_id: resolvedCompanyId } : {}),
     });
     if (error) throw error;
     return;
   }
 
-  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
   if (!resolvedCompanyId) throw new Error("Compagnie introuvable");
 
   const { data: roles, error: roleError } = await supabase

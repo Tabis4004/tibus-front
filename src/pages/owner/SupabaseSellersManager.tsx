@@ -65,9 +65,11 @@ const ROLE_LABELS: Record<OwnerTeamRoleName, string> = {
 };
 
 function AddSellerDialog({
+  companyId,
   onClose,
   onSaved,
 }: {
+  companyId: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -81,13 +83,13 @@ function AddSellerDialog({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (debouncedEmail.length < 3) {
+    if (!companyId || debouncedEmail.length < 3) {
       setFound(undefined);
       return;
     }
     let cancelled = false;
     setFound(undefined);
-    void findAssignableCompanyUserByEmailSupabase(debouncedEmail)
+    void findAssignableCompanyUserByEmailSupabase(debouncedEmail, companyId)
       .then((user) => {
         if (!cancelled) setFound(user);
       })
@@ -97,13 +99,17 @@ function AddSellerDialog({
     return () => {
       cancelled = true;
     };
-  }, [debouncedEmail]);
+  }, [companyId, debouncedEmail]);
 
   const handleAssign = async () => {
-    if (!found) return;
+    if (!found || !companyId) return;
     setSaving(true);
     try {
-      await assignCompanySellerByEmailSupabase({ email: emailInput, roleName });
+      await assignCompanySellerByEmailSupabase({
+        email: emailInput,
+        roleName,
+        companyId,
+      });
       toast.success(t("sellers.assigned", { name: found.name ?? found.email }));
       onSaved();
       onClose();
@@ -295,7 +301,11 @@ export default function SupabaseSellersManager() {
       )}
 
       {showAdd && (
-        <AddSellerDialog onClose={() => setShowAdd(false)} onSaved={() => void loadData()} />
+        <AddSellerDialog
+          companyId={companyId}
+          onClose={() => setShowAdd(false)}
+          onSaved={() => void loadData()}
+        />
       )}
 
       <AlertDialog open={!!removeTarget} onOpenChange={() => setRemoveTarget(null)}>
