@@ -239,7 +239,7 @@ export function useAppUserState() {
       hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
-      profileCompleted: isProfileComplete(profile),
+      profileCompleted: isProfileComplete(profile, effectiveRoles),
       onboardingCompleted: hasCompletedOnboarding(profile, appUserId, effectiveRoles),
       isReady,
       isLoading: waitingForProfile || isLoading,

@@ -1,18 +1,9 @@
-import { isProfileComplete } from "@/lib/auth/profile-completion.ts";
+import {
+  ESTABLISHED_PRO_ROLES,
+  isProfileComplete,
+} from "@/lib/auth/profile-completion.ts";
 
 const DISMISSED_PREFIX = "tibus:onboarding-dismissed:";
-
-const ESTABLISHED_PRO_ROLES = [
-  "super_admin",
-  "admin_pays",
-  "owner",
-  "vendeur",
-  "vendeur_master",
-  "vendeur_reseau",
-  "vendeur_independant",
-  "controleur",
-  "comptable_compagnie",
-] as const;
 
 export function onboardingDismissedStorageKey(userId: string) {
   return `${DISMISSED_PREFIX}${userId}`;
@@ -32,7 +23,7 @@ export function hasCompletedOnboarding(
     // quota / mode privé
   }
   if (
-    isProfileComplete(profile) &&
+    isProfileComplete(profile, roles) &&
     roles.some((role) => (ESTABLISHED_PRO_ROLES as readonly string[]).includes(role))
   ) {
     return true;

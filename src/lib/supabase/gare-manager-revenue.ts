@@ -6,6 +6,7 @@ export type GareManagerRevenueRow = {
   managerUserId: string | null;
   managerName: string | null;
   sharePct: number;
+  sharePctReservation: number;
   counterSalesGmv: number;
   counterShareCollected: number;
   reservationShareTotal: number;
@@ -60,6 +61,7 @@ export async function getGareManagerCounterRevenueSummarySupabase(
         managerUserId: r.managerUserId ? String(r.managerUserId) : null,
         managerName: r.managerName ? String(r.managerName) : null,
         sharePct: num(r.sharePct),
+        sharePctReservation: num(r.sharePctReservation),
         counterSalesGmv: num(r.counterSalesGmv),
         counterShareCollected: num(r.counterShareCollected),
         reservationShareTotal: num(r.reservationShareTotal),
@@ -73,11 +75,13 @@ export async function getGareManagerCounterRevenueSummarySupabase(
 export async function setGareManagerRevenueShareSupabase(input: {
   gareId: string;
   sharePct: number;
+  sharePctReservation?: number;
   gestionnaireUserId?: string | null;
 }) {
   const { data, error } = await supabase.rpc("set_gare_manager_revenue_share", {
     p_gare_id: input.gareId,
     p_share_pct: input.sharePct,
+    p_share_pct_reservation: input.sharePctReservation ?? input.sharePct,
     p_gestionnaire_user_id: input.gestionnaireUserId ?? null,
   });
 

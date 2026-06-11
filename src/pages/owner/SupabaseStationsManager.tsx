@@ -66,6 +66,7 @@ const stationSchema = z.object({
   googleMapsLink: z.string().optional(),
   gestionnaireUserId: z.string().optional(),
   gestionnaireSharePct: z.coerce.number().min(0).max(100),
+  gestionnaireSharePctReservation: z.coerce.number().min(0).max(100),
 });
 type StationFormData = z.infer<typeof stationSchema>;
 
@@ -99,6 +100,7 @@ function StationDialog({
       googleMapsLink: station?.address ?? "",
       gestionnaireUserId: station?.gestionnaireUserId ?? "",
       gestionnaireSharePct: station?.gestionnaireSharePct ?? 0,
+      gestionnaireSharePctReservation: station?.gestionnaireSharePctReservation ?? station?.gestionnaireSharePct ?? 0,
     },
   });
 
@@ -121,6 +123,7 @@ function StationDialog({
           googleMapsLink: data.googleMapsLink,
           gestionnaireUserId: data.gestionnaireUserId || null,
           gestionnaireSharePct: data.gestionnaireSharePct,
+          gestionnaireSharePctReservation: data.gestionnaireSharePctReservation,
         });
         toast.success(t("stations.station_updated"));
       } else {
@@ -189,7 +192,7 @@ function StationDialog({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>{t("stations.share_pct")}</Label>
+                <Label>{t("stations.share_pct_counter")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -197,7 +200,18 @@ function StationDialog({
                   step={0.5}
                   {...register("gestionnaireSharePct")}
                 />
-                <p className="text-xs text-muted-foreground">{t("stations.share_pct_hint")}</p>
+                <p className="text-xs text-muted-foreground">{t("stations.share_pct_counter_hint")}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("stations.share_pct_reservation")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  {...register("gestionnaireSharePctReservation")}
+                />
+                <p className="text-xs text-muted-foreground">{t("stations.share_pct_reservation_hint")}</p>
               </div>
             </>
           )}
@@ -331,10 +345,11 @@ export default function SupabaseStationsManager() {
                         <BuildingIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium">{station.name}</div>
-                          {station.gestionnaireSharePct > 0 && (
+                          {(station.gestionnaireSharePct > 0 || station.gestionnaireSharePctReservation > 0) && (
                             <p className="text-[11px] text-muted-foreground">
                               {station.gestionnaireName ?? t("stations.no_manager")} ·{" "}
-                              {station.gestionnaireSharePct}%
+                              {t("stations.share_pct_counter_short")} {station.gestionnaireSharePct}% ·{" "}
+                              {t("stations.share_pct_reservation_short")} {station.gestionnaireSharePctReservation}%
                             </p>
                           )}
                           {station.address && (

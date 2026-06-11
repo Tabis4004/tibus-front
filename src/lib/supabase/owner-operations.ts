@@ -19,6 +19,7 @@ export type SupabaseOwnerStation = {
   location: { city: string; country: string } | null;
   gestionnaireUserId: string | null;
   gestionnaireSharePct: number;
+  gestionnaireSharePctReservation: number;
   gestionnaireName: string | null;
 };
 
@@ -162,7 +163,7 @@ export async function listOwnerStationsSupabase(
 
   const { data, error } = await supabase
     .from("Gares")
-    .select("id, name, googleMapsLink, gestionnaireUserId, gestionnaireSharePct")
+    .select("id, name, googleMapsLink, gestionnaireUserId, gestionnaireSharePct, gestionnaireSharePctReservation")
     .eq("companyId", resolvedCompanyId)
     .order("name");
 
@@ -200,6 +201,7 @@ export async function listOwnerStationsSupabase(
       },
       gestionnaireUserId,
       gestionnaireSharePct: Number(station.gestionnaireSharePct ?? 0),
+      gestionnaireSharePctReservation: Number(station.gestionnaireSharePctReservation ?? station.gestionnaireSharePct ?? 0),
       gestionnaireName: gestionnaireUserId
         ? (managerNameById.get(gestionnaireUserId) ?? null)
         : null,
@@ -233,6 +235,7 @@ export async function updateOwnerStationSupabase(input: {
   googleMapsLink?: string;
   gestionnaireUserId?: string | null;
   gestionnaireSharePct?: number;
+  gestionnaireSharePctReservation?: number;
 }): Promise<void> {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
@@ -250,6 +253,7 @@ export async function updateOwnerStationSupabase(input: {
 
   if (
     input.gestionnaireSharePct !== undefined ||
+    input.gestionnaireSharePctReservation !== undefined ||
     input.gestionnaireUserId !== undefined
   ) {
     const { setGareManagerRevenueShareSupabase } = await import(
@@ -258,6 +262,7 @@ export async function updateOwnerStationSupabase(input: {
     await setGareManagerRevenueShareSupabase({
       gareId: input.stationId,
       sharePct: input.gestionnaireSharePct ?? 0,
+      sharePctReservation: input.gestionnaireSharePctReservation ?? input.gestionnaireSharePct ?? 0,
       gestionnaireUserId: input.gestionnaireUserId ?? null,
     });
   }

@@ -92,6 +92,7 @@ export default function GareManagerRevenuePanel({ companyId }: { companyId: stri
   const visibleRows = rows.filter(
     (row) =>
       row.sharePct > 0
+      || row.sharePctReservation > 0
       || row.managerUserId
       || row.counterSalesGmv > 0
       || row.reservationShareTotal > 0,
@@ -133,7 +134,8 @@ export default function GareManagerRevenuePanel({ companyId }: { companyId: stri
                 <tr>
                   <th className="px-3 py-2 whitespace-nowrap">{t("gare_revenue.col_station")}</th>
                   <th className="px-3 py-2 whitespace-nowrap">{t("gare_revenue.col_manager")}</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">%</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_pct_counter")}</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_pct_reservation")}</th>
                   <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_counter_gmv")}</th>
                   <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_counter_collected")}</th>
                   <th className="px-3 py-2 text-right whitespace-nowrap">{t("gare_revenue.col_reservation")}</th>
@@ -156,7 +158,7 @@ export default function GareManagerRevenuePanel({ companyId }: { companyId: stri
               </tbody>
               <tfoot className="bg-muted/30 font-semibold border-t">
                 <tr>
-                  <td className="px-3 py-2" colSpan={3}>
+                  <td className="px-3 py-2" colSpan={4}>
                     {t("gare_revenue.total_row")}
                   </td>
                   <td className="px-3 py-2 text-right">{amountCell(totals.counterSalesGmv, currency)}</td>
@@ -201,6 +203,7 @@ function GareRevenueTableRow({
         {row.managerName ?? t("gare_revenue.no_manager")}
       </td>
       <td className="px-3 py-2 text-right">{row.sharePct}%</td>
+      <td className="px-3 py-2 text-right">{row.sharePctReservation}%</td>
       <td className="px-3 py-2 text-right">{amountCell(row.counterSalesGmv, currency)}</td>
       <td className="px-3 py-2 text-right">{amountCell(row.counterShareCollected, currency)}</td>
       <td className="px-3 py-2 text-right">{amountCell(row.reservationShareTotal, currency)}</td>
