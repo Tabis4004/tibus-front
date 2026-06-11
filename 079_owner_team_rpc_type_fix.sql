@@ -4,6 +4,8 @@
 -- Cause : Role.name est varchar, role_name déclaré en text dans list_owner_team_members
 -- =============================================================================
 
+DROP FUNCTION IF EXISTS public.list_owner_team_members(uuid);
+
 CREATE OR REPLACE FUNCTION public.list_owner_team_members(p_company_id uuid DEFAULT NULL)
 RETURNS TABLE (
   user_id uuid,

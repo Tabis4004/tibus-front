@@ -85,6 +85,8 @@ BEGIN
   WHERE "userId" = p_user_id AND "roleId" = v_role_id AND "companyId" = v_company_id;
 END; $$;
 
+DROP FUNCTION IF EXISTS public.list_owner_team_members(uuid);
+
 CREATE OR REPLACE FUNCTION public.list_owner_team_members(p_company_id uuid DEFAULT NULL)
 RETURNS TABLE (user_id uuid, "firstName" varchar, "lastName" varchar, email varchar, role_name varchar)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
