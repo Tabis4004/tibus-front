@@ -400,8 +400,8 @@ async function listOwnerTeamDirectSupabase(companyId: string): Promise<SupabaseO
     if (!roleName || !user) continue;
     rows.push({
       user_id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      firstName: user.firstName ?? "",
+      lastName: user.lastName ?? "",
       email: user.email,
       role_name: roleName,
     });

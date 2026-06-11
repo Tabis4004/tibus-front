@@ -86,7 +86,7 @@ BEGIN
 END; $$;
 
 CREATE OR REPLACE FUNCTION public.list_owner_team_members(p_company_id uuid DEFAULT NULL)
-RETURNS TABLE (user_id uuid, "firstName" varchar, "lastName" varchar, email varchar, role_name text)
+RETURNS TABLE (user_id uuid, "firstName" varchar, "lastName" varchar, email varchar, role_name varchar)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_company_id uuid;
 BEGIN
@@ -98,7 +98,7 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT u.id, u."firstName", u."lastName", u.email, r.name
+  SELECT u.id, u."firstName", u."lastName", u.email, r.name::varchar
   FROM "UserRoles" ur
   JOIN "Role" r ON r.id = ur."roleId"
   JOIN "Users" u ON u.id = ur."userId"
