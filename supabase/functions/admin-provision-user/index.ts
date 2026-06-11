@@ -2,7 +2,12 @@ import { getUserFromRequest } from "../_shared/auth.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient, resolveAppUserId } from "../_shared/issue-ticket.ts";
 
-const OWNER_ROLES = ["vendeur", "comptable_compagnie", "controleur"] as const;
+const OWNER_ROLES = [
+  "vendeur",
+  "comptable_compagnie",
+  "controleur",
+  "gestionnaire_gare",
+] as const;
 
 type ProvisionBody = {
   firstName?: string;
@@ -272,7 +277,7 @@ Deno.serve(async (req) => {
     }
 
     const requiredCompanyRoles = roles.filter((r) =>
-      ["vendeur", "comptable_compagnie", "controleur", "owner"].includes(r)
+      ["vendeur", "comptable_compagnie", "controleur", "gestionnaire_gare", "owner"].includes(r)
     );
     const missingRequired = requiredCompanyRoles.filter((r) => !assignedRoles.includes(r));
     if (missingRequired.length > 0) {

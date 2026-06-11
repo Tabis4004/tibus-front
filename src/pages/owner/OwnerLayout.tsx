@@ -80,7 +80,7 @@ const CONVEX_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
       { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
       { toSuffix: "/owner/trips", labelKey: "sidebar.trips", icon: CalendarIcon },
-      { toSuffix: "/owner/sellers", labelKey: "sidebar.sellers", icon: UsersIcon },
+      { toSuffix: "/owner/sellers", labelKey: "sidebar.team", icon: UsersIcon },
     ],
   },
 ];
@@ -121,7 +121,7 @@ const SUPABASE_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/buses", labelKey: "sidebar.fleet", icon: BusIcon },
       { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
       { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
-      { toSuffix: "/owner/sellers", labelKey: "sidebar.sellers", icon: UsersIcon },
+      { toSuffix: "/owner/sellers", labelKey: "sidebar.team", icon: UsersIcon },
     ],
   },
   {

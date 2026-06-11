@@ -15,6 +15,7 @@ import {
   TicketIcon,
   WalletIcon,
   HandCoinsIcon,
+  UsersIcon,
 } from "lucide-react";
 
 export const GUARANTEE_FUND_ACCESS_ROLES = [
@@ -136,6 +137,18 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Revenus, caisse, commissions et KPI.",
     toSuffix: "/owner/analytics",
     icon: BarChart3Icon,
+  },
+  {
+    id: "team",
+    sectionKey: "console.section_operations",
+    sectionDefault: "Exploitation",
+    titleKey: "console.team_title",
+    titleDefault: "Équipe",
+    descKey: "console.team_desc",
+    descDefault: "Créer des comptes et attribuer vendeur, comptable, contrôleur ou gestionnaire de gare.",
+    toSuffix: "/owner/sellers",
+    icon: UsersIcon,
+    roles: ["owner", "super_admin"],
   },
   {
     id: "trips",
