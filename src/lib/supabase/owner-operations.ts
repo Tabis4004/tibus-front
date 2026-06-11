@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase";
-import { resolveOwnerCompanyId } from "@/lib/supabase/owner-company";
+import {
+  resolveOwnerCompanyId,
+  setOwnerActiveCompanySupabase,
+} from "@/lib/supabase/owner-company";
 
 export type SupabaseOwnerBus = {
   id: string;
@@ -287,28 +290,40 @@ export async function deleteOwnerStationSupabase(
   if (error) throw error;
 }
 
-export async function listOwnerSellersSupabase(
-  appUserId: string,
-  companyId?: string | null,
-): Promise<SupabaseOwnerSeller[]> {
-  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
-  if (!resolvedCompanyId) return [];
+type TeamRow = {
+  user_id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  role_name: string;
+};
 
-  const { data, error } = await supabase.rpc("list_owner_team_members", {
-    p_company_id: resolvedCompanyId,
-  });
+function joinedRoleName(
+  role: { name: string } | { name: string }[] | null | undefined,
+): string | null {
+  if (!role) return null;
+  if (Array.isArray(role)) return role[0]?.name ?? null;
+  return role.name ?? null;
+}
 
-  if (error) throw error;
+function joinedUser(
+  user:
+    | { id: string; firstName: string | null; lastName: string | null; email: string | null }
+    | {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+      }[]
+    | null
+    | undefined,
+) {
+  if (!user) return null;
+  return Array.isArray(user) ? (user[0] ?? null) : user;
+}
 
-  type TeamRow = {
-    user_id: string;
-    firstName: string | null;
-    lastName: string | null;
-    email: string | null;
-    role_name: string;
-  };
-
-  return ((data ?? []) as TeamRow[])
+function mapTeamRows(rows: TeamRow[]): SupabaseOwnerSeller[] {
+  return rows
     .map((row) => {
       const roleName = row.role_name;
       if (!isOwnerAssignableTeamRole(roleName)) return null;
@@ -330,9 +345,103 @@ export async function listOwnerSellersSupabase(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function isRpcSignatureMismatch(message: string) {
+  return /function|schema cache|could not find|p_company_id|arguments/i.test(message);
+}
+
+export async function syncOwnerTeamCompanyContext(companyId: string) {
+  try {
+    await setOwnerActiveCompanySupabase(companyId);
+  } catch {
+    // 058 peut ne pas être appliqué : le front garde quand même companyId explicite.
+  }
+}
+
+async function listOwnerTeamDirectSupabase(companyId: string): Promise<SupabaseOwnerSeller[]> {
+  const { data: roleRows, error: roleError } = await supabase
+    .from("Role")
+    .select("id, name")
+    .in("name", [...OWNER_ASSIGNABLE_TEAM_ROLES]);
+
+  if (roleError) throw roleError;
+
+  const roleIds = (roleRows ?? []).map((row) => row.id as string);
+  if (!roleIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("UserRoles")
+    .select("userId, Role(name), Users(id, firstName, lastName, email)")
+    .eq("companyId", companyId)
+    .in("roleId", roleIds);
+
+  if (error) throw error;
+
+  const rows: TeamRow[] = [];
+  for (const entry of data ?? []) {
+    const roleName = joinedRoleName(
+      entry.Role as { name: string } | { name: string }[] | null,
+    );
+    const user = joinedUser(
+      entry.Users as
+        | {
+            id: string;
+            firstName: string | null;
+            lastName: string | null;
+            email: string | null;
+          }
+        | {
+            id: string;
+            firstName: string | null;
+            lastName: string | null;
+            email: string | null;
+          }[]
+        | null,
+    );
+    if (!roleName || !user) continue;
+    rows.push({
+      user_id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role_name: roleName,
+    });
+  }
+
+  return mapTeamRows(rows);
+}
+
+export async function listOwnerSellersSupabase(
+  appUserId: string,
+  companyId?: string | null,
+): Promise<SupabaseOwnerSeller[]> {
+  const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
+  if (!resolvedCompanyId) return [];
+
+  await syncOwnerTeamCompanyContext(resolvedCompanyId);
+
+  const { data, error } = await supabase.rpc("list_owner_team_members", {
+    p_company_id: resolvedCompanyId,
+  });
+
+  if (!error) {
+    return mapTeamRows((data ?? []) as TeamRow[]);
+  }
+
+  if (isRpcSignatureMismatch(error.message)) {
+    return listOwnerTeamDirectSupabase(resolvedCompanyId);
+  }
+
+  throw error;
+}
+
 export async function findAssignableCompanyUserByEmailSupabase(
   email: string,
+  companyId?: string | null,
 ): Promise<SupabaseAssignableUser | null> {
+  if (companyId) {
+    await syncOwnerTeamCompanyContext(companyId);
+  }
+
   const { data, error } = await supabase.rpc(
     "find_assignable_company_user_by_email",
     { p_email: email.trim().toLowerCase() },
@@ -381,15 +490,30 @@ export async function assignCompanySellerByEmailSupabase(input: {
   roleName?: OwnerTeamRoleName;
   companyId?: string | null;
 }): Promise<SupabaseAssignableUser> {
-  const { data, error } = await supabase.rpc("assign_company_user_role_by_email", {
-    p_email: input.email.trim().toLowerCase(),
-    p_role_name: input.roleName ?? "vendeur",
-    p_company_id: input.companyId ?? null,
+  const email = input.email.trim().toLowerCase();
+  const roleName = input.roleName ?? "vendeur";
+  const companyId = input.companyId;
+  if (!companyId) throw new Error("Compagnie introuvable");
+
+  await syncOwnerTeamCompanyContext(companyId);
+
+  const withCompany = await supabase.rpc("assign_company_user_role_by_email", {
+    p_email: email,
+    p_role_name: roleName,
+    p_company_id: companyId ?? null,
   });
 
-  if (error) throw error;
+  const result =
+    withCompany.error && isRpcSignatureMismatch(withCompany.error.message)
+      ? await supabase.rpc("assign_company_user_role_by_email", {
+          p_email: email,
+          p_role_name: roleName,
+        })
+      : withCompany;
 
-  const row = Array.isArray(data) ? data[0] : null;
+  if (result.error) throw result.error;
+
+  const row = Array.isArray(result.data) ? result.data[0] : null;
   if (!row) throw new Error("Utilisateur introuvable");
 
   return {
@@ -405,18 +529,29 @@ export async function removeCompanySellerSupabase(
   roleName?: OwnerTeamRoleName,
   companyId?: string | null,
 ): Promise<void> {
-  if (roleName) {
-    const { error } = await supabase.rpc("remove_company_user_role", {
-      p_user_id: userId,
-      p_role_name: roleName,
-      p_company_id: companyId ?? null,
-    });
-    if (error) throw error;
-    return;
-  }
-
   const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
   if (!resolvedCompanyId) throw new Error("Compagnie introuvable");
+
+  await syncOwnerTeamCompanyContext(resolvedCompanyId);
+
+  if (roleName) {
+    const withCompany = await supabase.rpc("remove_company_user_role", {
+      p_user_id: userId,
+      p_role_name: roleName,
+      p_company_id: resolvedCompanyId,
+    });
+
+    if (withCompany.error && isRpcSignatureMismatch(withCompany.error.message)) {
+      const legacy = await supabase.rpc("remove_company_user_role", {
+        p_user_id: userId,
+        p_role_name: roleName,
+      });
+      if (legacy.error) throw legacy.error;
+    } else if (withCompany.error) {
+      throw withCompany.error;
+    }
+    return;
+  }
 
   const { data: roles, error: roleError } = await supabase
     .from("Role")

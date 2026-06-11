@@ -240,6 +240,8 @@
   "sellers.remove_confirm": "Retirer ce membre ?",
   "sellers.remove_desc": "{{name}} sera retiré de votre entreprise pour ce rôle.",
   "sellers.removed": "Membre retiré de votre entreprise.",
+  "sellers.load_error": "Impossible de charger l'équipe.",
+  "sellers.assign_error": "Impossible d'attribuer ce membre.",
   "sellers.remove_error": "Impossible de retirer le membre.",
   "sub.title": "Plans d'abonnement",
   "sub.desc": "Choisissez un plan pour débloquer toutes les fonctionnalités pour votre entreprise.",

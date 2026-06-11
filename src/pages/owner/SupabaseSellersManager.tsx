@@ -55,6 +55,7 @@ import {
   findAssignableCompanyUserByEmailSupabase,
   assignCompanySellerByEmailSupabase,
   removeCompanySellerSupabase,
+  syncOwnerTeamCompanyContext,
   type SupabaseOwnerSeller,
   type OwnerTeamRoleName,
 } from "@/lib/supabase/owner-operations";
@@ -125,7 +126,7 @@ function AddTeamMemberDialog({
     }
     let cancelled = false;
     setFound(undefined);
-    void findAssignableCompanyUserByEmailSupabase(debouncedEmail)
+    void findAssignableCompanyUserByEmailSupabase(debouncedEmail, companyId)
       .then((user) => {
         if (!cancelled) setFound(user);
       })
@@ -135,7 +136,7 @@ function AddTeamMemberDialog({
     return () => {
       cancelled = true;
     };
-  }, [debouncedEmail]);
+  }, [companyId, debouncedEmail]);
 
   const handleAssign = async () => {
     if (!found) return;
@@ -146,7 +147,7 @@ function AddTeamMemberDialog({
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("sellers.remove_error"));
+      toast.error(err instanceof Error ? err.message : t("sellers.assign_error"));
     } finally {
       setSaving(false);
     }
@@ -156,6 +157,7 @@ function AddTeamMemberDialog({
     if (!firstName.trim() || !lastName.trim() || !emailInput.trim() || password.length < 6) return;
     setSaving(true);
     try {
+      await syncOwnerTeamCompanyContext(companyId);
       const result = await provisionUserSupabase({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -297,22 +299,22 @@ export default function SupabaseSellersManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
   const appUser = useAppUser();
-  const { companyId } = useOwnerCompany();
+  const { companyId, isReady: companyReady } = useOwnerCompany();
   const canManageTeam = appUser.roles.includes("owner") || appUser.isSuperAdmin;
   const [sellers, setSellers] = useState<SupabaseOwnerSeller[] | undefined>(undefined);
   const [showAdd, setShowAdd] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<SupabaseOwnerSeller | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!appUserId || !companyId) return;
+    if (!appUserId || !companyId || !companyReady) return;
     setSellers(undefined);
     try {
       setSellers(await listOwnerSellersSupabase(appUserId, companyId));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("sellers.remove_error"));
+      toast.error(err instanceof Error ? err.message : t("sellers.load_error"));
       setSellers([]);
     }
-  }, [appUserId, companyId, t]);
+  }, [appUserId, companyId, companyReady, t]);
 
   useEffect(() => {
     void loadData();

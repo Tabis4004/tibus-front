@@ -240,6 +240,8 @@
   "sellers.remove_confirm": "Remove this member?",
   "sellers.remove_desc": "{{name}} will be removed from your company for this role.",
   "sellers.removed": "Member removed from your company.",
+  "sellers.load_error": "Could not load the team.",
+  "sellers.assign_error": "Could not assign this member.",
   "sellers.remove_error": "Failed to remove member.",
   "sub.title": "Subscription Plans",
   "sub.desc": "Choose a plan to unlock all features for your company.",
