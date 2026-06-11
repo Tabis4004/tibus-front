@@ -79,10 +79,74 @@ async function invokeFunction<T>(name: string, body: unknown): Promise<T> {
   return payload;
 }
 
+async function readFunctionError(error: { message?: string; context?: Response }): Promise<string> {
+  const ctx = error.context;
+  if (ctx) {
+    try {
+      const payload = (await ctx.json()) as { error?: string };
+      if (payload?.error?.trim()) return payload.error;
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return error.message?.trim() || "Impossible de créer le membre";
+}
+
 export async function provisionUserSupabase(
   input: ProvisionUserInput,
 ): Promise<ProvisionUserResult> {
+  const { data, error } = await supabase.functions.invoke("admin-provision-user", {
+    body: input,
+  });
+
+  if (error) {
+    throw new Error(await readFunctionError(error as { message?: string; context?: Response }));
+  }
+
+  if (data && typeof data === "object" && "error" in data) {
+    const message = String((data as { error?: string }).error ?? "").trim();
+    if (message) throw new Error(message);
+  }
+
+  if (data && typeof data === "object" && "success" in data) {
+    return data as ProvisionUserResult;
+  }
+
   return invokeFunction<ProvisionUserResult>("admin-provision-user", input);
+}
+
+/** Création équipe owner : privilégie l'assignation RPC si l'email existe déjà. */
+export async function provisionOwnerTeamMemberSupabase(
+  input: ProvisionUserInput & { roleName: OwnerTeamRole },
+): Promise<ProvisionUserResult> {
+  const { assignCompanySellerByEmailSupabase } = await import(
+    "@/lib/supabase/owner-operations.ts"
+  );
+
+  try {
+    return await provisionUserSupabase(input);
+  } catch (createErr) {
+    const message = createErr instanceof Error ? createErr.message : "";
+    const emailTaken = /existe déjà|already|exists|registered|409/i.test(message);
+    if (!emailTaken || !input.companyId) throw createErr;
+
+    const assigned = await assignCompanySellerByEmailSupabase({
+      email: input.email,
+      roleName: input.roleName,
+      companyId: input.companyId,
+    });
+
+    return {
+      success: true,
+      user: {
+        id: assigned.id,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: assigned.email ?? input.email,
+      },
+      roles: [input.roleName, "traveler"],
+    };
+  }
 }
 
 export async function assignCompanyRoleByEmailSupabase(input: {

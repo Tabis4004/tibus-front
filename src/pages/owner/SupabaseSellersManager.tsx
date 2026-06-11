@@ -59,7 +59,7 @@ import {
   type SupabaseOwnerSeller,
   type OwnerTeamRoleName,
 } from "@/lib/supabase/owner-operations";
-import { provisionUserSupabase } from "@/lib/supabase/user-management.ts";
+import { provisionOwnerTeamMemberSupabase } from "@/lib/supabase/user-management.ts";
 import { OWNER_ASSIGNABLE_TEAM_ROLES } from "@/lib/owner-team-roles.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
@@ -169,13 +169,14 @@ function AddTeamMemberDialog({
     setSaving(true);
     try {
       await syncOwnerTeamCompanyContext(companyId);
-      const result = await provisionUserSupabase({
+      const result = await provisionOwnerTeamMemberSupabase({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: emailInput.trim(),
         phone: phone.trim() || undefined,
         password,
         roles: [roleName],
+        roleName,
         companyId,
       });
       toast.success(

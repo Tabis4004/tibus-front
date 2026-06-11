@@ -63,6 +63,25 @@ async function ownerCompanyIds(
   return [...ids];
 }
 
+async function isOwnerOfCompany(
+  admin: ReturnType<typeof createAdminClient>,
+  appUserId: string,
+  companyId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("UserRoles")
+    .select("companyId, Role(name)")
+    .eq("userId", appUserId)
+    .eq("companyId", companyId);
+
+  if (error) throw error;
+
+  return (data ?? []).some((row) => {
+    const role = Array.isArray(row.Role) ? row.Role[0] : row.Role;
+    return (role as { name?: string } | null)?.name === "owner";
+  });
+}
+
 function rolesAreOwnerTeamOnly(roles: string[]) {
   return roles.length > 0
     && roles.every((role) => OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]));
@@ -137,18 +156,18 @@ Deno.serve(async (req) => {
 
     const superAdmin = await isSuperAdmin(admin, appUserId);
     const ownerCompanies = await ownerCompanyIds(admin, appUserId);
-    const ownerTeamProvisioning = ownerCompanies.length > 0 && rolesAreOwnerTeamOnly(roles);
-
-    if (!superAdmin && !ownerCompanies.length) {
-      return jsonResponse({ error: "Droits insuffisants" }, 403);
-    }
+    const ownerTeamProvisioning = rolesAreOwnerTeamOnly(roles);
 
     let companyId: string | null = body.companyId?.trim() || null;
     let countryId: string | null = body.countryId?.trim() || null;
 
     if (ownerTeamProvisioning) {
       if (companyId) {
-        if (!ownerCompanies.includes(companyId)) {
+        if (
+          !superAdmin
+          && !ownerCompanies.includes(companyId)
+          && !(await isOwnerOfCompany(admin, appUserId, companyId))
+        ) {
           return jsonResponse({ error: "Compagnie non autorisée pour ce propriétaire" }, 403);
         }
       } else if (ownerCompanies.length === 1) {
@@ -156,6 +175,8 @@ Deno.serve(async (req) => {
       } else {
         return jsonResponse({ error: "Sélectionnez une compagnie" }, 400);
       }
+    } else if (!superAdmin && !ownerCompanies.length) {
+      return jsonResponse({ error: "Droits insuffisants" }, 403);
     } else if (superAdmin) {
       const needsCompany = roles.some((r) =>
         ["owner", "vendeur", "controleur", "comptable_compagnie"].includes(r)
@@ -170,8 +191,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Droits insuffisants pour ces rôles" }, 403);
     }
 
-    if (rolesAreOwnerTeamOnly(roles) && !companyId) {
+    if (ownerTeamProvisioning && !companyId) {
       return jsonResponse({ error: "Compagnie requise pour les rôles compagnie" }, 400);
+    }
+
+    if (
+      ownerTeamProvisioning
+      && companyId
+      && !superAdmin
+      && !(await isOwnerOfCompany(admin, appUserId, companyId))
+    ) {
+      return jsonResponse({ error: "Action réservée au propriétaire de la compagnie" }, 403);
     }
 
     const { data: existingUser } = await admin

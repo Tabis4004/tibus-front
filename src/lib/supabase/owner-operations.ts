@@ -427,11 +427,11 @@ export async function listOwnerSellersSupabase(
     return mapTeamRows((data ?? []) as TeamRow[]);
   }
 
-  if (isRpcSignatureMismatch(error.message)) {
-    return listOwnerTeamDirectSupabase(resolvedCompanyId);
+  try {
+    return await listOwnerTeamDirectSupabase(resolvedCompanyId);
+  } catch {
+    throw error;
   }
-
-  throw error;
 }
 
 export async function findAssignableCompanyUserByEmailSupabase(
