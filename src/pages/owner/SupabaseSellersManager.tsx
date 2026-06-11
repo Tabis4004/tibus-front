@@ -59,14 +59,15 @@ import {
   type OwnerTeamRoleName,
 } from "@/lib/supabase/owner-operations";
 import { provisionUserSupabase } from "@/lib/supabase/user-management.ts";
+import { OWNER_ASSIGNABLE_TEAM_ROLES } from "@/lib/owner-team-roles.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 
-const ROLE_LABELS: Record<OwnerTeamRoleName, string> = {
-  vendeur: "Vendeur",
-  controleur: "Contrôleur",
-  comptable_compagnie: "Comptable",
-  gestionnaire_gare: "Gestionnaire gare",
+const ROLE_I18N_KEYS: Record<OwnerTeamRoleName, string> = {
+  vendeur: "sellers.role_vendeur",
+  controleur: "sellers.role_controleur",
+  comptable_compagnie: "sellers.role_comptable",
+  gestionnaire_gare: "sellers.role_gestionnaire_gare",
 };
 
 function RoleSelect({
@@ -76,15 +77,17 @@ function RoleSelect({
   value: OwnerTeamRoleName;
   onChange: (role: OwnerTeamRoleName) => void;
 }) {
+  const { t } = useTranslation("owner");
+
   return (
     <Select value={value} onValueChange={(v) => onChange(v as OwnerTeamRoleName)}>
       <SelectTrigger>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {(Object.keys(ROLE_LABELS) as OwnerTeamRoleName[]).map((role) => (
+        {OWNER_ASSIGNABLE_TEAM_ROLES.map((role) => (
           <SelectItem key={role} value={role}>
-            {ROLE_LABELS[role]}
+            {t(ROLE_I18N_KEYS[role])}
           </SelectItem>
         ))}
       </SelectContent>
@@ -138,7 +141,7 @@ function AddTeamMemberDialog({
     if (!found) return;
     setSaving(true);
     try {
-      await assignCompanySellerByEmailSupabase({ email: emailInput, roleName });
+      await assignCompanySellerByEmailSupabase({ email: emailInput, roleName, companyId });
       toast.success(t("sellers.assigned", { name: found.name ?? found.email }));
       onSaved();
       onClose();
@@ -229,6 +232,7 @@ function AddTeamMemberDialog({
             <div className="space-y-1.5">
               <Label>{t("sellers.role")}</Label>
               <RoleSelect value={roleName} onChange={setRoleName} />
+              <p className="text-xs text-muted-foreground">{t("sellers.roles_hint")}</p>
             </div>
           </TabsContent>
           <TabsContent value="assign" className="space-y-3 pt-2">
@@ -247,6 +251,7 @@ function AddTeamMemberDialog({
             <div className="space-y-1.5">
               <Label>{t("sellers.role")}</Label>
               <RoleSelect value={roleName} onChange={setRoleName} />
+              <p className="text-xs text-muted-foreground">{t("sellers.roles_hint")}</p>
             </div>
             {debouncedEmail.length >= 3 && (
               <div>
@@ -389,7 +394,7 @@ export default function SupabaseSellersManager() {
                   </div>
                 </div>
                 <Badge variant="secondary" className="text-[10px] shrink-0">
-                  {ROLE_LABELS[seller.roleName]}
+                  {t(ROLE_I18N_KEYS[seller.roleName])}
                 </Badge>
                 {canManageTeam ? (
                   <Button

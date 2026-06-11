@@ -23,11 +23,13 @@ export type SupabaseOwnerStation = {
   gestionnaireName: string | null;
 };
 
-export type OwnerTeamRoleName =
-  | "vendeur"
-  | "controleur"
-  | "comptable_compagnie"
-  | "gestionnaire_gare";
+import {
+  OWNER_ASSIGNABLE_TEAM_ROLES,
+  isOwnerAssignableTeamRole,
+  type OwnerAssignableTeamRole,
+} from "@/lib/owner-team-roles.ts";
+
+export type OwnerTeamRoleName = OwnerAssignableTeamRole;
 
 export type SupabaseOwnerSeller = {
   id: string;
@@ -309,12 +311,7 @@ export async function listOwnerSellersSupabase(
   return ((data ?? []) as TeamRow[])
     .map((row) => {
       const roleName = row.role_name;
-      if (
-        roleName !== "vendeur"
-        && roleName !== "controleur"
-        && roleName !== "comptable_compagnie"
-        && roleName !== "gestionnaire_gare"
-      ) return null;
+      if (!isOwnerAssignableTeamRole(roleName)) return null;
 
       const user = {
         firstName: row.firstName as string | null,
@@ -382,10 +379,12 @@ export async function listOwnerTeamSupabase(
 export async function assignCompanySellerByEmailSupabase(input: {
   email: string;
   roleName?: OwnerTeamRoleName;
+  companyId?: string | null;
 }): Promise<SupabaseAssignableUser> {
   const { data, error } = await supabase.rpc("assign_company_user_role_by_email", {
     p_email: input.email.trim().toLowerCase(),
     p_role_name: input.roleName ?? "vendeur",
+    p_company_id: input.companyId ?? null,
   });
 
   if (error) throw error;
@@ -410,6 +409,7 @@ export async function removeCompanySellerSupabase(
     const { error } = await supabase.rpc("remove_company_user_role", {
       p_user_id: userId,
       p_role_name: roleName,
+      p_company_id: companyId ?? null,
     });
     if (error) throw error;
     return;
@@ -421,7 +421,7 @@ export async function removeCompanySellerSupabase(
   const { data: roles, error: roleError } = await supabase
     .from("Role")
     .select("id")
-    .in("name", ["vendeur", "controleur", "comptable_compagnie"]);
+    .in("name", [...OWNER_ASSIGNABLE_TEAM_ROLES]);
 
   if (roleError) throw roleError;
 

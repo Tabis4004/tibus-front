@@ -3,14 +3,13 @@ import { supabase } from "@/lib/supabase";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-export const OWNER_TEAM_ROLES = [
-  "vendeur",
-  "comptable_compagnie",
-  "controleur",
-  "gestionnaire_gare",
-] as const;
+import {
+  OWNER_ASSIGNABLE_TEAM_ROLES,
+  type OwnerAssignableTeamRole,
+} from "@/lib/owner-team-roles.ts";
 
-export type OwnerTeamRole = (typeof OWNER_TEAM_ROLES)[number];
+export const OWNER_TEAM_ROLES = OWNER_ASSIGNABLE_TEAM_ROLES;
+export type OwnerTeamRole = OwnerAssignableTeamRole;
 
 export type ProvisionUserInput = {
   firstName: string;
