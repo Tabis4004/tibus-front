@@ -41,6 +41,10 @@ export function isAdminUsersRpcMissingError(message: string) {
   );
 }
 
+export function isAdminUsersRpcTypeError(message: string) {
+  return message.includes("structure of query does not match function result type");
+}
+
 export function isAdminUsersPermissionError(message: string) {
   return (
     message.includes("Droits insuffisants") ||
