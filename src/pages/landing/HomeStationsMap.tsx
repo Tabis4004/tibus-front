@@ -66,7 +66,7 @@ function loadGoogleMapsScript(apiKey: string): Promise<GoogleMapsApi> {
     script.id = MAPS_SCRIPT_ID;
     script.async = true;
     script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
     script.onload = () => {
       if (window.google?.maps) resolve(window.google.maps);
       else reject(new Error("Google Maps indisponible"));
@@ -94,7 +94,7 @@ export default function HomeStationsMap() {
 
   useEffect(() => {
     let cancelled = false;
-    void listGaresMapPointsSupabase()
+    void listGaresMapPointsSupabase({ googleMapsApiKey: apiKey })
       .then((rows) => {
         if (!cancelled) setGares(rows);
       })
@@ -104,7 +104,7 @@ export default function HomeStationsMap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apiKey]);
 
   const mappableGares = useMemo(
     () => (gares ?? []).filter((gare) => gare.lat != null && gare.lng != null),
