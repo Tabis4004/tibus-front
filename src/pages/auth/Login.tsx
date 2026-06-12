@@ -25,6 +25,8 @@ export default function LoginPage() {
   const { signInWithPassword, signUpWithPassword, isLoading } = useSupabaseAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [acceptedCgu, setAcceptedCgu] = useState(false);
 
@@ -54,15 +56,31 @@ export default function LoginPage() {
       toast.error(t("auth.cgu_required", { defaultValue: "Veuillez accepter les CGU pour continuer." }));
       return;
     }
+    if (!fullName.trim()) {
+      toast.error(t("profile.full_name", { defaultValue: "Nom complet" }) + " requis");
+      return;
+    }
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length < 9) {
+      toast.error(t("labels.phone", { defaultValue: "Téléphone" }) + " requis (9 chiffres minimum)");
+      return;
+    }
     setSubmitting(true);
     try {
-      await signUpWithPassword(email, password);
+      const result = await signUpWithPassword(email, password, {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+      });
       toast.success(
-        t("auth.sign_up_success", {
-          defaultValue: "Compte créé. Vérifiez votre email si la confirmation est activée.",
-        }),
+        result.requiresConfirmation
+          ? t("auth.sign_up_success", {
+              defaultValue: "Compte créé. Vérifiez votre email si la confirmation est activée.",
+            })
+          : t("auth.sign_up_ready", {
+              defaultValue: "Compte créé. Bienvenue sur Tibus !",
+            }),
       );
-      navigate(home, { replace: true });
+      navigate(result.requiresConfirmation ? home : home, { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("errors.generic"));
     } finally {
@@ -140,6 +158,31 @@ export default function LoginPage() {
                     defaultValue: "Inscription voyageur par défaut, sans compagnie.",
                   })}
                 </p>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-fullname">
+                    {t("profile.full_name", { defaultValue: "Nom complet" })} *
+                  </Label>
+                  <Input
+                    id="signup-fullname"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Prénom Nom"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">
+                    {t("labels.phone", { defaultValue: "Téléphone" })} *
+                  </Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+225 07 00 00 00 00"
+                    required
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input

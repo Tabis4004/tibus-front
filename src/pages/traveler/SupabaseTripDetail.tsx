@@ -102,6 +102,7 @@ import {
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { useTranslation } from "react-i18next";
 import SeatPicker from "@/components/seat-picker.tsx";
+import { profileDisplayName } from "@/lib/auth/profile-completion.ts";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 function fmt(iso: string, pattern: string) {
@@ -207,9 +208,9 @@ export default function SupabaseTripDetail() {
     const draft = loadBookingDraft(tripId);
     if (draft) return;
 
-    const fullName = `${appUser.profile.firstName} ${appUser.profile.lastName}`.trim();
-    setPassengerName(fullName);
-    setPassengerPhone(appUser.profile.phone ?? "");
+    const fullName = profileDisplayName(appUser.profile);
+    if (fullName) setPassengerName(fullName);
+    if (appUser.profile.phone) setPassengerPhone(appUser.profile.phone);
   }, [appUser.profile, tripId]);
 
   useEffect(() => {
@@ -405,6 +406,15 @@ export default function SupabaseTripDetail() {
   const handleBook = async () => {
     if (!passengerName.trim()) {
       toast.error(t("passenger_name"));
+      return;
+    }
+    const phone = passengerPhone.trim();
+    if (!phone) {
+      toast.error("Numéro de téléphone requis pour réserver");
+      return;
+    }
+    if (phone.replace(/\D/g, "").length < 9) {
+      toast.error("Numéro trop court — ex: 07 00 00 00 00 ou +225 07...");
       return;
     }
     if (!tripId) {
@@ -726,7 +736,7 @@ export default function SupabaseTripDetail() {
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pPhone">Téléphone</Label>
+              <Label htmlFor="pPhone">{t("labels.phone", { ns: "common", defaultValue: "Téléphone" })} *</Label>
               <Input
                 id="pPhone"
                 placeholder="+225 07 00 00 00 00"

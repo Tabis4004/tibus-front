@@ -38,10 +38,14 @@ export async function ensureUserProfile(authUser: User) {
 
   const meta = authUser.user_metadata ?? {};
   const { firstName, lastName } = splitName(
-    meta.full_name ?? meta.name ?? undefined,
+    (meta.full_name as string | undefined) ?? (meta.name as string | undefined),
   );
   const email = authUser.email ?? "";
   const username = buildUsername(email || authUser.id, authUser.id);
+  const phone = String(meta.phone ?? "").trim() || null;
+  const profileCompleted =
+    Boolean(phone && phone.replace(/\D/g, "").length >= 9) &&
+    !(firstName === "Utilisateur" && lastName === "Tibus");
 
   const { data: profile, error: profileError } = await supabase
     .from("Users")
@@ -51,7 +55,9 @@ export async function ensureUserProfile(authUser: User) {
       lastName,
       username,
       email: email || null,
+      phone,
       countryId: countries[0].id,
+      profileCompleted,
     })
     .select("id")
     .single();

@@ -1,4 +1,7 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate, useParams } from "react-router-dom";
+import { useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
 import {
   Authenticated,
   AuthLoading,
@@ -7,6 +10,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import AppHeader from "./_components/AppHeader.tsx";
 import BottomNav from "./_components/BottomNav.tsx";
+import { isSupabaseAuth } from "@/lib/auth/config";
+import { useAppUser } from "@/hooks/use-app-user.ts";
 
 function ProfileLoading() {
   return (
@@ -16,6 +21,58 @@ function ProfileLoading() {
       <Skeleton className="h-4 w-3/4" />
     </div>
   );
+}
+
+function SupabaseProfileGate({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const { lng } = useParams();
+  const appUser = useAppUser();
+
+  useEffect(() => {
+    if (appUser.isReady && !appUser.profileCompleted) {
+      navigate(`/${lng ?? "fr"}/complete-profile`, { replace: true });
+    }
+  }, [appUser.isReady, appUser.profileCompleted, navigate, lng]);
+
+  if (appUser.isLoading || !appUser.isReady) {
+    return <ProfileLoading />;
+  }
+
+  if (!appUser.profileCompleted) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function ConvexProfileGate({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const { lng } = useParams();
+  const currentUser = useQuery(api.users.getCurrentUser);
+
+  useEffect(() => {
+    if (currentUser && !currentUser.profileCompleted) {
+      navigate(`/${lng ?? "fr"}/complete-profile`, { replace: true });
+    }
+  }, [currentUser, navigate, lng]);
+
+  if (currentUser === undefined) {
+    return <ProfileLoading />;
+  }
+
+  if (!currentUser?.profileCompleted) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function ProfileGate({ children }: { children: React.ReactNode }) {
+  if (isSupabaseAuth()) {
+    return <SupabaseProfileGate>{children}</SupabaseProfileGate>;
+  }
+
+  return <ConvexProfileGate>{children}</ConvexProfileGate>;
 }
 
 export default function AppLayout() {
@@ -34,7 +91,9 @@ export default function AppLayout() {
       <Authenticated>
         <AppHeader />
         <main className="flex-1 pb-20 md:pb-0">
-          <Outlet />
+          <ProfileGate>
+            <Outlet />
+          </ProfileGate>
         </main>
         <BottomNav />
       </Authenticated>

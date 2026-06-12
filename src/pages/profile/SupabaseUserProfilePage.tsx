@@ -33,7 +33,7 @@ import { listCountriesSupabase, type CountryRow } from "@/lib/supabase/geography
 const profileSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   username: z.string().min(3).regex(/^[a-zA-Z0-9_]+$/, "Invalid username"),
-  phone: z.string().optional(),
+  phone: z.string().min(6, "Phone number is required"),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   countryId: z.string().min(1, "Country is required"),
 });
@@ -91,7 +91,7 @@ export default function SupabaseUserProfilePage() {
         userId: appUserId,
         fullName: data.fullName,
         username: data.username,
-        phone: data.phone?.trim() ?? "",
+        phone: data.phone.trim(),
         email: data.email || undefined,
         countryId: data.countryId,
       });
@@ -154,7 +154,7 @@ export default function SupabaseUserProfilePage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">{t("labels.phone")}</Label>
+              <Label htmlFor="phone">{t("labels.phone")} *</Label>
               <Input id="phone" type="tel" {...register("phone")} />
             </div>
             <div className="space-y-2">

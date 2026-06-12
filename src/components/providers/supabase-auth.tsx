@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { ensureUserProfile } from "@/lib/auth/ensure-profile";
+import { applySignupProfile } from "@/lib/auth/complete-profile";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { supabase } from "@/lib/supabase";
 
@@ -16,6 +17,11 @@ type SupabaseSignUpResult = {
   session: Session | null;
   appUserId: string | null;
   requiresConfirmation: boolean;
+};
+
+type SignUpProfile = {
+  fullName: string;
+  phone: string;
 };
 
 type SupabaseAuthContextValue = {
@@ -29,6 +35,7 @@ type SupabaseAuthContextValue = {
   signUpWithPassword: (
     email: string,
     password: string,
+    profile?: SignUpProfile,
   ) => Promise<SupabaseSignUpResult>;
   signOut: () => Promise<void>;
 };
@@ -113,18 +120,37 @@ export function SupabaseAuthProvider({
     if (signInError) throw signInError;
   }, []);
 
-  const signUpWithPassword = useCallback(async (email: string, password: string) => {
+  const signUpWithPassword = useCallback(async (
+    email: string,
+    password: string,
+    profile?: SignUpProfile,
+  ) => {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: profile
+          ? {
+              full_name: profile.fullName.trim(),
+              phone: profile.phone.trim(),
+            }
+          : undefined,
       },
     });
     if (signUpError) throw signUpError;
 
     const nextAppUserId =
       data.user && data.session ? await bootstrapProfile(data.user) : null;
+
+    if (nextAppUserId && profile) {
+      await applySignupProfile({
+        userId: nextAppUserId,
+        email,
+        fullName: profile.fullName,
+        phone: profile.phone,
+      });
+    }
 
     return {
       user: data.user,
