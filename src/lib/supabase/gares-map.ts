@@ -2,8 +2,9 @@ import { supabase } from "@/lib/supabase";
 import {
   geocodeGareName,
   isGoogleMapsLink,
+  parseGoogleMapsCoordinates,
   resolveGareCoordinates,
-  resolveGoogleMapsLinksBatch,
+  resolveGareStationsBatch,
 } from "@/lib/google-maps-link.ts";
 
 export type GareMapPoint = {
@@ -82,16 +83,21 @@ export async function listGaresMapPointsSupabase(
 
   if (error) throw error;
 
-  const baseRows = (data ?? [])
+  type RawGareRow = {
+    id: string;
+    name: string;
+    googleMapsLink: string;
+    dbLat: number | null;
+    dbLng: number | null;
+    companyName: string;
+    countryName: string;
+    cityName: string;
+  };
+
+  const rawRows: RawGareRow[] = (data ?? [])
     .map((row) => {
       const link = String(row.googleMapsLink ?? "").trim();
       if (!isGoogleMapsLink(link)) return null;
-
-      const coords = resolveGareCoordinates({
-        googleMapsLink: link,
-        latitude: row.latitude as number | null,
-        longitude: row.longitude as number | null,
-      });
 
       const { companyName, countryName } = companyNameFromJoin(
         row.Companies as
@@ -103,46 +109,61 @@ export async function listGaresMapPointsSupabase(
       return {
         id: String(row.id),
         name: String(row.name),
+        googleMapsLink: link,
+        dbLat: row.latitude as number | null,
+        dbLng: row.longitude as number | null,
         companyName,
         countryName,
         cityName: cityFromGareName(String(row.name)),
-        googleMapsLink: link,
-        lat: coords?.lat ?? null,
-        lng: coords?.lng ?? null,
       };
     })
-    .filter((row): row is GareMapPoint => Boolean(row));
-
-  const unresolvedLinks = baseRows
-    .filter((gare) => gare.lat == null || gare.lng == null)
-    .map((gare) => gare.googleMapsLink);
+    .filter((row): row is RawGareRow => Boolean(row));
 
   let resolvedByLink = new Map<string, { lat: number; lng: number }>();
-  if (unresolvedLinks.length > 0) {
-    try {
-      resolvedByLink = await resolveGoogleMapsLinksBatch(unresolvedLinks);
-    } catch {
-      resolvedByLink = new Map();
-    }
+  try {
+    resolvedByLink = await resolveGareStationsBatch(
+      rawRows.map((row) => ({
+        link: row.googleMapsLink,
+        name: row.name,
+        city: row.cityName,
+        country: row.countryName,
+      })),
+    );
+  } catch {
+    resolvedByLink = new Map();
   }
 
-  const withResolvedLinks = baseRows.map((gare) => {
-    if (gare.lat != null && gare.lng != null) return gare;
-    const coords = resolvedByLink.get(gare.googleMapsLink);
-    return coords ? { ...gare, lat: coords.lat, lng: coords.lng } : gare;
+  const withCoords: GareMapPoint[] = rawRows.map((row) => {
+    const fromLink =
+      resolvedByLink.get(row.googleMapsLink) ??
+      parseGoogleMapsCoordinates(row.googleMapsLink) ??
+      (row.dbLat != null && row.dbLng != null
+        ? { lat: row.dbLat, lng: row.dbLng }
+        : null);
+
+    return {
+      id: row.id,
+      name: row.name,
+      companyName: row.companyName,
+      countryName: row.countryName,
+      cityName: row.cityName,
+      googleMapsLink: row.googleMapsLink,
+      lat: fromLink?.lat ?? null,
+      lng: fromLink?.lng ?? null,
+    };
   });
 
   const apiKey = options?.googleMapsApiKey?.trim();
-  if (!apiKey) return withResolvedLinks;
+  if (!apiKey) return withCoords;
 
   const enriched: GareMapPoint[] = [];
-  for (const gare of withResolvedLinks) {
+  for (const gare of withCoords) {
     if (gare.lat != null && gare.lng != null) {
       enriched.push(gare);
       continue;
     }
 
-    const geocoded = await geocodeGareName(gare.name, apiKey);
+    const geocoded = await geocodeGareName(`${gare.name}, ${gare.cityName}, ${gare.countryName}`, apiKey);
     enriched.push(
       geocoded
         ? { ...gare, lat: geocoded.lat, lng: geocoded.lng }
@@ -156,6 +177,12 @@ export async function listGaresMapPointsSupabase(
 export function coordinatesFromGoogleMapsLink(
   googleMapsLink?: string | null,
 ): { latitude: number | null; longitude: number | null } {
+  const link = String(googleMapsLink ?? "").trim();
+  const fromLink = link ? parseGoogleMapsCoordinates(link) : null;
+  if (fromLink) {
+    return { latitude: fromLink.lat, longitude: fromLink.lng };
+  }
+
   const coords = resolveGareCoordinates({ googleMapsLink });
   return {
     latitude: coords?.lat ?? null,
@@ -165,19 +192,32 @@ export function coordinatesFromGoogleMapsLink(
 
 export async function coordinatesFromGoogleMapsLinkAsync(
   googleMapsLink?: string | null,
+  context?: { name?: string; city?: string; country?: string },
 ): Promise<{ latitude: number | null; longitude: number | null }> {
-  const direct = coordinatesFromGoogleMapsLink(googleMapsLink);
-  if (direct.latitude != null && direct.longitude != null) return direct;
-
   const link = String(googleMapsLink ?? "").trim();
-  if (!link) return direct;
+  if (!link) {
+    return { latitude: null, longitude: null };
+  }
+
+  const direct = parseGoogleMapsCoordinates(link);
+  if (direct) {
+    return { latitude: direct.lat, longitude: direct.lng };
+  }
 
   try {
-    const resolved = await resolveGoogleMapsLinksBatch([link]);
+    const resolved = await resolveGareStationsBatch([
+      {
+        link,
+        name: context?.name,
+        city: context?.city,
+        country: context?.country,
+      },
+    ]);
     const coords = resolved.get(link);
-    if (!coords) return direct;
-    return { latitude: coords.lat, longitude: coords.lng };
+    if (coords) return { latitude: coords.lat, longitude: coords.lng };
   } catch {
-    return direct;
+    // ignore
   }
+
+  return { latitude: null, longitude: null };
 }

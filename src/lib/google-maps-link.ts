@@ -34,6 +34,11 @@ export function parseGoogleMapsCoordinates(
     return { lat: Number(qMatch[1]), lng: Number(qMatch[2]) };
   }
 
+  const placeQueryMatch = decoded.match(/\/maps\/place\/[^/]+\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (placeQueryMatch) {
+    return { lat: Number(placeQueryMatch[1]), lng: Number(placeQueryMatch[2]) };
+  }
+
   const centerMatch = decoded.match(/[?&]center=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
   if (centerMatch) {
     return { lat: Number(centerMatch[1]), lng: Number(centerMatch[2]) };
@@ -71,17 +76,33 @@ type ResolvedLinkRow = {
   lat: number | null;
   lng: number | null;
   expandedUrl?: string | null;
+  source?: string | null;
 };
 
-export async function resolveGoogleMapsLinksBatch(
-  links: string[],
+export type GareStationResolveInput = {
+  link: string;
+  name?: string;
+  city?: string;
+  country?: string;
+};
+
+export async function resolveGareStationsBatch(
+  stations: GareStationResolveInput[],
 ): Promise<Map<string, { lat: number; lng: number }>> {
-  const uniqueLinks = [...new Set(links.map((link) => link.trim()).filter(Boolean))];
-  if (!uniqueLinks.length) return new Map();
+  const payload = stations
+    .map((station) => ({
+      link: station.link.trim(),
+      name: station.name?.trim(),
+      city: station.city?.trim(),
+      country: station.country?.trim(),
+    }))
+    .filter((station) => station.link);
+
+  if (!payload.length) return new Map();
 
   const { supabase } = await import("@/lib/supabase");
   const { data, error } = await supabase.functions.invoke("resolve-google-maps-link", {
-    body: { links: uniqueLinks },
+    body: { stations: payload },
   });
 
   if (error) throw error;
@@ -95,6 +116,13 @@ export async function resolveGoogleMapsLinksBatch(
   }
 
   return byLink;
+}
+
+/** @deprecated Préférer resolveGareStationsBatch avec nom/ville/pays. */
+export async function resolveGoogleMapsLinksBatch(
+  links: string[],
+): Promise<Map<string, { lat: number; lng: number }>> {
+  return resolveGareStationsBatch(links.map((link) => ({ link })));
 }
 
 export async function geocodeGareName(

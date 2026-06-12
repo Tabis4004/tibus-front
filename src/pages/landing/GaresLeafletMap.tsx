@@ -67,9 +67,9 @@ export default function GaresLeafletMap({ gares, className }: GaresLeafletMapPro
 
     if (bounds.isValid()) {
       if (gares.length === 1) {
-        map.setView(bounds.getCenter(), 14);
+        map.setView(bounds.getCenter(), 16);
       } else {
-        map.fitBounds(bounds, { padding: [48, 48], maxZoom: 12 });
+        map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
       }
     }
 

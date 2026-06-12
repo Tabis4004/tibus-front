@@ -33,6 +33,11 @@ export function parseGoogleMapsCoordinates(
     return { lat: Number(qMatch[1]), lng: Number(qMatch[2]) };
   }
 
+  const placeQueryMatch = decoded.match(/\/maps\/place\/[^/]+\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (placeQueryMatch) {
+    return { lat: Number(placeQueryMatch[1]), lng: Number(placeQueryMatch[2]) };
+  }
+
   const centerMatch = decoded.match(/[?&]center=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
   if (centerMatch) {
     return { lat: Number(centerMatch[1]), lng: Number(centerMatch[2]) };
@@ -58,6 +63,46 @@ export async function expandGoogleMapsLink(link: string): Promise<string | null>
   } catch {
     return null;
   }
+}
+
+export async function geocodeStationNominatim(input: {
+  name: string;
+  city?: string;
+  country?: string;
+}): Promise<{ lat: number; lng: number } | null> {
+  const parts = [input.name.trim(), input.city?.trim(), input.country?.trim()].filter(Boolean);
+  if (!parts.length) return null;
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", parts.join(", "));
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "8");
+
+  const response = await fetch(url.toString(), {
+    headers: { "User-Agent": "tibus-app/1.0 (gare-map-resolve)" },
+  });
+  if (!response.ok) return null;
+
+  const rows = (await response.json()) as Array<{
+    lat?: string;
+    lon?: string;
+    class?: string;
+    type?: string;
+  }>;
+
+  const preferred =
+    rows.find((row) => row.class === "amenity" && row.type === "bus_station") ??
+    rows.find((row) => row.type === "bus_stop") ??
+    rows.find((row) => row.class === "amenity" && row.type === "station") ??
+    rows[0];
+
+  if (!preferred?.lat || !preferred?.lon) return null;
+
+  const lat = Number(preferred.lat);
+  const lng = Number(preferred.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return { lat, lng };
 }
 
 export async function resolveGoogleMapsLinkCoordinates(
