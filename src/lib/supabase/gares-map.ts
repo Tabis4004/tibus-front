@@ -3,6 +3,7 @@ import {
   geocodeGareName,
   isGoogleMapsLink,
   resolveGareCoordinates,
+  resolveGoogleMapsLinksBatch,
 } from "@/lib/google-maps-link.ts";
 
 export type GareMapPoint = {
@@ -112,11 +113,30 @@ export async function listGaresMapPointsSupabase(
     })
     .filter((row): row is GareMapPoint => Boolean(row));
 
+  const unresolvedLinks = baseRows
+    .filter((gare) => gare.lat == null || gare.lng == null)
+    .map((gare) => gare.googleMapsLink);
+
+  let resolvedByLink = new Map<string, { lat: number; lng: number }>();
+  if (unresolvedLinks.length > 0) {
+    try {
+      resolvedByLink = await resolveGoogleMapsLinksBatch(unresolvedLinks);
+    } catch {
+      resolvedByLink = new Map();
+    }
+  }
+
+  const withResolvedLinks = baseRows.map((gare) => {
+    if (gare.lat != null && gare.lng != null) return gare;
+    const coords = resolvedByLink.get(gare.googleMapsLink);
+    return coords ? { ...gare, lat: coords.lat, lng: coords.lng } : gare;
+  });
+
   const apiKey = options?.googleMapsApiKey?.trim();
-  if (!apiKey) return baseRows;
+  if (!apiKey) return withResolvedLinks;
 
   const enriched: GareMapPoint[] = [];
-  for (const gare of baseRows) {
+  for (const gare of withResolvedLinks) {
     if (gare.lat != null && gare.lng != null) {
       enriched.push(gare);
       continue;
@@ -141,4 +161,23 @@ export function coordinatesFromGoogleMapsLink(
     latitude: coords?.lat ?? null,
     longitude: coords?.lng ?? null,
   };
+}
+
+export async function coordinatesFromGoogleMapsLinkAsync(
+  googleMapsLink?: string | null,
+): Promise<{ latitude: number | null; longitude: number | null }> {
+  const direct = coordinatesFromGoogleMapsLink(googleMapsLink);
+  if (direct.latitude != null && direct.longitude != null) return direct;
+
+  const link = String(googleMapsLink ?? "").trim();
+  if (!link) return direct;
+
+  try {
+    const resolved = await resolveGoogleMapsLinksBatch([link]);
+    const coords = resolved.get(link);
+    if (!coords) return direct;
+    return { latitude: coords.lat, longitude: coords.lng };
+  } catch {
+    return direct;
+  }
 }

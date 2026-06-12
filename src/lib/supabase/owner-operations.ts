@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { coordinatesFromGoogleMapsLink } from "@/lib/supabase/gares-map.ts";
+import { coordinatesFromGoogleMapsLinkAsync } from "@/lib/supabase/gares-map.ts";
 import {
   resolveOwnerCompanyId,
   setOwnerActiveCompanySupabase,
@@ -224,7 +224,7 @@ export async function createOwnerStationSupabase(input: {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
-  const { latitude, longitude } = coordinatesFromGoogleMapsLink(input.googleMapsLink);
+  const { latitude, longitude } = await coordinatesFromGoogleMapsLinkAsync(input.googleMapsLink);
 
   const { error } = await supabase.from("Gares").insert({
     name: input.name.trim(),
@@ -250,7 +250,7 @@ export async function updateOwnerStationSupabase(input: {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
 
-  const { latitude, longitude } = coordinatesFromGoogleMapsLink(input.googleMapsLink);
+  const { latitude, longitude } = await coordinatesFromGoogleMapsLinkAsync(input.googleMapsLink);
 
   const { error } = await supabase
     .from("Gares")
