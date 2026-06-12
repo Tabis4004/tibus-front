@@ -9,17 +9,65 @@ export type GareMapPoint = {
   id: string;
   name: string;
   companyName: string;
+  countryName: string;
+  cityName: string;
   googleMapsLink: string;
   lat: number | null;
   lng: number | null;
 };
 
+export type GaresByCountry = {
+  countryName: string;
+  cities: {
+    cityName: string;
+    gares: GareMapPoint[];
+  }[];
+}[];
+
 function companyNameFromJoin(
-  value: { name: string } | { name: string }[] | null | undefined,
-): string {
-  if (!value) return "";
-  if (Array.isArray(value)) return value[0]?.name ?? "";
-  return value.name ?? "";
+  value: { name: string; Countries?: { name: string } | { name: string }[] | null } | { name: string; Countries?: { name: string } | { name: string }[] | null }[] | null | undefined,
+): { companyName: string; countryName: string } {
+  const company = Array.isArray(value) ? value[0] : value;
+  if (!company) return { companyName: "", countryName: "" };
+
+  const countries = company.Countries;
+  const country = Array.isArray(countries) ? countries[0] : countries;
+
+  return {
+    companyName: company.name ?? "",
+    countryName: country?.name ?? "",
+  };
+}
+
+export function cityFromGareName(gareName: string): string {
+  const parts = gareName.split("—");
+  if (parts.length > 1) return parts[parts.length - 1].trim();
+  return gareName.replace(/^Gare\s+/i, "").trim();
+}
+
+export function groupGaresByCountryAndCity(gares: GareMapPoint[]): GaresByCountry {
+  const byCountry = new Map<string, Map<string, GareMapPoint[]>>();
+
+  for (const gare of gares) {
+    const country = gare.countryName.trim() || "Autre";
+    const city = gare.cityName.trim() || "Autre";
+    if (!byCountry.has(country)) byCountry.set(country, new Map());
+    const cities = byCountry.get(country)!;
+    if (!cities.has(city)) cities.set(city, []);
+    cities.get(city)!.push(gare);
+  }
+
+  return [...byCountry.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "fr"))
+    .map(([countryName, cities]) => ({
+      countryName,
+      cities: [...cities.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, "fr"))
+        .map(([cityName, cityGares]) => ({
+          cityName,
+          gares: cityGares.sort((a, b) => a.name.localeCompare(b.name, "fr")),
+        })),
+    }));
 }
 
 export async function listGaresMapPointsSupabase(
@@ -27,7 +75,7 @@ export async function listGaresMapPointsSupabase(
 ): Promise<GareMapPoint[]> {
   const { data, error } = await supabase
     .from("Gares")
-    .select("id, name, googleMapsLink, latitude, longitude, Companies(name)")
+    .select("id, name, googleMapsLink, latitude, longitude, Companies(name, Countries(name))")
     .not("googleMapsLink", "is", null)
     .order("name");
 
@@ -44,12 +92,19 @@ export async function listGaresMapPointsSupabase(
         longitude: row.longitude as number | null,
       });
 
+      const { companyName, countryName } = companyNameFromJoin(
+        row.Companies as
+          | { name: string; Countries?: { name: string } | { name: string }[] | null }
+          | { name: string; Countries?: { name: string } | { name: string }[] | null }[]
+          | null,
+      );
+
       return {
         id: String(row.id),
         name: String(row.name),
-        companyName: companyNameFromJoin(
-          row.Companies as { name: string } | { name: string }[] | null,
-        ),
+        companyName,
+        countryName,
+        cityName: cityFromGareName(String(row.name)),
         googleMapsLink: link,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,

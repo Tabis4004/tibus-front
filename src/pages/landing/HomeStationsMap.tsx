@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { listGaresMapPointsSupabase, type GareMapPoint } from "@/lib/supabase/gares-map.ts";
+import { listGaresMapPointsSupabase, groupGaresByCountryAndCity, type GareMapPoint } from "@/lib/supabase/gares-map.ts";
+import { Badge } from "@/components/ui/badge.tsx";
+import { cn } from "@/lib/utils.ts";
 
 type GoogleLatLng = { lat: number; lng: number };
 type GoogleMapInstance = {
@@ -77,9 +79,12 @@ function loadGoogleMapsScript(apiKey: string): Promise<GoogleMapsApi> {
 }
 
 function buildInfoContent(gare: GareMapPoint) {
+  const location = [gare.cityName, gare.countryName].filter(Boolean).join(", ");
   const company = gare.companyName ? `<p style="margin:4px 0 0;font-size:12px;color:#666">${gare.companyName}</p>` : "";
+  const place = location ? `<p style="margin:4px 0 0;font-size:12px;color:#666">${location}</p>` : "";
   return `<div style="max-width:220px;font-family:sans-serif">
     <strong>${gare.name}</strong>
+    ${place}
     ${company}
     <p style="margin:8px 0 0"><a href="${gare.googleMapsLink}" target="_blank" rel="noopener noreferrer">Ouvrir dans Google Maps</a></p>
   </div>`;
@@ -90,6 +95,7 @@ export default function HomeStationsMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [gares, setGares] = useState<GareMapPoint[] | undefined>(undefined);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<string>("all");
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   useEffect(() => {
@@ -106,9 +112,24 @@ export default function HomeStationsMap() {
     };
   }, [apiKey]);
 
-  const mappableGares = useMemo(
-    () => (gares ?? []).filter((gare) => gare.lat != null && gare.lng != null),
+  const groupedGares = useMemo(
+    () => groupGaresByCountryAndCity(gares ?? []),
     [gares],
+  );
+
+  const countryOptions = useMemo(
+    () => groupedGares.map((group) => group.countryName),
+    [groupedGares],
+  );
+
+  const visibleGares = useMemo(() => {
+    if (selectedCountry === "all") return gares ?? [];
+    return (gares ?? []).filter((gare) => gare.countryName === selectedCountry);
+  }, [gares, selectedCountry]);
+
+  const mappableGares = useMemo(
+    () => visibleGares.filter((gare) => gare.lat != null && gare.lng != null),
+    [visibleGares],
   );
 
   const embedCenter = useMemo(() => {
@@ -251,26 +272,82 @@ export default function HomeStationsMap() {
           </div>
         )}
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {gares.map((gare) => (
-            <a
-              key={gare.id}
-              href={gare.googleMapsLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group rounded-xl border bg-card p-3 hover:border-primary/40 hover:shadow-sm transition-all"
+        {countryOptions.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedCountry("all")}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                selectedCountry === "all"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background hover:border-primary/40",
+              )}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm truncate">{gare.name}</p>
-                  {gare.companyName && (
-                    <p className="text-xs text-muted-foreground truncate">{gare.companyName}</p>
-                  )}
+              {t("landing.stations_map_all_countries", { defaultValue: "Tous les pays" })}
+            </button>
+            {countryOptions.map((countryName) => (
+              <button
+                key={countryName}
+                type="button"
+                onClick={() => setSelectedCountry(countryName)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  selectedCountry === countryName
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background hover:border-primary/40",
+                )}
+              >
+                {countryName}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-8">
+          {(selectedCountry === "all" ? groupedGares : groupedGares.filter((g) => g.countryName === selectedCountry)).map(
+            (countryGroup) => (
+              <div key={countryGroup.countryName} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold">{countryGroup.countryName}</h3>
+                  <Badge variant="secondary">
+                    {countryGroup.cities.reduce((sum, city) => sum + city.gares.length, 0)}
+                  </Badge>
                 </div>
-                <ExternalLinkIcon className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+
+                <div className="space-y-5 pl-1 border-l-2 border-primary/20">
+                  {countryGroup.cities.map((cityGroup) => (
+                    <div key={`${countryGroup.countryName}-${cityGroup.cityName}`} className="space-y-3 pl-4">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        {cityGroup.cityName}
+                      </h4>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {cityGroup.gares.map((gare) => (
+                          <a
+                            key={gare.id}
+                            href={gare.googleMapsLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group rounded-xl border bg-card p-3 hover:border-primary/40 hover:shadow-sm transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm truncate">{gare.name}</p>
+                                {gare.companyName && (
+                                  <p className="text-xs text-muted-foreground truncate">{gare.companyName}</p>
+                                )}
+                              </div>
+                              <ExternalLinkIcon className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </a>
-          ))}
+            ),
+          )}
         </div>
       </div>
     </section>
