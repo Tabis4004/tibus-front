@@ -128,6 +128,14 @@ function UserMenu() {
             </Link>
           </DropdownMenuItem>
         )}
+        {isSupabaseAuth() && (
+          <DropdownMenuItem asChild>
+            <Link to={`/${lng}/account/profile`} className="cursor-pointer">
+              <UserIcon className="w-4 h-4 mr-2" />
+              {t("profile.edit_title", { defaultValue: "Mon profil" })}
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <ExploreFeaturesButton variant="menu-item" />
         <DropdownMenuSeparator />

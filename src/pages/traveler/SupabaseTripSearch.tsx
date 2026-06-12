@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   MapPinIcon,
@@ -37,8 +37,9 @@ import {
   useSupabaseSearchTrips,
 } from "@/hooks/use-supabase-trip-search.ts";
 import { TripCard } from "./_components/TripSearchCard.tsx";
+import { findBurkinaCountryId } from "@/lib/trip-search-defaults.ts";
 
-export default function SupabaseTripSearch() {
+export default function SupabaseTripSearch({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation("traveler");
   const { lng } = useParams<{ lng: string }>();
 
@@ -50,8 +51,19 @@ export default function SupabaseTripSearch() {
   const [departureDate, setDepartureDate] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [defaultCountryId, setDefaultCountryId] = useState("all");
+  const [defaultCountryApplied, setDefaultCountryApplied] = useState(false);
 
   const countries = useSupabaseCountries();
+
+  useEffect(() => {
+    if (!countries || defaultCountryApplied) return;
+    const burkinaId = findBurkinaCountryId(countries);
+    const nextDefault = burkinaId ?? "all";
+    setDefaultCountryId(nextDefault);
+    if (burkinaId) setCountryId(burkinaId);
+    setDefaultCountryApplied(true);
+  }, [countries, defaultCountryApplied]);
   const companies = useSupabaseActiveCompanies();
   const cities = useSupabaseCities(countryId);
 
@@ -89,7 +101,7 @@ export default function SupabaseTripSearch() {
   }, [cities]);
 
   const hasActiveFilters =
-    countryId !== "all" ||
+    countryId !== defaultCountryId ||
     companyId !== "all" ||
     originCity !== "" ||
     destinationCity !== "" ||
@@ -97,7 +109,7 @@ export default function SupabaseTripSearch() {
     maxPrice !== "";
 
   const clearFilters = () => {
-    setCountryId("all");
+    setCountryId(defaultCountryId);
     setCompanyId("all");
     setOriginCity("");
     setDestinationCity("");
@@ -106,36 +118,58 @@ export default function SupabaseTripSearch() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-5">
+    <div className={embedded ? "space-y-5" : "max-w-6xl mx-auto px-4 py-6 space-y-5"}>
       {/* Header */}
-      <motion.div
-        className="flex items-center justify-between"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-      >
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-            {t("search_trips")}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {t("search_trips_desc")}
-          </p>
+      {embedded ? (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">
+              {t("search_trips")}
+            </h2>
+            <p className="text-muted-foreground text-sm mt-0.5">{t("search_trips_desc")}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="cursor-pointer gap-1.5 relative md:hidden shrink-0"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FilterIcon className="w-4 h-4" />
+            {t("labels.filters", { ns: "common", defaultValue: "Filtres" })}
+            {hasActiveFilters && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary" />
+            )}
+          </Button>
         </div>
-        {/* Mobile filter toggle */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer gap-1.5 relative md:hidden"
-          onClick={() => setShowFilters(!showFilters)}
+      ) : (
+        <motion.div
+          className="flex items-center justify-between"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
         >
-          <FilterIcon className="w-4 h-4" />
-          {t("labels.filters", { ns: "common", defaultValue: "Filters" })}
-          {hasActiveFilters && (
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary" />
-          )}
-        </Button>
-      </motion.div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+              {t("search_trips")}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {t("search_trips_desc")}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="cursor-pointer gap-1.5 relative md:hidden"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FilterIcon className="w-4 h-4" />
+            {t("labels.filters", { ns: "common", defaultValue: "Filters" })}
+            {hasActiveFilters && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary" />
+            )}
+          </Button>
+        </motion.div>
+      )}
 
       {/* Desktop inline filters (always visible on md+) */}
       <div className="hidden md:block rounded-xl border bg-muted/30 p-4">
@@ -438,8 +472,8 @@ export default function SupabaseTripSearch() {
       {/* Active filter badges (mobile only when filters panel is closed) */}
       {hasActiveFilters && !showFilters && (
         <div className="flex flex-wrap gap-2 md:hidden">
-          {countryId !== "all" && countries && (
-            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setCountryId("all")}>
+          {countryId !== defaultCountryId && countries && (
+            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setCountryId(defaultCountryId)}>
               <GlobeIcon className="w-3 h-3" />
               {countries.find((c) => c._id === countryId)?.name}
               <XIcon className="w-3 h-3" />

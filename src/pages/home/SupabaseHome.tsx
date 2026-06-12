@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
+import SupabaseTripSearch from "../traveler/SupabaseTripSearch.tsx";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -66,7 +67,7 @@ export default function SupabaseHome() {
       <OnboardingGate />
       <AppHeader />
       <main className="flex-1 pb-20 md:pb-0">
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -81,7 +82,15 @@ export default function SupabaseHome() {
               })}
             </p>
           </motion.div>
+        </div>
 
+        <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
+          <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+            <SupabaseTripSearch embedded />
+          </div>
+        </section>
+
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
             <ExploreFeaturesButton variant="block" />
           </HomeBlockSection>

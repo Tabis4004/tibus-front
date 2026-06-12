@@ -29,6 +29,8 @@ import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAuth } from "@/hooks/use-auth.ts";
 import SupabaseHome from "./home/SupabaseHome.tsx";
 import HomeDashboard from "./home/Dashboard.tsx";
+import SupabaseTripSearch from "./traveler/SupabaseTripSearch.tsx";
+import LandingUpcomingTripsSection from "./landing/LandingUpcomingTripsSection.tsx";
 
 // ─── Landing Page (public / unauthenticated) ─────────────────────────────────
 
@@ -192,11 +194,19 @@ function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <LocaleSwitcher />
-            <Link to={`/${locale}/traveler/search`}>
-              <Button variant="ghost" size="sm" className="cursor-pointer hidden sm:flex">
-                {t("landing.nav_search", { defaultValue: "Search trips" })}
-              </Button>
-            </Link>
+            {isSupabaseAuth() ? (
+              <a href="#home-trip-search">
+                <Button variant="ghost" size="sm" className="cursor-pointer hidden sm:flex">
+                  {t("landing.nav_search", { defaultValue: "Search trips" })}
+                </Button>
+              </a>
+            ) : (
+              <Link to={`/${locale}/traveler/search`}>
+                <Button variant="ghost" size="sm" className="cursor-pointer hidden sm:flex">
+                  {t("landing.nav_search", { defaultValue: "Search trips" })}
+                </Button>
+              </Link>
+            )}
             <SignInButton signInText={t("auth.sign_in", { defaultValue: "Sign In" })} signOutText={t("auth.sign_out", { defaultValue: "Sign Out" })} />
           </div>
         </div>
@@ -248,12 +258,21 @@ function LandingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <Link to={`/${locale}/traveler/search`}>
-                  <Button size="lg" className="h-14 px-8 text-base cursor-pointer gap-2 shadow-lg shadow-primary/20">
-                    <SearchIcon className="w-5 h-5" />
-                    {heroContent?.ctaSearch ?? t("landing.cta_search", { defaultValue: "Search Trips" })}
-                  </Button>
-                </Link>
+                {isSupabaseAuth() ? (
+                  <a href="#home-trip-search">
+                    <Button size="lg" className="h-14 px-8 text-base cursor-pointer gap-2 shadow-lg shadow-primary/20">
+                      <SearchIcon className="w-5 h-5" />
+                      {heroContent?.ctaSearch ?? t("landing.cta_search", { defaultValue: "Search Trips" })}
+                    </Button>
+                  </a>
+                ) : (
+                  <Link to={`/${locale}/traveler/search`}>
+                    <Button size="lg" className="h-14 px-8 text-base cursor-pointer gap-2 shadow-lg shadow-primary/20">
+                      <SearchIcon className="w-5 h-5" />
+                      {heroContent?.ctaSearch ?? t("landing.cta_search", { defaultValue: "Search Trips" })}
+                    </Button>
+                  </Link>
+                )}
                 <Link to={`/${locale}/become-owner`}>
                   <Button size="lg" variant="secondary" className="h-14 px-8 text-base cursor-pointer gap-2">
                     <BuildingIcon className="w-5 h-5" />
@@ -293,6 +312,14 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      {isSupabaseAuth() && (
+        <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10">
+            <SupabaseTripSearch embedded />
+          </div>
+        </section>
+      )}
 
       {/* Trust signals bar */}
       <section className="border-y bg-primary/5">
@@ -335,6 +362,8 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      {!isSupabaseAuth() && <LandingUpcomingTripsSection />}
 
       {/* Features for Travelers */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">

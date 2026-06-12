@@ -27,7 +27,7 @@ export default function ExploreFeaturesButton({
     [appUser.roles],
   );
 
-  if (!appUser.isReady || appUser.isLoading || !appUser.profileCompleted) {
+  if (!appUser.isReady || appUser.isLoading) {
     return null;
   }
 

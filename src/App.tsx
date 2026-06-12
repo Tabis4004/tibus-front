@@ -26,7 +26,8 @@ import {
   CreateCompany,
   CompanyManual,
   CountryAdminManual,
-  CompleteProfile,
+  CompleteProfileRedirect,
+  UserProfile,
   ContactPage,
   FleetManager,
   GuidePageRoute,
@@ -90,11 +91,12 @@ function AppShell() {
                 </LocaleWrapper>
               }
             >
-              <Route path="complete-profile" element={<CompleteProfile />} />
+              <Route path="complete-profile" element={<CompleteProfileRedirect />} />
               <Route path="auth/login" element={<LoginPage />} />
               <Route index element={<Index />} />
 
               <Route element={<AppLayout />}>
+                <Route path="account/profile" element={<UserProfile />} />
                 <Route path="become-owner" element={<BecomeOwner />} />
                 <Route path="create-company" element={<CreateCompany />} />
                 <Route path="traveler" element={<TravelerHome />} />

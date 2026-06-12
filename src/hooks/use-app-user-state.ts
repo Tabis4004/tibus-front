@@ -9,7 +9,6 @@ import {
 } from "@/hooks/app-user-events.ts";
 import type { AppUserProfile } from "@/hooks/use-app-user.ts";
 import { hasCompletedOnboarding } from "@/lib/auth/onboarding-completion.ts";
-import { isProfileComplete } from "@/lib/auth/profile-completion.ts";
 
 const SELLER_ROLE_NAMES = [
   "vendeur",
@@ -239,7 +238,7 @@ export function useAppUserState() {
       hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
-      profileCompleted: isProfileComplete(profile, effectiveRoles),
+      profileCompleted: true,
       onboardingCompleted: hasCompletedOnboarding(profile, appUserId, effectiveRoles),
       isReady,
       isLoading: waitingForProfile || isLoading,

@@ -4,7 +4,7 @@ export type CompleteProfileInput = {
   userId: string;
   fullName: string;
   username: string;
-  phone: string;
+  phone?: string;
   email?: string;
   countryId: string;
 };
@@ -19,7 +19,7 @@ function splitName(fullName: string) {
 
 export async function completeUserProfile(input: CompleteProfileInput) {
   const username = input.username.trim().toLowerCase();
-  const phone = input.phone.trim();
+  const phone = input.phone?.trim() ?? "";
   const { firstName, lastName } = splitName(input.fullName);
 
   const { data: existingUsername, error: usernameError } = await supabase
@@ -50,7 +50,7 @@ export async function completeUserProfile(input: CompleteProfileInput) {
       firstName,
       lastName,
       username,
-      phone,
+      phone: phone || null,
       email: input.email?.trim() || null,
       countryId: input.countryId,
       profileCompleted: true,

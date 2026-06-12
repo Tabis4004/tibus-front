@@ -23,10 +23,10 @@ type ProfileLike =
   | null
   | undefined;
 
-/** Utilisateur authentifié avec une ligne Users — la page complete-profile n'est plus imposée. */
+/** Complétion de profil désactivée — l'utilisateur met à jour son profil volontairement. */
 export function isProfileComplete(
-  profile: ProfileLike,
+  _profile: ProfileLike,
   _roles: readonly string[] = [],
 ): boolean {
-  return Boolean(profile);
+  return true;
 }
