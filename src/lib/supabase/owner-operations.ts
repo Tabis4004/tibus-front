@@ -345,12 +345,30 @@ function mapTeamRows(rows: TeamRow[]): SupabaseOwnerSeller[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function isRpcSignatureMismatch(message: string) {
+function readSupabaseErrorText(err: unknown): string {
+  if (!err || typeof err !== "object") return "";
+  const payload = err as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  };
+  return [payload.message, payload.details, payload.hint, payload.code]
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join(" ");
+}
+
+function isRpcSignatureMismatch(err: unknown) {
+  const message = readSupabaseErrorText(err);
   return /function|schema cache|could not find|p_company_id|arguments/i.test(message);
 }
 
-function isRpcResultTypeMismatch(message: string) {
-  return /structure of query does not match function result type/i.test(message);
+function isRpcResultTypeMismatch(err: unknown) {
+  const message = readSupabaseErrorText(err);
+  return (
+    /structure of query does not match function result type/i.test(message)
+    || message.includes("42804")
+  );
 }
 
 export async function syncOwnerTeamCompanyContext(companyId: string) {
@@ -423,27 +441,20 @@ export async function listOwnerSellersSupabase(
 
   await syncOwnerTeamCompanyContext(resolvedCompanyId);
 
-  const { data, error } = await supabase.rpc("list_owner_team_members", {
-    p_company_id: resolvedCompanyId,
-  });
-
-  if (!error) {
-    return mapTeamRows((data ?? []) as TeamRow[]);
-  }
-
-  const useDirectFallback =
-    isRpcResultTypeMismatch(error.message) || isRpcSignatureMismatch(error.message);
-
-  if (useDirectFallback) {
-    try {
-      return await listOwnerTeamDirectSupabase(resolvedCompanyId);
-    } catch (directError) {
-      if (isRpcResultTypeMismatch(error.message)) throw directError;
-      throw error;
+  try {
+    return await listOwnerTeamDirectSupabase(resolvedCompanyId);
+  } catch (directError) {
+    const { data, error } = await supabase.rpc("list_owner_team_members", {
+      p_company_id: resolvedCompanyId,
+    });
+    if (!error) {
+      return mapTeamRows((data ?? []) as TeamRow[]);
     }
+    if (isRpcResultTypeMismatch(error) || isRpcSignatureMismatch(error)) {
+      throw directError;
+    }
+    throw error;
   }
-
-  throw error;
 }
 
 export async function findAssignableCompanyUserByEmailSupabase(
@@ -470,7 +481,7 @@ export async function findAssignableCompanyUserByEmailSupabase(
     };
   }
 
-  if (!isRpcResultTypeMismatch(error.message)) throw error;
+  if (!isRpcResultTypeMismatch(error)) throw error;
 
   const { data: userRow, error: directError } = await supabase
     .from("Users")
@@ -478,7 +489,12 @@ export async function findAssignableCompanyUserByEmailSupabase(
     .ilike("email", normalizedEmail)
     .maybeSingle();
 
-  if (directError) throw directError;
+  if (directError) {
+    throw new Error(
+      "Migration SQL 081_owner_team_rpc_definitive.sql requise sur Supabase pour rechercher un membre par email.",
+      { cause: directError },
+    );
+  }
   if (!userRow) return null;
 
   return {
@@ -533,20 +549,25 @@ export async function assignCompanySellerByEmailSupabase(input: {
   });
 
   let result = withCompany;
-  if (withCompany.error && isRpcSignatureMismatch(withCompany.error.message)) {
+  if (withCompany.error && isRpcSignatureMismatch(withCompany.error)) {
     result = await supabase.rpc("assign_company_user_role_by_email", {
       p_email: email,
       p_role_name: roleName,
     });
   }
 
-  if (result.error && isRpcResultTypeMismatch(result.error.message)) {
+  if (result.error && isRpcResultTypeMismatch(result.error)) {
     const { data: userRow, error: lookupError } = await supabase
       .from("Users")
       .select("id, firstName, lastName, email")
       .ilike("email", email)
       .maybeSingle();
-    if (lookupError) throw lookupError;
+    if (lookupError) {
+      throw new Error(
+        "Migration SQL 081_owner_team_rpc_definitive.sql requise sur Supabase pour attribuer un membre.",
+        { cause: lookupError },
+      );
+    }
     if (!userRow) throw new Error("Aucun utilisateur inscrit avec cet email");
 
     const roleRow = await supabase
@@ -605,7 +626,7 @@ export async function removeCompanySellerSupabase(
       p_company_id: resolvedCompanyId,
     });
 
-    if (withCompany.error && isRpcSignatureMismatch(withCompany.error.message)) {
+    if (withCompany.error && isRpcSignatureMismatch(withCompany.error)) {
       const legacy = await supabase.rpc("remove_company_user_role", {
         p_user_id: userId,
         p_role_name: roleName,
