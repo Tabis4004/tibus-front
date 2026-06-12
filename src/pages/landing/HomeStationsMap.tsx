@@ -41,11 +41,16 @@ type GoogleMapsApi = {
 declare global {
   interface Window {
     google?: { maps: GoogleMapsApi };
+    gm_authFailure?: () => void;
   }
 }
 
-const DEFAULT_CENTER: GoogleLatLng = { lat: 12.3714, lng: -1.5197 };
+const DEFAULT_CENTER: GoogleLatLng = { lat: 5.36, lng: -4.0083 };
 const MAPS_SCRIPT_ID = "tibus-google-maps-script";
+
+function useInteractiveGoogleMap(): boolean {
+  return import.meta.env.VITE_GOOGLE_MAPS_USE_JS === "true";
+}
 
 function loadGoogleMapsScript(apiKey: string): Promise<GoogleMapsApi> {
   if (window.google?.maps) {
@@ -97,10 +102,11 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string>("all");
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  const interactiveMap = useInteractiveGoogleMap() && Boolean(apiKey?.trim());
 
   useEffect(() => {
     let cancelled = false;
-    void listGaresMapPointsSupabase({ googleMapsApiKey: apiKey })
+    void listGaresMapPointsSupabase()
       .then((rows) => {
         if (!cancelled) setGares(rows);
       })
@@ -110,7 +116,13 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     return () => {
       cancelled = true;
     };
-  }, [apiKey]);
+  }, []);
+
+  useEffect(() => {
+    if (!gares?.length) return;
+    const coteIvoire = gares.find((gare) => /ivoire/i.test(gare.countryName))?.countryName;
+    if (coteIvoire) setSelectedCountry(coteIvoire);
+  }, [gares]);
 
   const groupedGares = useMemo(
     () => groupGaresByCountryAndCity(gares ?? []),
@@ -142,11 +154,18 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
   }, [mappableGares]);
 
   useEffect(() => {
-    if (!apiKey || !mapContainerRef.current || mappableGares.length === 0) return;
+    if (!interactiveMap || !apiKey || !mapContainerRef.current || mappableGares.length === 0) {
+      return;
+    }
 
     let markers: GoogleMarkerInstance[] = [];
     let map: GoogleMapInstance | null = null;
     let cancelled = false;
+
+    const previousAuthFailure = window.gm_authFailure;
+    window.gm_authFailure = () => {
+      if (!cancelled) setMapError("Google Maps API refusée");
+    };
 
     void loadGoogleMapsScript(apiKey)
       .then((maps) => {
@@ -200,11 +219,12 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
 
     return () => {
       cancelled = true;
+      window.gm_authFailure = previousAuthFailure;
       for (const marker of markers) marker.setMap(null);
       markers = [];
       map = null;
     };
-  }, [apiKey, mappableGares]);
+  }, [apiKey, interactiveMap, mappableGares]);
 
   if (gares === undefined) {
     const skeleton = <Skeleton className="h-80 w-full rounded-2xl" />;
@@ -238,39 +258,6 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
           </p>
         </div>
 
-        {apiKey && mappableGares.length > 0 && !mapError ? (
-          <div
-            ref={mapContainerRef}
-            className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted"
-          />
-        ) : mappableGares.length > 0 ? (
-          <div className="space-y-3">
-            <iframe
-              title={t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
-              className="h-[360px] md:h-[420px] w-full rounded-2xl border bg-muted"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://maps.google.com/maps?q=${embedCenter.lat},${embedCenter.lng}&hl=fr&z=7&output=embed`}
-            />
-            {!apiKey && (
-              <p className="text-xs text-muted-foreground">
-                {t("landing.stations_map_no_api_key", {
-                  defaultValue:
-                    "Ajoutez VITE_GOOGLE_MAPS_API_KEY pour afficher tous les points sur une carte interactive.",
-                })}
-              </p>
-            )}
-            {mapError && <p className="text-xs text-destructive">{mapError}</p>}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
-            {t("landing.stations_map_links_only", {
-              defaultValue:
-                "Les gares ont un lien Google Maps mais pas de coordonnées extractibles. Ouvrez chaque gare ci-dessous.",
-            })}
-          </div>
-        )}
-
         {countryOptions.length > 1 && (
           <div className="flex flex-wrap gap-2">
             <button
@@ -300,6 +287,37 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
                 {countryName}
               </button>
             ))}
+          </div>
+        )}
+
+        {interactiveMap && mappableGares.length > 0 && !mapError ? (
+          <div
+            ref={mapContainerRef}
+            className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted"
+          />
+        ) : mappableGares.length > 0 ? (
+          <div className="space-y-3">
+            <iframe
+              title={t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
+              className="h-[360px] md:h-[420px] w-full rounded-2xl border bg-muted"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://maps.google.com/maps?q=${embedCenter.lat},${embedCenter.lng}&hl=fr&z=${selectedCountry === "all" ? 7 : 11}&output=embed`}
+            />
+            {mapError && (
+              <p className="text-xs text-muted-foreground">
+                {t("landing.stations_map_embed_fallback", {
+                  defaultValue: "Carte simplifiée — ouvrez une gare pour l'itinéraire Google Maps.",
+                })}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+            {t("landing.stations_map_links_only", {
+              defaultValue:
+                "Les gares ont un lien Google Maps mais pas de coordonnées extractibles. Ouvrez chaque gare ci-dessous.",
+            })}
           </div>
         )}
 

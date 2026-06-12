@@ -7,6 +7,7 @@ export default function LandingTravelSection() {
     <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10 space-y-10">
         <SupabaseTripSearch embedded />
+        <div className="border-t pt-10" />
         <HomeStationsMap embedded />
       </div>
     </section>
