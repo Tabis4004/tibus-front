@@ -207,11 +207,11 @@ export async function listPartnerWebhookDeliveriesSupabase(
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    eventType: row.event_type as string,
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    eventType: String(row.event_type),
     responseStatus: (row.response_status as number | null) ?? null,
-    deliveredAt: row.delivered_at as string,
-    endpointUrl: row.endpoint_url as string,
+    deliveredAt: String(row.delivered_at),
+    endpointUrl: String(row.endpoint_url),
   }));
 }

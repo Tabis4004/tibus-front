@@ -313,13 +313,11 @@ function LandingPage() {
         </div>
       </section>
 
-      {isSupabaseAuth() && (
-        <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10">
-            <SupabaseTripSearch embedded />
-          </div>
-        </section>
-      )}
+      <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10">
+          <SupabaseTripSearch embedded />
+        </div>
+      </section>
 
       {/* Trust signals bar */}
       <section className="border-y bg-primary/5">
