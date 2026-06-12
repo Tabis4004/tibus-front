@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { listGaresMapPointsSupabase, groupGaresByCountryAndCity, type GareMapPoint } from "@/lib/supabase/gares-map.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
+import GaresLeafletMap from "@/pages/landing/GaresLeafletMap.tsx";
 
 type GoogleLatLng = { lat: number; lng: number };
 type GoogleMapInstance = {
@@ -143,15 +144,6 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     () => visibleGares.filter((gare) => gare.lat != null && gare.lng != null),
     [visibleGares],
   );
-
-  const embedCenter = useMemo(() => {
-    if (!mappableGares.length) return DEFAULT_CENTER;
-    const lat =
-      mappableGares.reduce((sum, gare) => sum + (gare.lat as number), 0) / mappableGares.length;
-    const lng =
-      mappableGares.reduce((sum, gare) => sum + (gare.lng as number), 0) / mappableGares.length;
-    return { lat, lng };
-  }, [mappableGares]);
 
   useEffect(() => {
     if (!interactiveMap || !apiKey || !mapContainerRef.current || mappableGares.length === 0) {
@@ -296,18 +288,16 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
             className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted"
           />
         ) : mappableGares.length > 0 ? (
-          <div className="space-y-3">
-            <iframe
-              title={t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
-              className="h-[360px] md:h-[420px] w-full rounded-2xl border bg-muted"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://maps.google.com/maps?q=${embedCenter.lat},${embedCenter.lng}&hl=fr&z=${selectedCountry === "all" ? 7 : 11}&output=embed`}
+          <div className="space-y-2">
+            <GaresLeafletMap
+              key={`${selectedCountry}-${mappableGares.map((g) => g.id).join(",")}`}
+              gares={mappableGares}
+              className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted z-0"
             />
             {mapError && (
               <p className="text-xs text-muted-foreground">
                 {t("landing.stations_map_embed_fallback", {
-                  defaultValue: "Carte simplifiée — ouvrez une gare pour l'itinéraire Google Maps.",
+                  defaultValue: "Carte OpenStreetMap — chaque pin correspond à une gare Tibus.",
                 })}
               </p>
             )}
