@@ -22,6 +22,7 @@ import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
 import SupabaseTripSearch from "../traveler/SupabaseTripSearch.tsx";
+import HomeStationsMap from "../landing/HomeStationsMap.tsx";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -89,6 +90,8 @@ export default function SupabaseHome() {
             <SupabaseTripSearch embedded />
           </div>
         </section>
+
+        <HomeStationsMap />
 
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>

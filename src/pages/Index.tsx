@@ -30,6 +30,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import SupabaseHome from "./home/SupabaseHome.tsx";
 import HomeDashboard from "./home/Dashboard.tsx";
 import SupabaseTripSearch from "./traveler/SupabaseTripSearch.tsx";
+import HomeStationsMap from "./landing/HomeStationsMap.tsx";
 import LandingUpcomingTripsSection from "./landing/LandingUpcomingTripsSection.tsx";
 
 // ─── Landing Page (public / unauthenticated) ─────────────────────────────────
@@ -318,6 +319,8 @@ function LandingPage() {
           <SupabaseTripSearch embedded />
         </div>
       </section>
+
+      <HomeStationsMap />
 
       {/* Trust signals bar */}
       <section className="border-y bg-primary/5">
