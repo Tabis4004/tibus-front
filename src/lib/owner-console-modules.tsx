@@ -15,6 +15,7 @@ import {
   TicketIcon,
   WalletIcon,
   HandCoinsIcon,
+  PlugIcon,
   UsersIcon,
 } from "lucide-react";
 
@@ -160,6 +161,18 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Planification des trajets et des départs.",
     toSuffix: "/owner/trips",
     icon: CalendarIcon,
+  },
+  {
+    id: "partner-api",
+    sectionKey: "console.section_operations",
+    sectionDefault: "Exploitation",
+    titleKey: "console.partner_api_title",
+    titleDefault: "API partenaire",
+    descKey: "console.partner_api_desc",
+    descDefault: "Lier les itinéraires d'un système externe et exposer les places disponibles.",
+    toSuffix: "/owner/partner-api",
+    icon: PlugIcon,
+    roles: ["owner", "super_admin"],
   },
   {
     id: "colis",

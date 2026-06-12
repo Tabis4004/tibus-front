@@ -336,7 +336,7 @@ export default function SupabaseAdminPanel() {
               <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {t("supabase_admin.sandbox_users_hint", {
                   defaultValue:
-                    "Mode sandbox UI : vous voyez l'admin sans super_admin en base. Pour lister tous les utilisateurs, exécutez 071_grant_super_admin_accounts.sql dans Supabase SQL Editor, puis déconnectez-vous et reconnectez-vous.",
+                    "Mode sandbox UI : vous voyez l'admin sans super_admin en base. Exécutez 084_grant_platform_roles_live.sql dans Supabase SQL Editor, puis déconnectez-vous et reconnectez-vous.",
                 })}
               </p>
             )}

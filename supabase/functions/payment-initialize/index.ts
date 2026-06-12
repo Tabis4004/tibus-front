@@ -10,11 +10,11 @@ async function resolveActiveGateway(
   admin: ReturnType<typeof createAdminClient>,
 ): Promise<PaymentGateway> {
   const { data, error } = await admin.rpc("get_active_payment_gateway");
-  if (error) return "fedapay";
-  const gateway = String((data as { gateway?: string } | null)?.gateway ?? "fedapay")
+  if (error) return "geniuspay";
+  const gateway = String((data as { gateway?: string } | null)?.gateway ?? "geniuspay")
     .trim()
     .toLowerCase();
-  return gateway === "geniuspay" ? "geniuspay" : "fedapay";
+  return gateway === "fedapay" ? "fedapay" : "geniuspay";
 }
 
 type PaymentTraveler = {

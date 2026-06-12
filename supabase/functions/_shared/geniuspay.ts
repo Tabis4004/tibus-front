@@ -1,3 +1,4 @@
+/** Même URL pour sandbox et live — le mode dépend des clés pk_live_/sk_live_ vs pk_sandbox_/sk_sandbox_. */
 const GENIUSPAY_BASE =
   Deno.env.get("GENIUSPAY_BASE_URL") ?? "https://pay.genius.ci/api/v1/merchant";
 

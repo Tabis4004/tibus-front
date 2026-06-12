@@ -9,9 +9,9 @@ export type ActivePaymentGatewayState = {
 };
 
 function normalizeGateway(value: unknown): ActivePaymentGateway {
-  return String(value ?? "fedapay").toLowerCase() === "geniuspay"
-    ? "geniuspay"
-    : "fedapay";
+  return String(value ?? "geniuspay").toLowerCase() === "fedapay"
+    ? "fedapay"
+    : "geniuspay";
 }
 
 export async function getActivePaymentGatewaySupabase(): Promise<ActivePaymentGatewayState> {

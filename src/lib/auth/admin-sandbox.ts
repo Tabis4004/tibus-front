@@ -4,7 +4,7 @@
  *
  * Disable in production with VITE_ADMIN_SANDBOX=false at build time.
  */
-export const ADMIN_SANDBOX_HARDCODED = true;
+export const ADMIN_SANDBOX_HARDCODED = false;
 
 export function isAdminSandboxEnabled(): boolean {
   if (import.meta.env.VITE_ADMIN_SANDBOX === "false") return false;

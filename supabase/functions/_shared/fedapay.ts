@@ -1,5 +1,5 @@
 const FEDAPAY_BASE =
-  Deno.env.get("FEDAPAY_BASE_URL") ?? "https://sandbox-api.fedapay.com";
+  Deno.env.get("FEDAPAY_BASE_URL") ?? "https://api.fedapay.com";
 
 function headers() {
   const secretKey = Deno.env.get("FEDAPAY_SECRET_KEY");

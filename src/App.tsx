@@ -39,6 +39,7 @@ import {
   OwnerLoyalty,
   OwnerMessages,
   OwnerOverview,
+  OwnerPartnerApi,
   OwnerReviews,
   OwnerSalesLedger,
   PaymentVerify,
@@ -120,6 +121,7 @@ function AppShell() {
                   <Route path="buses" element={<FleetManager />} />
                   <Route path="stations" element={<StationsManager />} />
                   <Route path="routes" element={<RoutesManager />} />
+                  <Route path="partner-api" element={<OwnerPartnerApi />} />
                   <Route path="trips" element={<TripsManager />} />
                   <Route path="sellers" element={<SellersManager />} />
                   <Route path="subscription" element={<SubscriptionPlans />} />

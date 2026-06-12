@@ -307,7 +307,7 @@
   "investor_plan.roi_empty": "Saisissez un montant investi (> 0 XOF) pour calculer ROI, TRI et gain net.",
   "investor_plan.reset": "Réinitialiser",
   "investor_plan.footer": "Document Tibus · super admin · commissions réseau simulées dans l'onglet Commissions stakeholders.",
-  "supabase_admin.sandbox_users_hint": "Mode sandbox UI : le panneau admin est visible mais PostgreSQL ne vous reconnaît pas comme super_admin. Exécutez 071_grant_super_admin_accounts.sql (puis 070_platform_admin_users.sql) dans Supabase, déconnectez-vous et reconnectez-vous pour voir tous les utilisateurs.",
+  "supabase_admin.sandbox_users_hint": "Mode sandbox UI : le panneau admin est visible mais PostgreSQL ne vous reconnaît pas comme super_admin. Exécutez 084_grant_platform_roles_live.sql dans Supabase, déconnectez-vous et reconnectez-vous.",
   "investor_plan.stats.capital": "Capital total",
   "investor_plan.stats.levee": "Apport investisseur",
   "investor_plan.stats.cumul_net": "Résultat net cumulé",

@@ -28,6 +28,7 @@ import {
   ScanLineIcon,
   BookOpenIcon,
   HandCoinsIcon,
+  PlugIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -79,6 +80,7 @@ const CONVEX_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/buses", labelKey: "sidebar.fleet", icon: BusIcon },
       { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
       { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
+      { toSuffix: "/owner/partner-api", labelKey: "sidebar.partner_api", icon: PlugIcon },
       { toSuffix: "/owner/trips", labelKey: "sidebar.trips", icon: CalendarIcon },
       { toSuffix: "/owner/sellers", labelKey: "sidebar.team", icon: UsersIcon },
     ],
@@ -121,6 +123,7 @@ const SUPABASE_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/buses", labelKey: "sidebar.fleet", icon: BusIcon },
       { toSuffix: "/owner/stations", labelKey: "sidebar.stations", icon: MapPinIcon },
       { toSuffix: "/owner/routes", labelKey: "sidebar.routes", icon: RouteIcon },
+      { toSuffix: "/owner/partner-api", labelKey: "sidebar.partner_api", icon: PlugIcon },
       { toSuffix: "/owner/sellers", labelKey: "sidebar.team", icon: UsersIcon },
     ],
   },

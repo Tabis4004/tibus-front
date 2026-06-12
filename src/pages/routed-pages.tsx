@@ -72,6 +72,7 @@ import ColisSettingsPage from "./owner/ColisSettingsPage.tsx";
 import LoyaltyPage from "./owner/LoyaltyPage.tsx";
 import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
 import OwnerMessagesPage from "./owner/OwnerMessagesPage.tsx";
+import PartnerApiPage from "./owner/PartnerApiPage.tsx";
 import CompanyManualPage from "./manual/CompanyManualPage.tsx";
 import CountryAdminManualPage from "./manual/CountryAdminManualPage.tsx";
 
@@ -288,6 +289,10 @@ export function OwnerCancellationPolicy() {
 
 export function OwnerMessages() {
   return supabaseOnlyPage("Messages & contact", OwnerMessagesPage);
+}
+
+export function OwnerPartnerApi() {
+  return supabaseOnlyPage("API partenaire itinéraires", PartnerApiPage);
 }
 
 export function TicketScanner() {
