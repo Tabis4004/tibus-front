@@ -120,6 +120,7 @@
   "landing.upcoming_title": "Trajets disponibles à venir",
   "landing.upcoming_desc": "Filtrez par pays, compagnie, date et budget pour trouver votre prochain départ.",
   "landing.view_all_trips": "Voir tous les trajets",
+  "landing.no_trips_country_hint": "Aucun départ pour ce pays. Essayez « Tous les pays » ou une autre date.",
   "seats_left": "places restantes",
   "occupancy_available": "Disponible",
   "occupancy_filling_up": "Se remplit",

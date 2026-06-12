@@ -222,25 +222,6 @@ export async function searchTripsSupabase(
     arretsByTrajet.set(row.trajetId, list);
   }
 
-  const reservationIds = reservations.map((r) => r.id as string);
-  const bookedCount = new Map<string, number>();
-  const chunkSize = 25;
-  for (let offset = 0; offset < reservationIds.length; offset += chunkSize) {
-    const chunk = reservationIds.slice(offset, offset + chunkSize);
-    const counts = await Promise.all(
-      chunk.map(async (reservationId) => {
-        const { data, error } = await supabase.rpc("get_occupied_seats", {
-          p_reservation_id: reservationId,
-        });
-        if (error) return [reservationId, 0] as const;
-        return [reservationId, Array.isArray(data) ? data.length : 0] as const;
-      }),
-    );
-    for (const [reservationId, count] of counts) {
-      bookedCount.set(reservationId, count);
-    }
-  }
-
   const results: TripSearchResult[] = [];
 
   for (const reservation of reservations) {
@@ -286,11 +267,6 @@ export async function searchTripsSupabase(
     const bus = busId ? busMap.get(busId) : undefined;
     const totalSeats =
       bus?.capacity ?? trajet.capacity ?? (reservation.capacity as number) ?? 45;
-    const booked = bookedCount.get(reservation.id as string) ?? 0;
-    const seatsAvailable = Math.max(
-      0,
-      (reservation.capacity as number) - booked,
-    );
 
     const country = countryMap.get(company.countryId);
     const durationMinutes =
@@ -302,7 +278,7 @@ export async function searchTripsSupabase(
       _id: reservation.id as string,
       departureTime: departureIso,
       arrivalTime: estimateArrivalIso(departureIso, arret.kilometrage),
-      seatsAvailable,
+      seatsAvailable: totalSeats,
       totalSeats,
       priceAmount: arret.price,
       currency: country?.currency ?? "XOF",
@@ -317,6 +293,21 @@ export async function searchTripsSupabase(
       },
       route: { estimatedDurationMinutes: durationMinutes },
     });
+  }
+
+  const seatCounts = await Promise.all(
+    results.map(async (trip) => {
+      const { data, error } = await supabase.rpc("get_occupied_seats", {
+        p_reservation_id: trip._id,
+      });
+      if (error) return [trip._id, 0] as const;
+      return [trip._id, Array.isArray(data) ? data.length : 0] as const;
+    }),
+  );
+  const bookedByReservation = new Map(seatCounts);
+  for (const trip of results) {
+    const booked = bookedByReservation.get(trip._id) ?? 0;
+    trip.seatsAvailable = Math.max(0, trip.totalSeats - booked);
   }
 
   return results;

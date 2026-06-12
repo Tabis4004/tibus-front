@@ -29,8 +29,7 @@ import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAuth } from "@/hooks/use-auth.ts";
 import SupabaseHome from "./home/SupabaseHome.tsx";
 import HomeDashboard from "./home/Dashboard.tsx";
-import SupabaseTripSearch from "./traveler/SupabaseTripSearch.tsx";
-import HomeStationsMap from "./landing/HomeStationsMap.tsx";
+import LandingTravelSection from "./landing/LandingTravelSection.tsx";
 
 // ─── Landing Page (public / unauthenticated) ─────────────────────────────────
 
@@ -313,11 +312,7 @@ function LandingPage() {
         </div>
       </section>
 
-      <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10">
-          <SupabaseTripSearch embedded />
-        </div>
-      </section>
+      <LandingTravelSection />
 
       {/* Trust signals bar */}
       <section className="border-y bg-primary/5">
@@ -537,8 +532,6 @@ function LandingPage() {
           </div>
         </div>
       </section>
-
-      <HomeStationsMap />
 
       {/* CTA */}
       <section className="bg-primary text-primary-foreground">

@@ -37,7 +37,7 @@ import {
   useSupabaseSearchTrips,
 } from "@/hooks/use-supabase-trip-search.ts";
 import { TripCard } from "./_components/TripSearchCard.tsx";
-import { findBurkinaCountryId } from "@/lib/trip-search-defaults.ts";
+import { resolveLandingCountryDefault } from "@/lib/trip-search-defaults.ts";
 
 export default function SupabaseTripSearch({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation("traveler");
@@ -59,12 +59,11 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
 
   useEffect(() => {
     if (!countries || defaultCountryApplied) return;
-    const burkinaId = findBurkinaCountryId(countries);
-    const nextDefault = burkinaId ?? "all";
+    const nextDefault = resolveLandingCountryDefault(countries, embedded);
     setDefaultCountryId(nextDefault);
-    if (burkinaId) setCountryId(burkinaId);
+    if (nextDefault !== "all") setCountryId(nextDefault);
     setDefaultCountryApplied(true);
-  }, [countries, defaultCountryApplied]);
+  }, [countries, defaultCountryApplied, embedded]);
   const companies = useSupabaseActiveCompanies();
   const cities = useSupabaseCities(countryId);
 
@@ -177,8 +176,8 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
         </motion.div>
       )}
 
-      {/* Desktop inline filters (always visible on md+) */}
-      <div className="hidden md:block rounded-xl border bg-muted/30 p-4">
+      {/* Desktop inline filters — always visible on landing */}
+      <div className={embedded ? "rounded-xl border bg-muted/30 p-4" : "hidden md:block rounded-xl border bg-muted/30 p-4"}>
         <div className="flex items-end gap-3 flex-wrap">
           {/* Country */}
           <div className="space-y-1 min-w-[140px]">
@@ -549,7 +548,24 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
                 <BusIcon />
               </EmptyMedia>
               <EmptyTitle>{t("no_trips")}</EmptyTitle>
-              <EmptyDescription>{t("no_trips_desc")}</EmptyDescription>
+              <EmptyDescription>
+                {embedded && countryId !== "all"
+                  ? tc("landing.no_trips_country_hint", {
+                      defaultValue:
+                        "Aucun départ pour ce pays. Essayez « Tous les pays » ou une autre date.",
+                    })
+                  : t("no_trips_desc")}
+              </EmptyDescription>
+              {embedded && countryId !== "all" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setCountryId("all")}
+                >
+                  {tc("labels.all_countries", { defaultValue: "Tous les pays" })}
+                </Button>
+              )}
             </EmptyHeader>
           </Empty>
         ) : (

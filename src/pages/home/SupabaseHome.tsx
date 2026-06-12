@@ -21,8 +21,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
-import SupabaseTripSearch from "../traveler/SupabaseTripSearch.tsx";
-import HomeStationsMap from "../landing/HomeStationsMap.tsx";
+import LandingTravelSection from "../landing/LandingTravelSection.tsx";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -85,11 +84,7 @@ export default function SupabaseHome() {
           </motion.div>
         </div>
 
-        <section id="home-trip-search" className="border-y bg-muted/30 scroll-mt-16">
-          <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
-            <SupabaseTripSearch embedded />
-          </div>
-        </section>
+        <LandingTravelSection />
 
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
@@ -244,8 +239,6 @@ export default function SupabaseHome() {
             />
           </HomeBlockSection>
         </div>
-
-        <HomeStationsMap />
       </main>
       <BottomNav />
     </div>

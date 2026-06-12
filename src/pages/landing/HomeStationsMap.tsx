@@ -90,7 +90,7 @@ function buildInfoContent(gare: GareMapPoint) {
   </div>`;
 }
 
-export default function HomeStationsMap() {
+export default function HomeStationsMap({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation("common");
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [gares, setGares] = useState<GareMapPoint[] | undefined>(undefined);
@@ -207,11 +207,11 @@ export default function HomeStationsMap() {
   }, [apiKey, mappableGares]);
 
   if (gares === undefined) {
+    const skeleton = <Skeleton className="h-80 w-full rounded-2xl" />;
+    if (embedded) return skeleton;
     return (
       <section className="border-b bg-background">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-          <Skeleton className="h-80 w-full rounded-2xl" />
-        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{skeleton}</div>
       </section>
     );
   }
@@ -220,9 +220,8 @@ export default function HomeStationsMap() {
     return null;
   }
 
-  return (
-    <section id="home-stations-map" className="border-b bg-background scroll-mt-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10 space-y-4">
+  const body = (
+    <div className={embedded ? "space-y-4" : "max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-10 space-y-4"}>
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-primary/10 text-primary">
             <MapPinIcon className="w-3 h-3" />
@@ -350,6 +349,15 @@ export default function HomeStationsMap() {
           )}
         </div>
       </div>
+  );
+
+  if (embedded) {
+    return <div id="home-stations-map">{body}</div>;
+  }
+
+  return (
+    <section id="home-stations-map" className="border-b bg-background scroll-mt-16">
+      {body}
     </section>
   );
 }

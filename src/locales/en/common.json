@@ -120,6 +120,7 @@
   "landing.upcoming_title": "Upcoming available trips",
   "landing.upcoming_desc": "Filter by country, company, date, and budget to find your next departure.",
   "landing.view_all_trips": "View all trips",
+  "landing.no_trips_country_hint": "No departures for this country. Try All countries or another date.",
   "seats_left": "seats left",
   "occupancy_available": "Available",
   "occupancy_filling_up": "Filling up",
