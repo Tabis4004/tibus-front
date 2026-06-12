@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import { isIssuedTicket } from "@/lib/supabase/ticket-policy";
 
 export type SearchTripsParams = {
   originCity?: string;
@@ -224,35 +223,22 @@ export async function searchTripsSupabase(
   }
 
   const reservationIds = reservations.map((r) => r.id as string);
-  const { data: bookings, error: bookingsError } = await supabase
-    .from("ReservationBus")
-    .select("reservationId, isReservation, paymentId")
-    .in("reservationId", reservationIds)
-    .eq("type", "voyage");
-
-  if (bookingsError) throw bookingsError;
-
-  const paymentIds = [
-    ...new Set((bookings ?? []).map((b) => b.paymentId as string)),
-  ];
-  const paymentTxMap = new Map<string, string | null>();
-  if (paymentIds.length > 0) {
-    const { data: payments, error: paymentsError } = await supabase
-      .from("Payment")
-      .select("id, txID")
-      .in("id", paymentIds);
-    if (paymentsError) throw paymentsError;
-    for (const payment of payments ?? []) {
-      paymentTxMap.set(payment.id as string, payment.txID as string | null);
-    }
-  }
-
   const bookedCount = new Map<string, number>();
-  for (const booking of bookings ?? []) {
-    const txID = paymentTxMap.get(booking.paymentId as string);
-    if (!isIssuedTicket(booking.isReservation as boolean, txID)) continue;
-    const id = booking.reservationId as string;
-    bookedCount.set(id, (bookedCount.get(id) ?? 0) + 1);
+  const chunkSize = 25;
+  for (let offset = 0; offset < reservationIds.length; offset += chunkSize) {
+    const chunk = reservationIds.slice(offset, offset + chunkSize);
+    const counts = await Promise.all(
+      chunk.map(async (reservationId) => {
+        const { data, error } = await supabase.rpc("get_occupied_seats", {
+          p_reservation_id: reservationId,
+        });
+        if (error) return [reservationId, 0] as const;
+        return [reservationId, Array.isArray(data) ? data.length : 0] as const;
+      }),
+    );
+    for (const [reservationId, count] of counts) {
+      bookedCount.set(reservationId, count);
+    }
   }
 
   const results: TripSearchResult[] = [];

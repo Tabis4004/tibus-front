@@ -91,8 +91,6 @@ export default function SupabaseHome() {
           </div>
         </section>
 
-        <HomeStationsMap />
-
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
             <ExploreFeaturesButton variant="block" />
@@ -246,6 +244,8 @@ export default function SupabaseHome() {
             />
           </HomeBlockSection>
         </div>
+
+        <HomeStationsMap />
       </main>
       <BottomNav />
     </div>

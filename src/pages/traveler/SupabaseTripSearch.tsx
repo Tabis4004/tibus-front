@@ -41,6 +41,7 @@ import { findBurkinaCountryId } from "@/lib/trip-search-defaults.ts";
 
 export default function SupabaseTripSearch({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation("traveler");
+  const { t: tc } = useTranslation("common");
   const { lng } = useParams<{ lng: string }>();
 
   // Filter states
@@ -50,7 +51,7 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
   const [destinationCity, setDestinationCity] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(embedded);
   const [defaultCountryId, setDefaultCountryId] = useState("all");
   const [defaultCountryApplied, setDefaultCountryApplied] = useState(false);
 
@@ -124,9 +125,14 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">
-              {t("search_trips")}
+              {tc("landing.upcoming_title", { defaultValue: "Trajets disponibles à venir" })}
             </h2>
-            <p className="text-muted-foreground text-sm mt-0.5">{t("search_trips_desc")}</p>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {tc("landing.upcoming_desc", {
+                defaultValue:
+                  "Filtrez par pays, compagnie, date et budget pour trouver votre prochain départ.",
+              })}
+            </p>
           </div>
           <Button
             variant="ghost"
