@@ -3,9 +3,15 @@ import { useTranslation } from "react-i18next";
 import { ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { listGaresMapPointsSupabase, groupGaresByCountryAndCity, type GareMapPoint } from "@/lib/supabase/gares-map.ts";
+import {
+  CITY_MAP_ZOOM_THRESHOLD_KM,
+  cityOptionsFromGares,
+  garesSpreadKm,
+} from "@/lib/gare-map-utils.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
-import GaresLeafletMap from "@/pages/landing/GaresLeafletMap.tsx";
+
+const GaresLeafletMap = lazy(() => import("@/pages/landing/GaresLeafletMap.tsx"));
 
 type GoogleLatLng = { lat: number; lng: number };
 type GoogleMapInstance = {
@@ -102,6 +108,7 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
   const [gares, setGares] = useState<GareMapPoint[] | undefined>(undefined);
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string>("all");
+  const [selectedCity, setSelectedCity] = useState<string>("all");
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   const interactiveMap = useInteractiveGoogleMap() && Boolean(apiKey?.trim());
 
@@ -145,8 +152,33 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     [visibleGares],
   );
 
+  const cityOptions = useMemo(
+    () => cityOptionsFromGares(mappableGares),
+    [mappableGares],
+  );
+
+  const needsCityZoom = useMemo(
+    () => garesSpreadKm(mappableGares) > CITY_MAP_ZOOM_THRESHOLD_KM,
+    [mappableGares],
+  );
+
   useEffect(() => {
-    if (!interactiveMap || !apiKey || !mapContainerRef.current || mappableGares.length === 0) {
+    if (!needsCityZoom || cityOptions.length <= 1) {
+      setSelectedCity("all");
+      return;
+    }
+    setSelectedCity((current) =>
+      current !== "all" && cityOptions.includes(current) ? current : cityOptions[0],
+    );
+  }, [selectedCountry, needsCityZoom, cityOptions]);
+
+  const mapGares = useMemo(() => {
+    if (!needsCityZoom || selectedCity === "all") return mappableGares;
+    return mappableGares.filter((gare) => gare.cityName === selectedCity);
+  }, [mappableGares, needsCityZoom, selectedCity]);
+
+  useEffect(() => {
+    if (!interactiveMap || !apiKey || !mapContainerRef.current || mapGares.length === 0) {
       return;
     }
 
@@ -175,7 +207,7 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
         const bounds = new maps.LatLngBounds();
         const infoWindow = new maps.InfoWindow();
 
-        for (const gare of mappableGares) {
+        for (const gare of mapGares) {
           const position = { lat: gare.lat as number, lng: gare.lng as number };
           const marker = new maps.Marker({
             map: activeMap,
@@ -195,9 +227,12 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
           bounds.extend(position);
         }
 
-        if (mappableGares.length === 1) {
-          activeMap.setCenter({ lat: mappableGares[0].lat as number, lng: mappableGares[0].lng as number });
-          activeMap.setZoom(13);
+        if (mapGares.length === 1) {
+          activeMap.setCenter({ lat: mapGares[0].lat as number, lng: mapGares[0].lng as number });
+          activeMap.setZoom(17);
+        } else if (needsCityZoom) {
+          activeMap.setCenter({ lat: mapGares[0].lat as number, lng: mapGares[0].lng as number });
+          activeMap.setZoom(17);
         } else {
           activeMap.fitBounds(bounds, 48);
           maps.event.trigger(activeMap, "resize");
@@ -216,7 +251,7 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
       markers = [];
       map = null;
     };
-  }, [apiKey, interactiveMap, mappableGares]);
+  }, [apiKey, interactiveMap, mapGares, needsCityZoom]);
 
   if (gares === undefined) {
     const skeleton = <Skeleton className="h-80 w-full rounded-2xl" />;
@@ -282,18 +317,48 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
           </div>
         )}
 
-        {interactiveMap && mappableGares.length > 0 && !mapError ? (
+        {needsCityZoom && cityOptions.length > 1 && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {t("landing.stations_map_city_hint", {
+                defaultValue: "Les gares sont éloignées — zoomez par ville pour voir chaque station.",
+              })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {cityOptions.map((cityName) => (
+                <button
+                  key={cityName}
+                  type="button"
+                  onClick={() => setSelectedCity(cityName)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                    selectedCity === cityName
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background hover:border-primary/40",
+                  )}
+                >
+                  {cityName}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {interactiveMap && mapGares.length > 0 && !mapError ? (
           <div
             ref={mapContainerRef}
             className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted"
           />
-        ) : mappableGares.length > 0 ? (
+        ) : mapGares.length > 0 ? (
           <div className="space-y-2">
-            <GaresLeafletMap
-              key={`${selectedCountry}-${mappableGares.map((g) => g.id).join(",")}`}
-              gares={mappableGares}
-              className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted z-0"
-            />
+            <Suspense fallback={<Skeleton className="h-[360px] md:h-[420px] w-full rounded-2xl" />}>
+              <GaresLeafletMap
+                key={`${selectedCountry}-${selectedCity}-${mapGares.map((g) => g.id).join(",")}`}
+                gares={mapGares}
+                fixedZoom={needsCityZoom ? 17 : undefined}
+                className="h-[360px] md:h-[420px] w-full rounded-2xl border overflow-hidden bg-muted z-0"
+              />
+            </Suspense>
             {mapError && (
               <p className="text-xs text-muted-foreground">
                 {t("landing.stations_map_embed_fallback", {
@@ -330,12 +395,14 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
                       </h4>
                       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {cityGroup.gares.map((gare) => (
-                          <a
+                          <button
                             key={gare.id}
-                            href={gare.googleMapsLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group rounded-xl border bg-card p-3 hover:border-primary/40 hover:shadow-sm transition-all"
+                            type="button"
+                            onClick={() => {
+                              if (needsCityZoom) setSelectedCity(gare.cityName);
+                              document.getElementById("home-stations-map")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }}
+                            className="group rounded-xl border bg-card p-3 hover:border-primary/40 hover:shadow-sm transition-all text-left"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -344,9 +411,18 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
                                   <p className="text-xs text-muted-foreground truncate">{gare.companyName}</p>
                                 )}
                               </div>
-                              <ExternalLinkIcon className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                              <a
+                                href={gare.googleMapsLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(event) => event.stopPropagation()}
+                                className="shrink-0 text-muted-foreground hover:text-primary"
+                                aria-label="Ouvrir dans Google Maps"
+                              >
+                                <ExternalLinkIcon className="w-4 h-4" />
+                              </a>
                             </div>
-                          </a>
+                          </button>
                         ))}
                       </div>
                     </div>

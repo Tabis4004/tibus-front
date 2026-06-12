@@ -36,9 +36,11 @@ function buildPopupHtml(gare: GareMapPoint) {
 type GaresLeafletMapProps = {
   gares: GareMapPoint[];
   className?: string;
+  /** Zoom fixe (ex. 17) pour afficher la gare, pas la ville entière. */
+  fixedZoom?: number;
 };
 
-export default function GaresLeafletMap({ gares, className }: GaresLeafletMapProps) {
+export default function GaresLeafletMap({ gares, className, fixedZoom }: GaresLeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -66,10 +68,11 @@ export default function GaresLeafletMap({ gares, className }: GaresLeafletMapPro
     }
 
     if (bounds.isValid()) {
-      if (gares.length === 1) {
-        map.setView(bounds.getCenter(), 16);
+      const zoom = fixedZoom ?? (gares.length === 1 ? 17 : 16);
+      if (gares.length === 1 || fixedZoom != null) {
+        map.setView(bounds.getCenter(), zoom);
       } else {
-        map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
+        map.fitBounds(bounds, { padding: [48, 48], maxZoom: zoom });
       }
     }
 
@@ -77,7 +80,7 @@ export default function GaresLeafletMap({ gares, className }: GaresLeafletMapPro
       map.remove();
       mapRef.current = null;
     };
-  }, [gares]);
+  }, [gares, fixedZoom]);
 
   useEffect(() => {
     const map = mapRef.current;
