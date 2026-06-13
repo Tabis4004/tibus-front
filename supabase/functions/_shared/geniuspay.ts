@@ -84,12 +84,33 @@ export function mapNetworkToGeniusPayMmo(
     case "mtn":
       return { payment_method: "mtn_money", gateway: "mtn_momo" };
     case "moov":
-      return { payment_method: "pawapay", mmo_provider: "MOOV_CIV" };
+      // Tunnel direct Moov CI — évite PawaPay MOOV_CIV (souvent non activé côté marchand).
+      return { payment_method: "moov_money", gateway: "moov_money" };
     case "wave":
       return { payment_method: "wave", gateway: "wave" };
     default:
       return {};
   }
+}
+
+function formatGeniusPayError(raw: string): string {
+  try {
+    const json = JSON.parse(raw) as {
+      error?: {
+        message?: string;
+        failureReason?: { message?: string; code?: string };
+      };
+      message?: string;
+    };
+    const detail =
+      json.error?.failureReason?.message ??
+      json.error?.message ??
+      json.message;
+    if (detail) return `Paiement GeniusPay : ${detail}`;
+  } catch {
+    // ignore
+  }
+  return `GeniusPay payment failed: ${raw.slice(0, 300)}`;
 }
 
 export async function createGeniusPayCheckout(args: {
@@ -138,7 +159,7 @@ export async function createGeniusPayCheckout(args: {
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`GeniusPay payment failed: ${text.slice(0, 400)}`);
+    throw new Error(formatGeniusPayError(text));
   }
 
   const json = JSON.parse(text) as Record<string, unknown>;
