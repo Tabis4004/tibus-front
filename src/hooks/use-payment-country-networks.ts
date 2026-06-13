@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
 import {
   getPaymentNetworkOptionsForCountry,
@@ -78,7 +78,9 @@ export function usePaymentCountryNetworks({
   useEffect(() => {
     if (!paymentCountryId) {
       setPaymentNetworkOptions([]);
-      setPaymentNetwork("unknown");
+      if (!networkManual) {
+        setPaymentNetwork("unknown");
+      }
       return;
     }
 
@@ -105,16 +107,26 @@ export function usePaymentCountryNetworks({
   }, [paymentCountryId, paymentCountryName, activeGateway]);
 
   useEffect(() => {
-    if (!paymentCountryId) return;
-    const allowed = paymentNetworkOptions.map((option) => option.value);
+    if (!paymentCountryId || networksLoading) return;
+
+    const allowed = paymentNetworkOptions
+      .map((option) => option.value)
+      .filter((value) => value !== "unknown");
+    if (paymentNetwork === "unknown") return;
     if (!allowed.includes(paymentNetwork)) {
       setPaymentNetwork("unknown");
-      setNetworkManual(false);
     }
-  }, [paymentCountryId, paymentNetworkOptions, paymentNetwork]);
+  }, [paymentCountryId, paymentNetworkOptions, paymentNetwork, networksLoading]);
 
   useEffect(() => {
-    if (!paymentCountryId || networkManual || networksLoading) return;
+    if (
+      !paymentCountryId ||
+      networkManual ||
+      networksLoading ||
+      paymentNetwork !== "unknown"
+    ) {
+      return;
+    }
 
     const inferred = inferNetworkFromPhone(passengerPhone, paymentCountryName);
     if (inferred && paymentNetworkOptions.some((option) => option.value === inferred)) {
@@ -134,6 +146,7 @@ export function usePaymentCountryNetworks({
     paymentCountryName,
     networkManual,
     networksLoading,
+    paymentNetwork,
     paymentNetworkOptions,
   ]);
 
@@ -154,6 +167,18 @@ export function usePaymentCountryNetworks({
     setPaymentNetwork(network);
   };
 
+  const restorePaymentSelection = useCallback(
+    (countryId: string | null | undefined, network: PaymentNetwork) => {
+      if (countryId) {
+        setCountryManual(true);
+        setPaymentCountryId(countryId);
+      }
+      setNetworkManual(true);
+      setPaymentNetwork(network);
+    },
+    [],
+  );
+
   return {
     countries,
     countriesError,
@@ -165,6 +190,7 @@ export function usePaymentCountryNetworks({
     inferredCountryName,
     selectPaymentCountry,
     selectPaymentNetwork,
+    restorePaymentSelection,
     setPaymentCountryId,
     setPaymentNetwork,
   };

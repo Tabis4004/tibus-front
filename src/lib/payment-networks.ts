@@ -107,7 +107,8 @@ export function getPaymentNetworkOptionsForCountry(
   countryName: string | null | undefined,
   networks?: readonly string[] | null,
 ): PaymentNetworkOption[] {
-  const resolved = (networks?.length ? networks : getPaymentNetworksForCountryName(countryName))
+  const countryOrder = getPaymentNetworksForCountryName(countryName);
+  const resolved = (networks?.length ? networks : countryOrder)
     .map((network) => network.trim().toLowerCase())
     .filter((network) => network && network !== "default") as PaymentNetwork[];
 
@@ -116,7 +117,18 @@ export function getPaymentNetworkOptionsForCountry(
     return [];
   }
 
-  return [...unique.map(networkOption), UNKNOWN_OPTION];
+  const sorted = countryOrder.length
+    ? unique.sort((a, b) => {
+        const indexA = countryOrder.indexOf(a);
+        const indexB = countryOrder.indexOf(b);
+        if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      })
+    : unique.sort((a, b) => a.localeCompare(b));
+
+  return [...sorted.map(networkOption), UNKNOWN_OPTION];
 }
 
 export function isPaymentNetwork(value: string): value is PaymentNetwork {

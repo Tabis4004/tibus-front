@@ -77,10 +77,9 @@ function PaymentSetupInner() {
     paymentNetworkOptions,
     networksLoading,
     inferredCountryName,
+    restorePaymentSelection,
     selectPaymentCountry,
     selectPaymentNetwork,
-    setPaymentCountryId,
-    setPaymentNetwork,
   } = usePaymentCountryNetworks({
     activeGateway,
     passengerPhone: draft?.passengerPhone ?? "",
@@ -106,9 +105,8 @@ function PaymentSetupInner() {
 
   useEffect(() => {
     if (!draft?.paymentNetwork || draft.paymentNetwork === "unknown") return;
-    if (draft.paymentCountryId) setPaymentCountryId(draft.paymentCountryId);
-    setPaymentNetwork(draft.paymentNetwork as PaymentNetwork);
-  }, [draft?.paymentCountryId, draft?.paymentNetwork, setPaymentCountryId, setPaymentNetwork]);
+    restorePaymentSelection(draft.paymentCountryId, draft.paymentNetwork as PaymentNetwork);
+  }, [draft?.paymentCountryId, draft?.paymentNetwork, restorePaymentSelection]);
 
   useEffect(() => {
     void getTravelerPaymentNoticeSupabase()
@@ -134,7 +132,12 @@ function PaymentSetupInner() {
   }, [draft, trip]);
 
   useEffect(() => {
-    if (!trip?.companyId || !paymentCountryId || !paymentNetwork) {
+    if (
+      !trip?.companyId ||
+      !paymentCountryId ||
+      !paymentNetwork ||
+      paymentNetwork === "unknown"
+    ) {
       setPaymentBreakdown(null);
       setPaymentPreviewError(null);
       return;
@@ -375,33 +378,19 @@ function PaymentSetupInner() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="payment-network">Réseau Mobile Money *</Label>
-          <select
-            id="payment-network"
-            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            value={paymentNetwork}
-            onChange={(event) => selectPaymentNetwork(event.target.value as PaymentNetwork)}
-            disabled={!paymentCountryId || networksLoading || paymentNetworkOptions.length === 0}
-          >
-            <option value="unknown" disabled>
+          <Label>Réseau Mobile Money *</Label>
+          {!paymentCountryId || networksLoading ? (
+            <p className="text-sm text-muted-foreground py-2">
               {!paymentCountryId
                 ? "Choisissez d'abord un pays"
-                : networksLoading
-                  ? "Chargement des réseaux..."
-                  : "Choisissez Orange, MTN, Wave..."}
-            </option>
-            {paymentNetworkOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {paymentNetworkLabel(option.value, lng ?? "fr")}
-              </option>
-            ))}
-          </select>
-          {paymentCountryName && paymentNetworkOptions.length === 0 && !networksLoading ? (
+                : "Chargement des réseaux..."}
+            </p>
+          ) : paymentNetworkOptions.length === 0 ? (
             <p className="text-xs text-destructive">
               Aucun réseau configuré pour {paymentCountryName}.
             </p>
-          ) : paymentNetworkOptions.length > 0 ? (
-            <div className="flex flex-wrap gap-2 pt-1">
+          ) : (
+            <div className="flex flex-wrap gap-2">
               {paymentNetworkOptions
                 .filter((option) => option.value !== "unknown")
                 .map((option) => (
@@ -410,7 +399,7 @@ function PaymentSetupInner() {
                     type="button"
                     onClick={() => selectPaymentNetwork(option.value)}
                     className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                       paymentNetwork === option.value
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted",
@@ -420,6 +409,15 @@ function PaymentSetupInner() {
                   </button>
                 ))}
             </div>
+          )}
+          {paymentNetwork !== "unknown" ? (
+            <p className="text-xs text-muted-foreground">
+              Réseau sélectionné : {paymentNetworkLabel(paymentNetwork, lng ?? "fr")}
+            </p>
+          ) : paymentCountryId && !networksLoading && paymentNetworkOptions.length > 0 ? (
+            <p className="text-xs text-amber-700">
+              Touchez un réseau ci-dessus pour activer le paiement.
+            </p>
           ) : null}
           {phoneCountryMismatch ? (
             <p className="text-xs text-amber-700">
