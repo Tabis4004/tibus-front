@@ -127,6 +127,48 @@ export function isPaymentNetwork(value: string): value is PaymentNetwork {
   );
 }
 
+const PHONE_COUNTRY_PREFIXES: Array<{ prefix: string; country: string }> = [
+  { prefix: "225", country: "Côte d'Ivoire" },
+  { prefix: "226", country: "Burkina Faso" },
+  { prefix: "221", country: "Sénégal" },
+  { prefix: "229", country: "Bénin" },
+  { prefix: "223", country: "Mali" },
+  { prefix: "228", country: "Togo" },
+  { prefix: "237", country: "Cameroun" },
+  { prefix: "241", country: "Gabon" },
+  { prefix: "233", country: "Ghana" },
+  { prefix: "224", country: "Guinée" },
+  { prefix: "245", country: "Guinée-Bissau" },
+  { prefix: "254", country: "Kenya" },
+  { prefix: "265", country: "Malawi" },
+  { prefix: "227", country: "Niger" },
+  { prefix: "234", country: "Nigeria" },
+  { prefix: "256", country: "Ouganda" },
+  { prefix: "243", country: "RD Congo" },
+  { prefix: "242", country: "République du Congo" },
+  { prefix: "250", country: "Rwanda" },
+  { prefix: "232", country: "Sierra Leone" },
+  { prefix: "255", country: "Tanzanie" },
+  { prefix: "260", country: "Zambie" },
+  { prefix: "258", country: "Mozambique" },
+];
+
+/** Pays Tibus déduit du préfixe international (ex. +225 → Côte d'Ivoire). */
+export function inferCountryNameFromPhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+
+  const sorted = [...PHONE_COUNTRY_PREFIXES].sort(
+    (a, b) => b.prefix.length - a.prefix.length,
+  );
+  for (const entry of sorted) {
+    if (digits.startsWith(entry.prefix)) {
+      return entry.country;
+    }
+  }
+  return null;
+}
+
 /** Indication CI à partir du préfixe — non fiable à 100 %, sert de pré-sélection UX. */
 export function inferCiNetworkFromPhone(phone: string): PaymentNetwork | null {
   return inferNetworkFromPhone(phone, "Côte d'Ivoire");

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
 import {
   getPaymentNetworkOptionsForCountry,
+  inferCountryNameFromPhone,
   inferNetworkFromPhone,
   type PaymentNetworkOption,
 } from "@/lib/payment-networks.ts";
@@ -24,6 +25,7 @@ export function usePaymentCountryNetworks({
   const [countriesError, setCountriesError] = useState<string | null>(null);
   const [paymentCountryId, setPaymentCountryId] = useState("");
   const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
+  const [countryManual, setCountryManual] = useState(false);
   const [networkManual, setNetworkManual] = useState(false);
   const [paymentNetworkOptions, setPaymentNetworkOptions] = useState<PaymentNetworkOption[]>([]);
   const [networksLoading, setNetworksLoading] = useState(false);
@@ -55,6 +57,23 @@ export function usePaymentCountryNetworks({
       cancelled = true;
     };
   }, [activeGateway]);
+
+  useEffect(() => {
+    if (!countries?.length || countryManual || paymentCountryId) return;
+
+    const inferredName = inferCountryNameFromPhone(passengerPhone);
+    if (inferredName) {
+      const match = countries.find((country) => country.name === inferredName);
+      if (match) {
+        setPaymentCountryId(match.id);
+        return;
+      }
+    }
+
+    if (countries.length === 1) {
+      setPaymentCountryId(countries[0].id);
+    }
+  }, [countries, countryManual, passengerPhone, paymentCountryId]);
 
   useEffect(() => {
     if (!paymentCountryId) {
@@ -95,14 +114,36 @@ export function usePaymentCountryNetworks({
   }, [paymentCountryId, paymentNetworkOptions, paymentNetwork]);
 
   useEffect(() => {
-    if (!paymentCountryId || networkManual) return;
+    if (!paymentCountryId || networkManual || networksLoading) return;
+
     const inferred = inferNetworkFromPhone(passengerPhone, paymentCountryName);
     if (inferred && paymentNetworkOptions.some((option) => option.value === inferred)) {
       setPaymentNetwork(inferred);
+      return;
     }
-  }, [passengerPhone, paymentCountryId, paymentCountryName, networkManual, paymentNetworkOptions]);
+
+    const concreteOptions = paymentNetworkOptions.filter(
+      (option) => option.value !== "unknown",
+    );
+    if (concreteOptions.length === 1) {
+      setPaymentNetwork(concreteOptions[0].value);
+    }
+  }, [
+    passengerPhone,
+    paymentCountryId,
+    paymentCountryName,
+    networkManual,
+    networksLoading,
+    paymentNetworkOptions,
+  ]);
+
+  const inferredCountryName = useMemo(
+    () => inferCountryNameFromPhone(passengerPhone),
+    [passengerPhone],
+  );
 
   const selectPaymentCountry = (countryId: string) => {
+    setCountryManual(true);
     setPaymentCountryId(countryId);
     setNetworkManual(false);
     setPaymentNetwork("unknown");
@@ -121,6 +162,7 @@ export function usePaymentCountryNetworks({
     paymentNetwork,
     paymentNetworkOptions,
     networksLoading,
+    inferredCountryName,
     selectPaymentCountry,
     selectPaymentNetwork,
     setPaymentCountryId,

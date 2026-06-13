@@ -76,6 +76,7 @@ function PaymentSetupInner() {
     paymentNetwork,
     paymentNetworkOptions,
     networksLoading,
+    inferredCountryName,
     selectPaymentCountry,
     selectPaymentNetwork,
     setPaymentCountryId,
@@ -85,6 +86,18 @@ function PaymentSetupInner() {
     passengerPhone: draft?.passengerPhone ?? "",
   });
 
+  const phoneCountryMismatch =
+    inferredCountryName &&
+    paymentCountryName &&
+    inferredCountryName !== paymentCountryName;
+
+  const payDisabledReason =
+    !paymentCountryId
+      ? "Choisissez le pays de votre portefeuille Mobile Money."
+      : paymentNetwork === "unknown"
+        ? "Choisissez votre réseau Mobile Money (Orange, MTN, Wave…)."
+        : null;
+
   useEffect(() => {
     if (!reservationId) return;
     const loaded = loadBookingDraft(reservationId);
@@ -92,14 +105,10 @@ function PaymentSetupInner() {
   }, [reservationId]);
 
   useEffect(() => {
-    if (!draft?.paymentCountryId) return;
-    setPaymentCountryId(draft.paymentCountryId);
-  }, [draft?.paymentCountryId, setPaymentCountryId]);
-
-  useEffect(() => {
-    if (!draft?.paymentNetwork) return;
+    if (!draft?.paymentNetwork || draft.paymentNetwork === "unknown") return;
+    if (draft.paymentCountryId) setPaymentCountryId(draft.paymentCountryId);
     setPaymentNetwork(draft.paymentNetwork as PaymentNetwork);
-  }, [draft?.paymentNetwork, setPaymentNetwork]);
+  }, [draft?.paymentCountryId, draft?.paymentNetwork, setPaymentCountryId, setPaymentNetwork]);
 
   useEffect(() => {
     void getTravelerPaymentNoticeSupabase()
@@ -391,6 +400,32 @@ function PaymentSetupInner() {
             <p className="text-xs text-destructive">
               Aucun réseau configuré pour {paymentCountryName}.
             </p>
+          ) : paymentNetworkOptions.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {paymentNetworkOptions
+                .filter((option) => option.value !== "unknown")
+                .map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => selectPaymentNetwork(option.value)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                      paymentNetwork === option.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-background hover:bg-muted",
+                    )}
+                  >
+                    {paymentNetworkLabel(option.value, lng ?? "fr")}
+                  </button>
+                ))}
+            </div>
+          ) : null}
+          {phoneCountryMismatch ? (
+            <p className="text-xs text-amber-700">
+              Ce numéro ({draft.passengerPhone}) correspond plutôt à {inferredCountryName}.
+              Vérifiez le pays de paiement.
+            </p>
           ) : null}
         </div>
 
@@ -442,6 +477,9 @@ function PaymentSetupInner() {
           )}
         </Button>
       </div>
+      {payDisabledReason && !paying ? (
+        <p className="text-xs text-center text-muted-foreground">{payDisabledReason}</p>
+      ) : null}
     </div>
   );
 }
