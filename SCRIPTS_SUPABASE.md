@@ -32,6 +32,7 @@
 | 24 | `024_gateway_fees_nullable.sql` | ⏳ **À exécuter** — Z/F nullable + correctif lot 22 + sauvegarde admin |
 | 92 | `supabase/migrations/092_company_expenses_ohada.sql` | ✅ **Exécuté** — dépenses compagnie + compte de résultat SYSCOHADA |
 | 93 | `supabase/migrations/093_chauffeur_role_gares_cities.sql` | ✅ **Exécuté** — rôle chauffeur + gares liées aux villes |
+| 94 | `supabase/migrations/094_expense_categories_all_companies.sql` | ✅ **Exécuté** — 11 types de dépenses preset pour toutes les compagnies |
 
 ## Politique anti-fraude (réservation voyageur)
 
@@ -333,3 +334,28 @@ supabase db query --linked -f supabase/migrations/092_company_expenses_ohada.sql
 - Types prédéfinis : carburant, réparations, pièces, salaires, électricité, communication, internet, matériel bureau, marketing, abonnement TV (+ CRUD).
 - RPCs : `list/upsert/delete_company_expense_category`, `list/upsert/delete_company_expense`, `get_company_income_statement` (SYSCOHADA).
 - UI owner : `/owner/expenses`, `/owner/income-statement`.
+
+## Lot 094 — Types de dépenses pour toutes les compagnies
+
+Exécuter `supabase/migrations/094_expense_categories_all_companies.sql` :
+
+```bash
+supabase db query --linked -f supabase/migrations/094_expense_categories_all_companies.sql
+```
+
+| Type | Compte SYSCOHADA | Libellé |
+|------|------------------|---------|
+| Carburant | 6047 | Achats de carburants et lubrifiants |
+| Réparations | 6156 | Entretien, réparations et maintenance |
+| Pièces détachées | 6042 | Achats de pièces et fournitures consommables |
+| Salaires équipe | 6412 | Salaires, appointements et commissions du personnel |
+| Électricité | 6052 | Eau et électricité |
+| Communication | 6241 | Frais de téléphone et communication |
+| Internet | 6248 | Frais d'Internet |
+| Achat de matériel de bureau | 6045 | Achats de matériel et fournitures de bureau |
+| Marketing | 6228 | Publicité, publications et relations publiques |
+| Abonnement TV | 6288 | Abonnements et services (TV, médias) |
+| Transports interne | 6135 | Transports internes et déplacements exploitation |
+
+- Seed automatique pour **toutes les compagnies existantes** (`seed_all_companies_expense_categories`).
+- Trigger `companies_seed_expense_categories` : chaque **nouvelle compagnie** reçoit les 11 types à l'inscription.
