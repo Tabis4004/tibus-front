@@ -13,13 +13,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
   Authenticated,
   AuthLoading,
@@ -65,7 +59,7 @@ function PaymentSetupInner() {
   const [draft, setDraft] = useState(() =>
     reservationId ? loadBookingDraft(reservationId) : null,
   );
-  const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
+  const [activeGateway, setActiveGateway] = useState<PaymentGateway>("geniuspay");
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
   const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false);
   const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
@@ -76,6 +70,7 @@ function PaymentSetupInner() {
 
   const {
     countries: paymentCountries,
+    countriesError,
     paymentCountryId,
     paymentCountryName,
     paymentNetwork,
@@ -318,21 +313,48 @@ function PaymentSetupInner() {
           ) : null}
         </div>
 
-        <div className="space-y-1.5">
-          <Label>Pays de paiement *</Label>
-          <Select value={paymentCountryId || undefined} onValueChange={selectPaymentCountry}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choisissez le pays de votre portefeuille" />
-            </SelectTrigger>
-            <SelectContent>
-              {(paymentCountries ?? []).map((country) => (
-                <SelectItem key={country.id} value={country.id}>
+        <div className="space-y-2">
+          <Label htmlFor="payment-country">Pays de paiement *</Label>
+          <select
+            id="payment-country"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={paymentCountryId}
+            onChange={(event) => selectPaymentCountry(event.target.value)}
+            disabled={!paymentCountries?.length}
+          >
+            <option value="" disabled>
+              {paymentCountries ? "Choisissez le pays de votre portefeuille" : "Chargement des pays..."}
+            </option>
+            {(paymentCountries ?? []).map((country) => (
+              <option key={country.id} value={country.id}>
+                {country.name}
+              </option>
+            ))}
+          </select>
+
+          {paymentCountries && paymentCountries.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {paymentCountries.map((country) => (
+                <button
+                  key={country.id}
+                  type="button"
+                  onClick={() => selectPaymentCountry(country.id)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                    paymentCountryId === country.id
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-muted",
+                  )}
+                >
                   {country.name}
-                </SelectItem>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-          {!paymentCountries ? (
+            </div>
+          ) : null}
+
+          {countriesError ? (
+            <p className="text-xs text-destructive">{countriesError}</p>
+          ) : !paymentCountries ? (
             <p className="text-xs text-muted-foreground">Chargement des pays...</p>
           ) : paymentCountries.length === 0 ? (
             <p className="text-xs text-destructive">Aucun pays de paiement configuré.</p>
@@ -343,30 +365,28 @@ function PaymentSetupInner() {
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <Label>Réseau Mobile Money *</Label>
-          <Select
+        <div className="space-y-2">
+          <Label htmlFor="payment-network">Réseau Mobile Money *</Label>
+          <select
+            id="payment-network"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             value={paymentNetwork}
-            onValueChange={(value) => selectPaymentNetwork(value as PaymentNetwork)}
+            onChange={(event) => selectPaymentNetwork(event.target.value as PaymentNetwork)}
             disabled={!paymentCountryId || networksLoading || paymentNetworkOptions.length === 0}
           >
-            <SelectTrigger>
-              <SelectValue
-                placeholder={
-                  paymentCountryId
-                    ? "Choisissez Orange, MTN, Wave..."
-                    : "Choisissez d'abord un pays"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {paymentNetworkOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {paymentNetworkLabel(option.value, lng ?? "fr")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <option value="unknown" disabled>
+              {!paymentCountryId
+                ? "Choisissez d'abord un pays"
+                : networksLoading
+                  ? "Chargement des réseaux..."
+                  : "Choisissez Orange, MTN, Wave..."}
+            </option>
+            {paymentNetworkOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {paymentNetworkLabel(option.value, lng ?? "fr")}
+              </option>
+            ))}
+          </select>
           {paymentCountryName && paymentNetworkOptions.length === 0 && !networksLoading ? (
             <p className="text-xs text-destructive">
               Aucun réseau configuré pour {paymentCountryName}.

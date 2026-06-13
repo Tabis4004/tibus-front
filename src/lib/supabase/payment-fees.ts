@@ -162,19 +162,29 @@ export async function listTravelerPaymentCountriesSupabase(params?: {
   gateway?: PaymentGateway;
   method?: PaymentMethod;
 }): Promise<TravelerPaymentCountry[]> {
-  const { data, error } = await supabase.rpc("list_traveler_payment_countries", {
-    p_gateway: params?.gateway ?? "geniuspay",
-    p_method: params?.method ?? "mobile_money",
-  });
+  const gateway = params?.gateway ?? "geniuspay";
+  const method = params?.method ?? "mobile_money";
 
-  if (error) throw error;
+  async function fetchFor(gw: PaymentGateway): Promise<TravelerPaymentCountry[]> {
+    const { data, error } = await supabase.rpc("list_traveler_payment_countries", {
+      p_gateway: gw,
+      p_method: method,
+    });
+    if (error) throw error;
+    return ((data ?? []) as Array<{ country_id?: unknown; country_name?: unknown }>)
+      .map((row) => ({
+        id: String(row.country_id ?? ""),
+        name: String(row.country_name ?? ""),
+      }))
+      .filter((row) => row.id && row.name);
+  }
 
-  return ((data ?? []) as Array<{ country_id?: unknown; country_name?: unknown }>)
-    .map((row) => ({
-      id: String(row.country_id ?? ""),
-      name: String(row.country_name ?? ""),
-    }))
-    .filter((row) => row.id && row.name);
+  const primary = await fetchFor(gateway);
+  if (primary.length > 0) return primary;
+  if (gateway !== "geniuspay") {
+    return fetchFor("geniuspay");
+  }
+  return primary;
 }
 
 export async function listTravelerPaymentNetworksSupabase(params: {

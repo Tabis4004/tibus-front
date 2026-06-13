@@ -21,6 +21,7 @@ export function usePaymentCountryNetworks({
   passengerPhone = "",
 }: UsePaymentCountryNetworksArgs) {
   const [countries, setCountries] = useState<TravelerPaymentCountry[] | undefined>(undefined);
+  const [countriesError, setCountriesError] = useState<string | null>(null);
   const [paymentCountryId, setPaymentCountryId] = useState("");
   const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
   const [networkManual, setNetworkManual] = useState(false);
@@ -35,13 +36,19 @@ export function usePaymentCountryNetworks({
   useEffect(() => {
     let cancelled = false;
     setCountries(undefined);
+    setCountriesError(null);
 
     void listTravelerPaymentCountriesSupabase({ gateway: activeGateway })
       .then((rows) => {
         if (!cancelled) setCountries(rows);
       })
-      .catch(() => {
-        if (!cancelled) setCountries([]);
+      .catch((err) => {
+        if (!cancelled) {
+          setCountries([]);
+          setCountriesError(
+            err instanceof Error ? err.message : "Impossible de charger les pays",
+          );
+        }
       });
 
     return () => {
@@ -108,6 +115,7 @@ export function usePaymentCountryNetworks({
 
   return {
     countries,
+    countriesError,
     paymentCountryId,
     paymentCountryName,
     paymentNetwork,
