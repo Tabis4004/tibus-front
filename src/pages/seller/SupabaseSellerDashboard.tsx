@@ -41,20 +41,12 @@ import {
 } from "@/lib/supabase/seller-counter";
 import { getActivePaymentGatewaySupabase } from "@/lib/supabase/payment-gateway.ts";
 import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
-import {
-  calculateTravelerPaymentSupabase,
-  listTravelerPaymentNetworksSupabase,
-} from "@/lib/supabase/payment-fees";
-import { supabase } from "@/lib/supabase";
+import { usePaymentCountryNetworks } from "@/hooks/use-payment-country-networks";
+import { calculateTravelerPaymentSupabase } from "@/lib/supabase/payment-fees";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 import { getOpenStationCashSupabase } from "@/lib/supabase/station-cash";
 import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
-import {
-  getPaymentNetworkOptionsForCountry,
-  inferNetworkFromPhone,
-  paymentNetworkLabel,
-  type PaymentNetworkOption,
-} from "@/lib/payment-networks.ts";
+import { paymentNetworkLabel } from "@/lib/payment-networks.ts";
 import {
   Select,
   SelectContent,
@@ -136,35 +128,27 @@ function SaleForm({
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
   const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false);
   const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
-  const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
-  const [networkManual, setNetworkManual] = useState(false);
-  const [paymentNetworkOptions, setPaymentNetworkOptions] = useState<PaymentNetworkOption[]>(
-    getPaymentNetworkOptionsForCountry(null),
-  );
-  const [companyCountryName, setCompanyCountryName] = useState<string | null>(null);
   const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
   const [loyaltyLookupUser, setLoyaltyLookupUser] = useState<SelectedLoyaltyUser | null>(null);
   const [cashOpen, setCashOpen] = useState<boolean | null>(null);
   const [cashPendingReversal, setCashPendingReversal] = useState(false);
 
-  const selectedSeats = useMemo(
-    () => travelers.map((t) => t.seatNumber).filter((seat): seat is string => Boolean(seat)),
-    [travelers],
-  );
-
-  const actionLabel = isDirectSale ? "Vendre" : t("book_and_pay_online");
-  const loadingLabel = isDirectSale ? "Vente..." : "Redirection...";
-
-  const nominalAmount = useMemo(
-    () =>
-      travelers.reduce((sum, traveler) => {
-        return sum + trip.priceAmount + toNumber(traveler.parcelAmount);
-      }, 0),
-    [travelers, trip.priceAmount],
-  );
-
   const companyId = trip.companyId ?? profile.company?.id ?? "";
   const primaryPhone = travelers[0]?.passengerPhone ?? "";
+
+  const {
+    countries: paymentCountries,
+    paymentCountryId,
+    paymentCountryName,
+    paymentNetwork,
+    paymentNetworkOptions,
+    networksLoading,
+    selectPaymentCountry,
+    selectPaymentNetwork,
+  } = usePaymentCountryNetworks({
+    activeGateway,
+    passengerPhone: primaryPhone,
+  });
 
   useEffect(() => {
     if (!isDirectSale) {
@@ -195,70 +179,24 @@ function SaleForm({
       .catch(() => setActiveGateway("fedapay"));
   }, []);
 
-  useEffect(() => {
-    if (!companyId) {
-      setCompanyCountryName(null);
-      setPaymentNetworkOptions(getPaymentNetworkOptionsForCountry(null));
-      return;
-    }
+  const selectedSeats = useMemo(
+    () => travelers.map((t) => t.seatNumber).filter((seat): seat is string => Boolean(seat)),
+    [travelers],
+  );
 
-    let cancelled = false;
+  const actionLabel = isDirectSale ? "Vendre" : t("book_and_pay_online");
+  const loadingLabel = isDirectSale ? "Vente..." : "Redirection...";
 
-    void (async () => {
-      const { data: company, error } = await supabase
-        .from("Companies")
-        .select("countryId, Countries(name)")
-        .eq("id", companyId)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      const countries = company?.Countries as { name?: string } | { name?: string }[] | null;
-      const countryName = error
-        ? null
-        : (Array.isArray(countries) ? countries[0]?.name : countries?.name) ?? null;
-      const countryId = (company?.countryId as string | undefined) ?? "";
-
-      setCompanyCountryName(countryName ?? null);
-
-      const gatewayNetworks = countryId
-        ? await listTravelerPaymentNetworksSupabase({
-            countryId,
-            gateway: activeGateway,
-          }).catch(() => [] as string[])
-        : [];
-
-      if (cancelled) return;
-
-      setPaymentNetworkOptions(
-        getPaymentNetworkOptionsForCountry(countryName, gatewayNetworks),
-      );
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId, activeGateway]);
+  const nominalAmount = useMemo(
+    () =>
+      travelers.reduce((sum, traveler) => {
+        return sum + trip.priceAmount + toNumber(traveler.parcelAmount);
+      }, 0),
+    [travelers, trip.priceAmount],
+  );
 
   useEffect(() => {
-    const allowed = paymentNetworkOptions.map((option) => option.value);
-    if (!allowed.includes(paymentNetwork)) {
-      const preferred = allowed.find((value) => value !== "unknown") ?? "unknown";
-      setPaymentNetwork(preferred as PaymentNetwork);
-      setNetworkManual(false);
-    }
-  }, [paymentNetworkOptions, paymentNetwork]);
-
-  useEffect(() => {
-    if (isDirectSale || networkManual) return;
-    const inferred = inferNetworkFromPhone(primaryPhone, companyCountryName);
-    if (inferred && paymentNetworkOptions.some((option) => option.value === inferred)) {
-      setPaymentNetwork(inferred);
-    }
-  }, [companyCountryName, isDirectSale, networkManual, paymentNetworkOptions, primaryPhone]);
-
-  useEffect(() => {
-    if (isDirectSale || !companyId) {
+    if (isDirectSale || !companyId || !paymentCountryId) {
       setPaymentBreakdown(null);
       setPaymentPreviewError(null);
       return;
@@ -271,6 +209,7 @@ function SaleForm({
     calculateTravelerPaymentSupabase({
       nominalAmount,
       companyId,
+      countryId: paymentCountryId,
       gateway: activeGateway,
       method: "mobile_money",
       network: paymentNetwork,
@@ -293,7 +232,7 @@ function SaleForm({
     return () => {
       cancelled = true;
     };
-  }, [companyId, isDirectSale, nominalAmount, paymentNetwork, activeGateway]);
+  }, [companyId, isDirectSale, nominalAmount, paymentCountryId, paymentNetwork, activeGateway]);
 
   const setTraveler = (id: string, patch: Partial<TravelerForm>) => {
     setTravelers((items) =>
@@ -339,6 +278,16 @@ function SaleForm({
       return;
     }
 
+    if (!isDirectSale && !paymentCountryId) {
+      toast.error("Choisissez le pays de paiement");
+      return;
+    }
+
+    if (!isDirectSale && (!paymentNetwork || paymentNetwork === "unknown")) {
+      toast.error("Choisissez votre réseau Mobile Money");
+      return;
+    }
+
     if (isDirectSale && cashOpen === false) {
       toast.error("Ouvrez votre caisse avant toute vente guichet (onglet Guichet → Session caisse journalière)");
       return;
@@ -371,6 +320,7 @@ function SaleForm({
             parcelAmount: toNumber(traveler.parcelAmount),
           })),
           channel: "seller_reservation",
+          paymentCountryId,
           paymentNetwork,
           successUrl,
           errorUrl,
@@ -572,32 +522,53 @@ function SaleForm({
       </Button>
 
       {!isDirectSale && (
-        <div className="space-y-1.5">
-          <Label>Réseau Mobile Money</Label>
-          <Select
-            value={paymentNetwork}
-            onValueChange={(value) => {
-              setNetworkManual(true);
-              setPaymentNetwork(value as PaymentNetwork);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {paymentNetworkOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {paymentNetworkLabel(option.value, lng ?? "fr")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {paymentBreakdown?.usedMaxFallback && (
-            <p className="text-xs text-muted-foreground">
-              Estimation avec le taux le plus élevé ({paymentBreakdown.network}).
-            </p>
-          )}
-        </div>
+        <>
+          <div className="space-y-1.5">
+            <Label>Pays de paiement *</Label>
+            <Select value={paymentCountryId || undefined} onValueChange={selectPaymentCountry}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choisissez le pays" />
+              </SelectTrigger>
+              <SelectContent>
+                {(paymentCountries ?? []).map((country) => (
+                  <SelectItem key={country.id} value={country.id}>
+                    {country.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Réseau Mobile Money *</Label>
+            <Select
+              value={paymentNetwork}
+              onValueChange={(value) => selectPaymentNetwork(value as PaymentNetwork)}
+              disabled={!paymentCountryId || networksLoading || paymentNetworkOptions.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={paymentCountryId ? "Choisissez le réseau" : "Sélectionnez d'abord un pays"} />
+              </SelectTrigger>
+              <SelectContent>
+                {paymentNetworkOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {paymentNetworkLabel(option.value, lng ?? "fr")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {paymentCountryName && paymentNetworkOptions.length === 0 && !networksLoading ? (
+              <p className="text-xs text-destructive">
+                Aucun réseau configuré pour {paymentCountryName}.
+              </p>
+            ) : null}
+            {paymentBreakdown?.usedMaxFallback && (
+              <p className="text-xs text-muted-foreground">
+                Estimation avec le taux le plus élevé ({paymentBreakdown.network}).
+              </p>
+            )}
+          </div>
+        </>
       )}
 
       <Separator />

@@ -28,6 +28,7 @@ export type InitializeFedaPayParams = {
   platformLoyaltyDiscountAmount?: number;
   paymentMethod?: "mobile_money" | "card" | "bank_transfer" | "wallet";
   paymentNetwork?: PaymentNetwork;
+  paymentCountryId?: string;
   successUrl: string;
   errorUrl: string;
 };

@@ -146,11 +146,36 @@ export async function deleteGatewayPaymentFeeSupabase(feeId: string): Promise<vo
 export type TravelerPaymentInput = {
   nominalAmount: number;
   companyId: string;
+  countryId?: string | null;
   gateway?: PaymentGateway;
   method?: PaymentMethod;
   network?: PaymentNetwork | null;
   tripMarginPercent?: number | null;
 };
+
+export type TravelerPaymentCountry = {
+  id: string;
+  name: string;
+};
+
+export async function listTravelerPaymentCountriesSupabase(params?: {
+  gateway?: PaymentGateway;
+  method?: PaymentMethod;
+}): Promise<TravelerPaymentCountry[]> {
+  const { data, error } = await supabase.rpc("list_traveler_payment_countries", {
+    p_gateway: params?.gateway ?? "geniuspay",
+    p_method: params?.method ?? "mobile_money",
+  });
+
+  if (error) throw error;
+
+  return ((data ?? []) as Array<{ country_id?: unknown; country_name?: unknown }>)
+    .map((row) => ({
+      id: String(row.country_id ?? ""),
+      name: String(row.country_name ?? ""),
+    }))
+    .filter((row) => row.id && row.name);
+}
 
 export async function listTravelerPaymentNetworksSupabase(params: {
   countryId: string;
@@ -191,6 +216,7 @@ export async function calculateTravelerPaymentSupabase(
     p_method: input.method ?? "mobile_money",
     p_network: input.network ?? "unknown",
     p_trip_margin_percent: input.tripMarginPercent ?? null,
+    p_country_id: input.countryId ?? null,
   });
 
   if (error) throw error;

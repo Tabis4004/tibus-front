@@ -99,8 +99,8 @@ export function getPaymentNetworksForCountryName(
   countryName: string | null | undefined,
 ): PaymentNetwork[] {
   const key = normalizeCountryName(countryName ?? "");
-  if (!key) return ["orange", "mtn", "moov", "wave"];
-  return COUNTRY_PAYMENT_NETWORKS[key] ?? ["orange", "mtn", "moov", "wave"];
+  if (!key) return [];
+  return COUNTRY_PAYMENT_NETWORKS[key] ?? [];
 }
 
 export function getPaymentNetworkOptionsForCountry(
@@ -113,7 +113,7 @@ export function getPaymentNetworkOptionsForCountry(
 
   const unique = Array.from(new Set(resolved));
   if (unique.length === 0) {
-    return PAYMENT_NETWORK_OPTIONS;
+    return [];
   }
 
   return [...unique.map(networkOption), UNKNOWN_OPTION];

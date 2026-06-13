@@ -63,17 +63,12 @@ import {
 } from "@/lib/supabase/booking-draft";
 import { getActivePaymentGatewaySupabase } from "@/lib/supabase/payment-gateway.ts";
 import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
+import { usePaymentCountryNetworks } from "@/hooks/use-payment-country-networks";
 import {
   calculateTravelerPaymentSupabase,
-  listTravelerPaymentNetworksSupabase,
 } from "@/lib/supabase/payment-fees";
 import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
-import {
-  getPaymentNetworkOptionsForCountry,
-  inferNetworkFromPhone,
-  paymentNetworkLabel,
-  type PaymentNetworkOption,
-} from "@/lib/payment-networks.ts";
+import { paymentNetworkLabel } from "@/lib/payment-networks.ts";
 import {
   DEFAULT_TRAVELER_PAYMENT_NOTICE,
   getTravelerPaymentNoticeSupabase,
@@ -105,7 +100,6 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { useTranslation } from "react-i18next";
 import SeatPicker from "@/components/seat-picker.tsx";
 import { profileDisplayName } from "@/lib/auth/profile-completion.ts";
-import { supabase } from "@/lib/supabase";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 function fmt(iso: string, pattern: string) {
@@ -140,16 +134,24 @@ export default function SupabaseTripDetail() {
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
   const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false);
   const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
-  const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
-  const [networkManual, setNetworkManual] = useState(false);
-  const [paymentNetworkOptions, setPaymentNetworkOptions] = useState<PaymentNetworkOption[]>(
-    getPaymentNetworkOptionsForCountry(null),
-  );
-  const [companyCountryName, setCompanyCountryName] = useState<string | null>(null);
   const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
   const [paymentNotice, setPaymentNotice] = useState<TravelerPaymentNotice>(
     DEFAULT_TRAVELER_PAYMENT_NOTICE,
   );
+
+  const {
+    countries: paymentCountries,
+    paymentCountryId,
+    paymentCountryName,
+    paymentNetwork,
+    paymentNetworkOptions,
+    networksLoading,
+    selectPaymentCountry,
+    selectPaymentNetwork,
+  } = usePaymentCountryNetworks({
+    activeGateway,
+    passengerPhone,
+  });
 
   const occupiedSeats = useSupabaseOccupiedSeats(tripId);
 
@@ -227,62 +229,7 @@ export default function SupabaseTripDetail() {
   }, []);
 
   useEffect(() => {
-    if (!trip?.countryId) {
-      setCompanyCountryName(null);
-      setPaymentNetworkOptions(getPaymentNetworkOptionsForCountry(null));
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      const { data: country, error } = await supabase
-        .from("Countries")
-        .select("name")
-        .eq("id", trip.countryId)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      const countryName = error ? null : ((country?.name as string | undefined) ?? null);
-      setCompanyCountryName(countryName);
-
-      const gatewayNetworks = await listTravelerPaymentNetworksSupabase({
-        countryId: trip.countryId,
-        gateway: activeGateway,
-      }).catch(() => [] as string[]);
-
-      if (cancelled) return;
-
-      setPaymentNetworkOptions(
-        getPaymentNetworkOptionsForCountry(countryName, gatewayNetworks),
-      );
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [trip?.countryId, activeGateway]);
-
-  useEffect(() => {
-    const allowed = paymentNetworkOptions.map((option) => option.value);
-    if (!allowed.includes(paymentNetwork)) {
-      const preferred = allowed.find((value) => value !== "unknown") ?? "unknown";
-      setPaymentNetwork(preferred as PaymentNetwork);
-      setNetworkManual(false);
-    }
-  }, [paymentNetworkOptions, paymentNetwork]);
-
-  useEffect(() => {
-    if (networkManual) return;
-    const inferred = inferNetworkFromPhone(passengerPhone, companyCountryName);
-    if (inferred && paymentNetworkOptions.some((option) => option.value === inferred)) {
-      setPaymentNetwork(inferred);
-    }
-  }, [passengerPhone, networkManual, companyCountryName, paymentNetworkOptions]);
-
-  useEffect(() => {
-    if (!trip?.companyId) {
+    if (!trip?.companyId || !paymentCountryId) {
       setPaymentBreakdown(null);
       setPaymentPreviewError(null);
       return;
@@ -303,6 +250,7 @@ export default function SupabaseTripDetail() {
     calculateTravelerPaymentSupabase({
       nominalAmount,
       companyId: trip.companyId,
+      countryId: paymentCountryId,
       gateway: activeGateway,
       method: "mobile_money",
       network: paymentNetwork,
@@ -334,6 +282,7 @@ export default function SupabaseTripDetail() {
     companyLoyaltyResult?.discountAmount,
     platformLoyaltyResult?.valid,
     platformLoyaltyResult?.discountAmount,
+    paymentCountryId,
     paymentNetwork,
     activeGateway,
   ]);
@@ -538,6 +487,14 @@ export default function SupabaseTripDetail() {
       toast.error("Numéro de téléphone requis pour payer");
       return;
     }
+    if (!paymentCountryId) {
+      toast.error("Choisissez le pays de paiement");
+      return;
+    }
+    if (!paymentNetwork || paymentNetwork === "unknown") {
+      toast.error("Choisissez votre réseau Mobile Money");
+      return;
+    }
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 9) {
       toast.error("Numéro trop court — ex: 07 00 00 00 00 ou +225 07...");
@@ -569,6 +526,7 @@ export default function SupabaseTripDetail() {
         loyaltyDiscountAmount: companyLoyaltyResult?.valid ? companyLoyaltyResult.discountAmount : undefined,
         platformLoyaltyPointsRedeemed: platformLoyaltyResult?.valid ? platformLoyaltyResult.pointsRedeemed : undefined,
         platformLoyaltyDiscountAmount: platformLoyaltyResult?.valid ? platformLoyaltyResult.discountAmount : undefined,
+        paymentCountryId,
         paymentNetwork,
         successUrl,
         errorUrl,
@@ -814,16 +772,38 @@ export default function SupabaseTripDetail() {
             )}
 
             <div className="space-y-1.5">
-              <Label>Réseau Mobile Money</Label>
+              <Label>Pays de paiement *</Label>
               <Select
-                value={paymentNetwork}
-                onValueChange={(value) => {
-                  setNetworkManual(true);
-                  setPaymentNetwork(value as PaymentNetwork);
-                }}
+                value={paymentCountryId || undefined}
+                onValueChange={selectPaymentCountry}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Choisissez votre pays" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(paymentCountries ?? []).map((country) => (
+                    <SelectItem key={country.id} value={country.id}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!paymentCountries ? (
+                <p className="text-xs text-muted-foreground">Chargement des pays...</p>
+              ) : paymentCountries.length === 0 ? (
+                <p className="text-xs text-destructive">Aucun pays de paiement configuré.</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Réseau Mobile Money *</Label>
+              <Select
+                value={paymentNetwork}
+                onValueChange={(value) => selectPaymentNetwork(value as PaymentNetwork)}
+                disabled={!paymentCountryId || networksLoading || paymentNetworkOptions.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={paymentCountryId ? "Choisissez votre réseau" : "Sélectionnez d'abord un pays"} />
                 </SelectTrigger>
                 <SelectContent>
                   {paymentNetworkOptions.map((option) => (
@@ -833,6 +813,11 @@ export default function SupabaseTripDetail() {
                   ))}
                 </SelectContent>
               </Select>
+              {paymentCountryName && paymentNetworkOptions.length === 0 && !networksLoading ? (
+                <p className="text-xs text-destructive">
+                  Aucun réseau configuré pour {paymentCountryName}.
+                </p>
+              ) : null}
               {paymentBreakdown?.usedMaxFallback && (
                 <p className="text-xs text-muted-foreground">
                   Estimation avec le taux le plus élevé ({paymentBreakdown.network}).

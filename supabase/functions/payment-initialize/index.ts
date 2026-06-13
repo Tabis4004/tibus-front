@@ -41,9 +41,57 @@ type InitBody = {
   platformLoyaltyDiscountAmount?: number;
   paymentMethod?: string;
   paymentNetwork?: string;
+  paymentCountryId?: string;
   successUrl?: string;
   errorUrl?: string;
 };
+
+async function resolveCountryCodeById(
+  admin: ReturnType<typeof createAdminClient>,
+  countryId: string,
+): Promise<string> {
+  const { data: country, error } = await admin
+    .from("Countries")
+    .select("name")
+    .eq("id", countryId)
+    .maybeSingle();
+
+  if (error || !country?.name) return "CI";
+
+  const name = String(country.name).trim().toLowerCase();
+  const isoByName: Record<string, string> = {
+    "côte d'ivoire": "CI",
+    "cote d'ivoire": "CI",
+    "burkina faso": "BF",
+    "sénégal": "SN",
+    "senegal": "SN",
+    "bénin": "BJ",
+    "benin": "BJ",
+    "mali": "ML",
+    "togo": "TG",
+    "cameroun": "CM",
+    "ghana": "GH",
+    "nigeria": "NG",
+    "kenya": "KE",
+    "rd congo": "CD",
+    "république du congo": "CG",
+    "gabon": "GA",
+    "guinée": "GN",
+    "guinee": "GN",
+    "niger": "NE",
+    "rwanda": "RW",
+    "ouganda": "UG",
+    "tanzanie": "TZ",
+    "zambie": "ZM",
+    "mozambique": "MZ",
+    "malawi": "MW",
+    "sierra leone": "SL",
+    "guinée-bissau": "GW",
+    "guinee-bissau": "GW",
+  };
+
+  return isoByName[name] ?? "CI";
+}
 
 async function resolveCompanyCountryCode(
   admin: ReturnType<typeof createAdminClient>,
@@ -382,6 +430,23 @@ Deno.serve(async (req) => {
 
     const paymentMethod = (body.paymentMethod ?? "mobile_money").trim().toLowerCase();
     const paymentNetwork = (body.paymentNetwork ?? "unknown").trim().toLowerCase();
+    const paymentCountryId = body.paymentCountryId?.trim() || null;
+
+    if (paymentMethod === "mobile_money") {
+      if (!paymentCountryId) {
+        return jsonResponse({
+          error: "Pays de paiement requis",
+          code: "PAYMENT_COUNTRY_REQUIRED",
+        }, 400);
+      }
+      if (!paymentNetwork || paymentNetwork === "unknown") {
+        return jsonResponse({
+          error: "Réseau Mobile Money requis",
+          code: "PAYMENT_NETWORK_REQUIRED",
+        }, 400);
+      }
+    }
+
     const { data: paymentCalc, error: paymentCalcError } = await admin.rpc(
       "calculate_traveler_payment_total",
       {
@@ -391,6 +456,7 @@ Deno.serve(async (req) => {
         p_method: paymentMethod,
         p_network: paymentNetwork,
         p_trip_margin_percent: null,
+        p_country_id: paymentCountryId,
       },
     );
 
@@ -469,7 +535,9 @@ Deno.serve(async (req) => {
       body.errorUrl ??
       successUrl.replace(/([?&])status=approved/, "$1status=failed");
 
-    const companyCountryCode = await resolveCompanyCountryCode(admin, companyId);
+    const paymentCountryCode = paymentCountryId
+      ? await resolveCountryCodeById(admin, paymentCountryId)
+      : await resolveCompanyCountryCode(admin, companyId);
 
     const checkout = activeGateway === "geniuspay"
       ? await createGeniusPayCheckout({
@@ -481,7 +549,7 @@ Deno.serve(async (req) => {
           name: firstTraveler.passengerName,
           email: user.email ?? "customer@tibus.app",
           phone: firstTraveler.passengerPhone,
-          country: companyCountryCode,
+          country: paymentCountryCode,
         },
         metadata: paymentMetadata,
         paymentNetwork,
