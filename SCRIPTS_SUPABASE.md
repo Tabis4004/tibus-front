@@ -30,6 +30,7 @@
 | 22 | `022_gateway_payment_network.sql` | ⏳ **À exécuter** — Y par réseau (orange/mtn/moov/wave) + fallback Y max |
 | 23 | `023_traveler_payment_notice.sql` | ⏳ **À exécuter** — message popup paiement voyageur (super_admin) |
 | 24 | `024_gateway_fees_nullable.sql` | ⏳ **À exécuter** — Z/F nullable + correctif lot 22 + sauvegarde admin |
+| 92 | `supabase/migrations/092_company_expenses_ohada.sql` | ✅ **Exécuté** — dépenses compagnie + compte de résultat SYSCOHADA |
 
 ## Politique anti-fraude (réservation voyageur)
 
@@ -313,3 +314,21 @@ Flux :
 2. Ventes via `seller_counter_sale` — créditent la session ouverte
 3. `submit_station_cash_reversal` — fin de service, statut `en_reversement`
 4. `validate_station_cash_reversal` — comptable ou owner, clôture `cloturee`
+
+## Lot 092 — Dépenses & compte de résultat OHADA
+
+Exécuter `supabase/migrations/092_company_expenses_ohada.sql` dans le SQL Editor Supabase **ou** via CLI :
+
+```bash
+cd /Users/tabistabis.tg/Documents/tibus-front
+supabase db query --linked -f supabase/migrations/092_company_expenses_ohada.sql
+```
+
+| Fichier | Statut |
+|---------|--------|
+| `supabase/migrations/092_company_expenses_ohada.sql` | ✅ Exécuté (prod `kqudaqtydimjclwaihqr`) |
+
+- Tables `CompanyExpenseCategory`, `CompanyExpense` (imputation membre équipe XOR bus+gare).
+- Types prédéfinis : carburant, réparations, pièces, salaires, électricité, communication, internet, matériel bureau, marketing, abonnement TV (+ CRUD).
+- RPCs : `list/upsert/delete_company_expense_category`, `list/upsert/delete_company_expense`, `get_company_income_statement` (SYSCOHADA).
+- UI owner : `/owner/expenses`, `/owner/income-statement`.

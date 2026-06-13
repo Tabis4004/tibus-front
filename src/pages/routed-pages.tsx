@@ -74,6 +74,8 @@ import LoyaltyPage from "./owner/LoyaltyPage.tsx";
 import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
 import OwnerMessagesPage from "./owner/OwnerMessagesPage.tsx";
 import PartnerApiPage from "./owner/PartnerApiPage.tsx";
+import ExpensesPage from "./owner/ExpensesPage.tsx";
+import IncomeStatementPage from "./owner/IncomeStatementPage.tsx";
 import CompanyManualPage from "./manual/CompanyManualPage.tsx";
 import CountryAdminManualPage from "./manual/CountryAdminManualPage.tsx";
 
@@ -306,6 +308,14 @@ export function OwnerMessages() {
 
 export function OwnerPartnerApi() {
   return supabaseOnlyPage("API partenaire itinéraires", PartnerApiPage);
+}
+
+export function OwnerExpenses() {
+  return supabaseOnlyPage("Dépenses compagnie", ExpensesPage);
+}
+
+export function OwnerIncomeStatement() {
+  return supabaseOnlyPage("Compte de résultat", IncomeStatementPage);
 }
 
 export function TicketScanner() {
