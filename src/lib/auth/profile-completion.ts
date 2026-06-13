@@ -3,6 +3,7 @@ export const ESTABLISHED_PRO_ROLES = [
   "admin_pays",
   "owner",
   "vendeur",
+  "chauffeur",
   "vendeur_master",
   "vendeur_reseau",
   "vendeur_independant",

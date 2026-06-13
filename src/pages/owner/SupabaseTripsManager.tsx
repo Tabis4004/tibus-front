@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
+import { formatRouteOptionLabel, formatTripItineraryLabel } from "@/lib/trip-display.ts";
 import { toast } from "sonner";
 import {
   CalendarIcon,
@@ -150,7 +151,14 @@ function TripFormDialog({
   }, [bus, trip, setValue]);
 
   const routeLabel = (r: OwnerRouteOption) =>
-    `${r.originName} (${r.originCity}) → ${r.destName} (${r.destCity})`;
+    formatRouteOptionLabel({
+      originCity: r.originCity,
+      originGare: r.originName,
+      destCity: r.destCity,
+      destGare: r.destName,
+      price: r.price,
+      currency: r.currency,
+    });
 
   const onSubmit = async (data: TripFormData) => {
     const depISO = new Date(
@@ -457,10 +465,27 @@ export default function SupabaseTripsManager() {
             >
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-1.5 font-semibold text-sm flex-wrap">
-                    <span>{trip.origin?.name ?? "Unknown"}</span>
-                    <ArrowRightIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span>{trip.destination?.name ?? "Unknown"}</span>
+                  <div className="font-semibold text-sm flex-wrap">
+                    {trip.origin && trip.destination ? (
+                      <p className="leading-snug">
+                        {formatTripItineraryLabel({
+                          originCity: trip.origin.city,
+                          originGare: trip.origin.name,
+                          destinationCity: trip.destination.city,
+                          destinationGare: trip.destination.name,
+                          departureTime: trip.departureTime,
+                          arrivalTime: trip.arrivalTime,
+                          priceAmount: trip.priceAmount,
+                          currency: trip.currency,
+                        })}
+                      </p>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Unknown</span>
+                        <ArrowRightIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span>Unknown</span>
+                      </span>
+                    )}
                   </div>
                   <StatusBadge status={trip.status} />
                 </div>

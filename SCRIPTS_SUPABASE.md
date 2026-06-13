@@ -31,6 +31,7 @@
 | 23 | `023_traveler_payment_notice.sql` | ⏳ **À exécuter** — message popup paiement voyageur (super_admin) |
 | 24 | `024_gateway_fees_nullable.sql` | ⏳ **À exécuter** — Z/F nullable + correctif lot 22 + sauvegarde admin |
 | 92 | `supabase/migrations/092_company_expenses_ohada.sql` | ✅ **Exécuté** — dépenses compagnie + compte de résultat SYSCOHADA |
+| 93 | `supabase/migrations/093_chauffeur_role_gares_cities.sql` | ✅ **Exécuté** — rôle chauffeur + gares liées aux villes |
 
 ## Politique anti-fraude (réservation voyageur)
 

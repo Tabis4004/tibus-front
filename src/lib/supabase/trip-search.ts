@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { cityNameFromGareRow } from "@/lib/trip-display.ts";
 
 export type SearchTripsParams = {
   originCity?: string;
@@ -26,7 +27,13 @@ export type TripSearchResult = {
   route: { estimatedDurationMinutes: number } | null;
 };
 
-type GareRow = { id: string; name: string; companyId: string };
+type GareRow = {
+  id: string;
+  name: string;
+  companyId: string;
+  cityId?: string | null;
+  Cities?: { name: string } | { name: string }[] | null;
+};
 type TrajetRow = {
   id: string;
   depart: string;
@@ -76,17 +83,16 @@ type CountryRow = { id: string; currency: string | null };
 type BusRow = { id: string; model: string | null; capacity: number };
 type ProgrammationBusRow = { trajetId: string; busId: string };
 
-function cityFromGare(gareName: string, cityNames: string[]): string {
-  const parts = gareName.split("—");
-  if (parts.length > 1) {
-    return parts[parts.length - 1].trim();
-  }
+function joinedCityName(
+  city: { name: string } | { name: string }[] | null | undefined,
+): string | null {
+  if (!city) return null;
+  if (Array.isArray(city)) return city[0]?.name ?? null;
+  return city.name ?? null;
+}
 
-  const normalized = gareName.replace(/^Gare\s+/i, "").trim();
-  const match = cityNames.find((city) =>
-    normalized.toLowerCase().includes(city.toLowerCase()),
-  );
-  return match ?? normalized;
+function cityFromGare(gare: GareRow, cityNames: string[]): string {
+  return cityNameFromGareRow(gare.name, joinedCityName(gare.Cities), cityNames);
 }
 
 function estimateArrivalIso(departureIso: string, kilometrage: number | null) {
@@ -163,7 +169,7 @@ export async function searchTripsSupabase(
 
   const { data: gares, error: garesError } = await supabase
     .from("Gares")
-    .select("id, name, companyId")
+    .select("id, name, companyId, cityId, Cities(name)")
     .in("id", [...gareIds]);
 
   if (garesError) throw garesError;
@@ -238,8 +244,8 @@ export async function searchTripsSupabase(
     if (params.companyId && company.id !== params.companyId) continue;
     if (params.countryId && company.countryId !== params.countryId) continue;
 
-    const originCity = cityFromGare(originGare.name, cityNames);
-    const destCity = cityFromGare(destGare.name, cityNames);
+    const originCity = cityFromGare(originGare, cityNames);
+    const destCity = cityFromGare(destGare, cityNames);
 
     if (
       params.originCity &&

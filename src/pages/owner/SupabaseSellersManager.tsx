@@ -77,6 +77,7 @@ function resolveErrorMessage(err: unknown, fallback: string): string {
 
 const ROLE_I18N_KEYS: Record<OwnerTeamRoleName, string> = {
   vendeur: "sellers.role_vendeur",
+  chauffeur: "sellers.role_chauffeur",
   controleur: "sellers.role_controleur",
   comptable_compagnie: "sellers.role_comptable",
   gestionnaire_gare: "sellers.role_gestionnaire_gare",

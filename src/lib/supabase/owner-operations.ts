@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { cityFromGareName, coordinatesFromGoogleMapsLinkAsync } from "@/lib/supabase/gares-map.ts";
+import { cityNameFromGareRow } from "@/lib/trip-display.ts";
 import {
   resolveOwnerCompanyId,
   setOwnerActiveCompanySupabase,
@@ -20,6 +21,8 @@ export type SupabaseOwnerStation = {
   name: string;
   address: string;
   isActive: boolean;
+  cityId: string;
+  cityName: string;
   location: { city: string; country: string } | null;
   gestionnaireUserId: string | null;
   gestionnaireSharePct: number;
@@ -169,7 +172,9 @@ export async function listOwnerStationsSupabase(
 
   const { data, error } = await supabase
     .from("Gares")
-    .select("id, name, googleMapsLink, gestionnaireUserId, gestionnaireSharePct, gestionnaireSharePctReservation")
+    .select(
+      "id, name, googleMapsLink, cityId, gestionnaireUserId, gestionnaireSharePct, gestionnaireSharePctReservation, Cities(name)",
+    )
     .eq("companyId", resolvedCompanyId)
     .order("name");
 
@@ -196,13 +201,19 @@ export async function listOwnerStationsSupabase(
 
   return (data ?? []).map((station) => {
     const gestionnaireUserId = (station.gestionnaireUserId as string | null) ?? null;
+    const cityJoin = station.Cities as { name: string } | { name: string }[] | null;
+    const linkedCity =
+      Array.isArray(cityJoin) ? cityJoin[0]?.name : cityJoin?.name ?? null;
+    const cityName = cityNameFromGareRow(station.name as string, linkedCity);
     return {
       id: station.id as string,
       name: station.name as string,
       address: (station.googleMapsLink as string | null) ?? "",
       isActive: true,
+      cityId: station.cityId as string,
+      cityName,
       location: {
-        city: cityFromGare(station.name as string),
+        city: cityName,
         country: "",
       },
       gestionnaireUserId,
@@ -219,10 +230,12 @@ export async function createOwnerStationSupabase(input: {
   appUserId: string;
   companyId?: string | null;
   name: string;
+  cityId: string;
   googleMapsLink?: string;
 }): Promise<void> {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
+  if (!input.cityId) throw new Error("Ville requise pour la gare");
 
   const { latitude, longitude } = await coordinatesFromGoogleMapsLinkAsync(input.googleMapsLink, {
     name: input.name,
@@ -232,6 +245,7 @@ export async function createOwnerStationSupabase(input: {
   const { error } = await supabase.from("Gares").insert({
     name: input.name.trim(),
     companyId,
+    cityId: input.cityId,
     googleMapsLink: input.googleMapsLink?.trim() || null,
     latitude,
     longitude,
@@ -245,6 +259,7 @@ export async function updateOwnerStationSupabase(input: {
   companyId?: string | null;
   stationId: string;
   name: string;
+  cityId: string;
   googleMapsLink?: string;
   gestionnaireUserId?: string | null;
   gestionnaireSharePct?: number;
@@ -252,6 +267,7 @@ export async function updateOwnerStationSupabase(input: {
 }): Promise<void> {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
+  if (!input.cityId) throw new Error("Ville requise pour la gare");
 
   const { latitude, longitude } = await coordinatesFromGoogleMapsLinkAsync(input.googleMapsLink, {
     name: input.name,
@@ -262,6 +278,7 @@ export async function updateOwnerStationSupabase(input: {
     .from("Gares")
     .update({
       name: input.name.trim(),
+      cityId: input.cityId,
       googleMapsLink: input.googleMapsLink?.trim() || null,
       latitude,
       longitude,

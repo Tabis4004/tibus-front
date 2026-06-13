@@ -4,6 +4,7 @@ import {
   listOwnerDeparturesSupabase,
   type OwnerDeparture,
 } from "@/lib/supabase/owner-trips";
+import { formatTripItineraryLabel } from "@/lib/trip-display.ts";
 import {
   getCompanyForAppUserSupabase,
   getMyCompanySupabase,
@@ -154,7 +155,19 @@ function deriveTicketStatus(
 }
 
 function routeLabel(trip: OwnerDeparture) {
-  return `${trip.origin?.name ?? "Unknown"} → ${trip.destination?.name ?? "Unknown"}`;
+  if (!trip.origin || !trip.destination) {
+    return `${trip.origin?.name ?? "Unknown"} → ${trip.destination?.name ?? "Unknown"}`;
+  }
+  return formatTripItineraryLabel({
+    originCity: trip.origin.city,
+    originGare: trip.origin.name,
+    destinationCity: trip.destination.city,
+    destinationGare: trip.destination.name,
+    departureTime: trip.departureTime,
+    arrivalTime: trip.arrivalTime,
+    priceAmount: trip.priceAmount,
+    currency: trip.currency,
+  });
 }
 
 function filtersFromTickets(tickets: OwnerTicketReportRow[]): OwnerTicketReport["filters"] {
@@ -487,7 +500,19 @@ export async function getTripManifestSupabase(
 
   return {
     companyName: company?.name ?? "Compagnie",
-    routeLabel: `${trip.origin?.name ?? "?"} → ${trip.destination?.name ?? "?"}`,
+    routeLabel:
+      trip.origin && trip.destination
+        ? formatTripItineraryLabel({
+            originCity: trip.origin.city,
+            originGare: trip.origin.name,
+            destinationCity: trip.destination.city,
+            destinationGare: trip.destination.name,
+            departureTime: trip.departureTime,
+            arrivalTime: trip.arrivalTime,
+            priceAmount: trip.priceAmount,
+            currency: trip.currency,
+          })
+        : `${trip.origin?.name ?? "?"} → ${trip.destination?.name ?? "?"}`,
     departureTime: trip.departureTime,
     busName: trip.bus?.name ?? "Bus",
     busPlateNumber: trip.bus?.plateNumber ?? "",

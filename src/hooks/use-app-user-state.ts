@@ -16,6 +16,7 @@ import {
 
 const SELLER_ROLE_NAMES = [
   "vendeur",
+  "chauffeur",
   "vendeur_independant",
   "vendeur_reseau",
   "vendeur_master",
@@ -56,6 +57,7 @@ const ROLE_PRIORITY = [
   "vendeur_master",
   "comptable_compagnie",
   "controleur",
+  "chauffeur",
   "vendeur_reseau",
   "vendeur",
   "vendeur_independant",

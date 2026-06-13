@@ -17,7 +17,7 @@ import QrScanner from "@/pages/verify/_components/QrScanner.tsx";
 import ManualTicketVerifyForm from "@/pages/verify/_components/ManualTicketVerifyForm.tsx";
 import TicketScanResult from "@/pages/verify/_components/TicketScanResult.tsx";
 
-const SCANNER_ROLES = ["owner", "controleur", "vendeur", "super_admin"] as const;
+const SCANNER_ROLES = ["owner", "controleur", "vendeur", "chauffeur", "super_admin"] as const;
 
 function vibrateForResult(ticket: VerifiedTicket) {
   if (!navigator.vibrate) return;

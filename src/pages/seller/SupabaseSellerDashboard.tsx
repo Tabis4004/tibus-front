@@ -61,6 +61,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import CompanySalesLedger from "@/pages/owner/_components/CompanySalesLedger.tsx";
 import StationCashPanel from "@/pages/seller/_components/StationCashPanel.tsx";
+import { formatTripItineraryLabel } from "@/lib/trip-display.ts";
 import ColisAutonomesPage from "@/pages/seller/ColisAutonomesPage.tsx";
 import { getCompanyColisSettingsSupabase } from "@/lib/supabase/colis-autonomes.ts";
 import SellerTicketReceiptPanel, {
@@ -775,7 +776,9 @@ export default function SupabaseSellerDashboard() {
   const totalAvailableSeats = trips.reduce((sum, trip) => sum + trip.seatsAvailable, 0);
   const canCancelTickets =
     profile.company &&
-    (profile.roleNames.includes("vendeur") || profile.roleNames.includes("owner"));
+    (profile.roleNames.includes("vendeur") ||
+      profile.roleNames.includes("chauffeur") ||
+      profile.roleNames.includes("owner"));
 
   const dashboardCards = [
     {
@@ -906,7 +909,10 @@ export default function SupabaseSellerDashboard() {
       {profile.canSellDirect && profile.company ? (
         <StationCashPanel
           companyId={profile.company.id}
-          canOpen={profile.roleNames.includes("vendeur")}
+          canOpen={
+            profile.roleNames.includes("vendeur") ||
+            profile.roleNames.includes("chauffeur")
+          }
         />
       ) : null}
 
@@ -925,8 +931,18 @@ export default function SupabaseSellerDashboard() {
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-bold">{trip.originLoc?.city ?? "?"} → {trip.destLoc?.city ?? "?"}</p>
-                  <p className="text-xs text-muted-foreground">{trip.origin?.name} → {trip.destination?.name}</p>
+                  <p className="font-bold text-sm leading-snug">
+                    {formatTripItineraryLabel({
+                      originCity: trip.originLoc?.city ?? "?",
+                      originGare: trip.origin?.name ?? "?",
+                      destinationCity: trip.destLoc?.city ?? "?",
+                      destinationGare: trip.destination?.name ?? "?",
+                      departureTime: trip.departureTime,
+                      arrivalTime: trip.arrivalTime,
+                      priceAmount: trip.priceAmount,
+                      currency: trip.currency,
+                    })}
+                  </p>
                 </div>
                 <Badge variant={trip.seatsAvailable === 0 ? "destructive" : "secondary"}>
                   {trip.seatsAvailable}/{trip.totalSeats}

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { isIssuedTicket } from "@/lib/supabase/ticket-policy";
+import { cityNameFromGareRow } from "@/lib/trip-display.ts";
 import {
   resolveCompanyStaffCompanyId,
   resolveOwnerCompanyId,
@@ -41,15 +42,28 @@ export type OwnerDeparture = {
   seatsAvailable: number;
   seatsBooked: number;
   status: "scheduled" | "active" | "completed";
-  origin: { name: string } | null;
-  destination: { name: string } | null;
+  origin: { name: string; city: string } | null;
+  destination: { name: string; city: string } | null;
   bus: { id: string; name: string; plateNumber: string } | null;
 };
 
-function cityFromGare(gareName: string): string {
-  const parts = gareName.split("—");
-  if (parts.length > 1) return parts[parts.length - 1].trim();
-  return gareName.replace(/^Gare\s+/i, "").trim();
+function joinedCityName(
+  city: { name: string } | { name: string }[] | null | undefined,
+): string | null {
+  if (!city) return null;
+  if (Array.isArray(city)) return city[0]?.name ?? null;
+  return city.name ?? null;
+}
+
+type GareWithCityRow = {
+  id: string;
+  name: string;
+  cityId?: string | null;
+  Cities?: { name: string } | { name: string }[] | null;
+};
+
+function resolveGareCity(gare: GareWithCityRow, cityNames: string[] = []): string {
+  return cityNameFromGareRow(gare.name, joinedCityName(gare.Cities), cityNames);
 }
 
 function estimateArrivalIso(departureIso: string, kilometrage: number | null) {
@@ -148,12 +162,18 @@ export async function listOwnerRoutesSupabase(
 
   const { data: gares, error: garesError } = await supabase
     .from("Gares")
-    .select("id, name")
+    .select("id, name, cityId, Cities(name)")
     .in("id", [...gareIds]);
 
   if (garesError) throw garesError;
 
-  const gareMap = new Map((gares ?? []).map((g) => [g.id as string, g.name as string]));
+  const { data: cities, error: citiesError } = await supabase.from("Cities").select("name");
+  if (citiesError) throw citiesError;
+  const cityNames = (cities ?? []).map((c) => c.name as string);
+
+  const gareMap = new Map(
+    (gares ?? []).map((g) => [g.id as string, g as GareWithCityRow]),
+  );
 
   const { data: company, error: companyError } = await supabase
     .from("Companies")
@@ -183,15 +203,19 @@ export async function listOwnerRoutesSupabase(
     );
     if (!arret) continue;
 
-    const originName = gareMap.get(trajet.depart as string) ?? "?";
-    const destName = gareMap.get(trajet.final as string) ?? "?";
+    const originGare = gareMap.get(trajet.depart as string);
+    const destGare = gareMap.get(trajet.final as string);
+    if (!originGare || !destGare) continue;
+
+    const originName = originGare.name;
+    const destName = destGare.name;
 
     routes.push({
       id: trajet.id as string,
       originName,
       destName,
-      originCity: cityFromGare(originName),
-      destCity: cityFromGare(destName),
+      originCity: resolveGareCity(originGare, cityNames),
+      destCity: resolveGareCity(destGare, cityNames),
       price: arret.price as number,
       currency,
       kilometrage: (arret.kilometrage as number | null) ?? null,
@@ -210,16 +234,20 @@ export async function listOwnerRouteStationsSupabase(
 
   const { data, error } = await supabase
     .from("Gares")
-    .select("id, name")
+    .select("id, name, cityId, Cities(name)")
     .eq("companyId", resolvedCompanyId)
     .order("name");
 
   if (error) throw error;
 
+  const { data: cities, error: citiesError } = await supabase.from("Cities").select("name");
+  if (citiesError) throw citiesError;
+  const cityNames = (cities ?? []).map((c) => c.name as string);
+
   return (data ?? []).map((gare) => ({
     id: gare.id as string,
     name: gare.name as string,
-    city: cityFromGare(gare.name as string),
+    city: resolveGareCity(gare as GareWithCityRow, cityNames),
     country: "",
   }));
 }
@@ -318,12 +346,18 @@ export async function listOwnerDeparturesSupabase(
 
   const { data: gares, error: garesError } = await supabase
     .from("Gares")
-    .select("id, name")
+    .select("id, name, cityId, Cities(name)")
     .in("id", [...gareIds]);
 
   if (garesError) throw garesError;
 
-  const gareMap = new Map((gares ?? []).map((g) => [g.id as string, g.name as string]));
+  const { data: cities, error: citiesError } = await supabase.from("Cities").select("name");
+  if (citiesError) throw citiesError;
+  const cityNames = (cities ?? []).map((c) => c.name as string);
+
+  const gareMap = new Map(
+    (gares ?? []).map((g) => [g.id as string, g as GareWithCityRow]),
+  );
 
   const busIds = [...new Set((progBuses ?? []).map((pb) => pb.busId as string))];
   const busMap = new Map<string, { name: string; plateNumber: string; capacity: number }>();
@@ -425,6 +459,9 @@ export async function listOwnerDeparturesSupabase(
 
     const departureIso = reservation.date as string;
 
+    const originGare = gareMap.get(trajet.depart as string);
+    const destGare = gareMap.get(trajet.final as string);
+
     results.push({
       id: reservation.id as string,
       trajetId: trajet.id as string,
@@ -439,8 +476,12 @@ export async function listOwnerDeparturesSupabase(
       seatsBooked: booked,
       seatsAvailable: Math.max(0, totalSeats - booked),
       status: deriveStatus(departureIso),
-      origin: { name: gareMap.get(trajet.depart as string) ?? "?" },
-      destination: { name: gareMap.get(trajet.final as string) ?? "?" },
+      origin: originGare
+        ? { name: originGare.name, city: resolveGareCity(originGare, cityNames) }
+        : null,
+      destination: destGare
+        ? { name: destGare.name, city: resolveGareCity(destGare, cityNames) }
+        : null,
       bus: bus && busId
         ? { id: busId, name: bus.name, plateNumber: bus.plateNumber }
         : null,

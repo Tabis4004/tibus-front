@@ -4,6 +4,7 @@ import { createAdminClient, resolveAppUserId } from "../_shared/issue-ticket.ts"
 
 const OWNER_ROLES = [
   "vendeur",
+  "chauffeur",
   "comptable_compagnie",
   "controleur",
   "gestionnaire_gare",
@@ -179,7 +180,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Droits insuffisants" }, 403);
     } else if (superAdmin) {
       const needsCompany = roles.some((r) =>
-        ["owner", "vendeur", "controleur", "comptable_compagnie"].includes(r)
+        ["owner", "vendeur", "chauffeur", "controleur", "comptable_compagnie"].includes(r)
       );
       if (needsCompany && !companyId) {
         return jsonResponse({ error: "Compagnie requise pour les rôles compagnie" }, 400);
@@ -307,7 +308,7 @@ Deno.serve(async (req) => {
     }
 
     const requiredCompanyRoles = roles.filter((r) =>
-      ["vendeur", "comptable_compagnie", "controleur", "gestionnaire_gare", "owner"].includes(r)
+      ["vendeur", "chauffeur", "comptable_compagnie", "controleur", "gestionnaire_gare", "owner"].includes(r)
     );
     const missingRequired = requiredCompanyRoles.filter((r) => !assignedRoles.includes(r));
     if (missingRequired.length > 0) {

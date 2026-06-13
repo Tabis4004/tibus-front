@@ -10,6 +10,7 @@ export { APP_USER_REFRESH_DONE_EVENT, APP_USER_REFRESH_EVENT } from "@/hooks/app
 
 export const SELLER_ROLE_NAMES = [
   "vendeur",
+  "chauffeur",
   "vendeur_independant",
   "vendeur_reseau",
   "vendeur_master",

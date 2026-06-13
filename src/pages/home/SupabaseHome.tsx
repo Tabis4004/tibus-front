@@ -42,7 +42,7 @@ export default function SupabaseHome() {
     appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
   const showSellerDashboard = appUser.hasSellerRole || appUser.hasMerchantAgentApplication;
   const showThirdPartyBooking = appUser.hasThirdPartySellerRole || appUser.hasMerchantAgentApplication;
-  const showTicketScanner = ["owner", "controleur", "vendeur", "super_admin"].some((role) =>
+  const showTicketScanner = ["owner", "controleur", "vendeur", "chauffeur", "super_admin"].some((role) =>
     appUser.roles.includes(role),
   );
 

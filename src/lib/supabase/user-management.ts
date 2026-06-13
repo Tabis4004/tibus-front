@@ -234,5 +234,5 @@ export function roleAssignmentKey(role: UserRoleAssignment) {
 }
 
 export function isCompanyScopedRole(roleName: string) {
-  return ["owner", "vendeur", "controleur", "comptable_compagnie"].includes(roleName);
+  return ["owner", "vendeur", "chauffeur", "controleur", "comptable_compagnie"].includes(roleName);
 }

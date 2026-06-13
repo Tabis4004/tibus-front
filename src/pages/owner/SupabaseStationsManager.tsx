@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
+import { listCitiesSupabase } from "@/lib/supabase/geography.ts";
 import {
   listOwnerStationsSupabase,
   listOwnerTeamSupabase,
@@ -63,6 +64,7 @@ import {
 
 const stationSchema = z.object({
   name: z.string().min(2, "Station name required"),
+  cityId: z.string().min(1, "City required"),
   googleMapsLink: z.string().optional(),
   gestionnaireUserId: z.string().optional(),
   gestionnaireSharePct: z.coerce.number().min(0).max(100),
@@ -74,18 +76,21 @@ function StationDialog({
   station,
   appUserId,
   companyId,
+  countryId,
   onClose,
   onSaved,
 }: {
   station?: SupabaseOwnerStation;
   appUserId: string;
   companyId: string;
+  countryId: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useTranslation("owner");
   const [saving, setSaving] = useState(false);
   const [team, setTeam] = useState<SupabaseOwnerTeamMember[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
 
   const {
     register,
@@ -97,6 +102,7 @@ function StationDialog({
     resolver: zodResolver(stationSchema),
     defaultValues: {
       name: station?.name ?? "",
+      cityId: station?.cityId ?? "",
       googleMapsLink: station?.address ?? "",
       gestionnaireUserId: station?.gestionnaireUserId ?? "",
       gestionnaireSharePct: station?.gestionnaireSharePct ?? 0,
@@ -105,11 +111,22 @@ function StationDialog({
   });
 
   useEffect(() => {
+    if (!countryId) {
+      setCities([]);
+      return;
+    }
+    void listCitiesSupabase(countryId)
+      .then((rows) => setCities(rows.map((row) => ({ id: row._id, name: row.name }))))
+      .catch(() => setCities([]));
+  }, [countryId]);
+
+  useEffect(() => {
     if (!station) return;
     void listOwnerTeamSupabase(appUserId, companyId).then(setTeam).catch(() => setTeam([]));
   }, [appUserId, companyId, station]);
 
   const selectedManagerId = watch("gestionnaireUserId");
+  const selectedCityId = watch("cityId");
 
   const onSubmit = async (data: StationFormData) => {
     setSaving(true);
@@ -120,6 +137,7 @@ function StationDialog({
           companyId,
           stationId: station.id,
           name: data.name,
+          cityId: data.cityId,
           googleMapsLink: data.googleMapsLink,
           gestionnaireUserId: data.gestionnaireUserId || null,
           gestionnaireSharePct: data.gestionnaireSharePct,
@@ -131,6 +149,7 @@ function StationDialog({
           appUserId,
           companyId,
           name: data.name,
+          cityId: data.cityId,
           googleMapsLink: data.googleMapsLink,
         });
         toast.success(t("stations.station_added"));
@@ -155,9 +174,30 @@ function StationDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-1">
           <div className="space-y-1.5">
             <Label>{t("stations.station_name")}</Label>
-            <Input placeholder="Gare — Lomé" {...register("name")} />
+            <Input placeholder="Gare Adjamé" {...register("name")} />
             {errors.name && (
               <p className="text-xs text-destructive">{errors.name.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("stations.city")}</Label>
+            <Select
+              value={selectedCityId}
+              onValueChange={(value) => setValue("cityId", value, { shouldValidate: true })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t("stations.city_placeholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {cities.map((city) => (
+                  <SelectItem key={city.id} value={city.id}>
+                    {city.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.cityId && (
+              <p className="text-xs text-destructive">{t("stations.city_required")}</p>
             )}
           </div>
           <div className="space-y-1.5">
@@ -236,7 +276,7 @@ function StationDialog({
 export default function SupabaseStationsManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
-  const { companyId } = useOwnerCompany();
+  const { companyId, selectedCompany } = useOwnerCompany();
   const [stations, setStations] = useState<SupabaseOwnerStation[] | undefined>(undefined);
   const [editStation, setEditStation] = useState<SupabaseOwnerStation | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -264,7 +304,7 @@ export default function SupabaseStationsManager() {
   }, [loadData]);
 
   const cityNames = [
-    ...new Set((stations ?? []).map((s) => s.location?.city).filter(Boolean)),
+    ...new Set((stations ?? []).map((s) => s.cityName).filter(Boolean)),
   ] as string[];
 
   const handleDelete = async () => {
@@ -316,9 +356,7 @@ export default function SupabaseStationsManager() {
       ) : (
         <div className="space-y-3">
           {cityNames.map((cityName) => {
-            const cityStations = (stations ?? []).filter(
-              (s) => s.location?.city === cityName,
-            );
+            const cityStations = (stations ?? []).filter((s) => s.cityName === cityName);
             return (
               <Card key={cityName}>
                 <CardContent className="p-4">
@@ -396,6 +434,7 @@ export default function SupabaseStationsManager() {
           station={editStation ?? undefined}
           appUserId={appUserId}
           companyId={companyId}
+          countryId={selectedCompany?.countryId ?? null}
           onClose={() => {
             setShowForm(false);
             setEditStation(null);

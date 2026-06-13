@@ -35,6 +35,7 @@ export const COMPANY_STAFF_ROLE_NAMES = [
   "comptable_compagnie",
   "controleur",
   "vendeur",
+  "chauffeur",
 ] as const;
 
 export type CompanyStaffRole = (typeof COMPANY_STAFF_ROLE_NAMES)[number];
@@ -360,7 +361,7 @@ export async function getOwnerKPIsSupabase(
     const name = roleNameFromJoin(
       row.Role as { name: string } | { name: string }[],
     );
-    return name === "vendeur" || name === "controleur" || name === "comptable_compagnie";
+    return name === "vendeur" || name === "chauffeur" || name === "controleur" || name === "comptable_compagnie";
   }).length;
 
   const gareIds = (gares ?? []).map((g) => g.id as string);

@@ -69,7 +69,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Vente, réservation et consultation des tickets.",
     toSuffix: "/seller",
     icon: TicketIcon,
-    roles: ["owner", "vendeur", "vendeur_reseau", "vendeur_master", "controleur", "super_admin"],
+    roles: ["owner", "vendeur", "chauffeur", "vendeur_reseau", "vendeur_master", "controleur", "super_admin"],
   },
   {
     id: "promo",
@@ -220,7 +220,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Scanner QR et validation des billets.",
     toSuffix: "/verify/scan",
     icon: ScanLineIcon,
-    roles: ["owner", "controleur", "vendeur", "vendeur_reseau", "vendeur_master", "super_admin"],
+    roles: ["owner", "controleur", "vendeur", "chauffeur", "vendeur_reseau", "vendeur_master", "super_admin"],
   },
   {
     id: "company",
