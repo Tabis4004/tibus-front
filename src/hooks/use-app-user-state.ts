@@ -10,7 +10,7 @@ import {
 import type { AppUserProfile } from "@/hooks/use-app-user.ts";
 import { hasCompletedOnboarding } from "@/lib/auth/onboarding-completion.ts";
 import {
-  hasCompletedProfileOnce,
+  isProfileComplete,
   shouldBackfillProfileCompleted,
 } from "@/lib/auth/profile-completion.ts";
 
@@ -258,7 +258,7 @@ export function useAppUserState() {
       hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
-      profileCompleted: hasCompletedProfileOnce(profile),
+      profileCompleted: isProfileComplete(profile, effectiveRoles),
       onboardingCompleted: hasCompletedOnboarding(profile, appUserId, effectiveRoles),
       isReady,
       isLoading: waitingForProfile || isLoading,

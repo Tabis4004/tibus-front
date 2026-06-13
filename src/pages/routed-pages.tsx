@@ -13,7 +13,6 @@ import ContactPageConvex from "./contact/page.tsx";
 import SupabaseContactPage from "./contact/SupabaseContactPage.tsx";
 import GuidePage from "./guide/page.tsx";
 import CompleteProfilePage from "./profile/CompleteProfile.tsx";
-import SupabaseCompleteProfile from "./profile/SupabaseCompleteProfile.tsx";
 import SupabaseUserProfilePage from "./profile/SupabaseUserProfilePage.tsx";
 import SellerDashboardPage from "./seller/SellerDashboard.tsx";
 import SupabaseSellerDashboard from "./seller/SupabaseSellerDashboard.tsx";
@@ -131,7 +130,11 @@ export function CountryAdminManual() {
 }
 
 export function CompleteProfileRedirect() {
-  return useSupabaseBranch(<SupabaseCompleteProfile />, <CompleteProfilePage />);
+  const { lng } = useParams();
+  if (isSupabaseAuth()) {
+    return <Navigate to={`/${lng ?? "fr"}/account/profile`} replace />;
+  }
+  return <CompleteProfilePage />;
 }
 
 export function UserProfile() {
