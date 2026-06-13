@@ -28,6 +28,7 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useAppUser, refreshAppUserAsync } from "@/hooks/use-app-user";
 import { completeUserProfile } from "@/lib/auth/complete-profile";
+import { hasCompletedProfileOnce } from "@/lib/auth/profile-completion";
 import { listCountriesSupabase, type CountryRow } from "@/lib/supabase/geography";
 
 const profileSchema = z.object({
@@ -44,9 +45,15 @@ export default function SupabaseCompleteProfile() {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { appUserId, session } = useSupabaseAuth();
-  const { profile } = useAppUser();
+  const { profile, isReady } = useAppUser();
   const [countries, setCountries] = useState<CountryRow[] | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isReady && hasCompletedProfileOnce(profile)) {
+      navigate("/", { replace: true });
+    }
+  }, [isReady, profile, navigate]);
 
   useEffect(() => {
     void listCountriesSupabase()

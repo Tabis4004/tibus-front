@@ -16,12 +16,20 @@ export type PaymentMethod =
   | "bank_transfer"
   | "wallet";
 
-/** Réseau mobile money (FedaPay CI, etc.) — voir aussi payment-networks.ts */
+/** Réseau mobile money — voir payment-networks.ts pour les libellés par pays */
 export type PaymentNetwork =
   | "orange"
   | "mtn"
   | "moov"
   | "wave"
+  | "free"
+  | "mpesa"
+  | "airtel"
+  | "vodacom"
+  | "mobicash"
+  | "togocel"
+  | "tigo"
+  | "zamtel"
   | "unknown";
 
 export type GatewayFeeRates = {

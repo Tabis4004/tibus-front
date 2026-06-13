@@ -65,13 +65,12 @@ function hasTravelerIdentity(profile: NonNullable<ProfileLike>): boolean {
   return hasName && hasValidProfilePhone(profile.phone);
 }
 
-/** Nom complet + téléphone requis pour les voyageurs. */
+/** Champs requis remplis (voyageur ou pro provisionné). */
 export function isProfileComplete(
   profile: ProfileLike,
   roles: readonly string[] = [],
 ): boolean {
   if (!profile) return false;
-  if (profile.profileCompleted) return true;
   if (hasTravelerIdentity(profile)) return true;
   if (
     roles.some((role) =>
@@ -82,4 +81,18 @@ export function isProfileComplete(
     return true;
   }
   return false;
+}
+
+/** Gate unique : une fois le flag DB à true, on ne redemande plus le formulaire. */
+export function hasCompletedProfileOnce(profile: ProfileLike): boolean {
+  return Boolean(profile?.profileCompleted);
+}
+
+/** Profil éligible au backfill automatique du flag (comptes legacy). */
+export function shouldBackfillProfileCompleted(
+  profile: ProfileLike,
+  roles: readonly string[] = [],
+): boolean {
+  if (!profile || profile.profileCompleted) return false;
+  return isProfileComplete(profile, roles);
 }

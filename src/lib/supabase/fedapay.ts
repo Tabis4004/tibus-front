@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import type { PaymentNetwork } from "@/config/commission.ts";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -26,7 +27,7 @@ export type InitializeFedaPayParams = {
   platformLoyaltyPointsRedeemed?: number;
   platformLoyaltyDiscountAmount?: number;
   paymentMethod?: "mobile_money" | "card" | "bank_transfer" | "wallet";
-  paymentNetwork?: "orange" | "mtn" | "moov" | "wave" | "unknown";
+  paymentNetwork?: PaymentNetwork;
   successUrl: string;
   errorUrl: string;
 };

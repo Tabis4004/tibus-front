@@ -9,7 +9,10 @@ import {
 } from "@/hooks/app-user-events.ts";
 import type { AppUserProfile } from "@/hooks/use-app-user.ts";
 import { hasCompletedOnboarding } from "@/lib/auth/onboarding-completion.ts";
-import { isProfileComplete } from "@/lib/auth/profile-completion.ts";
+import {
+  hasCompletedProfileOnce,
+  shouldBackfillProfileCompleted,
+} from "@/lib/auth/profile-completion.ts";
 
 const SELLER_ROLE_NAMES = [
   "vendeur",
@@ -172,8 +175,24 @@ export function useAppUserState() {
         .limit(1)
         .maybeSingle();
 
+      let profileRow = userRow as AppUserProfile;
+
+      if (
+        profileRow &&
+        shouldBackfillProfileCompleted(profileRow, roleNames)
+      ) {
+        const { error: backfillError } = await supabase
+          .from("Users")
+          .update({ profileCompleted: true })
+          .eq("id", appUserId);
+
+        if (!backfillError) {
+          profileRow = { ...profileRow, profileCompleted: true };
+        }
+      }
+
       if (!cancelled) {
-        setProfile(userRow as AppUserProfile);
+        setProfile(profileRow);
         setRoles(roleNames);
         setMerchantAgentApplicationStatus(
           (merchantAgentApplication?.status as string | null | undefined) ?? null,
@@ -239,7 +258,7 @@ export function useAppUserState() {
       hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
-      profileCompleted: isProfileComplete(profile, effectiveRoles),
+      profileCompleted: hasCompletedProfileOnce(profile),
       onboardingCompleted: hasCompletedOnboarding(profile, appUserId, effectiveRoles),
       isReady,
       isLoading: waitingForProfile || isLoading,

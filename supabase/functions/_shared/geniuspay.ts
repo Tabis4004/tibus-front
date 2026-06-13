@@ -88,6 +88,14 @@ export function mapNetworkToGeniusPayMmo(
       return { payment_method: "moov_money", gateway: "moov_money" };
     case "wave":
       return { payment_method: "wave", gateway: "wave" };
+    case "free":
+      return { payment_method: "free_money", gateway: "free_money" };
+    case "mpesa":
+      return { payment_method: "mpesa", gateway: "mpesa" };
+    case "airtel":
+      return { payment_method: "airtel_money", gateway: "airtel_money" };
+    case "mobicash":
+      return { payment_method: "mobicash", gateway: "mobicash" };
     default:
       return {};
   }

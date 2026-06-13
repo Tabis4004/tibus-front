@@ -65,12 +65,14 @@ import { getActivePaymentGatewaySupabase } from "@/lib/supabase/payment-gateway.
 import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
 import {
   calculateTravelerPaymentSupabase,
+  listTravelerPaymentNetworksSupabase,
 } from "@/lib/supabase/payment-fees";
 import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
 import {
-  inferCiNetworkFromPhone,
-  PAYMENT_NETWORK_OPTIONS,
+  getPaymentNetworkOptionsForCountry,
+  inferNetworkFromPhone,
   paymentNetworkLabel,
+  type PaymentNetworkOption,
 } from "@/lib/payment-networks.ts";
 import {
   DEFAULT_TRAVELER_PAYMENT_NOTICE,
@@ -103,6 +105,7 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { useTranslation } from "react-i18next";
 import SeatPicker from "@/components/seat-picker.tsx";
 import { profileDisplayName } from "@/lib/auth/profile-completion.ts";
+import { supabase } from "@/lib/supabase";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 function fmt(iso: string, pattern: string) {
@@ -139,6 +142,10 @@ export default function SupabaseTripDetail() {
   const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
   const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
   const [networkManual, setNetworkManual] = useState(false);
+  const [paymentNetworkOptions, setPaymentNetworkOptions] = useState<PaymentNetworkOption[]>(
+    getPaymentNetworkOptionsForCountry(null),
+  );
+  const [companyCountryName, setCompanyCountryName] = useState<string | null>(null);
   const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
   const [paymentNotice, setPaymentNotice] = useState<TravelerPaymentNotice>(
     DEFAULT_TRAVELER_PAYMENT_NOTICE,
@@ -220,12 +227,59 @@ export default function SupabaseTripDetail() {
   }, []);
 
   useEffect(() => {
+    if (!trip?.countryId) {
+      setCompanyCountryName(null);
+      setPaymentNetworkOptions(getPaymentNetworkOptionsForCountry(null));
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const { data: country, error } = await supabase
+        .from("Countries")
+        .select("name")
+        .eq("id", trip.countryId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const countryName = error ? null : ((country?.name as string | undefined) ?? null);
+      setCompanyCountryName(countryName);
+
+      const gatewayNetworks = await listTravelerPaymentNetworksSupabase({
+        countryId: trip.countryId,
+        gateway: activeGateway,
+      }).catch(() => [] as string[]);
+
+      if (cancelled) return;
+
+      setPaymentNetworkOptions(
+        getPaymentNetworkOptionsForCountry(countryName, gatewayNetworks),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trip?.countryId, activeGateway]);
+
+  useEffect(() => {
+    const allowed = paymentNetworkOptions.map((option) => option.value);
+    if (!allowed.includes(paymentNetwork)) {
+      const preferred = allowed.find((value) => value !== "unknown") ?? "unknown";
+      setPaymentNetwork(preferred as PaymentNetwork);
+      setNetworkManual(false);
+    }
+  }, [paymentNetworkOptions, paymentNetwork]);
+
+  useEffect(() => {
     if (networkManual) return;
-    const inferred = inferCiNetworkFromPhone(passengerPhone);
-    if (inferred) {
+    const inferred = inferNetworkFromPhone(passengerPhone, companyCountryName);
+    if (inferred && paymentNetworkOptions.some((option) => option.value === inferred)) {
       setPaymentNetwork(inferred);
     }
-  }, [passengerPhone, networkManual]);
+  }, [passengerPhone, networkManual, companyCountryName, paymentNetworkOptions]);
 
   useEffect(() => {
     if (!trip?.companyId) {
@@ -772,7 +826,7 @@ export default function SupabaseTripDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_NETWORK_OPTIONS.map((option) => (
+                  {paymentNetworkOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {paymentNetworkLabel(option.value, lng ?? "fr")}
                     </SelectItem>

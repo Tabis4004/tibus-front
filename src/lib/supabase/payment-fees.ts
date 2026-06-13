@@ -152,6 +152,35 @@ export type TravelerPaymentInput = {
   tripMarginPercent?: number | null;
 };
 
+export async function listTravelerPaymentNetworksSupabase(params: {
+  countryId: string;
+  gateway?: PaymentGateway;
+}): Promise<string[]> {
+  const { data, error } = await supabase.rpc("list_traveler_payment_networks", {
+    p_country_id: params.countryId,
+    p_gateway: params.gateway ?? "geniuspay",
+    p_method: "mobile_money",
+  });
+
+  if (!error && Array.isArray(data)) {
+    const networks = data
+      .map((row) => {
+        if (typeof row === "string") return row;
+        if (row && typeof row === "object" && "network" in row) {
+          return String((row as { network?: unknown }).network ?? "");
+        }
+        return "";
+      })
+      .map((network) => network.trim().toLowerCase())
+      .filter((network) => network && network !== "default");
+    if (networks.length > 0) {
+      return Array.from(new Set(networks));
+    }
+  }
+
+  return [];
+}
+
 export async function calculateTravelerPaymentSupabase(
   input: TravelerPaymentInput,
 ): Promise<PaymentBreakdown> {

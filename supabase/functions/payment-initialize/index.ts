@@ -45,6 +45,58 @@ type InitBody = {
   errorUrl?: string;
 };
 
+async function resolveCompanyCountryCode(
+  admin: ReturnType<typeof createAdminClient>,
+  companyId: string,
+): Promise<string> {
+  const { data: company, error } = await admin
+    .from("Companies")
+    .select("countryId, Countries(name)")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error || !company?.countryId) return "CI";
+
+  const countries = company.Countries as { name?: string } | { name?: string }[] | null;
+  const countryName = Array.isArray(countries)
+    ? countries[0]?.name
+    : countries?.name;
+  const name = String(countryName ?? "").trim().toLowerCase();
+
+  const isoByName: Record<string, string> = {
+    "côte d'ivoire": "CI",
+    "cote d'ivoire": "CI",
+    "burkina faso": "BF",
+    "sénégal": "SN",
+    "senegal": "SN",
+    "bénin": "BJ",
+    "benin": "BJ",
+    "mali": "ML",
+    "togo": "TG",
+    "cameroun": "CM",
+    "ghana": "GH",
+    "nigeria": "NG",
+    "kenya": "KE",
+    "rd congo": "CD",
+    "république du congo": "CG",
+    "gabon": "GA",
+    "guinée": "GN",
+    "guinee": "GN",
+    "niger": "NE",
+    "rwanda": "RW",
+    "ouganda": "UG",
+    "tanzanie": "TZ",
+    "zambie": "ZM",
+    "mozambique": "MZ",
+    "malawi": "MW",
+    "sierra leone": "SL",
+    "guinée-bissau": "GW",
+    "guinee-bissau": "GW",
+  };
+
+  return isoByName[name] ?? "CI";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -417,6 +469,8 @@ Deno.serve(async (req) => {
       body.errorUrl ??
       successUrl.replace(/([?&])status=approved/, "$1status=failed");
 
+    const companyCountryCode = await resolveCompanyCountryCode(admin, companyId);
+
     const checkout = activeGateway === "geniuspay"
       ? await createGeniusPayCheckout({
         amount: gatewayApiAmount,
@@ -427,7 +481,7 @@ Deno.serve(async (req) => {
           name: firstTraveler.passengerName,
           email: user.email ?? "customer@tibus.app",
           phone: firstTraveler.passengerPhone,
-          country: "CI",
+          country: companyCountryCode,
         },
         metadata: paymentMetadata,
         paymentNetwork,

@@ -41,14 +41,19 @@ import {
 } from "@/lib/supabase/seller-counter";
 import { getActivePaymentGatewaySupabase } from "@/lib/supabase/payment-gateway.ts";
 import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
-import { calculateTravelerPaymentSupabase } from "@/lib/supabase/payment-fees";
+import {
+  calculateTravelerPaymentSupabase,
+  listTravelerPaymentNetworksSupabase,
+} from "@/lib/supabase/payment-fees";
+import { supabase } from "@/lib/supabase";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 import { getOpenStationCashSupabase } from "@/lib/supabase/station-cash";
 import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
 import {
-  inferCiNetworkFromPhone,
-  PAYMENT_NETWORK_OPTIONS,
+  getPaymentNetworkOptionsForCountry,
+  inferNetworkFromPhone,
   paymentNetworkLabel,
+  type PaymentNetworkOption,
 } from "@/lib/payment-networks.ts";
 import {
   Select,
@@ -133,6 +138,10 @@ function SaleForm({
   const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
   const [paymentNetwork, setPaymentNetwork] = useState<PaymentNetwork>("unknown");
   const [networkManual, setNetworkManual] = useState(false);
+  const [paymentNetworkOptions, setPaymentNetworkOptions] = useState<PaymentNetworkOption[]>(
+    getPaymentNetworkOptionsForCountry(null),
+  );
+  const [companyCountryName, setCompanyCountryName] = useState<string | null>(null);
   const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
   const [loyaltyLookupUser, setLoyaltyLookupUser] = useState<SelectedLoyaltyUser | null>(null);
   const [cashOpen, setCashOpen] = useState<boolean | null>(null);
@@ -187,10 +196,66 @@ function SaleForm({
   }, []);
 
   useEffect(() => {
+    if (!companyId) {
+      setCompanyCountryName(null);
+      setPaymentNetworkOptions(getPaymentNetworkOptionsForCountry(null));
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const { data: company, error } = await supabase
+        .from("Companies")
+        .select("countryId, Countries(name)")
+        .eq("id", companyId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const countries = company?.Countries as { name?: string } | { name?: string }[] | null;
+      const countryName = error
+        ? null
+        : (Array.isArray(countries) ? countries[0]?.name : countries?.name) ?? null;
+      const countryId = (company?.countryId as string | undefined) ?? "";
+
+      setCompanyCountryName(countryName ?? null);
+
+      const gatewayNetworks = countryId
+        ? await listTravelerPaymentNetworksSupabase({
+            countryId,
+            gateway: activeGateway,
+          }).catch(() => [] as string[])
+        : [];
+
+      if (cancelled) return;
+
+      setPaymentNetworkOptions(
+        getPaymentNetworkOptionsForCountry(countryName, gatewayNetworks),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, activeGateway]);
+
+  useEffect(() => {
+    const allowed = paymentNetworkOptions.map((option) => option.value);
+    if (!allowed.includes(paymentNetwork)) {
+      const preferred = allowed.find((value) => value !== "unknown") ?? "unknown";
+      setPaymentNetwork(preferred as PaymentNetwork);
+      setNetworkManual(false);
+    }
+  }, [paymentNetworkOptions, paymentNetwork]);
+
+  useEffect(() => {
     if (isDirectSale || networkManual) return;
-    const inferred = inferCiNetworkFromPhone(primaryPhone);
-    if (inferred) setPaymentNetwork(inferred);
-  }, [isDirectSale, networkManual, primaryPhone]);
+    const inferred = inferNetworkFromPhone(primaryPhone, companyCountryName);
+    if (inferred && paymentNetworkOptions.some((option) => option.value === inferred)) {
+      setPaymentNetwork(inferred);
+    }
+  }, [companyCountryName, isDirectSale, networkManual, paymentNetworkOptions, primaryPhone]);
 
   useEffect(() => {
     if (isDirectSale || !companyId) {
@@ -520,7 +585,7 @@ function SaleForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PAYMENT_NETWORK_OPTIONS.map((option) => (
+              {paymentNetworkOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {paymentNetworkLabel(option.value, lng ?? "fr")}
                 </SelectItem>
