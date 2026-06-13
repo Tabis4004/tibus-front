@@ -303,9 +303,16 @@ export default function SupabaseStationsManager() {
     return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);
 
-  const cityNames = [
-    ...new Set((stations ?? []).map((s) => s.cityName).filter(Boolean)),
-  ] as string[];
+  const stationsByCity = (() => {
+    const map = new Map<string, SupabaseOwnerStation[]>();
+    for (const station of stations ?? []) {
+      const cityKey = station.cityName?.trim() || "—";
+      const group = map.get(cityKey) ?? [];
+      group.push(station);
+      map.set(cityKey, group);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, "fr"));
+  })();
 
   const handleDelete = async () => {
     if (!deleteTarget || !appUserId) return;
@@ -355,9 +362,7 @@ export default function SupabaseStationsManager() {
         </Empty>
       ) : (
         <div className="space-y-3">
-          {cityNames.map((cityName) => {
-            const cityStations = (stations ?? []).filter((s) => s.cityName === cityName);
-            return (
+          {stationsByCity.map(([cityName, cityStations]) => (
               <Card key={cityName}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3 mb-3">
@@ -424,8 +429,7 @@ export default function SupabaseStationsManager() {
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+          ))}
         </div>
       )}
 

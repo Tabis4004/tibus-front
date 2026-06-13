@@ -33,6 +33,7 @@
 | 92 | `supabase/migrations/092_company_expenses_ohada.sql` | ✅ **Exécuté** — dépenses compagnie + compte de résultat SYSCOHADA |
 | 93 | `supabase/migrations/093_chauffeur_role_gares_cities.sql` | ✅ **Exécuté** — rôle chauffeur + gares liées aux villes |
 | 94 | `supabase/migrations/094_expense_categories_all_companies.sql` | ✅ **Exécuté** — 11 types de dépenses preset pour toutes les compagnies |
+| 95 | `supabase/migrations/095_seed_cities_dr5hn.sql` | ✅ **Exécuté** — ~2180 villes (23 pays Tibus, source dr5hn) |
 
 ## Politique anti-fraude (réservation voyageur)
 
