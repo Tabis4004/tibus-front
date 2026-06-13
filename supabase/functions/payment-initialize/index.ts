@@ -429,7 +429,7 @@ Deno.serve(async (req) => {
     }
 
     const paymentMethod = (body.paymentMethod ?? "mobile_money").trim().toLowerCase();
-    const paymentNetwork = (body.paymentNetwork ?? "unknown").trim().toLowerCase();
+    let paymentNetwork = (body.paymentNetwork ?? "unknown").trim().toLowerCase();
     const paymentCountryId = body.paymentCountryId?.trim() || null;
 
     if (paymentMethod === "mobile_money") {
@@ -439,12 +439,19 @@ Deno.serve(async (req) => {
           code: "PAYMENT_COUNTRY_REQUIRED",
         }, 400);
       }
-      if (!paymentNetwork || paymentNetwork === "unknown") {
+      if (
+        activeGateway !== "geniuspay" &&
+        (!paymentNetwork || paymentNetwork === "unknown")
+      ) {
         return jsonResponse({
           error: "Réseau Mobile Money requis",
           code: "PAYMENT_NETWORK_REQUIRED",
         }, 400);
       }
+    }
+
+    if (activeGateway === "geniuspay" && paymentMethod === "mobile_money") {
+      paymentNetwork = "unknown";
     }
 
     const { data: paymentCalc, error: paymentCalcError } = await admin.rpc(
@@ -552,7 +559,7 @@ Deno.serve(async (req) => {
           country: paymentCountryCode,
         },
         metadata: paymentMetadata,
-        paymentNetwork,
+        paymentNetwork: paymentNetwork === "unknown" ? undefined : paymentNetwork,
       })
       : await createFedaPayCheckout({
         amount: gatewayApiAmount,

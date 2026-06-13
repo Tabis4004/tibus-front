@@ -15,11 +15,14 @@ import {
 type UsePaymentCountryNetworksArgs = {
   activeGateway: PaymentGateway;
   passengerPhone?: string;
+  /** GeniusPay : le réseau est choisi sur le checkout GeniusPay, pas côté Tibus. */
+  deferNetworkToGateway?: boolean;
 };
 
 export function usePaymentCountryNetworks({
   activeGateway,
   passengerPhone = "",
+  deferNetworkToGateway = false,
 }: UsePaymentCountryNetworksArgs) {
   const [countries, setCountries] = useState<TravelerPaymentCountry[] | undefined>(undefined);
   const [countriesError, setCountriesError] = useState<string | null>(null);
@@ -76,10 +79,14 @@ export function usePaymentCountryNetworks({
   }, [countries, countryManual, passengerPhone, paymentCountryId]);
 
   useEffect(() => {
-    if (!paymentCountryId) {
-      setPaymentNetworkOptions([]);
-      if (!networkManual) {
-        setPaymentNetwork("unknown");
+    if (!paymentCountryId || deferNetworkToGateway) {
+      if (deferNetworkToGateway) {
+        setPaymentNetworkOptions([]);
+      } else if (!paymentCountryId) {
+        setPaymentNetworkOptions([]);
+        if (!networkManual) {
+          setPaymentNetwork("unknown");
+        }
       }
       return;
     }
@@ -104,9 +111,10 @@ export function usePaymentCountryNetworks({
     return () => {
       cancelled = true;
     };
-  }, [paymentCountryId, paymentCountryName, activeGateway]);
+  }, [paymentCountryId, paymentCountryName, activeGateway, deferNetworkToGateway]);
 
   useEffect(() => {
+    if (deferNetworkToGateway) return;
     if (!paymentCountryId || networksLoading) return;
 
     const allowed = paymentNetworkOptions
@@ -116,9 +124,10 @@ export function usePaymentCountryNetworks({
     if (!allowed.includes(paymentNetwork)) {
       setPaymentNetwork("unknown");
     }
-  }, [paymentCountryId, paymentNetworkOptions, paymentNetwork, networksLoading]);
+  }, [paymentCountryId, paymentNetworkOptions, paymentNetwork, networksLoading, deferNetworkToGateway]);
 
   useEffect(() => {
+    if (deferNetworkToGateway) return;
     if (
       !paymentCountryId ||
       networkManual ||
@@ -158,8 +167,10 @@ export function usePaymentCountryNetworks({
   const selectPaymentCountry = (countryId: string) => {
     setCountryManual(true);
     setPaymentCountryId(countryId);
-    setNetworkManual(false);
-    setPaymentNetwork("unknown");
+    if (!deferNetworkToGateway) {
+      setNetworkManual(false);
+      setPaymentNetwork("unknown");
+    }
   };
 
   const selectPaymentNetwork = (network: PaymentNetwork) => {
