@@ -439,13 +439,19 @@ Deno.serve(async (req) => {
           code: "PAYMENT_COUNTRY_REQUIRED",
         }, 400);
       }
-      if (!paymentNetwork || paymentNetwork === "unknown") {
+      if (
+        activeGateway !== "geniuspay" &&
+        (!paymentNetwork || paymentNetwork === "unknown")
+      ) {
         return jsonResponse({
           error: "Réseau Mobile Money requis",
           code: "PAYMENT_NETWORK_REQUIRED",
         }, 400);
       }
     }
+
+    const resolvedNetwork =
+      activeGateway === "geniuspay" ? "unknown" : paymentNetwork;
 
     const { data: paymentCalc, error: paymentCalcError } = await admin.rpc(
       "calculate_traveler_payment_total",
@@ -454,7 +460,7 @@ Deno.serve(async (req) => {
         p_company_id: companyId,
         p_gateway: activeGateway,
         p_method: paymentMethod,
-        p_network: paymentNetwork,
+        p_network: resolvedNetwork,
         p_trip_margin_percent: null,
         p_country_id: paymentCountryId,
       },
@@ -552,7 +558,7 @@ Deno.serve(async (req) => {
           country: paymentCountryCode,
         },
         metadata: paymentMetadata,
-        paymentNetwork,
+        paymentNetwork: activeGateway === "geniuspay" ? undefined : paymentNetwork,
       })
       : await createFedaPayCheckout({
         amount: gatewayApiAmount,

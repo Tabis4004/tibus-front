@@ -5,7 +5,8 @@
  * - Y/Z/F : GatewayPaymentFees (lot 019)
  *
  * V = M × (1 + X%)
- * T = (M(1 + X) + F) / (1 - Z - Y)
+ * T (GeniusPay) = (M(1 + X) + F) / (1 - Z)   — sans Y opérateur (choisi sur GeniusPay)
+ * T (autres)    = (M(1 + X) + F) / (1 - Z - Y)
  */
 
 export type PaymentGateway = "fedapay" | "geniuspay" | "cinetpay" | "paystack" | "paiementpro";
