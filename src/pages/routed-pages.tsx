@@ -59,6 +59,7 @@ import BookingConfirmationPage from "./traveler/BookingConfirmation.tsx";
 import SupabaseBookingConfirmation from "./traveler/SupabaseBookingConfirmation.tsx";
 import PaymentVerifyPage from "./traveler/PaymentVerify.tsx";
 import SupabasePaymentVerify from "./traveler/SupabasePaymentVerify.tsx";
+import SupabasePaymentSetup from "./traveler/SupabasePaymentSetup.tsx";
 import CompanyProfilePage from "./traveler/CompanyProfile.tsx";
 import SupabaseCompanyProfile from "./traveler/SupabaseCompanyProfile.tsx";
 import TicketVerifyPage from "./verify/TicketVerify.tsx";
@@ -239,6 +240,10 @@ export function BookingConfirmation() {
 
 export function PaymentVerify() {
   return useSupabaseBranch(<SupabasePaymentVerify />, <PaymentVerifyPage />);
+}
+
+export function PaymentSetup() {
+  return useSupabaseBranch(<SupabasePaymentSetup />, <PaymentVerifyPage />);
 }
 
 export function CompanyProfile() {

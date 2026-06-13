@@ -61,19 +61,20 @@ import {
   loadBookingDraft,
   saveBookingDraft,
 } from "@/lib/supabase/booking-draft";
-import { getActivePaymentGatewaySupabase } from "@/lib/supabase/payment-gateway.ts";
-import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
-import { usePaymentCountryNetworks } from "@/hooks/use-payment-country-networks";
-import {
-  calculateTravelerPaymentSupabase,
-} from "@/lib/supabase/payment-fees";
-import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
-import { paymentNetworkLabel } from "@/lib/payment-networks.ts";
 import {
   DEFAULT_TRAVELER_PAYMENT_NOTICE,
   getTravelerPaymentNoticeSupabase,
   type TravelerPaymentNotice,
 } from "@/lib/supabase/traveler-payment-notice.ts";
+import {
+  Authenticated,
+  Unauthenticated,
+} from "@/components/auth/AuthBoundary.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import { useTranslation } from "react-i18next";
+import SeatPicker from "@/components/seat-picker.tsx";
+import { profileDisplayName } from "@/lib/auth/profile-completion.ts";
+import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 function TravelerPaymentInfoBanner({ text }: { text: string }) {
   const line = text.trim();
@@ -85,22 +86,6 @@ function TravelerPaymentInfoBanner({ text }: { text: string }) {
     </div>
   );
 }
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.tsx";
-import {
-  Authenticated,
-  Unauthenticated,
-} from "@/components/auth/AuthBoundary.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
-import { useTranslation } from "react-i18next";
-import SeatPicker from "@/components/seat-picker.tsx";
-import { profileDisplayName } from "@/lib/auth/profile-completion.ts";
-import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 function fmt(iso: string, pattern: string) {
   try { return format(parseISO(iso), pattern); } catch { return iso; }
@@ -130,28 +115,9 @@ export default function SupabaseTripDetail() {
   const [validatingCompanyLoyalty, setValidatingCompanyLoyalty] = useState(false);
   const [validatingPlatformLoyalty, setValidatingPlatformLoyalty] = useState(false);
   const [seatTakenOpen, setSeatTakenOpen] = useState(false);
-  const [continueLaterOpen, setContinueLaterOpen] = useState(false);
-  const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
-  const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false);
-  const [paymentPreviewError, setPaymentPreviewError] = useState<string | null>(null);
-  const [activeGateway, setActiveGateway] = useState<PaymentGateway>("fedapay");
   const [paymentNotice, setPaymentNotice] = useState<TravelerPaymentNotice>(
     DEFAULT_TRAVELER_PAYMENT_NOTICE,
   );
-
-  const {
-    countries: paymentCountries,
-    paymentCountryId,
-    paymentCountryName,
-    paymentNetwork,
-    paymentNetworkOptions,
-    networksLoading,
-    selectPaymentCountry,
-    selectPaymentNetwork,
-  } = usePaymentCountryNetworks({
-    activeGateway,
-    passengerPhone,
-  });
 
   const occupiedSeats = useSupabaseOccupiedSeats(tripId);
 
@@ -221,71 +187,6 @@ export default function SupabaseTripDetail() {
     if (fullName) setPassengerName(fullName);
     if (appUser.profile.phone) setPassengerPhone(appUser.profile.phone);
   }, [appUser.profile, tripId]);
-
-  useEffect(() => {
-    void getActivePaymentGatewaySupabase()
-      .then((state) => setActiveGateway(state.gateway))
-      .catch(() => setActiveGateway("fedapay"));
-  }, []);
-
-  useEffect(() => {
-    if (!trip?.companyId || !paymentCountryId) {
-      setPaymentBreakdown(null);
-      setPaymentPreviewError(null);
-      return;
-    }
-
-    const nominalAmount = Math.max(
-      0,
-      trip.priceAmount
-        - (promoResult?.valid ? (promoResult.discountAmount ?? 0) : 0)
-        - (companyLoyaltyResult?.valid ? (companyLoyaltyResult.discountAmount ?? 0) : 0)
-        - (platformLoyaltyResult?.valid ? (platformLoyaltyResult.discountAmount ?? 0) : 0),
-    );
-
-    let cancelled = false;
-    setPaymentPreviewLoading(true);
-    setPaymentPreviewError(null);
-
-    calculateTravelerPaymentSupabase({
-      nominalAmount,
-      companyId: trip.companyId,
-      countryId: paymentCountryId,
-      gateway: activeGateway,
-      method: "mobile_money",
-      network: paymentNetwork,
-    })
-      .then((breakdown) => {
-        if (!cancelled) setPaymentBreakdown(breakdown);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setPaymentBreakdown(null);
-          setPaymentPreviewError(
-            err instanceof Error ? err.message : "Calcul du montant impossible",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPaymentPreviewLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    trip?.companyId,
-    trip?.priceAmount,
-    promoResult?.valid,
-    promoResult?.discountAmount,
-    companyLoyaltyResult?.valid,
-    companyLoyaltyResult?.discountAmount,
-    platformLoyaltyResult?.valid,
-    platformLoyaltyResult?.discountAmount,
-    paymentCountryId,
-    paymentNetwork,
-    activeGateway,
-  ]);
 
   useEffect(() => {
     if (!tripId || !selectedSeat || !occupiedSeats?.includes(selectedSeat)) return;
@@ -440,106 +341,27 @@ export default function SupabaseTripDetail() {
         setSeatTakenOpen(true);
         return;
       }
-      setContinueLaterOpen(true);
-    } catch {
-      toast.error(t("errors.generic", { ns: "common" }));
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleContinueLater = () => {
-    if (!tripId) return;
-    saveBookingDraft({
-      reservationId: tripId,
-      passengerName: passengerName.trim(),
-      passengerPhone: passengerPhone.trim(),
-      selectedSeat,
-      promoCode,
-      promoId: promoResult?.valid ? promoResult.promoId : undefined,
-      discountAmount: promoResult?.valid ? promoResult.discountAmount : undefined,
-      loyaltyPointsRedeemed: companyLoyaltyResult?.valid ? companyLoyaltyResult.pointsRedeemed : undefined,
-      loyaltyDiscountAmount: companyLoyaltyResult?.valid ? companyLoyaltyResult.discountAmount : undefined,
-      platformLoyaltyPointsRedeemed: platformLoyaltyResult?.valid ? platformLoyaltyResult.pointsRedeemed : undefined,
-      platformLoyaltyDiscountAmount: platformLoyaltyResult?.valid ? platformLoyaltyResult.discountAmount : undefined,
-      savedAt: new Date().toISOString(),
-    });
-    setContinueLaterOpen(false);
-    setDialogOpen(false);
-    toast.success(
-      "Vos informations sont sauvegardées sur cet appareil. Le siège n'est pas garanti — revenez payer dès que possible.",
-    );
-  };
-
-  const handlePayNow = async () => {
-    if (!tripId || !passengerName.trim()) return;
-    if (trip.totalSeats > 0 && !selectedSeat) {
-      toast.error("Choisissez un siège avant de payer");
-      return;
-    }
-    if (selectedSeat && occupiedSeats?.includes(selectedSeat)) {
-      setSeatTakenOpen(true);
-      return;
-    }
-
-    const phone = passengerPhone.trim();
-    if (!phone) {
-      toast.error("Numéro de téléphone requis pour payer");
-      return;
-    }
-    if (!paymentCountryId) {
-      toast.error("Choisissez le pays de paiement");
-      return;
-    }
-    if (!paymentNetwork || paymentNetwork === "unknown") {
-      toast.error("Choisissez votre réseau Mobile Money");
-      return;
-    }
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 9) {
-      toast.error("Numéro trop court — ex: 07 00 00 00 00 ou +225 07...");
-      return;
-    }
-
-    setContinueLaterOpen(false);
-    setLoading(true);
-
-    try {
-      const availability = await checkTripAvailabilitySupabase(tripId);
-      if (!availability.available) {
-        setSeatTakenOpen(true);
-        return;
-      }
-
-      const baseUrl = window.location.origin;
-      const successUrl = `${baseUrl}/${lng}/payment/verify?reservationId=${tripId}&gateway=${activeGateway}`;
-      const errorUrl = `${baseUrl}/${lng}/payment/verify?status=failed&reservationId=${tripId}&gateway=${activeGateway}`;
-
-      const { checkoutUrl } = await initializePaymentSupabase({
+      saveBookingDraft({
         reservationId: tripId,
         passengerName: passengerName.trim(),
-        passengerPhone: phone,
-        seatNumber: selectedSeat ?? undefined,
+        passengerPhone: passengerPhone.trim(),
+        selectedSeat,
+        promoCode,
         promoId: promoResult?.valid ? promoResult.promoId : undefined,
         discountAmount: promoResult?.valid ? promoResult.discountAmount : undefined,
         loyaltyPointsRedeemed: companyLoyaltyResult?.valid ? companyLoyaltyResult.pointsRedeemed : undefined,
         loyaltyDiscountAmount: companyLoyaltyResult?.valid ? companyLoyaltyResult.discountAmount : undefined,
         platformLoyaltyPointsRedeemed: platformLoyaltyResult?.valid ? platformLoyaltyResult.pointsRedeemed : undefined,
         platformLoyaltyDiscountAmount: platformLoyaltyResult?.valid ? platformLoyaltyResult.discountAmount : undefined,
-        paymentCountryId,
-        paymentNetwork,
-        successUrl,
-        errorUrl,
+        savedAt: new Date().toISOString(),
       });
 
-      window.location.href = checkoutUrl;
-    } catch (err) {
-      const error = err as Error & { code?: string };
-      if (error.code === "SOLD_OUT") {
-        setSeatTakenOpen(true);
-        return;
-      }
-      toast.error(supabaseErrorMessage(error, t("errors.generic", { ns: "common" })));
+      setDialogOpen(false);
+      navigate(`/${lng ?? "fr"}/payment/setup?reservationId=${tripId}`);
+    } catch {
+      toast.error(t("errors.generic", { ns: "common" }));
+    } finally {
       setLoading(false);
     }
   };
@@ -771,60 +593,6 @@ export default function SupabaseTripDetail() {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label>Pays de paiement *</Label>
-              <Select
-                value={paymentCountryId || undefined}
-                onValueChange={selectPaymentCountry}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choisissez votre pays" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(paymentCountries ?? []).map((country) => (
-                    <SelectItem key={country.id} value={country.id}>
-                      {country.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!paymentCountries ? (
-                <p className="text-xs text-muted-foreground">Chargement des pays...</p>
-              ) : paymentCountries.length === 0 ? (
-                <p className="text-xs text-destructive">Aucun pays de paiement configuré.</p>
-              ) : null}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Réseau Mobile Money *</Label>
-              <Select
-                value={paymentNetwork}
-                onValueChange={(value) => selectPaymentNetwork(value as PaymentNetwork)}
-                disabled={!paymentCountryId || networksLoading || paymentNetworkOptions.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={paymentCountryId ? "Choisissez votre réseau" : "Sélectionnez d'abord un pays"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentNetworkOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {paymentNetworkLabel(option.value, lng ?? "fr")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {paymentCountryName && paymentNetworkOptions.length === 0 && !networksLoading ? (
-                <p className="text-xs text-destructive">
-                  Aucun réseau configuré pour {paymentCountryName}.
-                </p>
-              ) : null}
-              {paymentBreakdown?.usedMaxFallback && (
-                <p className="text-xs text-muted-foreground">
-                  Estimation avec le taux le plus élevé ({paymentBreakdown.network}).
-                </p>
-              )}
-            </div>
-
             <Separator />
 
             {loyaltyContext?.company.active ? (
@@ -964,24 +732,18 @@ export default function SupabaseTripDetail() {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">{t("labels.total_to_pay", { ns: "common" })}</span>
                 <span className="font-bold text-primary text-lg">
-                  {paymentPreviewLoading
-                    ? "..."
-                    : `${trip.currency} ${(
-                        paymentBreakdown?.totalAmount ??
-                        (trip.priceAmount
-                          - (promoResult?.valid ? (promoResult.discountAmount ?? 0) : 0)
-                          - (companyLoyaltyResult?.valid ? (companyLoyaltyResult.discountAmount ?? 0) : 0)
-                          - (platformLoyaltyResult?.valid ? (platformLoyaltyResult.discountAmount ?? 0) : 0))
-                      ).toLocaleString()}`}
+                  {trip.currency}{" "}
+                  {(
+                    trip.priceAmount
+                    - (promoResult?.valid ? (promoResult.discountAmount ?? 0) : 0)
+                    - (companyLoyaltyResult?.valid ? (companyLoyaltyResult.discountAmount ?? 0) : 0)
+                    - (platformLoyaltyResult?.valid ? (platformLoyaltyResult.discountAmount ?? 0) : 0)
+                  ).toLocaleString()}
                 </span>
               </div>
-              {paymentPreviewError && (
-                <p className="text-xs text-amber-700">
-                  {paymentPreviewError.includes("Configuration frais gateway")
-                    ? "Frais de paiement non configurés — le montant affiché est indicatif."
-                    : paymentPreviewError}
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Les frais Mobile Money dépendent du pays et du réseau — choisis à l'étape suivante.
+              </p>
             </div>
           </div>
 
@@ -1011,46 +773,6 @@ export default function SupabaseTripDetail() {
               onClick={() => navigate(`/${lng}/traveler/search`)}
             >
               Rechercher un autre trajet
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={continueLaterOpen} onOpenChange={setContinueLaterOpen}>
-        <AlertDialogContent className="max-w-md gap-4">
-          <TravelerPaymentInfoBanner text={paymentNotice.infoLine} />
-          <AlertDialogHeader>
-            <AlertDialogTitle>{paymentNotice.title}</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>{paymentNotice.paragraph1}</p>
-                <p>1. {paymentNotice.paragraph2}</p>
-                <div className="space-y-1.5">
-                  <p>2. {paymentNotice.networkIntro}</p>
-                  {paymentNotice.hints.length > 0 && (
-                    <ul className="list-none space-y-1">
-                      {paymentNotice.hints.map((hint) => (
-                        <li key={`${hint.countryCode}-${hint.cheapestNetwork}`}>
-                          <span className="font-medium">{hint.countryCode}</span>
-                          {" → "}
-                          {paymentNetworkLabel(
-                            hint.cheapestNetwork as PaymentNetwork,
-                            lng ?? "fr",
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer" onClick={handleContinueLater}>
-              Continuer plus tard
-            </AlertDialogCancel>
-            <AlertDialogAction className="cursor-pointer" onClick={handlePayNow}>
-              Payer maintenant
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

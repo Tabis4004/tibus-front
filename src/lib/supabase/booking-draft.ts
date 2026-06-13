@@ -10,6 +10,8 @@ export type BookingDraft = {
   loyaltyDiscountAmount?: number;
   platformLoyaltyPointsRedeemed?: number;
   platformLoyaltyDiscountAmount?: number;
+  paymentCountryId?: string;
+  paymentNetwork?: string;
   savedAt: string;
 };
 

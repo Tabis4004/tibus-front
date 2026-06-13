@@ -44,6 +44,7 @@ import {
   OwnerReviews,
   OwnerSalesLedger,
   PaymentVerify,
+  PaymentSetup,
   PromoCodesPage,
   ReferralPageRoute,
   RoutesManager,
@@ -105,6 +106,7 @@ function AppShell() {
                 <Route path="traveler/referral" element={<ReferralPageRoute />} />
                 <Route path="trip/:tripId" element={<TripDetail />} />
                 <Route path="booking/:bookingId" element={<BookingConfirmation />} />
+                <Route path="payment/setup" element={<PaymentSetup />} />
                 <Route path="payment/verify" element={<PaymentVerify />} />
                 <Route path="verify/scan" element={<TicketScanner />} />
                 <Route path="verify/:reference" element={<TicketVerify />} />
