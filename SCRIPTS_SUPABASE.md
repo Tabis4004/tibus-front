@@ -35,6 +35,12 @@
 | 94 | `supabase/migrations/094_expense_categories_all_companies.sql` | ✅ **Exécuté** — 11 types de dépenses preset pour toutes les compagnies |
 | 95 | `supabase/migrations/095_seed_cities_dr5hn.sql` | ✅ **Exécuté** — ~2180 villes (23 pays Tibus, source dr5hn) |
 | 96 | `supabase/migrations/096_geniuspay_traveler_fee_formula.sql` | ✅ **Exécuté** — GeniusPay : T = (M×(1+X)+F)/(1-Z), sans Y opérateur |
+| 97 | `supabase/migrations/097_geniuspay_additive_fee_formula.sql` | ✅ **Exécuté** — GeniusPay : MT = M×(1+X+Y)+F |
+| 98 | `supabase/migrations/098_geniuspay_full_additive_formula.sql` | ✅ **Exécuté** — GeniusPay : MT = M×(1+X+Y+Z)+F |
+| 99 | `supabase/migrations/099_geniuspay_platform_margin_only.sql` | ✅ **Exécuté** — GeniusPay API = M×(1+X) seulement |
+| 100 | `supabase/migrations/100_geniuspay_gross_nominal_deducted.sql` | ✅ **Exécuté** — GeniusPay API = M×(1+X+Y+Z)+F, déduction Y%×M + Z%×M + F |
+| 101 | `supabase/migrations/101_geniuspay_deducted_on_gross.sql` | ✅ **Exécuté** — GeniusPay : T=(V+F)/(1-Y-Z), frais sur T |
+| 102 | `supabase/migrations/102_orange_ci_geniuspay_5pct.sql` | ✅ **Exécuté** — Orange CI Y=5% (Paystack) |
 
 ## Politique anti-fraude (réservation voyageur)
 

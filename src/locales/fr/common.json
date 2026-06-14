@@ -256,5 +256,22 @@
   "guide.explore_features": "Explorer les fonctionnalités",
   "guide.view_full_guide": "Voir le guide complet",
   "guide.nav_guide": "Guide d'utilisation",
-  "guide.nav_guide_desc": "Apprendre à utiliser Tibus"
+  "guide.nav_guide_desc": "Apprendre à utiliser Tibus",
+  "scanner.title": "Contrôle embarquement",
+  "scanner.subtitle": "Scannez le QR code ou saisissez la référence TB-…",
+  "scanner.valid_title": "Billet valide",
+  "scanner.valid_message": "Billet valide — embarquement autorisé",
+  "scanner.duplicate_title": "Scan en doublon",
+  "scanner.duplicate_message": "Billet déjà scanné à l'embarquement",
+  "scanner.refused_title": "Embarquement refusé",
+  "scanner.already_on_board_title": "Déjà à bord",
+  "scanner.already_on_board_message": "Passager déjà confirmé — embarquement refusé",
+  "scanner.passenger_boarded_message": "Passager accepté à bord",
+  "scanner.wrong_company_message": "Ticket non valide, vérifiez la compagnie d'achat et la gare de départ",
+  "scanner.verify_failed": "Vérification impossible",
+  "scanner.first_scan_at": "Premier scan : {{time}}",
+  "scanner.on_board_at": "Confirmé à bord : {{time}}",
+  "scanner.mark_on_board": "Marquer à bord",
+  "scanner.marking_on_board": "Confirmation…",
+  "scanner.scan_another": "Scanner un autre billet"
 }

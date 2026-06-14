@@ -4,9 +4,10 @@
  * - X : CommissionSettings / resolve_seller_commission_setting (caisse existante)
  * - Y/Z/F : GatewayPaymentFees (lot 019)
  *
- * V = M × (1 + X%)
- * T (GeniusPay) = (M(1 + X) + F) / (1 - Z)   — sans Y opérateur (choisi sur GeniusPay)
- * T (autres)    = (M(1 + X) + F) / (1 - Z - Y)
+ * V = M × (1 + X%)   — net reversé à Tibus (après déduction GP)
+ * T (GeniusPay / Tibus) = M × (1 + X% + Y% + Z%) + F — réseau choisi avant redirection
+ * T (FedaPay)       = V × (1 + Y% + Z%) + F
+ * T (autres)        = (M(1 + X) + F) / (1 - Z - Y)
  */
 
 export type PaymentGateway = "fedapay" | "geniuspay" | "cinetpay" | "paystack" | "paiementpro";
@@ -76,7 +77,13 @@ export type PaymentBreakdown = {
   requestedNetwork?: string;
   usedMaxFallback?: boolean;
   gatewayAmount?: number;
-  feeMode?: "on_top" | "deducted";
+  feeMode?: "on_top" | "deducted" | "deducted_on_gross" | "deducted_on_nominal" | "additive";
+  feesDeferredToGateway?: boolean;
+  gatewayFeePercentMin?: number;
+  gatewayFeePercentMax?: number;
+  totalAmountMin?: number;
+  totalAmountMax?: number;
+  networkFeeDeferred?: boolean;
 };
 
 function assertFiniteAmount(value: number, label: string) {
@@ -154,4 +161,34 @@ export function calculatePaymentBreakdown(
     paidBy: options?.paidBy ?? "company",
     marginScope: options?.marginScope ?? "unset",
   };
+}
+
+/** Total Tibus GeniusPay : M × (1 + X% + Y% + Z%) + F. */
+export function calculateTibusGeniusPayTotal(
+  nominalAmount: number,
+  platformMarginPercent: number,
+  networkFeePercent: number,
+  geniusPayFeePercent: number,
+  fixedFee: number,
+): number {
+  return Math.ceil(
+    nominalAmount * (1 + (platformMarginPercent + networkFeePercent + geniusPayFeePercent) / 100)
+      + fixedFee,
+  );
+}
+
+/** Total GeniusPay après choix réseau : T = (V + F) / (1 - Y% - Z%), frais prélevés sur T. */
+export function calculateGeniusPayTravelerTotal(
+  platformNetAmount: number,
+  yPercent: number,
+  zPercent: number,
+  fFixed: number,
+): number {
+  const denominator = 1 - (yPercent + zPercent) / 100;
+  if (denominator <= 0) {
+    throw new InvalidGatewayFeeRatesError(
+      `Taux invalides: Y (${yPercent}%) + Z (${zPercent}%) doivent être < 100%.`,
+    );
+  }
+  return Math.ceil((platformNetAmount + fFixed) / denominator);
 }

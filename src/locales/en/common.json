@@ -256,5 +256,22 @@
   "guide.explore_features": "Explore features",
   "guide.view_full_guide": "View full guide",
   "guide.nav_guide": "User Guide",
-  "guide.nav_guide_desc": "Learn how to use Tibus"
+  "guide.nav_guide_desc": "Learn how to use Tibus",
+  "scanner.title": "Boarding control",
+  "scanner.subtitle": "Scan the QR code or enter the TB-… reference",
+  "scanner.valid_title": "Valid ticket",
+  "scanner.valid_message": "Valid ticket — boarding authorized",
+  "scanner.duplicate_title": "Duplicate scan",
+  "scanner.duplicate_message": "Ticket already scanned at boarding",
+  "scanner.refused_title": "Boarding refused",
+  "scanner.already_on_board_title": "Already on board",
+  "scanner.already_on_board_message": "Passenger already confirmed — boarding refused",
+  "scanner.passenger_boarded_message": "Passenger accepted on board",
+  "scanner.wrong_company_message": "Invalid ticket, check the issuing company and departure station",
+  "scanner.verify_failed": "Verification failed",
+  "scanner.first_scan_at": "First scan: {{time}}",
+  "scanner.on_board_at": "Confirmed on board: {{time}}",
+  "scanner.mark_on_board": "Mark on board",
+  "scanner.marking_on_board": "Confirming…",
+  "scanner.scan_another": "Scan another ticket"
 }

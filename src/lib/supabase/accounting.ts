@@ -82,6 +82,19 @@ export type SellerCommissionSummary = {
   currency: string;
 };
 
+export type PlatformCommissionSummary = {
+  capturedTotal: number;
+  travelerOnlineCaptured: number;
+  counterCompanyCaptured: number;
+  travelerNominalTotal: number;
+  counterNominalTotal: number;
+  ticketCount: number;
+  counterTicketCount: number;
+  stakeholderPending: number;
+  stakeholderPaid: number;
+  currency: string;
+};
+
 export type CommissionSettingScope = "country" | "company";
 
 export type CommissionSetting = {
@@ -272,6 +285,30 @@ export async function getSellerCommissionSummarySupabase(): Promise<SellerCommis
   };
 }
 
+export async function getPlatformCommissionSummarySupabase(
+  countryId?: string | null,
+): Promise<PlatformCommissionSummary> {
+  const { data, error } = await supabase.rpc("get_platform_commission_summary", {
+    p_country_id: countryId ?? null,
+  });
+
+  if (error) throw error;
+
+  const payload = (data ?? {}) as Record<string, unknown>;
+  return {
+    capturedTotal: numberValue(payload.capturedTotal),
+    travelerOnlineCaptured: numberValue(payload.travelerOnlineCaptured),
+    counterCompanyCaptured: numberValue(payload.counterCompanyCaptured),
+    travelerNominalTotal: numberValue(payload.travelerNominalTotal),
+    counterNominalTotal: numberValue(payload.counterNominalTotal),
+    ticketCount: Number(payload.ticketCount ?? 0),
+    counterTicketCount: Number(payload.counterTicketCount ?? 0),
+    stakeholderPending: numberValue(payload.stakeholderPending),
+    stakeholderPaid: numberValue(payload.stakeholderPaid),
+    currency: String(payload.currency ?? "XOF"),
+  };
+}
+
 export async function listCommissionSettingsSupabase(): Promise<CommissionSetting[]> {
   const { data, error } = await supabase.rpc("list_commission_settings");
 
@@ -306,5 +343,98 @@ export async function deleteCommissionSettingSupabase(settingId: string): Promis
     p_setting_id: settingId,
   });
 
+  if (error) throw error;
+}
+
+export type SellerCommissionDashboardEntry = {
+  bookingId: string;
+  createdAt: string;
+  commissionAmount: number;
+  commissionStatus: string;
+  companyName: string;
+  reference: string;
+  currency: string;
+};
+
+export type SellerCommissionDashboard = {
+  sellerUserId: string;
+  dateFrom: string;
+  dateTo: string;
+  currency: string;
+  totalAmount: number;
+  pendingAmount: number;
+  paymentRequestedAmount: number;
+  paidAmount: number;
+  ticketCount: number;
+  entries: SellerCommissionDashboardEntry[];
+};
+
+export async function getSellerCommissionDashboardSupabase(input?: {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  sellerUserId?: string | null;
+}): Promise<SellerCommissionDashboard> {
+  const { data, error } = await supabase.rpc("get_seller_commission_dashboard", {
+    p_date_from: input?.dateFrom ?? null,
+    p_date_to: input?.dateTo ?? null,
+    p_seller_user_id: input?.sellerUserId ?? null,
+  });
+  if (error) throw error;
+  const payload = (data ?? {}) as Record<string, unknown>;
+  const entries = Array.isArray(payload.entries) ? payload.entries : [];
+  return {
+    sellerUserId: String(payload.sellerUserId ?? ""),
+    dateFrom: String(payload.dateFrom ?? ""),
+    dateTo: String(payload.dateTo ?? ""),
+    currency: String(payload.currency ?? "XOF"),
+    totalAmount: numberValue(payload.totalAmount),
+    pendingAmount: numberValue(payload.pendingAmount),
+    paymentRequestedAmount: numberValue(payload.paymentRequestedAmount),
+    paidAmount: numberValue(payload.paidAmount),
+    ticketCount: Number(payload.ticketCount ?? 0),
+    entries: entries.map((row) => {
+      const item = row as Record<string, unknown>;
+      return {
+        bookingId: String(item.bookingId ?? ""),
+        createdAt: String(item.createdAt ?? ""),
+        commissionAmount: numberValue(item.commissionAmount),
+        commissionStatus: String(item.commissionStatus ?? "pending"),
+        companyName: String(item.companyName ?? ""),
+        reference: String(item.reference ?? ""),
+        currency: String(item.currency ?? "XOF"),
+      };
+    }),
+  };
+}
+
+export async function requestSellerCommissionPaymentSupabase(input?: {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  note?: string | null;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("request_seller_commission_payment", {
+    p_date_from: input?.dateFrom ?? null,
+    p_date_to: input?.dateTo ?? null,
+    p_note: input?.note ?? null,
+  });
+  if (error) throw error;
+  return String(data);
+}
+
+export async function confirmSellerCommissionPaymentSupabase(requestId: string): Promise<void> {
+  const { error } = await supabase.rpc("confirm_seller_commission_payment", {
+    p_request_id: requestId,
+  });
+  if (error) throw error;
+}
+
+export async function updateCompanyRecruitedBySupabase(
+  companyId: string,
+  recruitedByUserId: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc("update_company_recruited_by", {
+    p_company_id: companyId,
+    p_recruited_by_user_id: recruitedByUserId,
+  });
   if (error) throw error;
 }

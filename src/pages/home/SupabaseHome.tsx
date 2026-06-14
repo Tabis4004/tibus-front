@@ -1,9 +1,8 @@
-import { useParams } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   SearchIcon,
   ShieldIcon,
-  BookOpenIcon,
   TicketIcon,
   StoreIcon,
   LayoutDashboardIcon,
@@ -11,6 +10,7 @@ import {
   MessageCircleIcon,
   GiftIcon,
   ClipboardListIcon,
+  BookOpenIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { motion } from "motion/react";
@@ -18,10 +18,11 @@ import AppHeader from "../layout/_components/AppHeader.tsx";
 import BottomNav from "../layout/_components/BottomNav.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
-import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
+import { HomeManualBlocks } from "./_components/HomeManualBlocks.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
 import LandingTravelSection from "../landing/LandingTravelSection.tsx";
+import { resolveDashboardPath } from "@/lib/auth/role-routing.ts";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -62,9 +63,12 @@ export default function SupabaseHome() {
     );
   }
 
+  if (appUser.isReady && appUser.roles.includes("owner")) {
+    return <Navigate to={resolveDashboardPath(locale, appUser.roles)} replace />;
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
-      <OnboardingGate />
       <AppHeader />
       <main className="flex-1 pb-20 md:pb-0">
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
@@ -88,6 +92,7 @@ export default function SupabaseHome() {
 
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
+            <HomeManualBlocks />
             <ExploreFeaturesButton variant="block" />
           </HomeBlockSection>
 
@@ -194,30 +199,6 @@ export default function SupabaseHome() {
                     defaultValue: "Administration de la plateforme Tibus",
                   })}
                   icon={ShieldIcon}
-                />
-              )}
-
-              {showCountryAdminPanel && (
-                <HomeActionBlock
-                  to={`/${locale}/manual/admin-pays`}
-                  title={t("manual.country_admin_nav_title", {
-                    defaultValue: "Manuel admin pays",
-                  })}
-                  description={t("manual.country_admin_nav_desc", {
-                    defaultValue: "Comprendre votre rôle, les commissions et le fond de garantie",
-                  })}
-                  icon={BookOpenIcon}
-                />
-              )}
-
-              {(showOwnerDashboard || appUser.isSuperAdmin) && (
-                <HomeActionBlock
-                  to={`/${locale}/manual/compagnie`}
-                  title={t("manual.nav_title", { defaultValue: "Manuel compagnie" })}
-                  description={t("manual.nav_desc", {
-                    defaultValue: "Guide complet avec captures d'écran pour former vos équipes",
-                  })}
-                  icon={BookOpenIcon}
                 />
               )}
             </HomeBlockSection>

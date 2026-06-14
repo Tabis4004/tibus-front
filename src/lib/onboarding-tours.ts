@@ -1,4 +1,5 @@
 import type { OnboardingAudience } from "@/lib/onboarding-audience.ts";
+import { OWNER_CONSOLE_MODULES } from "@/lib/owner-console-modules.tsx";
 
 export type TourStepConfig = {
   target: string;
@@ -13,6 +14,40 @@ export type ResolvedTour = {
   steps: TourStepConfig[];
   onStart?: () => void;
 };
+
+export function buildOwnerOverviewTourSteps(): TourStepConfig[] {
+  const moduleSteps: TourStepConfig[] = OWNER_CONSOLE_MODULES.filter(
+    (module) => module.tourTarget,
+  ).map((module) => ({
+    target: `[data-tour="${module.tourTarget}"]`,
+    titleKey: module.titleKey,
+    descKey: module.descKey,
+    titleDefault: module.titleDefault,
+    descDefault: module.descDefault,
+    placement: "bottom" as const,
+  }));
+
+  return [
+    {
+      target: '[data-tour="owner-explore-features"]',
+      titleKey: "tour.owner.explore_title",
+      descKey: "tour.owner.explore_desc",
+      titleDefault: "Explorer à tout moment",
+      descDefault:
+        "Relancez ce guide via ce bouton, le header (après le drapeau) ou le menu utilisateur.",
+      placement: "bottom",
+    },
+    {
+      target: '[data-tour="owner-overview"]',
+      titleKey: "tour.owner.overview_title",
+      descKey: "tour.owner.overview_desc",
+      titleDefault: "Aperçu",
+      descDefault: "Indicateurs clés et accès rapide par blocs à votre activité.",
+      placement: "bottom",
+    },
+    ...moduleSteps,
+  ];
+}
 
 export const OWNER_SIDEBAR_TOUR: TourStepConfig[] = [
   {
@@ -431,7 +466,7 @@ export function resolveOnboardingTour(
   if (audience === "owner") {
     if (/\/owner(\/|$)/.test(pathname)) {
       return {
-        steps: OWNER_SIDEBAR_TOUR,
+        steps: buildOwnerOverviewTourSteps(),
         onStart: () => {
           openOwnerSidebarForTour();
         },

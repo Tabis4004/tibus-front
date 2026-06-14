@@ -7,9 +7,11 @@ import {
   type PlatformAdminUserRow,
 } from "@/lib/supabase/admin-users.ts";
 import {
+  getPlatformCommissionSummarySupabase,
   getSellerCommissionSummarySupabase,
   listCommissionSettingsSupabase,
   type CommissionSetting,
+  type PlatformCommissionSummary,
   type SellerCommissionSummary,
 } from "@/lib/supabase/accounting.ts";
 
@@ -30,6 +32,7 @@ export type SupabaseCompanyRow = {
   commissionRate: number;
   managerName: string | null;
   currency: string | null;
+  recruitedByUserId: string | null;
 };
 
 export type SupabaseCountryRow = {
@@ -95,6 +98,7 @@ export type AdminDataSlice = {
   plans: SupabasePlanRow[];
   subscriptions: SupabaseSubscriptionRow[];
   commissions: SellerCommissionSummary | null;
+  platformCommissions: PlatformCommissionSummary | null;
   commissionSettings: CommissionSetting[];
 };
 
@@ -123,7 +127,7 @@ function joinedOne<T>(value: T | T[] | null | undefined): T | null {
 export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminDataKey[] {
   if (!isSuperAdmin) {
     if (tab === "commissions") {
-      return ["countries", "companies", "commissions", "commissionSettings"];
+      return ["countries", "companies", "commissions", "platformCommissions", "commissionSettings"];
     }
     if (tab === "guarantee_fund") {
       return ["companies"];
@@ -141,7 +145,7 @@ export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminD
     case "plans":
       return ["plans", "countries"];
     case "commissions":
-      return ["countries", "companies", "commissions", "commissionSettings"];
+      return ["countries", "companies", "commissions", "platformCommissions", "commissionSettings"];
     case "guarantee_fund":
       return ["companies"];
     case "geography":
@@ -272,7 +276,7 @@ async function loadUsers(hasDbSuperAdmin: boolean): Promise<Pick<AdminDataSlice,
 async function loadCompanies(): Promise<Pick<AdminDataSlice, "companies">> {
   const { data: rows, error } = await supabase
     .from("Companies")
-    .select("id, name, countryId, isActive, commissionRate, managerName, Countries(name, currency)")
+    .select("id, name, countryId, isActive, commissionRate, managerName, recruitedByUserId, Countries(name, currency)")
     .order("createdAt", { ascending: false });
 
   if (error) throw error;
@@ -294,6 +298,7 @@ async function loadCompanies(): Promise<Pick<AdminDataSlice, "companies">> {
         commissionRate: Number(row.commissionRate ?? 0),
         managerName: (row.managerName as string | null) ?? null,
         currency: country?.currency ?? null,
+        recruitedByUserId: (row.recruitedByUserId as string | null) ?? null,
       };
     }),
   };
@@ -426,13 +431,14 @@ async function loadSubscriptions(): Promise<Pick<AdminDataSlice, "subscriptions"
 }
 
 async function loadCommissions(): Promise<
-  Pick<AdminDataSlice, "commissions" | "commissionSettings">
+  Pick<AdminDataSlice, "commissions" | "platformCommissions" | "commissionSettings">
 > {
-  const [commissions, commissionSettings] = await Promise.all([
-    getSellerCommissionSummarySupabase(),
+  const [commissions, platformCommissions, commissionSettings] = await Promise.all([
+    getSellerCommissionSummarySupabase().catch(() => null),
+    getPlatformCommissionSummarySupabase().catch(() => null),
     listCommissionSettingsSupabase(),
   ]);
-  return { commissions, commissionSettings };
+  return { commissions, platformCommissions, commissionSettings };
 }
 
 type LoaderContext = {
@@ -452,6 +458,7 @@ const LOADER_BY_KEY: Record<
   plans: () => loadPlans(),
   subscriptions: () => loadSubscriptions(),
   commissions: () => loadCommissions(),
+  platformCommissions: () => loadCommissions(),
   commissionSettings: () => loadCommissions(),
 };
 

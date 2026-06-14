@@ -13,6 +13,10 @@ import {
   isProfileComplete,
   shouldBackfillProfileCompleted,
 } from "@/lib/auth/profile-completion.ts";
+import {
+  resolveDashboardRole,
+  resolveDashboardRoleUi,
+} from "@/lib/auth/role-routing.ts";
 
 const SELLER_ROLE_NAMES = [
   "vendeur",
@@ -234,6 +238,8 @@ export function useAppUserState() {
     "traveler";
 
   const primaryRoleUi = normalizeRoleForUi(primaryRole);
+  const dashboardRole = resolveDashboardRole(effectiveRoles);
+  const dashboardRoleUi = resolveDashboardRoleUi(effectiveRoles);
 
   const waitingForProfile =
     !!session && (authLoading || isBootstrapping || !appUserId || !isReady);
@@ -257,6 +263,8 @@ export function useAppUserState() {
         hasAnyRole(effectiveRoles, MERCHANT_AGENT_CTA_BLOCKING_ROLES) || hasMerchantAgentApplication,
       primaryRole,
       primaryRoleUi,
+      dashboardRole,
+      dashboardRoleUi,
       hasDbSuperAdmin,
       isSuperAdmin: effectiveRoles.includes("super_admin"),
       isAdminSandbox,
@@ -279,6 +287,8 @@ export function useAppUserState() {
       merchantAgentApplicationStatus,
       primaryRole,
       primaryRoleUi,
+      dashboardRole,
+      dashboardRoleUi,
       profile,
       refresh,
       waitingForProfile,

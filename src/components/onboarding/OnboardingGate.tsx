@@ -17,7 +17,7 @@ import {
 import SpotlightTour from "@/components/onboarding/SpotlightTour.tsx";
 
 const EXCLUDED_PATH =
-  /\/(trip\/|booking\/|payment\/|verify\/|agent-marchand|complete-profile|auth\/)/;
+  /\/(trip\/|booking\/|payment\/|verify\/|agent-marchand|complete-profile|auth\/|manual\/)/;
 
 function useTourReady(steps: TourStepConfig[], enabled: boolean) {
   const [readySteps, setReadySteps] = useState<TourStepConfig[]>([]);

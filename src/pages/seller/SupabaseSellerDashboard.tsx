@@ -54,10 +54,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import {
-  getSellerCommissionSummarySupabase,
-  type SellerCommissionSummary,
-} from "@/lib/supabase/accounting";
+import SellerCommissionDashboardPanel from "@/pages/admin/_components/SellerCommissionDashboardPanel.tsx";
+import StakeholderPayoutDashboardPanel from "@/pages/admin/_components/StakeholderPayoutDashboardPanel.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import CompanySalesLedger from "@/pages/owner/_components/CompanySalesLedger.tsx";
 import StationCashPanel from "@/pages/seller/_components/StationCashPanel.tsx";
@@ -636,7 +634,6 @@ export default function SupabaseSellerDashboard() {
   const appUser = useAppUser();
   const [profile, setProfile] = useState<SellerProfileSupabase | null | undefined>(undefined);
   const [trips, setTrips] = useState<SellerCounterTrip[] | undefined>(undefined);
-  const [commissions, setCommissions] = useState<SellerCommissionSummary | null>(null);
   const [selectedTrip, setSelectedTrip] = useState<SellerCounterTrip | null>(null);
   const [receiptTickets, setReceiptTickets] = useState<CounterSaleTicket[] | null>(null);
   const [reprintInput, setReprintInput] = useState<TicketReceiptInput | null>(null);
@@ -652,12 +649,10 @@ export default function SupabaseSellerDashboard() {
       setProfile(nextProfile);
       if (!nextProfile) {
         setTrips([]);
-        setCommissions(null);
         return;
       }
-      const [nextTrips, nextCommissions, colisSettings, receiptInfo] = await Promise.all([
+      const [nextTrips, colisSettings, receiptInfo] = await Promise.all([
         listSellerTripsSupabase(nextProfile),
-        getSellerCommissionSummarySupabase().catch(() => null),
         nextProfile.company
           ? getCompanyColisSettingsSupabase(nextProfile.company.id).catch(() => null)
           : Promise.resolve(null),
@@ -666,14 +661,12 @@ export default function SupabaseSellerDashboard() {
           : Promise.resolve(null),
       ]);
       setTrips(nextTrips);
-      setCommissions(nextCommissions);
       setColisModuleEnabled(Boolean(colisSettings?.colisAutonomeEnabled));
       setCompanyReceiptInfo(receiptInfo);
     } catch (err) {
       toast.error(supabaseErrorMessage(err, "Chargement vendeur impossible"));
       setProfile(null);
       setTrips([]);
-      setCommissions(null);
     }
   };
 
@@ -780,6 +773,10 @@ export default function SupabaseSellerDashboard() {
       profile.roleNames.includes("chauffeur") ||
       profile.roleNames.includes("owner"));
 
+  const isPlatformSeller = profile.roleNames.some((role) =>
+    ["vendeur_independant", "vendeur_master"].includes(role),
+  );
+
   const dashboardCards = [
     {
       label: profile.canSellDirect ? "Mode caisse" : "Mode réservation",
@@ -795,13 +792,6 @@ export default function SupabaseSellerDashboard() {
       label: "Places",
       value: totalAvailableSeats.toLocaleString(),
       icon: UsersIcon,
-    },
-    {
-      label: "Commissions",
-      value: commissions
-        ? `${commissions.pendingTotal.toLocaleString()} ${commissions.currency}`
-        : "—",
-      icon: PercentIcon,
     },
   ];
 
@@ -831,7 +821,7 @@ export default function SupabaseSellerDashboard() {
         </div>
       </div>
 
-      <div data-tour="seller-kpis" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div data-tour="seller-kpis" className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {dashboardCards.map(({ label, value, icon: Icon }) => (
           <Card key={label}>
             <CardContent className="p-4">
@@ -845,63 +835,17 @@ export default function SupabaseSellerDashboard() {
         ))}
       </div>
 
-      {commissions && (
+      {isPlatformSeller ? (
         <Card data-tour="seller-commissions">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <PercentIcon className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="font-bold text-sm">Commissions</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {commissions.totalTickets} vente(s) tiers
-                  </p>
-                </div>
-              </div>
-              <Badge variant="secondary">{commissions.currency}</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-lg bg-muted p-3">
-                <p className="text-[10px] text-muted-foreground">En attente</p>
-                <p className="font-black">
-                  {commissions.pendingTotal.toLocaleString()} {commissions.currency}
-                </p>
-              </div>
-              <div className="rounded-lg bg-muted p-3">
-                <p className="text-[10px] text-muted-foreground">Payees</p>
-                <p className="font-black">
-                  {commissions.paidTotal.toLocaleString()} {commissions.currency}
-                </p>
-              </div>
-            </div>
-            {commissions.entries.length > 0 ? (
-              <div className="space-y-2">
-                {commissions.entries.slice(0, 3).map((entry) => (
-                  <div key={entry.bookingId} className="flex items-center justify-between gap-3 text-xs">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{entry.companyName}</p>
-                      <p className="text-muted-foreground truncate">
-                        {entry.reference} · {entry.routeLabel}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-bold">
-                        {entry.commissionAmount.toLocaleString()} {entry.currency}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {entry.commissionRate}%
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Aucune commission tiers enregistrée pour le moment.
-              </p>
-            )}
+          <CardContent className="p-4 space-y-6">
+            <SellerCommissionDashboardPanel embedded allowPaymentRequest />
+            <StakeholderPayoutDashboardPanel embedded />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-4">
+            <StakeholderPayoutDashboardPanel embedded />
           </CardContent>
         </Card>
       )}

@@ -3,6 +3,12 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { refreshAppUserAsync } from "@/hooks/use-app-user.ts";
+import {
+  fetchUserRoleNames,
+  resolveDashboardPath,
+} from "@/lib/auth/role-routing.ts";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -30,7 +36,30 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [acceptedCgu, setAcceptedCgu] = useState(false);
 
-  const home = `/${lng ?? "fr"}`;
+  const locale = lng ?? "fr";
+  const home = `/${locale}`;
+
+  const redirectAfterAuth = async () => {
+    try {
+      await refreshAppUserAsync();
+    } catch {
+      // Profile refresh may lag; fall back to role lookup or home.
+    }
+
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id;
+    if (!userId) {
+      navigate(home, { replace: true });
+      return;
+    }
+
+    try {
+      const roles = await fetchUserRoleNames(userId);
+      navigate(resolveDashboardPath(locale, roles), { replace: true });
+    } catch {
+      navigate(home, { replace: true });
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +71,7 @@ export default function LoginPage() {
     try {
       await signInWithPassword(email, password);
       toast.success(t("auth.sign_in_success", { defaultValue: "Connexion réussie" }));
-      navigate(home, { replace: true });
+      await redirectAfterAuth();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("errors.generic"));
     } finally {
@@ -80,7 +109,11 @@ export default function LoginPage() {
               defaultValue: "Compte créé. Bienvenue sur Tibus !",
             }),
       );
-      navigate(result.requiresConfirmation ? home : home, { replace: true });
+      if (result.requiresConfirmation) {
+        navigate(home, { replace: true });
+      } else {
+        await redirectAfterAuth();
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("errors.generic"));
     } finally {

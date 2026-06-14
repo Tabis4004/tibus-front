@@ -439,10 +439,7 @@ Deno.serve(async (req) => {
           code: "PAYMENT_COUNTRY_REQUIRED",
         }, 400);
       }
-      if (
-        activeGateway !== "geniuspay" &&
-        (!paymentNetwork || paymentNetwork === "unknown")
-      ) {
+      if (!paymentNetwork || paymentNetwork === "unknown") {
         return jsonResponse({
           error: "Réseau Mobile Money requis",
           code: "PAYMENT_NETWORK_REQUIRED",
@@ -450,8 +447,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const resolvedNetwork =
-      activeGateway === "geniuspay" ? "unknown" : paymentNetwork;
+    const resolvedNetwork = paymentNetwork;
 
     const { data: paymentCalc, error: paymentCalcError } = await admin.rpc(
       "calculate_traveler_payment_total",
@@ -488,17 +484,23 @@ Deno.serve(async (req) => {
     const calc = paymentCalc as {
       totalAmount?: unknown;
       platformNetAmount?: unknown;
+      platformMarginPercent?: unknown;
       gatewayAmount?: unknown;
       feeMode?: unknown;
     } | null;
 
-    // FedaPay amount field = V ; GeniusPay = montant total voyageur T
-    const gatewayApiAmount = Number(
-      activeGateway === "fedapay"
-        ? (calc?.gatewayAmount ?? calc?.platformNetAmount ?? calc?.totalAmount ?? nominalAmount)
-        : (calc?.totalAmount ?? calc?.gatewayAmount ?? nominalAmount),
+    const platformNetAmount = Math.ceil(
+      Number(calc?.platformNetAmount ?? payableNominal),
     );
-    const travelerCheckoutAmount = Number(calc?.totalAmount ?? gatewayApiAmount);
+
+    const gatewayApiAmount = activeGateway === "geniuspay"
+      ? Number(calc?.gatewayAmount ?? calc?.totalAmount ?? platformNetAmount)
+      : Number(
+        calc?.gatewayAmount ?? calc?.platformNetAmount ?? calc?.totalAmount ?? payableNominal,
+      );
+    const travelerCheckoutAmount = Number(
+      calc?.totalAmount ?? gatewayApiAmount,
+    );
 
     const firstTraveler = normalizedTravelers[0];
     const nameParts = firstTraveler.passengerName.split(/\s+/);
@@ -530,8 +532,11 @@ Deno.serve(async (req) => {
         ? String(resolvedPlatformLoyaltyDiscount)
         : "",
       nominalAmount: String(payableNominal),
+      platformNetAmount: String(platformNetAmount),
+      platformMarginPercent: String(calc?.platformMarginPercent ?? ""),
       totalAmount: String(travelerCheckoutAmount),
       gatewayApiAmount: String(gatewayApiAmount),
+      feeModel: activeGateway === "geniuspay" ? "additive" : "",
       paymentMethod,
       paymentNetwork,
       companyId,
@@ -555,10 +560,10 @@ Deno.serve(async (req) => {
           name: firstTraveler.passengerName,
           email: user.email ?? "customer@tibus.app",
           phone: firstTraveler.passengerPhone,
-          country: paymentCountryCode,
         },
         metadata: paymentMetadata,
-        paymentNetwork: activeGateway === "geniuspay" ? undefined : paymentNetwork,
+        paymentNetwork: resolvedNetwork,
+        paymentCountryCode,
       })
       : await createFedaPayCheckout({
         amount: gatewayApiAmount,
@@ -579,6 +584,7 @@ Deno.serve(async (req) => {
       transactionId: checkout.transactionId,
       amount: travelerCheckoutAmount,
       gatewayApiAmount,
+      platformNetAmount,
       nominalAmount: payableNominal,
       gateway: activeGateway,
     });

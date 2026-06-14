@@ -52,6 +52,12 @@ type PaymentBreakdownJson = {
   usedMaxFallback?: unknown;
   gatewayAmount?: unknown;
   feeMode?: unknown;
+  feesDeferredToGateway?: unknown;
+  gatewayFeePercentMin?: unknown;
+  gatewayFeePercentMax?: unknown;
+  totalAmountMin?: unknown;
+  totalAmountMax?: unknown;
+  networkFeeDeferred?: unknown;
 };
 
 function numberValue(value: unknown): number {
@@ -82,8 +88,30 @@ function normalizeBreakdown(payload: PaymentBreakdownJson): PaymentBreakdown {
     gatewayAmount: payload.gatewayAmount != null
       ? numberValue(payload.gatewayAmount)
       : undefined,
-    feeMode: payload.feeMode === "on_top" || payload.feeMode === "deducted"
+    feeMode: payload.feeMode === "on_top" ||
+        payload.feeMode === "deducted" ||
+        payload.feeMode === "deducted_on_gross" ||
+        payload.feeMode === "deducted_on_nominal" ||
+        payload.feeMode === "additive"
       ? payload.feeMode
+      : undefined,
+    feesDeferredToGateway: payload.feesDeferredToGateway != null
+      ? Boolean(payload.feesDeferredToGateway)
+      : undefined,
+    gatewayFeePercentMin: payload.gatewayFeePercentMin != null
+      ? numberValue(payload.gatewayFeePercentMin)
+      : undefined,
+    gatewayFeePercentMax: payload.gatewayFeePercentMax != null
+      ? numberValue(payload.gatewayFeePercentMax)
+      : undefined,
+    totalAmountMin: payload.totalAmountMin != null
+      ? numberValue(payload.totalAmountMin)
+      : undefined,
+    totalAmountMax: payload.totalAmountMax != null
+      ? numberValue(payload.totalAmountMax)
+      : undefined,
+    networkFeeDeferred: payload.networkFeeDeferred != null
+      ? Boolean(payload.networkFeeDeferred)
       : undefined,
   };
 }

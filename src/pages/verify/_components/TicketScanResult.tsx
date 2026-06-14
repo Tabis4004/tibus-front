@@ -31,9 +31,12 @@ function resolveTone(ticket: VerifiedTicket): ResultTone {
   return "error";
 }
 
-function resolveMessage(ticket: VerifiedTicket, fallback: string): string {
+function resolveMessage(ticket: VerifiedTicket, fallback: string, t: (key: string) => string): string {
+  if (ticket.result === "wrong_company") return t("scanner.wrong_company_message");
   if (ticket.message === "already_on_board") return fallback;
   if (ticket.message === "passenger_boarded") return fallback;
+  if (ticket.result === "valid" && ticket.valid) return t("scanner.valid_message");
+  if (ticket.result === "duplicate") return t("scanner.duplicate_message");
   return ticket.message || fallback;
 }
 
@@ -66,7 +69,9 @@ export default function TicketScanResult({
     tone === "success" ? CheckCircleIcon : tone === "warning" ? AlertTriangleIcon : XCircleIcon;
 
   const title =
-    ticket.result === "on_board"
+    ticket.result === "wrong_company"
+      ? t("scanner.refused_title")
+      : ticket.result === "on_board"
       ? t("scanner.already_on_board_title")
       : tone === "success"
         ? t("scanner.valid_title")
@@ -81,6 +86,7 @@ export default function TicketScanResult({
       : ticket.message === "passenger_boarded"
         ? t("scanner.passenger_boarded_message")
         : t("scanner.verify_failed"),
+    t,
   );
 
   const toneStyles = {

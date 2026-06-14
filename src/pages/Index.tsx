@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import LocaleSwitcher from "@/components/ui/locale-switcher.tsx";
+import ManualNavLinks from "@/components/manual/ManualNavLinks.tsx";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAuth } from "@/hooks/use-auth.ts";
 import SupabaseHome from "./home/SupabaseHome.tsx";
@@ -193,6 +194,7 @@ function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <LocaleSwitcher />
+            <ManualNavLinks />
             {isSupabaseAuth() ? (
               <a href="#home-trip-search">
                 <Button variant="ghost" size="sm" className="cursor-pointer hidden sm:flex">

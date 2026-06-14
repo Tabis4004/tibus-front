@@ -18,8 +18,9 @@ export function startExploreTour(input: {
 }) {
   const tour = resolveOnboardingTour(input.pathname, input.audience);
   if (!tour) {
-    input.navigate(getDefaultTourPath(input.audience, input.lng));
-    window.setTimeout(() => dispatchExploreFeaturesTour(), 600);
+    const targetPath = getDefaultTourPath(input.audience, input.lng);
+    input.navigate(targetPath);
+    window.setTimeout(() => dispatchExploreFeaturesTour(), 1200);
     return;
   }
   dispatchExploreFeaturesTour();

@@ -132,16 +132,25 @@ async function invokeFunction<T>(name: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
 
+  const rawText = await response.text();
+
   let payload: (T & { error?: string; code?: string; message?: string }) | null =
     null;
   try {
-    payload = (await response.json()) as T & {
-      error?: string;
-      code?: string;
-      message?: string;
-    };
+    payload = rawText
+      ? (JSON.parse(rawText) as T & {
+        error?: string;
+        code?: string;
+        message?: string;
+      })
+      : null;
   } catch {
-    payload = null;
+    if (rawText.trimStart().startsWith("<")) {
+      throw new Error(
+        `Service paiement indisponible (${response.status}). Réessayez dans un instant.`,
+      );
+    }
+    throw new Error(`Réponse invalide du service paiement (${response.status}).`);
   }
 
   if (!response.ok) {

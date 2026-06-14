@@ -4,7 +4,7 @@ import { Authenticated, Unauthenticated } from "@/components/auth/AuthBoundary.t
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Link, useParams } from "react-router-dom";
-import { BusIcon, LogOutIcon, UserIcon, ShieldIcon, Share2Icon, PlusIcon } from "lucide-react";
+import { BusIcon, LogOutIcon, UserIcon, ShieldIcon, Share2Icon, PlusIcon, LayoutDashboardIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import NotificationCenter from "./NotificationCenter.tsx";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
+import ManualNavLinks from "@/components/manual/ManualNavLinks.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
@@ -62,9 +63,13 @@ function UserMenu() {
   const { lng } = useParams<{ lng: string }>();
 
   const role = isSupabaseAuth()
-    ? appUser.primaryRoleUi
+    ? appUser.dashboardRoleUi
     : (dbUser?.role ?? "traveler");
   const roleLabel = t(`roles.${role}`);
+  const hasOwnerDashboard = isSupabaseAuth() && appUser.roles.includes("owner");
+  const hasPlatformAdmin =
+    isSupabaseAuth() &&
+    (appUser.isSuperAdmin || appUser.roles.includes("admin_pays"));
   const canCreateCompany =
     isSupabaseAuth() &&
     appUser.isReady &&
@@ -95,7 +100,15 @@ function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {role === "superadmin" && (
+        {hasOwnerDashboard && (
+          <DropdownMenuItem asChild>
+            <Link to={`/${lng}/owner`} className="cursor-pointer">
+              <LayoutDashboardIcon className="w-4 h-4 mr-2 text-primary" />
+              {t("owner_dashboard", { defaultValue: "Tableau de bord propriétaire" })}
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {hasPlatformAdmin && (
           <DropdownMenuItem asChild>
             <Link to={`/${lng}/admin`} className="cursor-pointer">
               <ShieldIcon className="w-4 h-4 mr-2 text-primary" />
@@ -167,6 +180,7 @@ export default function AppHeader() {
         </Link>
         <div className="flex items-center gap-2">
           <LocaleSwitcher />
+          <ManualNavLinks />
           <Unauthenticated>
             <SignInButton />
           </Unauthenticated>

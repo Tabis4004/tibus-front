@@ -181,7 +181,7 @@ export default function SupabaseOwnerOverview() {
 
       <OwnerCompanyBanner company={company} />
 
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour="owner-overview">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
           {t("console.kpi_section", { defaultValue: "Indicateurs" })}
         </h2>

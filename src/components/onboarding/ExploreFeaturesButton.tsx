@@ -119,6 +119,7 @@ export default function ExploreFeaturesButton({
       className="cursor-pointer gap-1.5 text-xs h-8 max-sm:px-2"
       onClick={handleClick}
       title={label}
+      data-tour="owner-explore-features"
     >
       <CompassIcon className="w-3.5 h-3.5" />
       <span className="max-sm:sr-only">{label}</span>

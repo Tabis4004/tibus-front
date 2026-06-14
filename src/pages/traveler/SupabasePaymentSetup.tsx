@@ -22,7 +22,12 @@ import {
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { usePaymentCountryNetworks } from "@/hooks/use-payment-country-networks";
 import { useSupabaseTripDetail } from "@/hooks/use-supabase-trip-detail";
-import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
+import {
+  type PaymentBreakdown,
+  type PaymentGateway,
+  type PaymentMethod,
+  type PaymentNetwork,
+} from "@/config/commission.ts";
 import { paymentNetworkLabel } from "@/lib/payment-networks.ts";
 import {
   loadBookingDraft,
@@ -84,10 +89,9 @@ function PaymentSetupInner() {
   } = usePaymentCountryNetworks({
     activeGateway,
     passengerPhone: draft?.passengerPhone ?? "",
-    deferNetworkToGateway: isGeniusPayCheckout,
   });
 
-  const checkoutNetwork: PaymentNetwork = isGeniusPayCheckout ? "unknown" : paymentNetwork;
+  const checkoutNetwork: PaymentNetwork = paymentNetwork;
 
   const phoneCountryMismatch =
     inferredCountryName &&
@@ -96,9 +100,11 @@ function PaymentSetupInner() {
 
   const payDisabledReason = !paymentCountryId
     ? "Choisissez le pays de votre portefeuille Mobile Money."
-    : !isGeniusPayCheckout && checkoutNetwork === "unknown"
+    : checkoutNetwork === "unknown"
       ? "Choisissez votre réseau Mobile Money."
-      : null;
+      : phoneCountryMismatch
+        ? `Le numéro correspond à ${inferredCountryName}, pas à ${paymentCountryName}.`
+        : null;
 
   useEffect(() => {
     if (!reservationId) return;
@@ -108,16 +114,11 @@ function PaymentSetupInner() {
 
   useEffect(() => {
     if (!draft?.paymentCountryId) return;
-    if (isGeniusPayCheckout) {
-      restorePaymentSelection(draft.paymentCountryId, "unknown");
-      return;
-    }
     if (!draft.paymentNetwork || draft.paymentNetwork === "unknown") return;
     restorePaymentSelection(draft.paymentCountryId, draft.paymentNetwork as PaymentNetwork);
   }, [
     draft?.paymentCountryId,
     draft?.paymentNetwork,
-    isGeniusPayCheckout,
     restorePaymentSelection,
   ]);
 
@@ -145,13 +146,19 @@ function PaymentSetupInner() {
   }, [draft, trip]);
 
   useEffect(() => {
-    if (!trip?.companyId || !paymentCountryId) {
+    if (!trip?.companyId) {
       setPaymentBreakdown(null);
       setPaymentPreviewError(null);
       return;
     }
 
-    if (!isGeniusPayCheckout && checkoutNetwork === "unknown") {
+    if (!paymentCountryId) {
+      setPaymentBreakdown(null);
+      setPaymentPreviewError(null);
+      return;
+    }
+
+    if (checkoutNetwork === "unknown") {
       setPaymentBreakdown(null);
       setPaymentPreviewError(null);
       return;
@@ -193,7 +200,6 @@ function PaymentSetupInner() {
     paymentCountryId,
     checkoutNetwork,
     activeGateway,
-    isGeniusPayCheckout,
   ]);
 
   const persistDraft = () => {
@@ -223,8 +229,14 @@ function PaymentSetupInner() {
       toast.error("Choisissez le pays de paiement");
       return;
     }
-    if (!isGeniusPayCheckout && checkoutNetwork === "unknown") {
+    if (checkoutNetwork === "unknown") {
       toast.error("Choisissez votre réseau Mobile Money");
+      return;
+    }
+    if (phoneCountryMismatch) {
+      toast.error(
+        `Le numéro correspond à ${inferredCountryName}, pas à ${paymentCountryName}. Alignez le pays de paiement.`,
+      );
       return;
     }
     const phone = draft.passengerPhone.trim();
@@ -387,64 +399,56 @@ function PaymentSetupInner() {
             <p className="text-xs text-destructive">Aucun pays de paiement configuré.</p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              {isGeniusPayCheckout
-                ? "Pays de votre compte Mobile Money — le réseau sera choisi sur GeniusPay."
-                : "Sélectionnez le pays où est enregistré votre compte Mobile Money."}
+              Sélectionnez le pays où est enregistré votre compte Mobile Money.
             </p>
           )}
         </div>
 
-        {isGeniusPayCheckout ? (
-          <div className="rounded-lg border border-dashed bg-muted/30 p-3 space-y-2">
-            <p className="text-sm font-medium">Paiement via GeniusPay</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t("geniuspay_info", {
-                defaultValue:
-                  "Vous choisirez votre réseau Mobile Money (Orange, MTN, Wave, Moov…) sur la page GeniusPay.",
-              })}
+        <div className="space-y-2">
+          <Label>Réseau Mobile Money *</Label>
+          {!paymentCountryId || networksLoading ? (
+            <p className="text-sm text-muted-foreground py-2">
+              {!paymentCountryId ? "Choisissez d'abord un pays" : "Chargement des réseaux..."}
             </p>
-            {paymentBreakdown ? (
-              <p className="text-xs text-muted-foreground">
-                Total Tibus = billet + commission plateforme ({paymentBreakdown.platformMarginPercent}
-                %) + frais GeniusPay ({paymentBreakdown.geniusPayFeePercent}%) + fixe{" "}
-                {paymentBreakdown.fixedFee.toLocaleString()} {trip.currency}.
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Label>Réseau Mobile Money *</Label>
-            {!paymentCountryId || networksLoading ? (
-              <p className="text-sm text-muted-foreground py-2">
-                {!paymentCountryId ? "Choisissez d'abord un pays" : "Chargement des réseaux..."}
-              </p>
-            ) : paymentNetworkOptions.length === 0 ? (
-              <p className="text-xs text-destructive">
-                Aucun réseau configuré pour {paymentCountryName}.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {paymentNetworkOptions
-                  .filter((option) => option.value !== "unknown")
-                  .map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => selectPaymentNetwork(option.value)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        paymentNetwork === option.value
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input bg-background hover:bg-muted",
-                      )}
-                    >
-                      {paymentNetworkLabel(option.value, lng ?? "fr")}
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
+          ) : paymentNetworkOptions.length === 0 ? (
+            <p className="text-xs text-destructive">
+              Aucun réseau configuré pour {paymentCountryName}.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {paymentNetworkOptions
+                .filter((option) => option.value !== "unknown")
+                .map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => selectPaymentNetwork(option.value)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      paymentNetwork === option.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-background hover:bg-muted",
+                    )}
+                  >
+                    {paymentNetworkLabel(option.value, lng ?? "fr")}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {isGeniusPayCheckout ? (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Paiement via GeniusPay — opérateur{" "}
+            {checkoutNetwork !== "unknown"
+              ? paymentNetworkLabel(checkoutNetwork, lng ?? "fr")
+              : "à choisir"}
+            {paymentBreakdown
+              ? ` · total ${paymentBreakdown.totalAmount.toLocaleString()} ${trip.currency}`
+              : ""}
+            . Vous finalisez sur la page GeniusPay (geniuspay.ci).
+          </p>
+        ) : null}
 
         {phoneCountryMismatch ? (
           <p className="text-xs text-amber-700">
@@ -455,7 +459,9 @@ function PaymentSetupInner() {
 
         <div className="rounded-lg border bg-background p-3 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Total à payer</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Total à payer
+            </p>
             <p className="text-2xl font-black text-primary">
               {paymentPreviewLoading
                 ? "..."
@@ -465,13 +471,16 @@ function PaymentSetupInner() {
               <p className="text-[11px] text-muted-foreground mt-1">
                 Billet {nominalAmount.toLocaleString()} {trip.currency}
                 {paymentBreakdown.platformMarginPercent > 0
-                  ? ` · commission ${paymentBreakdown.platformMarginPercent}%`
+                  ? ` · plateforme ${paymentBreakdown.platformMarginPercent} %`
                   : ""}
                 {paymentBreakdown.geniusPayFeePercent > 0
-                  ? ` · GeniusPay ${paymentBreakdown.geniusPayFeePercent}%`
+                  ? ` · GeniusPay ${paymentBreakdown.geniusPayFeePercent} %`
                   : ""}
                 {paymentBreakdown.fixedFee > 0
-                  ? ` · fixe ${paymentBreakdown.fixedFee.toLocaleString()}`
+                  ? ` · fixe ${paymentBreakdown.fixedFee.toLocaleString()} ${trip.currency}`
+                  : ""}
+                {paymentBreakdown.gatewayFeePercent > 0
+                  ? ` · réseau ${paymentBreakdown.gatewayFeePercent} %`
                   : ""}
               </p>
             ) : null}
@@ -502,8 +511,10 @@ function PaymentSetupInner() {
           onClick={() => void handlePay()}
           disabled={
             paying ||
+            paymentPreviewLoading ||
             !paymentCountryId ||
-            (!isGeniusPayCheckout && checkoutNetwork === "unknown")
+            checkoutNetwork === "unknown" ||
+            Boolean(phoneCountryMismatch)
           }
         >
           {paying ? (

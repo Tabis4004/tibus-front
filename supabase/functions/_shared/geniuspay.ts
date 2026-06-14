@@ -9,6 +9,11 @@ export type GeniusPayPayment = {
   metadata?: Record<string, string>;
 };
 
+const PHONE_COUNTRY_PREFIXES = [
+  "225", "226", "221", "229", "223", "228", "237", "241", "233", "224", "245",
+  "254", "265", "227", "234", "256", "243", "242", "250", "232", "255", "260", "258",
+].sort((a, b) => b.length - a.length);
+
 function apiHeaders() {
   const publicKey =
     Deno.env.get("GENIUSPAY_PUBLIC_KEY") ??
@@ -24,32 +29,41 @@ function apiHeaders() {
   };
 }
 
-/** Téléphone international (+225…) pour GeniusPay / PawaPay */
+/** Téléphone international — ne force pas la Côte d'Ivoire ; GeniusPay gère le pays au checkout. */
 export function normalizeGeniusPayPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
+  const trimmed = raw.trim();
+  const digits = trimmed.replace(/\D/g, "");
   if (!digits) {
     throw new Error(
-      "Numéro de téléphone requis — format: 07 00 00 00 00 ou +225 07...",
+      "Numéro de téléphone requis — format international (+225…) ou local",
     );
   }
 
-  if (raw.trim().startsWith("+")) {
+  if (trimmed.startsWith("+")) {
     return `+${digits}`;
   }
 
-  let local = digits;
-  if (local.startsWith("225") && local.length >= 12) {
-    return `+${local}`;
+  for (const prefix of PHONE_COUNTRY_PREFIXES) {
+    if (digits.startsWith(prefix) && digits.length >= prefix.length + 8) {
+      return `+${digits}`;
+    }
   }
-  if (local.length === 9 && /^[1-9]/.test(local)) {
-    local = `0${local}`;
+
+  if (/^0[1-9]\d{8}$/.test(digits)) {
+    return `+225${digits.slice(1)}`;
   }
-  if (!/^0[1-9]\d{8}$/.test(local)) {
-    throw new Error(
-      "Numéro invalide — utilisez 10 chiffres ivoiriens (ex: 07 00 00 00 00)",
-    );
+
+  if (/^0\d{7,9}$/.test(digits)) {
+    return `+226${digits.replace(/^0/, "")}`;
   }
-  return `+225${local.slice(1)}`;
+
+  if (digits.length >= 10) {
+    return `+${digits}`;
+  }
+
+  throw new Error(
+    "Numéro invalide — utilisez le format international (+225, +226…) ou un numéro local valide",
+  );
 }
 
 function flattenMetadata(metadata: Record<string, string>): Record<string, string> {
@@ -75,29 +89,103 @@ function parsePayment(json: Record<string, unknown>): GeniusPayPayment | null {
   };
 }
 
+export type GeniusPayRouting = {
+  paymentMethod: string;
+  gateway?: string;
+  mmoProvider?: string;
+};
+
+/** Codes PawaPay par pays/réseau (doc GeniusPay). */
+const PAWAPAY_MMO_PROVIDERS: Record<string, Partial<Record<string, string>>> = {
+  CI: {
+    orange: "ORANGE_CIV",
+    mtn: "MTN_MOMO_CIV",
+    moov: "MOOV_CIV",
+    wave: "WAVE_CIV",
+  },
+  BF: {
+    orange: "ORANGE_BFA",
+    moov: "MOOV_BFA",
+    mobicash: "MOOV_BFA",
+    wave: "WAVE_BFA",
+  },
+  SN: {
+    orange: "ORANGE_SEN",
+    free: "FREE_SEN",
+    wave: "WAVE_SEN",
+  },
+  BJ: {
+    mtn: "MTN_MOMO_BEN",
+    moov: "MOOV_BEN",
+  },
+  TG: {
+    moov: "MOOV_TGO",
+    togocel: "MOOV_TGO",
+  },
+  ML: {
+    orange: "ORANGE_MLI",
+    mobicash: "ORANGE_MLI",
+  },
+  CM: {
+    mtn: "MTN_MOMO_CMR",
+    orange: "ORANGE_CMR",
+  },
+  GH: {
+    mtn: "MTN_GHA",
+  },
+  KE: {
+    mpesa: "MPESA_KEN",
+    airtel: "AIRTEL_KEN",
+  },
+};
+
 export function mapNetworkToGeniusPayMmo(
   network?: string,
-): { payment_method?: string; gateway?: string; mmo_provider?: string } {
-  switch ((network ?? "unknown").toLowerCase()) {
-    case "orange":
-      return { payment_method: "orange_money", gateway: "orange_money" };
-    case "mtn":
-      return { payment_method: "mtn_money", gateway: "mtn_momo" };
-    case "moov":
-      // Tunnel direct Moov CI — évite PawaPay MOOV_CIV (souvent non activé côté marchand).
-      return { payment_method: "moov_money", gateway: "moov_money" };
+  countryCode?: string,
+): GeniusPayRouting | null {
+  return mapNetworkToGeniusPayRouting(network, countryCode);
+}
+
+/** Route GeniusPay — PawaPay + mmo_provider quand disponible (évite checkout Wave par défaut en CI). */
+export function mapNetworkToGeniusPayRouting(
+  network?: string,
+  countryCode?: string,
+): GeniusPayRouting | null {
+  const normalized = (network ?? "unknown").trim().toLowerCase();
+  if (!normalized || normalized === "unknown") return null;
+
+  const country = (countryCode ?? "CI").trim().toUpperCase();
+  const pawapayProvider = PAWAPAY_MMO_PROVIDERS[country]?.[normalized];
+
+  if (pawapayProvider) {
+    return {
+      paymentMethod: "pawapay",
+      mmoProvider: pawapayProvider,
+    };
+  }
+
+  switch (normalized) {
     case "wave":
-      return { payment_method: "wave", gateway: "wave" };
+      return { paymentMethod: "wave" };
+    case "orange":
+      return { paymentMethod: "orange_money" };
+    case "mtn":
+      return { paymentMethod: "mtn_money" };
+    case "moov":
+    case "togocel":
+      return { paymentMethod: "moov_money" };
     case "free":
-      return { payment_method: "free_money", gateway: "free_money" };
-    case "mpesa":
-      return { payment_method: "mpesa", gateway: "mpesa" };
+      return { paymentMethod: "pawapay" };
     case "airtel":
-      return { payment_method: "airtel_money", gateway: "airtel_money" };
+      return { paymentMethod: "airtel_money" };
+    case "mpesa":
+    case "vodacom":
+    case "tigo":
+    case "zamtel":
     case "mobicash":
-      return { payment_method: "mobicash", gateway: "mobicash" };
+      return { paymentMethod: "pawapay" };
     default:
-      return {};
+      return null;
   }
 }
 
@@ -121,6 +209,20 @@ function formatGeniusPayError(raw: string): string {
   return `GeniusPay payment failed: ${raw.slice(0, 300)}`;
 }
 
+function isGeniusPayHostedUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "pay.genius.ci" ||
+      host.endsWith(".genius.ci") ||
+      host === "geniuspay.ci" ||
+      host.endsWith(".geniuspay.ci")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function createGeniusPayCheckout(args: {
   amount: number;
   description: string;
@@ -129,14 +231,31 @@ export async function createGeniusPayCheckout(args: {
   customer: {
     name: string;
     email: string;
-    phone: string;
-    country?: string;
+    phone?: string;
   };
   metadata: Record<string, string>;
   paymentNetwork?: string;
+  paymentCountryCode?: string;
 }) {
-  const phone = normalizeGeniusPayPhone(args.customer.phone);
-  const routing = mapNetworkToGeniusPayMmo(args.paymentNetwork);
+  const network = (args.paymentNetwork ?? "").trim().toLowerCase();
+  if (!network || network === "unknown") {
+    throw new Error(
+      "Réseau Mobile Money requis avant redirection vers GeniusPay.",
+    );
+  }
+
+  const phone = args.customer.phone?.trim();
+  if (!args.paymentCountryCode?.trim()) {
+    throw new Error("Pays de paiement requis pour GeniusPay.");
+  }
+
+  const countryCode = args.paymentCountryCode.trim().toUpperCase();
+
+  // Checkout hébergé : ne pas envoyer le téléphone (sinon GeniusPay auto-route vers Wave/opérateur direct).
+  const customer: Record<string, string> = {
+    name: args.customer.name,
+    email: args.customer.email,
+  };
 
   const body: Record<string, unknown> = {
     amount: Math.ceil(args.amount),
@@ -144,20 +263,15 @@ export async function createGeniusPayCheckout(args: {
     description: args.description,
     success_url: args.successUrl,
     error_url: args.errorUrl,
-    customer: {
-      name: args.customer.name,
-      email: args.customer.email,
-      phone,
-      country: args.customer.country ?? "CI",
-    },
-    metadata: flattenMetadata(args.metadata),
+    customer,
+    metadata: flattenMetadata({
+      ...args.metadata,
+      feeModel: args.metadata.feeModel ?? "additive",
+      tibusPaymentNetwork: network,
+      tibusPaymentCountry: countryCode,
+      passengerPhone: phone ? normalizeGeniusPayPhone(phone) : "",
+    }),
   };
-
-  if (routing.payment_method) {
-    body.payment_method = routing.payment_method;
-    if (routing.gateway) body.gateway = routing.gateway;
-    if (routing.mmo_provider) body.mmo_provider = routing.mmo_provider;
-  }
 
   const res = await fetch(`${GENIUSPAY_BASE}/payments`, {
     method: "POST",
@@ -170,23 +284,44 @@ export async function createGeniusPayCheckout(args: {
     throw new Error(formatGeniusPayError(text));
   }
 
-  const json = JSON.parse(text) as Record<string, unknown>;
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(
+      "GeniusPay a renvoyé une réponse invalide (HTML). Réessayez ou choisissez un autre réseau.",
+    );
+  }
   const data = json.data as {
     reference?: string;
     id?: number;
     checkout_url?: string;
     payment_url?: string;
+    gateway?: string;
+    payment_method?: string;
   } | undefined;
 
-  const checkoutUrl = data?.checkout_url ?? data?.payment_url;
-  if (!checkoutUrl || !data?.reference) {
-    throw new Error(`GeniusPay checkout invalide: ${text.slice(0, 400)}`);
+  const hostedCheckout = data?.checkout_url?.trim();
+  const paymentUrl = data?.payment_url?.trim();
+  const redirectUrl =
+    (hostedCheckout && isGeniusPayHostedUrl(hostedCheckout) ? hostedCheckout : undefined) ??
+    (paymentUrl && isGeniusPayHostedUrl(paymentUrl) ? paymentUrl : undefined);
+
+  if (!redirectUrl || !data?.reference) {
+    const external = paymentUrl && !isGeniusPayHostedUrl(paymentUrl)
+      ? ` (URL opérateur reçue: ${paymentUrl.slice(0, 80)}…)`
+      : "";
+    throw new Error(
+      `GeniusPay n'a pas fourni de page checkout hébergée${external}. Réessayez.`,
+    );
   }
 
   return {
-    checkoutUrl,
+    checkoutUrl: redirectUrl,
     reference: data.reference,
     transactionId: String(data.id ?? data.reference),
+    gateway: data.gateway,
+    paymentMethod: data.payment_method,
   };
 }
 

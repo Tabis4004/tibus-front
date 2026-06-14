@@ -6,14 +6,26 @@ import {
   BuildingIcon,
   BusIcon,
   MapPinIcon,
+  UserPlusIcon,
   UsersIcon,
   RouteIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { supabase } from "@/lib/supabase";
+import { updateCompanyRecruitedBySupabase } from "@/lib/supabase/accounting.ts";
+import { listPlatformUsersForAdminSupabase, type PlatformAdminUserRow } from "@/lib/supabase/admin-users.ts";
 import { useAppUser } from "@/hooks/use-app-user";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminAuditHub from "./_components/AdminAuditHub.tsx";
@@ -24,6 +36,8 @@ type CompanyOverview = {
   managerName: string | null;
   isActive: boolean;
   countryName: string | null;
+  recruitedByUserId: string | null;
+  recruitedByName: string | null;
   busCount: number;
   stationCount: number;
   sellerCount: number;
@@ -35,6 +49,9 @@ export default function SupabaseAdminCompanyManager() {
   const { t } = useTranslation("common");
   const { isSuperAdmin, isReady } = useAppUser();
   const [company, setCompany] = useState<CompanyOverview | null | undefined>(undefined);
+  const [recruiterOptions, setRecruiterOptions] = useState<{ id: string; label: string }[]>([]);
+  const [recruiterDraft, setRecruiterDraft] = useState<string>("__none");
+  const [savingRecruiter, setSavingRecruiter] = useState(false);
 
   useEffect(() => {
     if (isReady && !isSuperAdmin) {
@@ -49,7 +66,7 @@ export default function SupabaseAdminCompanyManager() {
     void (async () => {
       const { data: row, error } = await supabase
         .from("Companies")
-        .select("id, name, managerName, isActive, Countries(name)")
+        .select("id, name, managerName, isActive, recruitedByUserId, Countries(name), recruitedBy:Users!Companies_recruitedByUserId_fkey(firstName, lastName, email)")
         .eq("id", companyId)
         .maybeSingle();
 
@@ -59,6 +76,13 @@ export default function SupabaseAdminCompanyManager() {
       }
 
       const country = Array.isArray(row.Countries) ? row.Countries[0] : row.Countries;
+      const recruitedBy = Array.isArray(row.recruitedBy) ? row.recruitedBy[0] : row.recruitedBy;
+      const recruitedByUserId = (row.recruitedByUserId as string | null) ?? null;
+      const recruitedByName = recruitedBy
+        ? `${(recruitedBy as { firstName?: string }).firstName ?? ""} ${(recruitedBy as { lastName?: string }).lastName ?? ""}`.trim()
+          || (recruitedBy as { email?: string }).email
+          || null
+        : null;
 
       const [{ count: busCount }, { count: stationCount }, { data: roles }] = await Promise.all([
         supabase.from("Bus").select("id", { count: "exact", head: true }).eq("companyId", companyId),
@@ -82,10 +106,13 @@ export default function SupabaseAdminCompanyManager() {
           managerName: (row.managerName as string | null) ?? null,
           isActive: Boolean(row.isActive),
           countryName: (country as { name?: string } | null)?.name ?? null,
+          recruitedByUserId,
+          recruitedByName: recruitedByName ?? null,
           busCount: busCount ?? 0,
           stationCount: stationCount ?? 0,
           sellerCount,
         });
+        setRecruiterDraft(recruitedByUserId ?? "__none");
       }
     })().catch(() => {
       if (!cancelled) setCompany(null);
@@ -95,6 +122,49 @@ export default function SupabaseAdminCompanyManager() {
       cancelled = true;
     };
   }, [companyId]);
+
+  useEffect(() => {
+    void listPlatformUsersForAdminSupabase(500)
+      .then((users) => {
+        setRecruiterOptions(
+          users
+            .filter((user: PlatformAdminUserRow) =>
+              user.roles.some((role: string) =>
+                ["vendeur_independant", "vendeur_master", "vendeur_reseau", "master", "master_independant"].includes(role),
+              ),
+            )
+            .map((user: PlatformAdminUserRow) => ({
+              id: user.id,
+              label: `${user.firstName} ${user.lastName}`.trim() || user.email || user.username,
+            })),
+        );
+      })
+      .catch(() => setRecruiterOptions([]));
+  }, []);
+
+  const handleSaveRecruiter = async () => {
+    if (!company) return;
+    setSavingRecruiter(true);
+    try {
+      const userId = recruiterDraft === "__none" ? null : recruiterDraft;
+      await updateCompanyRecruitedBySupabase(company.id, userId);
+      const selected = recruiterOptions.find((option) => option.id === userId);
+      setCompany((current) =>
+        current
+          ? {
+              ...current,
+              recruitedByUserId: userId,
+              recruitedByName: selected?.label ?? null,
+            }
+          : current,
+      );
+      toast.success("Recruteur enregistré.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible.");
+    } finally {
+      setSavingRecruiter(false);
+    }
+  };
 
   if (!companyId) return null;
 
@@ -165,6 +235,43 @@ export default function SupabaseAdminCompanyManager() {
           <CardContent className="text-2xl font-bold">{company.sellerCount}</CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserPlusIcon className="w-4 h-4" />
+            Recruteur plateforme
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Vendeur indépendant ou master ayant recruté cette compagnie pour Tibus. Utilisé pour le partage
+            de commission « recruteur ».
+          </p>
+          <div className="space-y-1.5 max-w-md">
+            <Label>Recruteur</Label>
+            <Select value={recruiterDraft} onValueChange={setRecruiterDraft}>
+              <SelectTrigger>
+                <SelectValue placeholder="Aucun recruteur" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Aucun</SelectItem>
+                {recruiterOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {company.recruitedByName ? (
+            <p className="text-xs text-muted-foreground">Actuel : {company.recruitedByName}</p>
+          ) : null}
+          <Button size="sm" disabled={savingRecruiter} onClick={() => void handleSaveRecruiter()}>
+            Enregistrer le recruteur
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

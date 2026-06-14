@@ -7,6 +7,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import AppHeader from "./_components/AppHeader.tsx";
 import BottomNav from "./_components/BottomNav.tsx";
+import OnboardingGate from "@/components/onboarding/OnboardingGate.tsx";
 
 function ProfileLoading() {
   return (
@@ -28,9 +29,13 @@ export default function AppLayout() {
         </main>
       </AuthLoading>
       <Unauthenticated>
-        <Outlet />
+        <AppHeader />
+        <main className="flex-1 pb-20 md:pb-0">
+          <Outlet />
+        </main>
       </Unauthenticated>
       <Authenticated>
+        <OnboardingGate />
         <AppHeader />
         <main className="flex-1 pb-20 md:pb-0">
           <Outlet />

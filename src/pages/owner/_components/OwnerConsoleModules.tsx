@@ -36,7 +36,7 @@ function ModuleBlock({
   const Icon = module.icon;
 
   return (
-    <Link to={`/${lng}${module.toSuffix}`} className="block">
+    <Link to={`/${lng}${module.toSuffix}`} className="block" data-tour={module.tourTarget}>
       <div className="rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/40 hover:shadow-sm transition-all group">
         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-5 h-5 text-primary" />

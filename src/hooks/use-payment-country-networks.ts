@@ -15,13 +15,15 @@ import {
 type UsePaymentCountryNetworksArgs = {
   activeGateway: PaymentGateway;
   passengerPhone?: string;
-  /** GeniusPay : le réseau est choisi sur le checkout GeniusPay, pas côté Tibus. */
+  /** GeniusPay : pays et réseau choisis sur le checkout GeniusPay, pas côté Tibus. */
+  deferCountryToGateway?: boolean;
   deferNetworkToGateway?: boolean;
 };
 
 export function usePaymentCountryNetworks({
   activeGateway,
   passengerPhone = "",
+  deferCountryToGateway = false,
   deferNetworkToGateway = false,
 }: UsePaymentCountryNetworksArgs) {
   const [countries, setCountries] = useState<TravelerPaymentCountry[] | undefined>(undefined);
@@ -39,6 +41,13 @@ export function usePaymentCountryNetworks({
   );
 
   useEffect(() => {
+    if (deferCountryToGateway) {
+      setCountries([]);
+      setCountriesError(null);
+      setPaymentCountryId("");
+      return;
+    }
+
     let cancelled = false;
     setCountries(undefined);
     setCountriesError(null);
@@ -59,9 +68,10 @@ export function usePaymentCountryNetworks({
     return () => {
       cancelled = true;
     };
-  }, [activeGateway]);
+  }, [activeGateway, deferCountryToGateway]);
 
   useEffect(() => {
+    if (deferCountryToGateway) return;
     if (!countries?.length || countryManual || paymentCountryId) return;
 
     const inferredName = inferCountryNameFromPhone(passengerPhone);
@@ -76,10 +86,10 @@ export function usePaymentCountryNetworks({
     if (countries.length === 1) {
       setPaymentCountryId(countries[0].id);
     }
-  }, [countries, countryManual, passengerPhone, paymentCountryId]);
+  }, [countries, countryManual, passengerPhone, paymentCountryId, deferCountryToGateway]);
 
   useEffect(() => {
-    if (!paymentCountryId || deferNetworkToGateway) {
+    if (!paymentCountryId || deferNetworkToGateway || deferCountryToGateway) {
       if (deferNetworkToGateway) {
         setPaymentNetworkOptions([]);
       } else if (!paymentCountryId) {

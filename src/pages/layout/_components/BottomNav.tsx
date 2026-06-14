@@ -13,14 +13,8 @@ export default function BottomNav() {
   const appUser = useAppUser();
   const convexUser = useQuery(api.users.getCurrentUser, isSupabaseAuth() ? "skip" : {});
 
-  const role = isSupabaseAuth()
-    ? appUser.isSuperAdmin
-      ? "superadmin"
-      : appUser.roles.includes("owner")
-        ? "owner"
-        : appUser.hasSellerRole
-          ? "seller"
-          : "traveler"
+  const dashboardRole = isSupabaseAuth()
+    ? appUser.dashboardRole
     : (convexUser?.role ?? "traveler");
 
   const travelerLinks = [
@@ -43,12 +37,18 @@ export default function BottomNav() {
     { to: `/${lng}/admin`, icon: ShieldIcon, label: t("nav.admin") },
   ];
 
+  const hasSellerNav = isSupabaseAuth()
+    ? appUser.hasSellerRole
+    : dashboardRole === "seller";
+
   const links =
-    role === "superadmin"
-      ? adminLinks
-      : role === "owner"
-        ? ownerLinks
-        : role === "seller"
+    dashboardRole === "owner"
+      ? ownerLinks
+      : dashboardRole === "super_admin" ||
+          dashboardRole === "admin_pays" ||
+          dashboardRole === "superadmin"
+        ? adminLinks
+        : hasSellerNav
           ? sellerLinks
           : travelerLinks;
 

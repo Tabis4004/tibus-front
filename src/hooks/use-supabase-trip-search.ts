@@ -72,11 +72,16 @@ export function useSupabaseActiveCompanies() {
   return data;
 }
 
-export function useSupabaseSearchTrips(params: SearchTripsParams) {
+export function useSupabaseSearchTrips(params: SearchTripsParams, enabled = true) {
   const [data, setData] = useState<TripSearchResult[] | undefined>(undefined);
   const paramsKey = JSON.stringify(params);
 
   useEffect(() => {
+    if (!enabled) {
+      setData(undefined);
+      return;
+    }
+
     let cancelled = false;
     setData(undefined);
 
@@ -91,7 +96,7 @@ export function useSupabaseSearchTrips(params: SearchTripsParams) {
     return () => {
       cancelled = true;
     };
-  }, [paramsKey]);
+  }, [paramsKey, enabled]);
 
   return data;
 }

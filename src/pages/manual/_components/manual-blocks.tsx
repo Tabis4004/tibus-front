@@ -63,7 +63,13 @@ export function ManualSectionBlock({ section }: { section: ManualSection }) {
       ) : null}
       {section.figure ? <ManualFigureBlock figure={section.figure} /> : null}
       {section.subsections?.length ? (
-        <div className={section.id === "owner" || section.id === "commissions" ? "grid gap-4 md:grid-cols-2" : "space-y-3"}>
+        <div
+          className={
+            section.id === "owner" || section.id === "commissions" || section.id === "finance"
+              ? "grid gap-4 md:grid-cols-2"
+              : "space-y-3"
+          }
+        >
           {section.subsections.map((item) => (
             <ManualSubsectionBlock key={item.title} item={item} />
           ))}

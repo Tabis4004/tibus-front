@@ -1,13 +1,9 @@
-import { useEffect } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeftIcon, BookOpenIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
-  canAccessCountryAdminManual,
   COUNTRY_ADMIN_MANUAL_SECTIONS,
   COUNTRY_ADMIN_MANUAL_SUBTITLE,
   COUNTRY_ADMIN_MANUAL_TITLE,
@@ -16,31 +12,9 @@ import { ManualSectionBlock } from "./_components/manual-blocks.tsx";
 
 export default function CountryAdminManualPage() {
   const { lng } = useParams<{ lng: string }>();
-  const navigate = useNavigate();
   const { t } = useTranslation("common");
-  const appUser = useAppUser();
   const locale = lng ?? "fr";
   const home = `/${locale}`;
-  const canAccess = canAccessCountryAdminManual(appUser.roles, appUser.isSuperAdmin);
-
-  useEffect(() => {
-    if (appUser.isReady && !canAccess) {
-      navigate(home, { replace: true });
-    }
-  }, [appUser.isReady, canAccess, home, navigate]);
-
-  if (!appUser.isReady || appUser.isLoading) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
-    );
-  }
-
-  if (!canAccess) {
-    return null;
-  }
 
   return (
     <div className="min-h-svh bg-background">
@@ -54,7 +28,7 @@ export default function CountryAdminManualPage() {
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                {t("manual.country_admin_badge", { defaultValue: "Admin pays & Super admin" })}
+                {t("manual.public_badge", { defaultValue: "Documentation publique" })}
               </Badge>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#1A5296]">
@@ -101,7 +75,7 @@ export default function CountryAdminManualPage() {
 
         <p className="text-center text-xs text-muted-foreground italic pt-4 border-t">
           {t("manual.country_admin_footer", {
-            defaultValue: "Document Tibus · Administration pays · Accès restreint admin_pays / super_admin",
+            defaultValue: "Document Tibus · Administration pays",
           })}
         </p>
       </div>

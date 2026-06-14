@@ -17,6 +17,8 @@ export type IssueTicketInput = {
   platformLoyaltyPointsRedeemed?: number;
   platformLoyaltyDiscountAmount?: number;
   paymentTxId: string;
+  platformMarginPercent?: number;
+  travelerPaidTotal?: number;
 };
 
 function generateTicketRef() {
@@ -240,6 +242,21 @@ export async function issueTicketAfterPayment(
 
   if (bookingError) throw bookingError;
 
+  const { error: commissionCaptureError } = await admin.rpc(
+    "capture_booking_platform_commission",
+    {
+      p_booking_id: booking.id as string,
+      p_nominal_amount: totalPrice,
+      p_company_id: companyId,
+      p_sale_channel: saleChannel,
+      p_commission_rate: input.platformMarginPercent ?? null,
+      p_traveler_paid_total: input.travelerPaidTotal ?? null,
+    },
+  );
+  if (commissionCaptureError) {
+    console.warn("capture_booking_platform_commission:", commissionCaptureError.message);
+  }
+
   const { error: guaranteeDeductError } = await admin.rpc("deduct_company_guarantee_fund", {
     p_company_id: companyId,
     p_amount: totalPrice,
@@ -358,6 +375,10 @@ export async function issueTicketsFromPaymentMetadata(
         : undefined,
       paymentTxId: travelers.length === 1 ? paymentTxId : `${paymentTxId}:${i + 1}`,
       saleChannel,
+      platformMarginPercent: meta.platformMarginPercent
+        ? Number(meta.platformMarginPercent)
+        : undefined,
+      travelerPaidTotal: meta.totalAmount ? Number(meta.totalAmount) : undefined,
     });
     issued.push(ticket);
   }

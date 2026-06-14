@@ -332,6 +332,15 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation("owner");
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    const onSidebar = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>).detail;
+      if (detail?.open) setMobileOpen(true);
+    };
+    window.addEventListener("tibus:owner-sidebar", onSidebar);
+    return () => window.removeEventListener("tibus:owner-sidebar", onSidebar);
+  }, []);
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
       <aside className="hidden md:flex flex-col w-60 bg-background border-r border-border shrink-0">

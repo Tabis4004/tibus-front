@@ -38,8 +38,24 @@ import {
 } from "@/hooks/use-supabase-trip-search.ts";
 import { TripCard } from "./_components/TripSearchCard.tsx";
 import { resolveLandingCountryDefault } from "@/lib/trip-search-defaults.ts";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion.tsx";
 
-export default function SupabaseTripSearch({ embedded = false }: { embedded?: boolean }) {
+export default function SupabaseTripSearch({
+  embedded = false,
+  hideTitle = false,
+  accordionResults = false,
+}: {
+  embedded?: boolean;
+  /** Masque le titre (ex. landing page). */
+  hideTitle?: boolean;
+  /** Liste des voyages dans un accordéon (landing). */
+  accordionResults?: boolean;
+}) {
   const { t } = useTranslation("traveler");
   const { t: tc } = useTranslation("common");
   const { lng } = useParams<{ lng: string }>();
@@ -51,7 +67,8 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
   const [destinationCity, setDestinationCity] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-  const [showFilters, setShowFilters] = useState(embedded);
+  const [showFilters, setShowFilters] = useState(false);
+  const [resultsExpanded, setResultsExpanded] = useState(false);
   const [defaultCountryId, setDefaultCountryId] = useState("all");
   const [defaultCountryApplied, setDefaultCountryApplied] = useState(false);
 
@@ -83,7 +100,10 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
     return args;
   }, [originCity, destinationCity, departureDate, companyId, countryId]);
 
-  const trips = useSupabaseSearchTrips(searchArgs);
+  const landingLayout = accordionResults;
+
+  const tripsEnabled = !landingLayout || resultsExpanded;
+  const trips = useSupabaseSearchTrips(searchArgs, tripsEnabled);
 
   // Filter by price on client side
   const filteredTrips = useMemo(() => {
@@ -117,10 +137,78 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
     setMaxPrice("");
   };
 
+  const resultsBody = (
+    <>
+      {filteredTrips === undefined ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 md:h-24 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : filteredTrips.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <BusIcon />
+            </EmptyMedia>
+            <EmptyTitle>{t("no_trips")}</EmptyTitle>
+            <EmptyDescription>
+              {embedded && countryId !== "all"
+                ? tc("landing.no_trips_country_hint", {
+                    defaultValue:
+                      "Aucun départ pour ce pays. Essayez « Tous les pays » ou une autre date.",
+                  })
+                : t("no_trips_desc")}
+            </EmptyDescription>
+            {embedded && countryId !== "all" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setCountryId("all")}
+              >
+                {tc("labels.all_countries", { defaultValue: "Tous les pays" })}
+              </Button>
+            )}
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="space-y-3">
+          {filteredTrips.map((trip, i) => (
+            <motion.div
+              key={trip._id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3), ease: "easeOut" }}
+            >
+              <TripCard trip={trip} lng={lng} t={t} />
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className={embedded ? "space-y-5" : "max-w-6xl mx-auto px-4 py-6 space-y-5"}>
+      {landingLayout ? (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">
+              {tc("landing.upcoming_title", { defaultValue: "Trajets disponibles à venir" })}
+            </h2>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {tc("landing.upcoming_desc", {
+                defaultValue:
+                  "Filtrez par pays, compagnie, date et budget pour trouver votre prochain départ.",
+              })}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Header */}
-      {embedded ? (
+      {embedded && !hideTitle && !accordionResults ? (
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">
@@ -146,7 +234,22 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
             )}
           </Button>
         </div>
-      ) : (
+      ) : embedded && hideTitle && !accordionResults ? (
+        <div className="flex justify-end md:hidden">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="cursor-pointer gap-1.5 relative shrink-0"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FilterIcon className="w-4 h-4" />
+            {t("labels.filters", { ns: "common", defaultValue: "Filtres" })}
+            {hasActiveFilters && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary" />
+            )}
+          </Button>
+        </div>
+      ) : embedded ? null : (
         <motion.div
           className="flex items-center justify-between"
           initial={{ opacity: 0, y: -10 }}
@@ -176,8 +279,14 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
         </motion.div>
       )}
 
-      {/* Desktop inline filters — always visible on landing */}
-      <div className={embedded ? "rounded-xl border bg-muted/30 p-4" : "hidden md:block rounded-xl border bg-muted/30 p-4"}>
+      {/* Filtres — un seul bloc sur la landing ; desktop/mobile séparés ailleurs */}
+      <div
+        className={
+          landingLayout
+            ? "rounded-xl border bg-muted/30 p-4"
+            : "hidden md:block rounded-xl border bg-muted/30 p-4"
+        }
+      >
         <div className="flex items-end gap-3 flex-wrap">
           {/* Country */}
           <div className="space-y-1 min-w-[140px]">
@@ -325,8 +434,8 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
         </div>
       </div>
 
-      {/* Mobile filters panel */}
-      {showFilters && (
+      {/* Panneau filtres mobile (page recherche uniquement) */}
+      {!landingLayout && showFilters && (
         <div className="md:hidden rounded-xl border bg-muted/30 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">
@@ -475,7 +584,7 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
       )}
 
       {/* Active filter badges (mobile only when filters panel is closed) */}
-      {hasActiveFilters && !showFilters && (
+      {hasActiveFilters && !showFilters && !landingLayout && (
         <div className="flex flex-wrap gap-2 md:hidden">
           {countryId !== defaultCountryId && countries && (
             <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setCountryId(defaultCountryId)}>
@@ -522,67 +631,63 @@ export default function SupabaseTripSearch({ embedded = false }: { embedded?: bo
         </div>
       )}
 
-      {/* Results */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            {t("available_trips")}
-          </h2>
-          {filteredTrips !== undefined && (
-            <span className="text-xs text-muted-foreground">
-              {filteredTrips.length} {t("labels.results", { ns: "common", defaultValue: "results" })}
-            </span>
-          )}
+      {/* Résultats */}
+      {landingLayout ? (
+        <Accordion
+          type="single"
+          collapsible
+          defaultValue=""
+          className="rounded-xl border bg-background px-4 shadow-sm"
+          onValueChange={(value) => setResultsExpanded(value === "results")}
+        >
+          <AccordionItem value="results" className="border-0">
+            <AccordionTrigger className="cursor-pointer py-4 hover:no-underline [&>svg]:size-5">
+              <div className="flex w-full items-center justify-between gap-3 pr-2">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <BusIcon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold tracking-tight">
+                      {t("available_trips")}
+                    </p>
+                    <p className="text-xs font-normal text-muted-foreground">
+                      {tc("landing.upcoming_desc", {
+                        defaultValue:
+                          "Ouvrez pour parcourir les départs et réserver.",
+                      })}
+                    </p>
+                  </div>
+                </div>
+                {resultsExpanded && filteredTrips !== undefined ? (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {filteredTrips.length}{" "}
+                    {t("labels.results", { ns: "common", defaultValue: "résultats" })}
+                  </span>
+                ) : null}
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              {resultsExpanded ? resultsBody : null}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              {t("available_trips")}
+            </h2>
+            {filteredTrips !== undefined && (
+              <span className="text-xs text-muted-foreground">
+                {filteredTrips.length}{" "}
+                {t("labels.results", { ns: "common", defaultValue: "results" })}
+              </span>
+            )}
+          </div>
+          {resultsBody}
         </div>
-
-        {filteredTrips === undefined ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-32 md:h-24 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : filteredTrips.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <BusIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("no_trips")}</EmptyTitle>
-              <EmptyDescription>
-                {embedded && countryId !== "all"
-                  ? tc("landing.no_trips_country_hint", {
-                      defaultValue:
-                        "Aucun départ pour ce pays. Essayez « Tous les pays » ou une autre date.",
-                    })
-                  : t("no_trips_desc")}
-              </EmptyDescription>
-              {embedded && countryId !== "all" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setCountryId("all")}
-                >
-                  {tc("labels.all_countries", { defaultValue: "Tous les pays" })}
-                </Button>
-              )}
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <div className="space-y-3">
-            {filteredTrips.map((trip, i) => (
-              <motion.div
-                key={trip._id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3), ease: "easeOut" }}
-              >
-                <TripCard trip={trip} lng={lng} t={t} />
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

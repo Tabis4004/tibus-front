@@ -51,6 +51,8 @@ import {
   PlatformLoyaltySettingsPanel,
   PlatformScalingMetricsPanel,
   StakeholderCommissionPanel,
+  StakeholderPayoutDashboardPanel,
+  SellerCommissionDashboardPanel,
   SupabasePlansTab,
   SupabaseSubscriptionsTab,
   TpePosDiagnosticsPanel,
@@ -77,6 +79,21 @@ import { cn } from "@/lib/utils.ts";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminTabAuditHub from "./_components/AdminTabAuditHub.tsx";
+
+function resolveCompanyCommissionDisplay(
+  company: SupabaseCompanyRow,
+  settings: CommissionSetting[],
+) {
+  const companyOverride = settings.find(
+    (setting) => setting.scope === "company" && setting.companyId === company.id,
+  );
+  const countrySetting = settings.find(
+    (setting) => setting.scope === "country" && setting.countryId === company.countryId,
+  );
+  const rate = companyOverride?.rate ?? countrySetting?.rate ?? company.commissionRate;
+  const paidBy = companyOverride?.paidBy ?? countrySetting?.paidBy ?? "company";
+  return { rate, paidBy };
+}
 
 type TabId = AdminTabId;
 
@@ -112,10 +129,11 @@ function initialData(): AdminData {
     cities: [],
     roles: [],
     plans: [],
-    subscriptions: [],
-    commissions: null,
-    commissionSettings: [],
-  };
+  subscriptions: [],
+  commissions: null,
+  platformCommissions: null,
+  commissionSettings: [],
+};
 }
 
 export default function SupabaseAdminPanel() {
@@ -395,10 +413,20 @@ export default function SupabaseAdminPanel() {
               <EmptyState icon={BuildingIcon} title={t("no_companies")} description={t("no_companies_desc", { defaultValue: "Aucune entreprise Supabase trouvée." })} />
             ) : (
               <div className="divide-y">
-                {data.companies.map((company) => (
+                {data.companies.map((company) => {
+                  const commission = resolveCompanyCommissionDisplay(
+                    company,
+                    data.commissionSettings ?? [],
+                  );
+                  return (
                   <div key={company.id} className="py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{company.name}</p>
+                      <Link
+                        to={`/${lng ?? "fr"}/admin/company/${company.id}`}
+                        className="font-medium truncate block hover:text-primary"
+                      >
+                        {company.name}
+                      </Link>
                       <p className="text-xs text-muted-foreground truncate">
                         {company.managerName ?? t("owner_label")} · {company.countryName ?? t("geo.countries")}
                       </p>
@@ -407,10 +435,16 @@ export default function SupabaseAdminPanel() {
                       <Badge variant={company.isActive ? "default" : "secondary"}>
                         {company.isActive ? tc("status.active") : tc("status.inactive")}
                       </Badge>
-                      <Badge variant="secondary">{company.commissionRate}%</Badge>
+                      <Badge variant="secondary">
+                        {commission.rate}% ·{" "}
+                        {commission.paidBy === "traveler"
+                          ? t("commissions.paid_by_traveler_short", { defaultValue: "voyageur" })
+                          : t("commissions.paid_by_company_short", { defaultValue: "compagnie" })}
+                      </Badge>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -461,11 +495,59 @@ export default function SupabaseAdminPanel() {
               <LoadingRows />
             ) : (
               <>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <StatCard icon={CircleDollarSignIcon} label={t("commissions.pending")} value={data.commissions?.pendingTotal ?? 0} suffix={` ${data.commissions?.currency ?? ""}`} />
-                  <StatCard icon={CircleDollarSignIcon} label={t("commissions.paid")} value={data.commissions?.paidTotal ?? 0} suffix={` ${data.commissions?.currency ?? ""}`} />
-                  <StatCard icon={PercentIcon} label={t("commissions.no_entries")} value={data.commissions?.totalTickets ?? 0} />
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  <StatCard
+                    icon={CircleDollarSignIcon}
+                    label={t("commissions.traveler_online_captured", { defaultValue: "Commissions voyageur en ligne" })}
+                    value={data.platformCommissions?.travelerOnlineCaptured ?? data.platformCommissions?.capturedTotal ?? 0}
+                    suffix={` ${data.platformCommissions?.currency ?? data.commissions?.currency ?? "XOF"}`}
+                  />
+                  <StatCard
+                    icon={CircleDollarSignIcon}
+                    label={t("commissions.counter_company_captured", { defaultValue: "Commissions guichet (compagnie)" })}
+                    value={data.platformCommissions?.counterCompanyCaptured ?? 0}
+                    suffix={` ${data.platformCommissions?.currency ?? "XOF"}`}
+                  />
+                  <StatCard
+                    icon={CircleDollarSignIcon}
+                    label={t("commissions.stakeholder_due", { defaultValue: "Solde stakeholders" })}
+                    value={data.platformCommissions?.stakeholderPending ?? 0}
+                    suffix={` ${data.platformCommissions?.currency ?? "XOF"}`}
+                  />
+                  <StatCard
+                    icon={PercentIcon}
+                    label={t("commissions.traveler_tickets", { defaultValue: "Billets voyageur payés" })}
+                    value={data.platformCommissions?.ticketCount ?? 0}
+                  />
                 </div>
+                <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+                  <p>
+                    {t("commissions.traveler_nominal_hint", {
+                      defaultValue: "Montant nominal réservations en ligne : {{amount}} {{currency}} ({{count}} billet(s)).",
+                      amount: data.platformCommissions?.travelerNominalTotal ?? 0,
+                      currency: data.platformCommissions?.currency ?? "XOF",
+                      count: data.platformCommissions?.ticketCount ?? 0,
+                    })}
+                  </p>
+                  {(data.platformCommissions?.counterCompanyCaptured ?? 0) > 0 && (
+                    <p>
+                      {t("commissions.counter_nominal_hint", {
+                        defaultValue:
+                          "Guichet : {{commission}} {{currency}} sur {{nominal}} {{currency}} ({{count}} vente(s)) — à imputer au fonds de garantie compagnie.",
+                        commission: data.platformCommissions?.counterCompanyCaptured ?? 0,
+                        nominal: data.platformCommissions?.counterNominalTotal ?? 0,
+                        currency: data.platformCommissions?.currency ?? "XOF",
+                        count: data.platformCommissions?.counterTicketCount ?? 0,
+                      })}
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("commissions.traveler_paid_hint", {
+                    defaultValue:
+                      "Les commissions en ligne ne peuvent pas dépasser la marge sur les réservations voyageur. Les ventes au guichet (payées par la compagnie) sont comptabilisées séparément.",
+                  })}
+                </p>
                 {errors.commissions && (
                   <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                     {t("supabase_admin.commissions_rpc_missing", {
@@ -474,6 +556,12 @@ export default function SupabaseAdminPanel() {
                     <span className="text-destructive">{errors.commissions}</span>
                   </p>
                 )}
+                <AdminTabSuspense>
+                  <StakeholderPayoutDashboardPanel
+                    embedded
+                    countryId={data.countries[0]?.id ?? null}
+                  />
+                </AdminTabSuspense>
                 <Accordion type="multiple" value={commissionAccordionSections} onValueChange={setCommissionAccordionSections} className="flex flex-col gap-2">
                   <CommissionSettingsManager
                     settings={data.commissionSettings}
@@ -507,6 +595,14 @@ export default function SupabaseAdminPanel() {
                             id: country.id,
                             name: country.name,
                           }))}
+                          companies={data.companies.map((company) => ({
+                            id: company.id,
+                            name: company.name,
+                            countryId: company.countryId,
+                            recruitedByUserId: company.recruitedByUserId,
+                          }))}
+                          commissionSettings={data.commissionSettings ?? []}
+                          onCommissionSettingsChanged={reloadCurrentTab}
                         />
                       </AdminTabSuspense>
                     ) : (
@@ -514,6 +610,17 @@ export default function SupabaseAdminPanel() {
                         {t("stakeholder_commissions.realtime_hint")}
                       </p>
                     )}
+                  </AdminCollapsibleSection>
+                  <AdminCollapsibleSection
+                    value="seller-commissions"
+                    title={t("seller_commissions.title", { defaultValue: "Commissions vendeurs indépendants / master" })}
+                    auditModuleKey="admin.commissions.seller_dashboard"
+                  >
+                    {commissionAccordionSections.includes("seller-commissions") ? (
+                      <AdminTabSuspense>
+                        <SellerCommissionDashboardPanel embedded />
+                      </AdminTabSuspense>
+                    ) : null}
                   </AdminCollapsibleSection>
                   <AdminCollapsibleSection
                     value="gateway-fees"

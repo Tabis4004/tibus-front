@@ -27,6 +27,7 @@ function vibrateForResult(ticket: VerifiedTicket) {
 }
 
 function resolveToastMessage(ticket: VerifiedTicket, t: (key: string) => string): string {
+  if (ticket.result === "wrong_company") return t("scanner.wrong_company_message");
   if (ticket.message === "already_on_board") return t("scanner.already_on_board_message");
   if (ticket.message === "passenger_boarded") return t("scanner.passenger_boarded_message");
   return ticket.message;
@@ -71,6 +72,8 @@ export default function TicketScannerPage() {
         } else if (verified.result === "duplicate") {
           toast.warning(resolveToastMessage(verified, t));
         } else if (!verified.valid && verified.message) {
+          toast.error(resolveToastMessage(verified, t));
+        } else if (verified.result === "wrong_company") {
           toast.error(resolveToastMessage(verified, t));
         }
       } catch (err) {

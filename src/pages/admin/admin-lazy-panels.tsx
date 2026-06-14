@@ -6,6 +6,12 @@ export const GatewayFeeSettingsPanel = lazy(
 export const StakeholderCommissionPanel = lazy(
   () => import("./_components/StakeholderCommissionPanel.tsx"),
 );
+export const StakeholderPayoutDashboardPanel = lazy(
+  () => import("./_components/StakeholderPayoutDashboardPanel.tsx"),
+);
+export const SellerCommissionDashboardPanel = lazy(
+  () => import("./_components/SellerCommissionDashboardPanel.tsx"),
+);
 export const PaymentGatewaySettingsPanel = lazy(
   () => import("./_components/PaymentGatewaySettingsPanel.tsx"),
 );

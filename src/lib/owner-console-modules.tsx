@@ -46,6 +46,8 @@ export type OwnerConsoleModule = {
   roles?: string[];
   /** Shown only to super_admin */
   adminOnly?: boolean;
+  /** data-tour target for guided tour on owner overview */
+  tourTarget?: string;
   sectionKey: string;
   sectionDefault: string;
 };
@@ -61,6 +63,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Billets vendus, annulations et réimpressions.",
     toSuffix: "/owner/sales",
     icon: ReceiptTextIcon,
+    tourTarget: "owner-sales",
   },
   {
     id: "seller",
@@ -84,6 +87,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Réductions et campagnes promotionnelles.",
     toSuffix: "/owner/promo-codes",
     icon: TagIcon,
+    tourTarget: "owner-promo-codes",
   },
   {
     id: "loyalty",
@@ -95,6 +99,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Points et avantages pour vos voyageurs.",
     toSuffix: "/owner/loyalty",
     icon: PercentIcon,
+    tourTarget: "owner-loyalty",
   },
   {
     id: "guarantee",
@@ -107,6 +112,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/guarantee-fund",
     icon: LandmarkIcon,
     roles: [...GUARANTEE_FUND_ACCESS_ROLES],
+    tourTarget: "owner-guarantee-fund",
   },
   {
     id: "cash",
@@ -119,6 +125,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/cash-register",
     icon: WalletIcon,
     roles: ["owner", "comptable_compagnie", "super_admin"],
+    tourTarget: "owner-cash-register",
   },
   {
     id: "gare-manager-commissions",
@@ -131,6 +138,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/gare-manager-commissions",
     icon: HandCoinsIcon,
     roles: ["owner", "comptable_compagnie", "super_admin"],
+    tourTarget: "owner-gare-commissions",
   },
   {
     id: "expenses",
@@ -143,6 +151,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/expenses",
     icon: ReceiptTextIcon,
     roles: ["owner", "comptable_compagnie", "super_admin"],
+    tourTarget: "owner-expenses",
   },
   {
     id: "income-statement",
@@ -155,6 +164,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/income-statement",
     icon: FileSpreadsheetIcon,
     roles: ["owner", "comptable_compagnie", "super_admin"],
+    tourTarget: "owner-income-statement",
   },
   {
     id: "analytics",
@@ -166,6 +176,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Revenus, caisse, commissions et KPI.",
     toSuffix: "/owner/analytics",
     icon: BarChart3Icon,
+    tourTarget: "owner-analytics",
   },
   {
     id: "fleet",
@@ -177,6 +188,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Bus, immatriculation et capacité des véhicules.",
     toSuffix: "/owner/buses",
     icon: BusIcon,
+    tourTarget: "owner-fleet",
   },
   {
     id: "stations",
@@ -188,6 +200,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Points d'arrêt, villes et gestionnaires de gare.",
     toSuffix: "/owner/stations",
     icon: MapPinIcon,
+    tourTarget: "owner-stations",
   },
   {
     id: "routes",
@@ -199,6 +212,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Lignes, tarifs et gares de départ et d'arrivée.",
     toSuffix: "/owner/routes",
     icon: RouteIcon,
+    tourTarget: "owner-routes",
   },
   {
     id: "team",
@@ -211,6 +225,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/sellers",
     icon: UsersIcon,
     roles: ["owner", "super_admin"],
+    tourTarget: "owner-sellers",
   },
   {
     id: "trips",
@@ -222,6 +237,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Planification des trajets et des départs.",
     toSuffix: "/owner/trips",
     icon: CalendarIcon,
+    tourTarget: "owner-trips",
   },
   {
     id: "partner-api",
@@ -234,6 +250,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/partner-api",
     icon: PlugIcon,
     roles: ["owner", "super_admin"],
+    tourTarget: "owner-partner-api",
   },
   {
     id: "colis",
@@ -245,6 +262,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Nature de colis, SMS et paramètres module.",
     toSuffix: "/owner/colis",
     icon: PackageIcon,
+    tourTarget: "owner-colis",
   },
   {
     id: "scan",
@@ -257,6 +275,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/verify/scan",
     icon: ScanLineIcon,
     roles: ["owner", "controleur", "vendeur", "chauffeur", "vendeur_reseau", "vendeur_master", "super_admin"],
+    tourTarget: "owner-scan",
   },
   {
     id: "company",
@@ -268,6 +287,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Profil public, logo et coordonnées.",
     toSuffix: "/owner/company",
     icon: BuildingIcon,
+    tourTarget: "owner-company",
   },
   {
     id: "cancellation",
@@ -279,6 +299,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Frais, délais et règles de remboursement.",
     toSuffix: "/owner/cancellation",
     icon: ReceiptTextIcon,
+    tourTarget: "owner-cancellation",
   },
   {
     id: "messages",
@@ -290,6 +311,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "WhatsApp, email de notification et support.",
     toSuffix: "/owner/messages",
     icon: MessageSquareIcon,
+    tourTarget: "owner-messages",
   },
   {
     id: "admin",
