@@ -178,6 +178,7 @@ export async function verifyTicketQrSupabase(input: {
   token?: string | null;
   recordBoarding?: boolean;
   manualReference?: boolean;
+  scannerCompanyId?: string | null;
 }): Promise<VerifiedTicket> {
   let reference = normalizeTicketReference(input.reference);
   if (!reference) {
@@ -210,6 +211,7 @@ export async function verifyTicketQrSupabase(input: {
       p_token: input.token ?? null,
       p_record_boarding: Boolean(input.recordBoarding),
       p_manual_reference: manualReference,
+      p_scanner_company_id: input.scannerCompanyId ?? null,
     });
     if (error) throw error;
     return mapVerifiedTicket((data ?? {}) as Record<string, unknown>);
@@ -223,23 +225,12 @@ export async function verifyTicketQrSupabase(input: {
       !result.passengerName
     ) {
       const lookup = await lookupTicketForVerify(reference);
-      if (lookup) {
-        if (result.result === "not_found" || result.result === "error") {
-          result = await callVerify(lookup.bookingReference);
-        }
-        if (
-          result.result === "not_found" ||
-          result.result === "error" ||
-          !result.passengerName
-        ) {
-          return lookup;
-        }
+      if (lookup?.bookingReference) {
+        result = await callVerify(lookup.bookingReference);
       }
     }
     return result;
   } catch (err) {
-    const lookup = await lookupTicketForVerify(reference);
-    if (lookup) return lookup;
     throw new Error(rpcErrorMessage(err));
   }
 }
@@ -260,10 +251,14 @@ export async function verifyTicketByReferenceSupabase(
   }
 }
 
-export async function confirmPassengerOnBoardSupabase(reference: string): Promise<VerifiedTicket> {
+export async function confirmPassengerOnBoardSupabase(
+  reference: string,
+  scannerCompanyId?: string | null,
+): Promise<VerifiedTicket> {
   const normalized = normalizeTicketReference(reference);
   const { data, error } = await supabase.rpc("confirm_passenger_on_board", {
     p_reference: normalized,
+    p_scanner_company_id: scannerCompanyId ?? null,
   });
   if (error) throw new Error(rpcErrorMessage(error));
   return mapVerifiedTicket((data ?? {}) as Record<string, unknown>);

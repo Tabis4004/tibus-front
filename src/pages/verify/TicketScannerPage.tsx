@@ -13,6 +13,7 @@ import {
   verifyTicketQrSupabase,
   type VerifiedTicket,
 } from "@/lib/supabase/ticket-verify.ts";
+import { resolveScannerCompanyId } from "@/lib/supabase/scanner-company.ts";
 import QrScanner from "@/pages/verify/_components/QrScanner.tsx";
 import ManualTicketVerifyForm from "@/pages/verify/_components/ManualTicketVerifyForm.tsx";
 import TicketScanResult from "@/pages/verify/_components/TicketScanResult.tsx";
@@ -41,8 +42,18 @@ export default function TicketScannerPage() {
   const [result, setResult] = useState<VerifiedTicket | null>(null);
   const [checking, setChecking] = useState(false);
   const [markingOnBoard, setMarkingOnBoard] = useState(false);
+  const [scannerCompanyId, setScannerCompanyId] = useState<string | null>(null);
 
   const hasAccess = SCANNER_ROLES.some((role) => appUser.roles.includes(role));
+
+  const scannerUserId = appUser.profile?.id ?? null;
+
+  useEffect(() => {
+    if (!appUser.isReady || appUser.isLoading || !scannerUserId) return;
+    void resolveScannerCompanyId(scannerUserId, appUser.roles)
+      .then((companyId) => setScannerCompanyId(companyId))
+      .catch(() => setScannerCompanyId(null));
+  }, [scannerUserId, appUser.isReady, appUser.isLoading, appUser.roles]);
 
   useEffect(() => {
     if (!appUser.isReady || appUser.isLoading) return;
@@ -64,16 +75,17 @@ export default function TicketScannerPage() {
           token: input.token ?? null,
           recordBoarding: true,
           manualReference: input.manualReference,
+          scannerCompanyId,
         });
         setResult(verified);
         vibrateForResult(verified);
-        if (verified.result === "on_board") {
+        if (verified.result === "wrong_company") {
+          toast.error(resolveToastMessage(verified, t));
+        } else if (verified.result === "on_board") {
           toast.error(resolveToastMessage(verified, t));
         } else if (verified.result === "duplicate") {
           toast.warning(resolveToastMessage(verified, t));
         } else if (!verified.valid && verified.message) {
-          toast.error(resolveToastMessage(verified, t));
-        } else if (verified.result === "wrong_company") {
           toast.error(resolveToastMessage(verified, t));
         }
       } catch (err) {
@@ -108,7 +120,7 @@ export default function TicketScannerPage() {
         setChecking(false);
       }
     },
-    [],
+    [scannerCompanyId, t],
   );
 
   const handleScan = useCallback(
@@ -141,7 +153,10 @@ export default function TicketScannerPage() {
     if (!result?.bookingReference) return;
     setMarkingOnBoard(true);
     try {
-      const updated = await confirmPassengerOnBoardSupabase(result.bookingReference);
+      const updated = await confirmPassengerOnBoardSupabase(
+        result.bookingReference,
+        scannerCompanyId,
+      );
       setResult(updated);
       vibrateForResult(updated);
       toast.success(resolveToastMessage(updated, t));
@@ -159,7 +174,7 @@ export default function TicketScannerPage() {
     } finally {
       setMarkingOnBoard(false);
     }
-  }, [result?.bookingReference, t]);
+  }, [result?.bookingReference, scannerCompanyId, t]);
 
   if (appUser.isLoading) {
     return (

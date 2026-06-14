@@ -41,6 +41,7 @@ function resolveMessage(ticket: VerifiedTicket, fallback: string, t: (key: strin
 }
 
 function hasTicketDetails(ticket: VerifiedTicket): boolean {
+  if (ticket.result === "wrong_company") return Boolean(ticket.bookingReference);
   return Boolean(
     ticket.bookingReference &&
       (ticket.passengerName ||
@@ -115,6 +116,7 @@ export default function TicketScanResult({
     Boolean(onMarkOnBoard) &&
     !ticket.onBoardAt &&
     Boolean(ticket.bookingId) &&
+    ticket.result !== "wrong_company" &&
     (ticket.result === "valid" || ticket.result === "duplicate");
 
   return (
