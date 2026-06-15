@@ -287,8 +287,8 @@ export async function downloadTicketReceiptPdf(
 export async function downloadTicketReceiptImage(
   node: HTMLElement | null,
   reference: string,
-): Promise<void> {
-  if (!node) return;
+): Promise<Blob | null> {
+  if (!node) return null;
   try {
     const dataUrl = await toPng(node, {
       cacheBust: true,
@@ -299,9 +299,104 @@ export async function downloadTicketReceiptImage(
     link.download = `receipt-${reference}.png`;
     link.href = dataUrl;
     link.click();
+
+    const response = await fetch(dataUrl);
+    return await response.blob();
   } catch {
     toast.error("Impossible de generer l'image du recu");
+    return null;
   }
+}
+
+export async function createTicketReceiptImageBlob(
+  node: HTMLElement | null,
+): Promise<Blob | null> {
+  if (!node) return null;
+  try {
+    const dataUrl = await toPng(node, {
+      cacheBust: true,
+      backgroundColor: "#ffffff",
+      pixelRatio: 2,
+    });
+    const response = await fetch(dataUrl);
+    return await response.blob();
+  } catch {
+    return null;
+  }
+}
+
+export function buildTicketReceiptShareCaption(input: TicketReceiptInput): string {
+  return [
+    `Ticket Tibus - ${input.reference}`,
+    input.companyName,
+    input.passengerName,
+    `${input.trip.originCity} -> ${input.trip.destCity}`,
+    `Depart: ${fmt(input.trip.departureTime, "dd/MM/yyyy HH:mm")}`,
+    `${input.trip.currency} ${input.totalPrice.toLocaleString()}`,
+    "",
+    `Verification: ${buildVerifyUrl(input)}`,
+    "Powered by Tibus",
+  ].join("\n");
+}
+
+function openWhatsappShareLink(caption: string, phoneNumber?: string): void {
+  const digits = phoneNumber?.replace(/\D/g, "") ?? "";
+  const url = digits
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(caption)}`
+    : `https://wa.me/?text=${encodeURIComponent(caption)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export async function shareTicketReceiptImageViaWhatsapp(
+  node: HTMLElement | null,
+  options: {
+    reference: string;
+    caption?: string;
+    phoneNumber?: string;
+  },
+): Promise<void> {
+  if (!node) {
+    toast.error("Recu introuvable");
+    return;
+  }
+
+  const caption = options.caption ?? `Ticket Tibus - ${options.reference}`;
+  const blob = await createTicketReceiptImageBlob(node);
+  if (!blob) {
+    toast.error("Impossible de generer l'image du ticket");
+    return;
+  }
+
+  const file = new File([blob], `ticket-${options.reference}.png`, {
+    type: "image/png",
+  });
+
+  if (
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function" &&
+    navigator.canShare({ files: [file] })
+  ) {
+    try {
+      await navigator.share({
+        title: `Ticket ${options.reference}`,
+        text: caption,
+        files: [file],
+      });
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = `ticket-${options.reference}.png`;
+  link.href = objectUrl;
+  link.click();
+  URL.revokeObjectURL(objectUrl);
+
+  openWhatsappShareLink(caption, options.phoneNumber);
+  toast.success("Image telechargee. Joignez-la dans WhatsApp si besoin.");
 }
 
 export async function shareTicketReceiptText(input: TicketReceiptInput): Promise<void> {

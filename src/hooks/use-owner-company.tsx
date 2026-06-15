@@ -8,8 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
   listOwnerCompaniesSupabase,
+  ownerCompanyStorageKey,
   setOwnerActiveCompanySupabase,
   type OwnerCompanyOption,
 } from "@/lib/supabase/owner-company";
@@ -17,7 +19,7 @@ import {
 export const OWNER_COMPANY_REFRESH_EVENT = "tibus:owner-company-refresh";
 
 function storageKey(userId: string) {
-  return `tibus:owner-company:${userId}`;
+  return ownerCompanyStorageKey(userId);
 }
 
 type OwnerCompanyContextValue = {
@@ -39,6 +41,7 @@ export function refreshOwnerCompanyContext() {
 
 export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
   const { appUserId } = useSupabaseAuth();
+  const { isSuperAdmin } = useAppUser();
   const [companies, setCompanies] = useState<OwnerCompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,7 +65,7 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     void (async () => {
-      const rows = await listOwnerCompaniesSupabase(appUserId);
+      const rows = await listOwnerCompaniesSupabase(appUserId, { isSuperAdmin });
       if (cancelled) return;
 
       setCompanies(rows);
@@ -105,7 +108,7 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [appUserId, refreshKey]);
+  }, [appUserId, refreshKey, isSuperAdmin]);
 
   const setSelectedCompanyId = useCallback(
     async (companyId: string) => {

@@ -18,6 +18,8 @@ import {
   isPosPrinterAvailable,
   printTicketReceipt,
   shareTicketReceiptText,
+  shareTicketReceiptImageViaWhatsapp,
+  buildTicketReceiptShareCaption,
   type SellerCompanyReceiptInfo,
   type TicketReceiptInput,
   type TicketReceiptParcel,
@@ -97,6 +99,14 @@ export default function SellerTicketReceiptPanel({
 
   const handleShare = useCallback(() => {
     void shareTicketReceiptText(mergedInput);
+  }, [mergedInput]);
+
+  const handleWhatsAppShare = useCallback(() => {
+    void shareTicketReceiptImageViaWhatsapp(receiptRef.current, {
+      reference: mergedInput.reference,
+      caption: buildTicketReceiptShareCaption(mergedInput),
+      phoneNumber: mergedInput.passengerPhone,
+    });
   }, [mergedInput]);
 
   const info = mergedInput.companyInfo;
@@ -279,14 +289,23 @@ export default function SellerTicketReceiptPanel({
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleDownloadImage}>
-            <DownloadIcon className="w-3.5 h-3.5 mr-1.5" />
-            PNG
-          </Button>
-          <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleShare}>
-            <ShareIcon className="w-3.5 h-3.5 mr-1.5" />
-            {t("share", { defaultValue: "Partager" })}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleDownloadImage}>
+              <DownloadIcon className="w-3.5 h-3.5 mr-1.5" />
+              PNG
+            </Button>
+            <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleShare}>
+              <ShareIcon className="w-3.5 h-3.5 mr-1.5" />
+              {t("share", { defaultValue: "Partager" })}
+            </Button>
+          </div>
+          <Button
+            size="sm"
+            className="w-full cursor-pointer text-xs bg-[#25D366] hover:bg-[#1ebe57] text-white"
+            onClick={handleWhatsAppShare}
+          >
+            {t("share_whatsapp_image", { defaultValue: "Partager l'image sur WhatsApp" })}
           </Button>
         </div>
       </div>

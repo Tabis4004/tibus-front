@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import QRCode from "qrcode";
 import { toPng } from "html-to-image";
+import { shareTicketReceiptImageViaWhatsapp } from "@/lib/ticket-receipt-print.ts";
 import { printer } from "@/lib/printer.ts";
 import { generateReceiptPDF, type ReceiptFormat, type ReceiptData } from "@/lib/receipt-pdf.ts";
 import SeatPicker from "@/components/seat-picker.tsx";
@@ -586,6 +587,24 @@ function ReceiptPage({ trip, confirmedRef, passengerName, passengerPhone, parcel
 
   const handleDownload = useCallback(() => { downloadReceiptImage(receiptRef, confirmedRef); }, [confirmedRef]);
   const handleShare = useCallback(() => { shareTicketText(trip, confirmedRef, passengerName, lng ?? "fr", companyName); }, [trip, confirmedRef, passengerName, lng, companyName]);
+  const handleWhatsAppShare = useCallback(() => {
+    const text = [
+      `Ticket Tibus - ${confirmedRef}`,
+      companyName,
+      passengerName,
+      `${trip.originLoc?.city ?? "?"} -> ${trip.destLoc?.city ?? "?"}`,
+      `Depart: ${fmt(trip.departureTime, "dd/MM/yyyy HH:mm")}`,
+      `${trip.currency} ${totalPrice.toLocaleString()}`,
+      "",
+      `Verification: ${window.location.origin}/${lng ?? "fr"}/verify/${confirmedRef}`,
+      "Powered by Tibus",
+    ].join("\n");
+    void shareTicketReceiptImageViaWhatsapp(receiptRef.current, {
+      reference: confirmedRef,
+      caption: text,
+      phoneNumber: passengerPhone,
+    });
+  }, [confirmedRef, companyName, passengerName, passengerPhone, trip, totalPrice, lng]);
 
   const handlePrint = useCallback(async () => {
     const verifyUrl = `${window.location.origin}/${lng ?? "fr"}/verify/${confirmedRef}`;
@@ -972,14 +991,23 @@ lines.push({ text: separator }, { text: "Powered By Tibus", align: "center", siz
         </div>
 
         {/* Quick actions: share, image download */}
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleDownload}>
-            <DownloadIcon className="w-3.5 h-3.5 mr-1.5" />
-            PNG
-          </Button>
-          <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleShare}>
-            <ShareIcon className="w-3.5 h-3.5 mr-1.5" />
-            {t("share", { defaultValue: "Partager" })}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleDownload}>
+              <DownloadIcon className="w-3.5 h-3.5 mr-1.5" />
+              PNG
+            </Button>
+            <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleShare}>
+              <ShareIcon className="w-3.5 h-3.5 mr-1.5" />
+              {t("share", { defaultValue: "Partager" })}
+            </Button>
+          </div>
+          <Button
+            size="sm"
+            className="w-full cursor-pointer text-xs bg-[#25D366] hover:bg-[#1ebe57] text-white"
+            onClick={handleWhatsAppShare}
+          >
+            {t("share_whatsapp_image", { defaultValue: "Partager l'image sur WhatsApp" })}
           </Button>
         </div>
       </div>

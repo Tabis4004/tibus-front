@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { listGaresMapPointsSupabase, groupGaresByCountryAndCity, type GareMapPoint } from "@/lib/supabase/gares-map.ts";
+import type { GaresMapScope } from "@/lib/gares-map-audience.ts";
 import {
   CITY_MAP_ZOOM_THRESHOLD_KM,
   cityOptionsFromGares,
@@ -102,7 +103,15 @@ function buildInfoContent(gare: GareMapPoint) {
   </div>`;
 }
 
-export default function HomeStationsMap({ embedded = false }: { embedded?: boolean }) {
+export default function HomeStationsMap({
+  embedded = false,
+  scope = "platform",
+  companyId = null,
+}: {
+  embedded?: boolean;
+  scope?: GaresMapScope;
+  companyId?: string | null;
+}) {
   const { t } = useTranslation("common");
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [gares, setGares] = useState<GareMapPoint[] | undefined>(undefined);
@@ -111,10 +120,15 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   const interactiveMap = useInteractiveGoogleMap() && Boolean(apiKey?.trim());
+  const isCompanyScope = scope === "company";
 
   useEffect(() => {
+    if (isCompanyScope && companyId === undefined) return;
+
     let cancelled = false;
-    void listGaresMapPointsSupabase()
+    void listGaresMapPointsSupabase(
+      isCompanyScope && companyId ? { companyId } : undefined,
+    )
       .then((rows) => {
         if (!cancelled) setGares(rows);
       })
@@ -124,7 +138,7 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [companyId, isCompanyScope]);
 
   useEffect(() => {
     if (!gares?.length) return;
@@ -263,6 +277,18 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     );
   }
 
+  if (isCompanyScope && !companyId) {
+    return (
+      <section className="border-b bg-background">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 text-sm text-muted-foreground">
+          {t("landing.stations_map_company_missing", {
+            defaultValue: "Aucune compagnie associée à votre compte pour afficher les gares.",
+          })}
+        </div>
+      </section>
+    );
+  }
+
   if (!gares.length) {
     return null;
   }
@@ -278,10 +304,15 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
             {t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {t("landing.stations_map_desc", {
-              defaultValue:
-                "Toutes les gares enregistrées avec un lien Google Maps. Cliquez sur un point pour ouvrir l'emplacement.",
-            })}
+            {isCompanyScope
+              ? t("landing.stations_map_desc_company", {
+                  defaultValue:
+                    "Les gares de votre compagnie avec un lien Google Maps. Cliquez sur un point pour ouvrir l'emplacement.",
+                })
+              : t("landing.stations_map_desc", {
+                  defaultValue:
+                    "Toutes les gares enregistrées avec un lien Google Maps. Cliquez sur un point pour ouvrir l'emplacement.",
+                })}
           </p>
         </div>
 

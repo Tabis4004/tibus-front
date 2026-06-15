@@ -8,6 +8,7 @@ import {
   CreditCardIcon,
   GlobeIcon,
   KeyIcon,
+  LayoutDashboardIcon,
   LandmarkIcon,
   MapPinIcon,
   MessageCircleIcon,
@@ -59,6 +60,8 @@ import {
   TravelerBookingNoticePanel,
 } from "./admin-lazy-panels.tsx";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
+import { enterSuperAdminOwnerCompanyContext } from "@/lib/supabase/owner-company.ts";
+import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -157,6 +160,7 @@ export default function SupabaseAdminPanel() {
     cities: 0,
   });
   const [tabRefreshNonce, setTabRefreshNonce] = useState(0);
+  const [managingCompanyId, setManagingCompanyId] = useState<string | null>(null);
   const reloadCurrentTab = useCallback(() => {
     setTabRefreshNonce((nonce) => nonce + 1);
   }, []);
@@ -188,6 +192,23 @@ export default function SupabaseAdminPanel() {
   const selectTab = (id: TabId) => {
     setTab(id);
     setSearchParams({ tab: id }, { replace: true });
+  };
+
+  const handleManageCompanyAsOwner = async (companyId: string) => {
+    const appUserId = appUser.profile?.id;
+    if (!appUserId) return;
+    setManagingCompanyId(companyId);
+    try {
+      await enterSuperAdminOwnerCompanyContext(appUserId, companyId);
+      refreshOwnerCompanyContext();
+      navigate(`/${lng ?? "fr"}/owner`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Impossible d'ouvrir la console owner.",
+      );
+    } finally {
+      setManagingCompanyId(null);
+    }
   };
 
   useEffect(() => {
@@ -431,7 +452,20 @@ export default function SupabaseAdminPanel() {
                         {company.managerName ?? t("owner_label")} · {company.countryName ?? t("geo.countries")}
                       </p>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-1">
+                    <div className="flex flex-wrap justify-end items-center gap-1">
+                      {appUser.isSuperAdmin ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          disabled={managingCompanyId === company.id}
+                          onClick={() => void handleManageCompanyAsOwner(company.id)}
+                        >
+                          <LayoutDashboardIcon className="w-3.5 h-3.5 mr-1" />
+                          {t("manage_resources")}
+                        </Button>
+                      ) : null}
                       <Badge variant={company.isActive ? "default" : "secondary"}>
                         {company.isActive ? tc("status.active") : tc("status.inactive")}
                       </Badge>

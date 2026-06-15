@@ -82,11 +82,14 @@ function periodToRange(period: PeriodFilter): Pick<CompanyTicketSalesFilters, "c
 export default function CompanySalesLedger({
   companyId,
   canCancel = false,
+  canReprint = false,
   onReprint,
 }: {
   companyId: string;
   canCancel?: boolean;
-  onReprint?: (row: CompanyTicketSaleRow) => void;
+  /** Guichet tickets only — requires vendor-card access roles. */
+  canReprint?: boolean;
+  onReprint?: (row: CompanyTicketSaleRow) => void | Promise<void>;
 }) {
   const [rows, setRows] = useState<CompanyTicketSaleRow[] | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -101,6 +104,7 @@ export default function CompanySalesLedger({
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch] = useDebounce(searchInput, 350);
   const [guaranteeBalance, setGuaranteeBalance] = useState<string | null>(null);
+  const [reprintingId, setReprintingId] = useState<string | null>(null);
 
   useEffect(() => {
     void getCompanyGuaranteeFundSupabase(companyId)
@@ -318,10 +322,27 @@ export default function CompanySalesLedger({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-1.5">
-                        {onReprint && row.ticketStatus !== "cancelled" && (
-                          <Button size="sm" variant="outline" onClick={() => onReprint(row)}>
+                        {canReprint &&
+                          onReprint &&
+                          row.saleChannel === "counter_sale" &&
+                          row.ticketStatus !== "cancelled" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reprintingId === row.bookingId}
+                            onClick={() => {
+                              setReprintingId(row.bookingId);
+                              void Promise.resolve(onReprint(row))
+                                .catch((err) =>
+                                  toast.error(
+                                    err instanceof Error ? err.message : "Réimpression impossible",
+                                  ),
+                                )
+                                .finally(() => setReprintingId(null));
+                            }}
+                          >
                             <PrinterIcon className="w-3.5 h-3.5 mr-1" />
-                            Reimprimer
+                            {reprintingId === row.bookingId ? "Chargement…" : "Reimprimer"}
                           </Button>
                         )}
                         {canCancel && row.canCancel && (

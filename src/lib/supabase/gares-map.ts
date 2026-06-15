@@ -73,13 +73,19 @@ export function groupGaresByCountryAndCity(gares: GareMapPoint[]): GaresByCountr
 }
 
 export async function listGaresMapPointsSupabase(
-  options?: { googleMapsApiKey?: string },
+  options?: { googleMapsApiKey?: string; companyId?: string },
 ): Promise<GareMapPoint[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("Gares")
     .select("id, name, googleMapsLink, latitude, longitude, Companies(name, Countries(name))")
     .not("googleMapsLink", "is", null)
     .order("name");
+
+  if (options?.companyId) {
+    query = query.eq("companyId", options.companyId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 

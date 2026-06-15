@@ -26,16 +26,7 @@ export function HomeManualBlocks() {
           key={item.toSuffix}
           to={`/${locale}${item.toSuffix}`}
           title={t(item.labelKey, { defaultValue: item.labelDefault })}
-          description={t(
-            item.toSuffix.includes("admin-pays")
-              ? "manual.country_admin_nav_desc"
-              : "manual.nav_desc",
-            {
-              defaultValue: item.toSuffix.includes("admin-pays")
-                ? "Guide admin pays — commissions et fond de garantie"
-                : "Guide complet pour former vos équipes",
-            },
-          )}
+          description={t(item.descKey, { defaultValue: item.descDefault })}
           icon={BookOpenIcon}
         />
       ))}

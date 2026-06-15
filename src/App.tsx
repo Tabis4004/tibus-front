@@ -9,6 +9,7 @@ import { useServiceWorker } from "@/hooks/use-service-worker.ts";
 import { useTibusWebViewBootstrap } from "@/hooks/use-tibus-webview.ts";
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
+import NosGaresPage from "./pages/landing/NosGaresPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AppLayout from "./pages/layout/AppLayout.tsx";
 import OwnerLayout from "./pages/owner/OwnerLayout.tsx";
@@ -26,6 +27,7 @@ import {
   CreateCompany,
   CompanyManual,
   CountryAdminManual,
+  SellerManual,
   CompleteProfileRedirect,
   UserProfile,
   ContactPage,
@@ -97,6 +99,7 @@ function AppShell() {
               <Route path="complete-profile" element={<CompleteProfileRedirect />} />
               <Route path="auth/login" element={<LoginPage />} />
               <Route index element={<Index />} />
+              <Route path="gares" element={<NosGaresPage />} />
 
               <Route element={<AppLayout />}>
                 <Route path="account/profile" element={<UserProfile />} />
@@ -146,6 +149,7 @@ function AppShell() {
                 <Route path="guide" element={<GuidePageRoute />} />
                 <Route path="manual/compagnie" element={<CompanyManual />} />
                 <Route path="manual/admin-pays" element={<CountryAdminManual />} />
+                <Route path="manual/vendeur" element={<SellerManual />} />
                 <Route path="admin" element={<AdminPanel />} />
                 <Route path="admin/users/new" element={<AdminUserForm />} />
                 <Route path="admin/users/:userId/edit" element={<AdminUserForm />} />

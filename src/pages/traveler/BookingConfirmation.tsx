@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import QRCode from "qrcode";
 import { toPng } from "html-to-image";
+import { shareTicketReceiptImageViaWhatsapp } from "@/lib/ticket-receipt-print.ts";
 import { generateReceiptPDF, type ReceiptFormat, type ReceiptData } from "@/lib/receipt-pdf.ts";
 import {
   CheckCircleIcon,
@@ -308,6 +309,15 @@ export default function BookingConfirmation() {
     }
   }, [booking?.bookingReference]);
 
+  const handleWhatsAppShare = useCallback(() => {
+    if (!booking) return;
+    void shareTicketReceiptImageViaWhatsapp(receiptRef.current, {
+      reference: booking.bookingReference,
+      caption: buildShareText(booking as BookingData),
+      phoneNumber: booking.passengerPhone,
+    });
+  }, [booking]);
+
   const downloadCorporatePDF = useCallback((format: ReceiptFormat) => {
     if (!booking) return;
     const verifyUrl = `${window.location.origin}/${lng ?? "fr"}/verify/${booking.bookingReference}`;
@@ -463,12 +473,21 @@ export default function BookingConfirmation() {
         </div>
 
         {/* Quick actions */}
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleDownload}>
-            <DownloadIcon className="w-3.5 h-3.5 mr-1.5" /> PNG
-          </Button>
-          <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={() => handleShare(booking as BookingData)}>
-            <ShareIcon className="w-3.5 h-3.5 mr-1.5" /> {t("receipt.share", { defaultValue: "Partager" })}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={handleDownload}>
+              <DownloadIcon className="w-3.5 h-3.5 mr-1.5" /> PNG
+            </Button>
+            <Button variant="secondary" size="sm" className="flex-1 cursor-pointer text-xs" onClick={() => handleShare(booking as BookingData)}>
+              <ShareIcon className="w-3.5 h-3.5 mr-1.5" /> {t("receipt.share", { defaultValue: "Partager" })}
+            </Button>
+          </div>
+          <Button
+            size="sm"
+            className="w-full cursor-pointer text-xs bg-[#25D366] hover:bg-[#1ebe57] text-white"
+            onClick={handleWhatsAppShare}
+          >
+            {t("receipt.share_whatsapp_image", { defaultValue: "Partager l'image sur WhatsApp" })}
           </Button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import {
   ArrowLeftIcon,
   BuildingIcon,
   BusIcon,
+  LayoutDashboardIcon,
   MapPinIcon,
   UserPlusIcon,
   UsersIcon,
@@ -27,6 +28,8 @@ import { supabase } from "@/lib/supabase";
 import { updateCompanyRecruitedBySupabase } from "@/lib/supabase/accounting.ts";
 import { listPlatformUsersForAdminSupabase, type PlatformAdminUserRow } from "@/lib/supabase/admin-users.ts";
 import { useAppUser } from "@/hooks/use-app-user";
+import { enterSuperAdminOwnerCompanyContext } from "@/lib/supabase/owner-company.ts";
+import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 
@@ -47,11 +50,12 @@ export default function SupabaseAdminCompanyManager() {
   const { lng, companyId } = useParams<{ lng: string; companyId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("common");
-  const { isSuperAdmin, isReady } = useAppUser();
+  const { isSuperAdmin, isReady, profile } = useAppUser();
   const [company, setCompany] = useState<CompanyOverview | null | undefined>(undefined);
   const [recruiterOptions, setRecruiterOptions] = useState<{ id: string; label: string }[]>([]);
   const [recruiterDraft, setRecruiterDraft] = useState<string>("__none");
   const [savingRecruiter, setSavingRecruiter] = useState(false);
+  const [openingOwnerConsole, setOpeningOwnerConsole] = useState(false);
 
   useEffect(() => {
     if (isReady && !isSuperAdmin) {
@@ -142,6 +146,23 @@ export default function SupabaseAdminCompanyManager() {
       .catch(() => setRecruiterOptions([]));
   }, []);
 
+  const handleOpenOwnerConsole = async () => {
+    const appUserId = profile?.id;
+    if (!company || !appUserId) return;
+    setOpeningOwnerConsole(true);
+    try {
+      await enterSuperAdminOwnerCompanyContext(appUserId, company.id);
+      refreshOwnerCompanyContext();
+      navigate(`/${lng ?? "fr"}/owner`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Impossible d'ouvrir la console owner.",
+      );
+    } finally {
+      setOpeningOwnerConsole(false);
+    }
+  };
+
   const handleSaveRecruiter = async () => {
     if (!company) return;
     setSavingRecruiter(true);
@@ -207,6 +228,15 @@ export default function SupabaseAdminCompanyManager() {
         <Badge variant={company.isActive ? "default" : "secondary"} className="ml-auto">
           {company.isActive ? t("status.active") : t("status.inactive")}
         </Badge>
+        <Button
+          type="button"
+          size="sm"
+          disabled={openingOwnerConsole}
+          onClick={() => void handleOpenOwnerConsole()}
+        >
+          <LayoutDashboardIcon className="w-4 h-4 mr-1" />
+          Gérer
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -282,15 +312,16 @@ export default function SupabaseAdminCompanyManager() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-3">
           <p>
-            La gestion opérationnelle (gares, bus, trajets, vendeurs) se fait depuis la console
-            owner avec un compte assigné à cette compagnie.
+            Ouvrez la console owner pour suivre l'activité opérationnelle : gares, bus, trajets,
+            vendeurs et rapports.
           </p>
-          <p>
-            Utilisez le panneau admin pour créer des utilisateurs, assigner le rôle owner et lier
-            la compagnie <span className="font-semibold text-foreground">{company.name}</span>.
-          </p>
-          <Button asChild variant="secondary">
-            <Link to={`/${lng ?? "fr"}/admin`}>Retour panneau admin</Link>
+          <Button
+            type="button"
+            disabled={openingOwnerConsole}
+            onClick={() => void handleOpenOwnerConsole()}
+          >
+            <LayoutDashboardIcon className="w-4 h-4 mr-1" />
+            Gérer la compagnie
           </Button>
         </CardContent>
       </Card>

@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import {
   ArrowLeftIcon,
+  BookOpenIcon,
   BusIcon,
   CalendarIcon,
   ClockIcon,
@@ -11,7 +12,6 @@ import {
   PercentIcon,
   PlusIcon,
   TicketIcon,
-  TrashIcon,
   UsersIcon,
   ListIcon,
   ScanLineIcon,
@@ -66,14 +66,13 @@ import SellerTicketReceiptPanel, {
   counterTicketToReceiptInput,
 } from "@/components/seller/SellerTicketReceiptPanel.tsx";
 import type { TicketReceiptInput } from "@/lib/ticket-receipt-print.ts";
-import type { CompanyTicketSaleRow } from "@/lib/supabase/cancellation.ts";
+import { useCompanyTicketReprint } from "@/hooks/use-company-ticket-reprint.tsx";
 import CompanyLoyaltyUserLookup, {
   type SelectedLoyaltyUser,
 } from "@/components/CompanyLoyaltyUserLookup.tsx";
-import { randomUUID } from "@/lib/random-id.ts";
+import { hasSellerManualAccess } from "@/lib/seller-manual-access.ts";
 
-type TravelerForm = {
-  id: string;
+type SalePassengerDraft = {
   passengerName: string;
   passengerPhone: string;
   seatNumber: string | null;
@@ -82,24 +81,37 @@ type TravelerForm = {
   parcelAmount: string;
 };
 
+function resizePassengerNames(names: string[], count: number): string[] {
+  const next = names.slice(0, count);
+  while (next.length < count) next.push("");
+  return next;
+}
+
+function buildPassengerDrafts(input: {
+  passengerCount: number;
+  passengerNames: string[];
+  passengerPhone: string;
+  selectedSeats: string[];
+  parcelCount: string;
+  parcelWeight: string;
+  parcelAmount: string;
+}): SalePassengerDraft[] {
+  return Array.from({ length: input.passengerCount }, (_, index) => ({
+    passengerName: input.passengerNames[index] ?? "",
+    passengerPhone: input.passengerPhone,
+    seatNumber: input.selectedSeats[index] ?? null,
+    parcelCount: index === 0 ? input.parcelCount : "0",
+    parcelWeight: index === 0 ? input.parcelWeight : "0",
+    parcelAmount: index === 0 ? input.parcelAmount : "0",
+  }));
+}
+
 function fmt(iso: string, pattern: string) {
   try {
     return format(parseISO(iso), pattern);
   } catch {
     return iso;
   }
-}
-
-function newTravelerForm(): TravelerForm {
-  return {
-    id: randomUUID(),
-    passengerName: "",
-    passengerPhone: "",
-    seatNumber: null,
-    parcelCount: "0",
-    parcelWeight: "0",
-    parcelAmount: "0",
-  };
 }
 
 function toNumber(value: string): number {
@@ -122,7 +134,14 @@ function SaleForm({
   const { lng } = useParams<{ lng: string }>();
   const occupiedSeats = useSupabaseOccupiedSeats(trip._id);
   const isDirectSale = profile.canSellDirect;
-  const [travelers, setTravelers] = useState<TravelerForm[]>([newTravelerForm()]);
+  const maxPassengers = Math.max(1, Math.min(trip.seatsAvailable, trip.totalSeats || trip.seatsAvailable));
+  const [passengerCount, setPassengerCount] = useState(1);
+  const [passengerNames, setPassengerNames] = useState<string[]>([""]);
+  const [passengerPhone, setPassengerPhone] = useState("");
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [parcelCount, setParcelCount] = useState("0");
+  const [parcelWeight, setParcelWeight] = useState("0");
+  const [parcelAmount, setParcelAmount] = useState("0");
   const [saving, setSaving] = useState(false);
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
   const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false);
@@ -133,7 +152,6 @@ function SaleForm({
   const [cashPendingReversal, setCashPendingReversal] = useState(false);
 
   const companyId = trip.companyId ?? profile.company?.id ?? "";
-  const primaryPhone = travelers[0]?.passengerPhone ?? "";
 
   const {
     countries: paymentCountries,
@@ -146,7 +164,7 @@ function SaleForm({
     selectPaymentNetwork,
   } = usePaymentCountryNetworks({
     activeGateway,
-    passengerPhone: primaryPhone,
+    passengerPhone,
   });
 
   useEffect(() => {
@@ -178,21 +196,23 @@ function SaleForm({
       .catch(() => setActiveGateway("fedapay"));
   }, []);
 
-  const selectedSeats = useMemo(
-    () => travelers.map((t) => t.seatNumber).filter((seat): seat is string => Boolean(seat)),
-    [travelers],
-  );
+  const handlePassengerCountChange = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    const nextCount = Number.isFinite(parsed)
+      ? Math.min(Math.max(parsed, 1), maxPassengers)
+      : 1;
+    setPassengerCount(nextCount);
+    setPassengerNames((names) => resizePassengerNames(names, nextCount));
+    setSelectedSeats((seats) => seats.slice(0, nextCount));
+  };
 
   const actionLabel = isDirectSale ? "Vendre" : t("book_and_pay_online");
   const loadingLabel = isDirectSale ? "Vente..." : "Redirection...";
 
-  const nominalAmount = useMemo(
-    () =>
-      travelers.reduce((sum, traveler) => {
-        return sum + trip.priceAmount + toNumber(traveler.parcelAmount);
-      }, 0),
-    [travelers, trip.priceAmount],
-  );
+  const nominalAmount = useMemo(() => {
+    const ticketsTotal = trip.priceAmount * passengerCount;
+    return ticketsTotal + toNumber(parcelAmount);
+  }, [passengerCount, parcelAmount, trip.priceAmount]);
 
   useEffect(() => {
     if (isDirectSale || !companyId || !paymentCountryId) {
@@ -233,18 +253,26 @@ function SaleForm({
     };
   }, [companyId, isDirectSale, nominalAmount, paymentCountryId, paymentNetwork, activeGateway]);
 
-  const setTraveler = (id: string, patch: Partial<TravelerForm>) => {
-    setTravelers((items) =>
-      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
-  };
-
-  const removeTraveler = (id: string) => {
-    setTravelers((items) => (items.length === 1 ? items : items.filter((item) => item.id !== id)));
+  const setPassengerName = (index: number, name: string) => {
+    setPassengerNames((names) => {
+      const next = [...names];
+      next[index] = name;
+      return next;
+    });
   };
 
   const handleSell = async () => {
-    const normalized = travelers.map((traveler) => ({
+    const drafts = buildPassengerDrafts({
+      passengerCount,
+      passengerNames,
+      passengerPhone,
+      selectedSeats,
+      parcelCount,
+      parcelWeight,
+      parcelAmount,
+    });
+
+    const normalized = drafts.map((traveler) => ({
       ...traveler,
       passengerName: traveler.passengerName.trim(),
       passengerPhone: traveler.passengerPhone.trim(),
@@ -255,25 +283,25 @@ function SaleForm({
       return;
     }
 
-    if (trip.totalSeats > 0 && normalized.some((traveler) => !traveler.seatNumber)) {
-      toast.error("Choisissez un siege pour chaque voyageur");
+    if (trip.totalSeats > 0 && selectedSeats.length !== passengerCount) {
+      toast.error(`Choisissez ${passengerCount} siège(s) sur le plan`);
       return;
     }
 
     const uniqueSeats = new Set(selectedSeats);
     if (uniqueSeats.size !== selectedSeats.length) {
-      toast.error("Deux voyageurs ne peuvent pas avoir le meme siege");
+      toast.error("Deux voyageurs ne peuvent pas avoir le même siège");
       return;
     }
 
     const occupied = occupiedSeats ?? [];
     if (selectedSeats.some((seat) => occupied.includes(seat))) {
-      toast.error("Un siege selectionne est deja occupe");
+      toast.error("Un siège sélectionné est déjà occupé");
       return;
     }
 
-    if (!isDirectSale && normalized.some((traveler) => !traveler.passengerPhone)) {
-      toast.error("Téléphone requis pour chaque paiement en ligne");
+    if (!isDirectSale && !passengerPhone.trim()) {
+      toast.error("Téléphone requis pour le paiement en ligne");
       return;
     }
 
@@ -387,138 +415,133 @@ function SaleForm({
         </div>
       </div>
 
-      {travelers.map((traveler, index) => {
-        const occupiedForTraveler = [
-          ...(occupiedSeats ?? []),
-          ...selectedSeats.filter((seat) => seat !== traveler.seatNumber),
-        ];
-
-        return (
-          <Card key={traveler.id}>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold text-sm">Voyageur {index + 1}</p>
-                {travelers.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => removeTraveler(traveler.id)}
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Nom complet *</Label>
-                  <Input
-                    value={traveler.passengerName}
-                    onChange={(event) => setTraveler(traveler.id, { passengerName: event.target.value })}
-                    placeholder="Nom du voyageur"
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Nombre de passagers *</Label>
+              <Input
+                type="number"
+                min={1}
+                max={maxPassengers}
+                value={passengerCount}
+                onChange={(event) => handlePassengerCountChange(event.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {maxPassengers} place(s) disponible(s) sur ce départ
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Téléphone {isDirectSale ? "" : "*"}</Label>
+              {isDirectSale && companyId ? (
+                <>
+                  <CompanyLoyaltyUserLookup
+                    companyId={companyId}
+                    query={passengerPhone}
+                    onQueryChange={(value) => {
+                      setPassengerPhone(value);
+                      if (!value.trim()) setLoyaltyLookupUser(null);
+                    }}
+                    onSelect={(user) => {
+                      setLoyaltyLookupUser(user);
+                      if (user?.phone) setPassengerPhone(user.phone);
+                    }}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Telephone</Label>
-                  {isDirectSale && companyId && index === 0 ? (
-                    <>
-                      <CompanyLoyaltyUserLookup
-                        companyId={companyId}
-                        query={traveler.passengerPhone}
-                        onQueryChange={(value) => {
-                          setTraveler(traveler.id, { passengerPhone: value });
-                          if (!value.trim()) setLoyaltyLookupUser(null);
-                        }}
-                        onSelect={(user) => {
-                          setLoyaltyLookupUser(user);
-                          if (user?.phone) {
-                            setTraveler(traveler.id, { passengerPhone: user.phone });
-                          }
-                        }}
-                      />
-                      {loyaltyLookupUser?.companyLoyaltyActive ? (
-                        <p className="text-xs text-primary">
-                          Fidélité compagnie : {loyaltyLookupUser.companyPoints} pts pour {loyaltyLookupUser.displayName}
-                        </p>
-                      ) : loyaltyLookupUser ? (
-                        <p className="text-xs text-muted-foreground">
-                          Compte Tibus trouvé — la vente peut continuer. Aucun point fidélité compagnie (programme inactif).
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <Input
-                      value={traveler.passengerPhone}
-                      onChange={(event) => setTraveler(traveler.id, { passengerPhone: event.target.value })}
-                      placeholder="+228..."
-                    />
-                  )}
-                </div>
-              </div>
-
-              {trip.totalSeats > 0 && (
-                <div className="space-y-2">
-                  <Label>Siege</Label>
-                  <SeatPicker
-                    totalSeats={trip.totalSeats}
-                    occupiedSeats={occupiedForTraveler}
-                    selectedSeat={traveler.seatNumber}
-                    onSelect={(seat) => setTraveler(traveler.id, { seatNumber: seat })}
-                    busType={trip.bus?.busType}
-                  />
-                </div>
+                  {loyaltyLookupUser?.companyLoyaltyActive ? (
+                    <p className="text-xs text-primary">
+                      Fidélité compagnie : {loyaltyLookupUser.companyPoints} pts pour{" "}
+                      {loyaltyLookupUser.displayName}
+                    </p>
+                  ) : loyaltyLookupUser ? (
+                    <p className="text-xs text-muted-foreground">
+                      Compte Tibus trouvé — la vente peut continuer. Aucun point fidélité compagnie
+                      (programme inactif).
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <Input
+                  value={passengerPhone}
+                  onChange={(event) => setPassengerPhone(event.target.value)}
+                  placeholder="+228..."
+                />
               )}
+            </div>
+          </div>
 
-              <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
-                <div className="flex items-center gap-1.5 text-xs font-semibold">
-                  <PackageIcon className="w-3.5 h-3.5" /> Colis
+          <div className="space-y-2">
+            <Label>Noms des passagers *</Label>
+            <div className="space-y-2">
+              {passengerNames.slice(0, passengerCount).map((name, index) => (
+                <div key={`passenger-${index}`} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">
+                    Passager {index + 1}
+                  </span>
+                  <Input
+                    value={name}
+                    onChange={(event) => setPassengerName(index, event.target.value)}
+                    placeholder="Nom et prénom"
+                    className="flex-1"
+                  />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Nombre</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={traveler.parcelCount}
-                      onChange={(event) => setTraveler(traveler.id, { parcelCount: event.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Poids (kg)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={traveler.parcelWeight}
-                      onChange={(event) => setTraveler(traveler.id, { parcelWeight: event.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Montant</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={traveler.parcelAmount}
-                      onChange={(event) => setTraveler(traveler.id, { parcelAmount: event.target.value })}
-                    />
-                  </div>
-                </div>
+              ))}
+            </div>
+          </div>
+
+          {trip.totalSeats > 0 && (
+            <div className="space-y-2">
+              <Label>Sièges *</Label>
+              <SeatPicker
+                totalSeats={trip.totalSeats}
+                occupiedSeats={occupiedSeats ?? []}
+                selectedSeats={selectedSeats}
+                maxSelections={passengerCount}
+                onSelectMultiple={setSelectedSeats}
+                busType={trip.bus?.busType}
+              />
+            </div>
+          )}
+
+          <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <PackageIcon className="w-3.5 h-3.5" /> Colis (groupé)
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Un seul bloc colis pour la vente — rattaché au premier passager.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px]">Nombre</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={parcelCount}
+                  onChange={(event) => setParcelCount(event.target.value)}
+                />
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-
-      <Button
-        type="button"
-        variant="secondary"
-        className="w-full cursor-pointer"
-        onClick={() => setTravelers((items) => [...items, newTravelerForm()])}
-      >
-        <PlusIcon className="w-4 h-4 mr-1.5" /> Ajouter un voyageur
-      </Button>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Poids (kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={parcelWeight}
+                  onChange={(event) => setParcelWeight(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Montant</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={parcelAmount}
+                  onChange={(event) => setParcelAmount(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {!isDirectSale && (
         <>
@@ -579,7 +602,7 @@ function SaleForm({
           </p>
           {!isDirectSale && (
             <p className="text-xs text-muted-foreground">
-              Billets + colis : {trip.currency} {nominalAmount.toLocaleString()}
+              {passengerCount} billet(s) + colis : {trip.currency} {nominalAmount.toLocaleString()}
             </p>
           )}
           <p className="text-xl font-black text-primary">
@@ -606,27 +629,6 @@ function SaleForm({
   );
 }
 
-function saleRowToReceiptInput(
-  row: CompanyTicketSaleRow,
-  companyName: string,
-): TicketReceiptInput {
-  const parts = row.routeLabel.split(/\s*(?:→|->|—|-)\s*/);
-  return {
-    reference: row.reference,
-    passengerName: row.passengerName,
-    seatNumber: row.seatNumber,
-    totalPrice: row.ticketAmount,
-    companyName,
-    trip: {
-      originCity: parts[0]?.trim() || row.routeLabel,
-      destCity: parts[1]?.trim() || "?",
-      departureTime: row.departureTime,
-      priceAmount: row.ticketAmount,
-      currency: row.currency,
-    },
-  };
-}
-
 export default function SupabaseSellerDashboard() {
   const { t } = useTranslation("seller");
   const { lng } = useParams<{ lng: string }>();
@@ -636,9 +638,13 @@ export default function SupabaseSellerDashboard() {
   const [trips, setTrips] = useState<SellerCounterTrip[] | undefined>(undefined);
   const [selectedTrip, setSelectedTrip] = useState<SellerCounterTrip | null>(null);
   const [receiptTickets, setReceiptTickets] = useState<CounterSaleTicket[] | null>(null);
-  const [reprintInput, setReprintInput] = useState<TicketReceiptInput | null>(null);
   const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(null);
   const [colisModuleEnabled, setColisModuleEnabled] = useState(false);
+  const companyName = profile?.company?.name ?? companyReceiptInfo?.name ?? "Tibus";
+  const { onReprint, reprintView, isReprinting } = useCompanyTicketReprint(
+    profile?.company?.id ?? "",
+    companyName,
+  );
 
   const load = async () => {
     if (!appUserId) return;
@@ -695,16 +701,8 @@ export default function SupabaseSellerDashboard() {
     );
   }
 
-  if (reprintInput) {
-    return (
-      <SellerTicketReceiptPanel
-        input={reprintInput}
-        companyInfo={companyReceiptInfo ?? undefined}
-        showSuccessHeader={false}
-        onBack={() => setReprintInput(null)}
-        onDone={() => setReprintInput(null)}
-      />
-    );
+  if (isReprinting && reprintView) {
+    return reprintView;
   }
 
   if (selectedTrip && receiptTickets) {
@@ -800,6 +798,14 @@ export default function SupabaseSellerDashboard() {
       <div data-tour="seller-header" className="flex items-center justify-between gap-2">
         <p className="text-sm font-bold">Espace guichet</p>
         <div className="flex items-center gap-2">
+          {hasSellerManualAccess(appUser.roles) ? (
+            <Button variant="outline" size="sm" className="h-8 cursor-pointer" asChild>
+              <Link to={`/${lng ?? "fr"}/manual/vendeur`}>
+                <BookOpenIcon className="w-4 h-4 mr-1.5" />
+                Manuel
+              </Link>
+            </Button>
+          ) : null}
           <ExploreFeaturesButton variant="icon" />
           <Button variant="outline" size="sm" className="h-8 cursor-pointer" asChild>
             <Link to={`/${lng ?? "fr"}/verify/scan`} data-tour="seller-scan">
@@ -923,8 +929,8 @@ export default function SupabaseSellerDashboard() {
         {t("counter_sale_note", {
           defaultValue:
             profile.canSellDirect
-              ? "Chaque voyageur ajouté crée un ticket vendu distinct avec sa propre référence."
-              : "Les agents réseau font une réservation tiers puis passent par le paiement en ligne.",
+              ? "Indiquez le nombre de passagers, leurs noms, les sièges sur le plan, puis validez une seule fois."
+              : "Indiquez les passagers et le téléphone : le voyageur paie ensuite en ligne.",
         })}
       </p>
     </div>
@@ -956,11 +962,8 @@ export default function SupabaseSellerDashboard() {
           <CompanySalesLedger
             companyId={profile.company.id}
             canCancel={Boolean(canCancelTickets)}
-            onReprint={(row) =>
-              setReprintInput(
-                saleRowToReceiptInput(row, profile.company?.name ?? companyReceiptInfo?.name ?? "Tibus"),
-              )
-            }
+            canReprint
+            onReprint={onReprint}
           />
         </TabsContent>
         {colisModuleEnabled && profile.canSellDirect ? (

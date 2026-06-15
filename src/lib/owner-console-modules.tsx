@@ -29,6 +29,22 @@ export const GUARANTEE_FUND_ACCESS_ROLES = [
   "super_admin",
 ] as const;
 
+/** Roles with access to the counter / vendor card (`/seller`). */
+export const VENDOR_CONSOLE_ROLE_NAMES = [
+  "owner",
+  "vendeur",
+  "chauffeur",
+  "vendeur_reseau",
+  "vendeur_master",
+  "controleur",
+  "super_admin",
+] as const;
+
+export function canReprintCounterTickets(roles: string[], isSuperAdmin = false): boolean {
+  if (isSuperAdmin) return true;
+  return VENDOR_CONSOLE_ROLE_NAMES.some((role) => roles.includes(role));
+}
+
 export function canAccessGuaranteeFund(roles: string[], isSuperAdmin: boolean): boolean {
   if (isSuperAdmin) return true;
   return GUARANTEE_FUND_ACCESS_ROLES.some((role) => roles.includes(role));

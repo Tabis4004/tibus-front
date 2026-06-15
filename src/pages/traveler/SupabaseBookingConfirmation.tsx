@@ -2,6 +2,7 @@ import { useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import QRCode from "qrcode";
 import { buildTicketVerifyUrl } from "@/lib/ticket-verify-url.ts";
+import { shareTicketReceiptImageViaWhatsapp } from "@/lib/ticket-receipt-print.ts";
 import { toPng } from "html-to-image";
 import { generateReceiptPDF, type ReceiptFormat } from "@/lib/receipt-pdf.ts";
 import {
@@ -277,6 +278,15 @@ export default function SupabaseBookingConfirmation() {
     }
   }, [booking?.bookingReference]);
 
+  const handleWhatsAppShare = useCallback(() => {
+    if (!booking) return;
+    void shareTicketReceiptImageViaWhatsapp(receiptRef.current, {
+      reference: booking.bookingReference,
+      caption: buildShareText(booking, lng),
+      phoneNumber: booking.passengerPhone,
+    });
+  }, [booking, lng]);
+
   const downloadCorporatePDF = useCallback(
     (pdfFormat: ReceiptFormat) => {
       if (!booking) return;
@@ -431,36 +441,47 @@ export default function SupabaseBookingConfirmation() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1 cursor-pointer text-xs"
+              onClick={handleDownload}
+            >
+              <DownloadIcon className="w-3.5 h-3.5 mr-1.5" /> PNG
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1 cursor-pointer text-xs"
+              onClick={() => {
+                const text = buildShareText(booking, lng);
+                if (typeof navigator.share === "function") {
+                  void navigator.share({
+                    title: `Ticket ${booking.bookingReference}`,
+                    text,
+                  });
+                } else {
+                  window.open(
+                    `https://wa.me/?text=${encodeURIComponent(text)}`,
+                    "_blank",
+                  );
+                }
+              }}
+            >
+              <ShareIcon className="w-3.5 h-3.5 mr-1.5" />{" "}
+              {t("receipt.share", { defaultValue: "Partager" })}
+            </Button>
+          </div>
           <Button
-            variant="secondary"
             size="sm"
-            className="flex-1 cursor-pointer text-xs"
-            onClick={handleDownload}
+            className="w-full cursor-pointer text-xs bg-[#25D366] hover:bg-[#1ebe57] text-white"
+            onClick={handleWhatsAppShare}
           >
-            <DownloadIcon className="w-3.5 h-3.5 mr-1.5" /> PNG
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="flex-1 cursor-pointer text-xs"
-            onClick={() => {
-              const text = buildShareText(booking, lng);
-              if (typeof navigator.share === "function") {
-                void navigator.share({
-                  title: `Ticket ${booking.bookingReference}`,
-                  text,
-                });
-              } else {
-                window.open(
-                  `https://wa.me/?text=${encodeURIComponent(text)}`,
-                  "_blank",
-                );
-              }
-            }}
-          >
-            <ShareIcon className="w-3.5 h-3.5 mr-1.5" />{" "}
-            {t("receipt.share", { defaultValue: "Partager" })}
+            {t("receipt.share_whatsapp_image", {
+              defaultValue: "Partager l'image sur WhatsApp",
+            })}
           </Button>
         </div>
       </div>

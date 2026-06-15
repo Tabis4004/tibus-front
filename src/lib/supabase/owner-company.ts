@@ -67,12 +67,61 @@ export type OwnerCompanyOption = {
   logo: string | null;
 };
 
+export function ownerCompanyStorageKey(userId: string) {
+  return `tibus:owner-company:${userId}`;
+}
+
 function joinedOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-export async function listOwnerCompaniesSupabase(
+function sortOwnerCompanyOptions(companies: OwnerCompanyOption[]) {
+  return [...companies].sort((a, b) => {
+    const countryCompare = (a.countryName ?? "").localeCompare(b.countryName ?? "");
+    if (countryCompare !== 0) return countryCompare;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function ownerCompanyOptionFromCompanyRow(row: {
+  id: string;
+  name: string;
+  logo?: string | null;
+  countryId?: string | null;
+  Countries?:
+    | { name: string; currency: string | null }
+    | { name: string; currency: string | null }[]
+    | null;
+}): OwnerCompanyOption {
+  const country = joinedOne(row.Countries ?? null);
+  return {
+    id: row.id,
+    name: row.name,
+    countryId: (row.countryId as string | null) ?? null,
+    countryName: country?.name ?? null,
+    currency: country?.currency ?? null,
+    logo: (row.logo as string | null) ?? null,
+  };
+}
+
+export async function isAppUserSuperAdminSupabase(
+  appUserId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("UserRoles")
+    .select("Role(name)")
+    .eq("userId", appUserId);
+
+  if (error) throw error;
+
+  return (data ?? []).some((row) => {
+    const name = roleNameFromJoin(row.Role as { name: string } | { name: string }[]);
+    return name === "super_admin";
+  });
+}
+
+async function listOwnedCompaniesOnlySupabase(
   appUserId: string,
 ): Promise<OwnerCompanyOption[]> {
   const { data, error } = await supabase
@@ -114,24 +163,56 @@ export async function listOwnerCompaniesSupabase(
           }[]
         | null,
     );
-    const country = joinedOne(joined?.Countries ?? null);
-    const name = joined?.name ?? companies.get(companyId)?.name ?? "Compagnie";
+    if (!joined?.name) continue;
 
-    companies.set(companyId, {
+    companies.set(companyId, ownerCompanyOptionFromCompanyRow({
       id: companyId,
-      name,
-      countryId: (joined?.countryId as string | null) ?? null,
-      countryName: country?.name ?? null,
-      currency: country?.currency ?? null,
-      logo: (joined?.logo as string | null) ?? null,
-    });
+      name: joined.name,
+      logo: joined.logo,
+      countryId: joined.countryId,
+      Countries: joined.Countries,
+    }));
   }
 
-  return [...companies.values()].sort((a, b) => {
-    const countryCompare = (a.countryName ?? "").localeCompare(b.countryName ?? "");
-    if (countryCompare !== 0) return countryCompare;
-    return a.name.localeCompare(b.name);
-  });
+  return sortOwnerCompanyOptions([...companies.values()]);
+}
+
+export async function listAllCompaniesAsOwnerOptionsSupabase(): Promise<OwnerCompanyOption[]> {
+  const { data, error } = await supabase
+    .from("Companies")
+    .select("id, name, logo, countryId, Countries(name, currency)")
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+
+  return sortOwnerCompanyOptions(
+    (data ?? []).map((row) =>
+      ownerCompanyOptionFromCompanyRow({
+        id: row.id as string,
+        name: row.name as string,
+        logo: row.logo as string | null,
+        countryId: row.countryId as string | null,
+        Countries: row.Countries as
+          | { name: string; currency: string | null }
+          | { name: string; currency: string | null }[]
+          | null,
+      }),
+    ),
+  );
+}
+
+export async function listOwnerCompaniesSupabase(
+  appUserId: string,
+  options?: { isSuperAdmin?: boolean },
+): Promise<OwnerCompanyOption[]> {
+  const isSuperAdmin =
+    options?.isSuperAdmin ?? (await isAppUserSuperAdminSupabase(appUserId));
+
+  if (isSuperAdmin) {
+    return listAllCompaniesAsOwnerOptionsSupabase();
+  }
+
+  return listOwnedCompaniesOnlySupabase(appUserId);
 }
 
 async function readStoredActiveOwnerCompanyId(
@@ -154,23 +235,62 @@ async function readStoredActiveOwnerCompanyId(
 export async function resolveOwnerCompanyId(
   appUserId: string,
   preferredCompanyId?: string | null,
+  options?: { isSuperAdmin?: boolean },
 ): Promise<string | null> {
-  const companies = await listOwnerCompaniesSupabase(appUserId);
-  if (!companies.length) return null;
-
-  if (
-    preferredCompanyId &&
-    companies.some((company) => company.id === preferredCompanyId)
-  ) {
-    return preferredCompanyId;
-  }
+  const isSuperAdmin =
+    options?.isSuperAdmin ?? (await isAppUserSuperAdminSupabase(appUserId));
+  const companies = await listOwnerCompaniesSupabase(appUserId, { isSuperAdmin });
 
   const storedActive = await readStoredActiveOwnerCompanyId(appUserId);
-  if (storedActive && companies.some((company) => company.id === storedActive)) {
-    return storedActive;
+  const localStored =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem(ownerCompanyStorageKey(appUserId))
+      : null;
+
+  const candidates = [preferredCompanyId, storedActive, localStored].filter(
+    (id): id is string => Boolean(id),
+  );
+
+  for (const candidateId of candidates) {
+    if (companies.some((company) => company.id === candidateId)) {
+      return candidateId;
+    }
+  }
+
+  if (isSuperAdmin || candidates.length > 0) {
+    for (const candidateId of candidates) {
+      const { data, error } = await supabase
+        .from("Companies")
+        .select("id")
+        .eq("id", candidateId)
+        .maybeSingle();
+      if (!error && data) return candidateId;
+    }
   }
 
   return companies[0]?.id ?? null;
+}
+
+export async function enterSuperAdminOwnerCompanyContext(
+  appUserId: string,
+  companyId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("Companies")
+    .select("id")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error("Compagnie introuvable");
+
+  localStorage.setItem(ownerCompanyStorageKey(appUserId), companyId);
+
+  try {
+    await setOwnerActiveCompanySupabase(companyId);
+  } catch {
+    // Keep local selection when RPC is not deployed yet
+  }
 }
 
 export async function createOwnerCompanySupabase(input: {

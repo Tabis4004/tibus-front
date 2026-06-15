@@ -11,6 +11,7 @@ import {
   GiftIcon,
   ClipboardListIcon,
   BookOpenIcon,
+  MapPinIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { motion } from "motion/react";
@@ -21,7 +22,6 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeManualBlocks } from "./_components/HomeManualBlocks.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
-import LandingTravelSection from "../landing/LandingTravelSection.tsx";
 import { resolveDashboardPath } from "@/lib/auth/role-routing.ts";
 
 export default function SupabaseHome() {
@@ -88,8 +88,6 @@ export default function SupabaseHome() {
           </motion.div>
         </div>
 
-        <LandingTravelSection />
-
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
           <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
             <HomeManualBlocks />
@@ -106,6 +104,14 @@ export default function SupabaseHome() {
               icon={SearchIcon}
               highlighted
               tour="travel-book"
+            />
+            <HomeActionBlock
+              to={`/${locale}/gares`}
+              title={t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
+              description={t("home.gares_desc", {
+                defaultValue: "Voir les gares Tibus sur la carte",
+              })}
+              icon={MapPinIcon}
             />
             <HomeActionBlock
               to={`/${locale}/traveler/bookings`}
