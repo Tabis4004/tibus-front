@@ -278,7 +278,7 @@ export default function AdminUserFormPage() {
     }
   };
 
-  if (!appUser.isReady || appUser.isLoading) {
+  if (!appUser.isReady) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
         <Skeleton className="h-8 w-48" />

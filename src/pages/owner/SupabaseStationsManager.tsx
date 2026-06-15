@@ -282,9 +282,11 @@ export default function SupabaseStationsManager() {
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SupabaseOwnerStation | null>(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options?: { preserveList?: boolean }) => {
     if (!appUserId || !companyId) return;
-    setStations(undefined);
+    if (!options?.preserveList) {
+      setStations(undefined);
+    }
     try {
       setStations(await listOwnerStationsSupabase(appUserId, companyId));
     } catch (err) {
@@ -298,7 +300,7 @@ export default function SupabaseStationsManager() {
   }, [loadData]);
 
   useEffect(() => {
-    const onRefresh = () => void loadData();
+    const onRefresh = () => void loadData({ preserveList: true });
     window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);

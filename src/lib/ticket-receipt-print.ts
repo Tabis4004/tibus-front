@@ -288,22 +288,55 @@ export async function downloadTicketReceiptImage(
   node: HTMLElement | null,
   reference: string,
 ): Promise<Blob | null> {
-  if (!node) return null;
+  const blob = await createTicketReceiptImageBlob(node);
+  if (!blob) {
+    toast.error("Impossible de generer l'image du recu");
+    return null;
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = `receipt-${reference}.png`;
+  link.href = objectUrl;
+  link.click();
+  URL.revokeObjectURL(objectUrl);
+  return blob;
+}
+
+function openWhatsappChat(phoneNumber?: string): void {
+  const digits = phoneNumber?.replace(/\D/g, "") ?? "";
+  const url = digits ? `https://wa.me/${digits}` : "https://wa.me/";
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function waitForReceiptImages(node: HTMLElement): Promise<void> {
+  const images = node.querySelectorAll("img");
+  await Promise.all(
+    [...images].map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        }),
+    ),
+  );
+}
+
+async function renderReceiptImageBlob(node: HTMLElement): Promise<Blob | null> {
+  await waitForReceiptImages(node);
   try {
     const dataUrl = await toPng(node, {
       cacheBust: true,
       backgroundColor: "#ffffff",
       pixelRatio: 2,
     });
-    const link = document.createElement("a");
-    link.download = `receipt-${reference}.png`;
-    link.href = dataUrl;
-    link.click();
-
     const response = await fetch(dataUrl);
     return await response.blob();
   } catch {
-    toast.error("Impossible de generer l'image du recu");
     return null;
   }
 }
@@ -312,17 +345,7 @@ export async function createTicketReceiptImageBlob(
   node: HTMLElement | null,
 ): Promise<Blob | null> {
   if (!node) return null;
-  try {
-    const dataUrl = await toPng(node, {
-      cacheBust: true,
-      backgroundColor: "#ffffff",
-      pixelRatio: 2,
-    });
-    const response = await fetch(dataUrl);
-    return await response.blob();
-  } catch {
-    return null;
-  }
+  return renderReceiptImageBlob(node);
 }
 
 export function buildTicketReceiptShareCaption(input: TicketReceiptInput): string {
@@ -339,12 +362,29 @@ export function buildTicketReceiptShareCaption(input: TicketReceiptInput): strin
   ].join("\n");
 }
 
-function openWhatsappShareLink(caption: string, phoneNumber?: string): void {
-  const digits = phoneNumber?.replace(/\D/g, "") ?? "";
-  const url = digits
-    ? `https://wa.me/${digits}?text=${encodeURIComponent(caption)}`
-    : `https://wa.me/?text=${encodeURIComponent(caption)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+async function copyReceiptImageToClipboard(blob: Blob): Promise<boolean> {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+    return false;
+  }
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "image/png": blob,
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function downloadReceiptImageBlob(blob: Blob, reference: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = `ticket-${reference}.png`;
+  link.href = objectUrl;
+  link.click();
+  URL.revokeObjectURL(objectUrl);
 }
 
 export async function shareTicketReceiptImageViaWhatsapp(
@@ -360,7 +400,6 @@ export async function shareTicketReceiptImageViaWhatsapp(
     return;
   }
 
-  const caption = options.caption ?? `Ticket Tibus - ${options.reference}`;
   const blob = await createTicketReceiptImageBlob(node);
   if (!blob) {
     toast.error("Impossible de generer l'image du ticket");
@@ -371,32 +410,28 @@ export async function shareTicketReceiptImageViaWhatsapp(
     type: "image/png",
   });
 
-  if (
-    typeof navigator.share === "function" &&
-    typeof navigator.canShare === "function" &&
-    navigator.canShare({ files: [file] })
-  ) {
-    try {
-      await navigator.share({
-        title: `Ticket ${options.reference}`,
-        text: caption,
-        files: [file],
-      });
-      return;
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+  // WhatsApp ignore souvent le fichier si title/text sont presents (surtout iOS).
+  if (typeof navigator.share === "function" && typeof navigator.canShare === "function") {
+    const shareData = { files: [file] };
+    if (navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+      }
     }
   }
 
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.download = `ticket-${options.reference}.png`;
-  link.href = objectUrl;
-  link.click();
-  URL.revokeObjectURL(objectUrl);
+  if (await copyReceiptImageToClipboard(blob)) {
+    openWhatsappChat(options.phoneNumber);
+    toast.success("Image copiee. Collez-la dans WhatsApp.");
+    return;
+  }
 
-  openWhatsappShareLink(caption, options.phoneNumber);
-  toast.success("Image telechargee. Joignez-la dans WhatsApp si besoin.");
+  downloadReceiptImageBlob(blob, options.reference);
+  openWhatsappChat(options.phoneNumber);
+  toast.success("Image telechargee. Joignez-la dans WhatsApp.");
 }
 
 export async function shareTicketReceiptText(input: TicketReceiptInput): Promise<void> {

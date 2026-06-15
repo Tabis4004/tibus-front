@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
@@ -57,10 +58,16 @@ export function SupabaseAuthProvider({
   const [isLoading, setIsLoading] = useState(enabled);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const lastBootstrappedAuthIdRef = useRef<string | null>(null);
 
   const bootstrapProfile = useCallback(async (authUser: User | null) => {
     if (!authUser || !enabled) {
+      lastBootstrappedAuthIdRef.current = null;
       setAppUserId(null);
+      return null;
+    }
+
+    if (lastBootstrappedAuthIdRef.current === authUser.id) {
       return null;
     }
 
@@ -68,6 +75,7 @@ export function SupabaseAuthProvider({
     setError(null);
     try {
       const id = await ensureUserProfile(authUser);
+      lastBootstrappedAuthIdRef.current = authUser.id;
       setAppUserId(id);
       return id;
     } catch (err) {
@@ -103,10 +111,21 @@ export function SupabaseAuthProvider({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setIsLoading(false);
-      void bootstrapProfile(nextSession?.user ?? null);
+
+      if (event === "TOKEN_REFRESHED") {
+        return;
+      }
+
+      if (event === "SIGNED_OUT" || !nextSession?.user) {
+        lastBootstrappedAuthIdRef.current = null;
+        setAppUserId(null);
+        return;
+      }
+
+      void bootstrapProfile(nextSession.user);
     });
 
     return () => subscription.unsubscribe();

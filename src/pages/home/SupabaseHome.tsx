@@ -23,6 +23,7 @@ import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton
 import { HomeManualBlocks } from "./_components/HomeManualBlocks.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
 import { resolveDashboardPath } from "@/lib/auth/role-routing.ts";
+import { canViewNetworkGaresMap } from "@/lib/gares-map-audience.ts";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -46,6 +47,7 @@ export default function SupabaseHome() {
   const showTicketScanner = ["owner", "controleur", "vendeur", "chauffeur", "super_admin"].some((role) =>
     appUser.roles.includes(role),
   );
+  const showGaresMap = canViewNetworkGaresMap(appUser.roles, true);
 
   if (appUser.isLoading) {
     return (
@@ -89,47 +91,6 @@ export default function SupabaseHome() {
         </div>
 
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-          <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
-            <HomeManualBlocks />
-            <ExploreFeaturesButton variant="block" />
-          </HomeBlockSection>
-
-          <HomeBlockSection title={t("home.section_travel", { defaultValue: "Voyage" })}>
-            <HomeActionBlock
-              to={`/${locale}/traveler/search`}
-              title={t("book_reserve", { defaultValue: "Book / Reserve a Ticket" })}
-              description={t("home.book_desc", {
-                defaultValue: "Rechercher un trajet et réserver votre siège",
-              })}
-              icon={SearchIcon}
-              highlighted
-              tour="travel-book"
-            />
-            <HomeActionBlock
-              to={`/${locale}/gares`}
-              title={t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
-              description={t("home.gares_desc", {
-                defaultValue: "Voir les gares Tibus sur la carte",
-              })}
-              icon={MapPinIcon}
-            />
-            <HomeActionBlock
-              to={`/${locale}/traveler/bookings`}
-              title={t("my_bookings", { defaultValue: "My Bookings" })}
-              description={t("my_bookings_desc", { defaultValue: "View your tickets" })}
-              icon={ClipboardListIcon}
-            />
-            <HomeActionBlock
-              to={`/${locale}/traveler/referral`}
-              title={t("referral_cta", { defaultValue: "Parrainage & points Tibus" })}
-              description={t("home.referral_desc", {
-                defaultValue: "Parrainez vos proches et cumulez des points",
-              })}
-              icon={GiftIcon}
-              tour="travel-referral"
-            />
-          </HomeBlockSection>
-
           {(showTicketScanner ||
             !appUser.shouldHideMerchantAgentCta ||
             showOwnerDashboard ||
@@ -209,6 +170,49 @@ export default function SupabaseHome() {
               )}
             </HomeBlockSection>
           )}
+
+          <HomeBlockSection title={t("home.section_discover", { defaultValue: "Découverte" })}>
+            <HomeManualBlocks />
+            <ExploreFeaturesButton variant="block" />
+          </HomeBlockSection>
+
+          <HomeBlockSection title={t("home.section_travel", { defaultValue: "Voyage" })}>
+            <HomeActionBlock
+              to={`/${locale}/traveler/search`}
+              title={t("book_reserve", { defaultValue: "Book / Reserve a Ticket" })}
+              description={t("home.book_desc", {
+                defaultValue: "Rechercher un trajet et réserver votre siège",
+              })}
+              icon={SearchIcon}
+              highlighted
+              tour="travel-book"
+            />
+            {showGaresMap ? (
+              <HomeActionBlock
+                to={`/${locale}/gares`}
+                title={t("landing.stations_map_title", { defaultValue: "Nos gares sur la carte" })}
+                description={t("home.gares_desc", {
+                  defaultValue: "Voir les gares Tibus sur la carte",
+                })}
+                icon={MapPinIcon}
+              />
+            ) : null}
+            <HomeActionBlock
+              to={`/${locale}/traveler/bookings`}
+              title={t("my_bookings", { defaultValue: "My Bookings" })}
+              description={t("my_bookings_desc", { defaultValue: "View your tickets" })}
+              icon={ClipboardListIcon}
+            />
+            <HomeActionBlock
+              to={`/${locale}/traveler/referral`}
+              title={t("referral_cta", { defaultValue: "Parrainage & points Tibus" })}
+              description={t("home.referral_desc", {
+                defaultValue: "Parrainez vos proches et cumulez des points",
+              })}
+              icon={GiftIcon}
+              tour="travel-referral"
+            />
+          </HomeBlockSection>
 
           <HomeBlockSection title={t("home.section_help", { defaultValue: "Aide" })}>
             <HomeActionBlock

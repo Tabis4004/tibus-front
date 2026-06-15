@@ -97,7 +97,6 @@ export function useAppUserState() {
 
   const refresh = useCallback(() => {
     setIsLoading(true);
-    setIsReady(false);
     setRefreshKey((key) => key + 1);
   }, []);
 
@@ -106,6 +105,14 @@ export function useAppUserState() {
     window.addEventListener(APP_USER_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(APP_USER_REFRESH_EVENT, onRefresh);
   }, [refresh]);
+
+  useEffect(() => {
+    if (!appUserId) return;
+    setIsReady(false);
+    setProfile(null);
+    setRoles([]);
+    setMerchantAgentApplicationStatus(null);
+  }, [appUserId]);
 
   useEffect(() => {
     if (!isSupabaseAuth() || !appUserId) {
@@ -119,7 +126,6 @@ export function useAppUserState() {
 
     let cancelled = false;
     setIsLoading(true);
-    setIsReady(false);
     setError(null);
 
     void (async () => {
@@ -242,7 +248,7 @@ export function useAppUserState() {
   const dashboardRoleUi = resolveDashboardRoleUi(effectiveRoles);
 
   const waitingForProfile =
-    !!session && (authLoading || isBootstrapping || !appUserId || !isReady);
+    !!session && !isReady && (authLoading || isBootstrapping || !appUserId);
   const hasMerchantAgentApplication =
     merchantAgentApplicationStatus !== null &&
     MERCHANT_AGENT_CTA_BLOCKING_APPLICATION_STATUSES.includes(
@@ -271,7 +277,7 @@ export function useAppUserState() {
       profileCompleted: isProfileComplete(profile, effectiveRoles),
       onboardingCompleted: hasCompletedOnboarding(profile, appUserId, effectiveRoles),
       isReady,
-      isLoading: waitingForProfile || isLoading,
+      isLoading: waitingForProfile || (!isReady && isLoading),
       error,
       refresh,
     }),

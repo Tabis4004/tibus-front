@@ -434,7 +434,7 @@ function SupabaseOwnerLayout() {
 
   return (
     <OwnerCompanyProvider>
-      {appUser.isLoading || !appUser.isReady ? (
+      {!appUser.isReady ? (
         <OwnerLayoutShell>
           <div className="p-6 space-y-4">
             <Skeleton className="h-8 w-48" />

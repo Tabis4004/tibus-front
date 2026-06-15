@@ -317,7 +317,7 @@ function LandingPage() {
 
       <LandingTravelSection />
 
-      <HomeStationsMap scope="platform" />
+      <HomeStationsMap />
 
       {/* Trust signals bar */}
       <section className="border-y bg-primary/5">
