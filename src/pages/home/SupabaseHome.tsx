@@ -1,4 +1,4 @@
-import { useParams, Navigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   SearchIcon,
@@ -22,7 +22,6 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeManualBlocks } from "./_components/HomeManualBlocks.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
-import { resolveDashboardPath } from "@/lib/auth/role-routing.ts";
 import { canViewNetworkGaresMap } from "@/lib/gares-map-audience.ts";
 
 export default function SupabaseHome() {
@@ -63,10 +62,6 @@ export default function SupabaseHome() {
         <BottomNav />
       </div>
     );
-  }
-
-  if (appUser.isReady && appUser.roles.includes("owner")) {
-    return <Navigate to={resolveDashboardPath(locale, appUser.roles)} replace />;
   }
 
   return (

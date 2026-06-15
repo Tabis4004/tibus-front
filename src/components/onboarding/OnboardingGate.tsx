@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -19,12 +19,21 @@ import SpotlightTour from "@/components/onboarding/SpotlightTour.tsx";
 const EXCLUDED_PATH =
   /\/(trip\/|booking\/|payment\/|verify\/|agent-marchand|complete-profile|auth\/|manual\/)/;
 
+const EMPTY_TOUR_STEPS: TourStepConfig[] = [];
+
+function clearReadySteps(
+  setter: Dispatch<SetStateAction<TourStepConfig[]>>,
+) {
+  setter((prev) => (prev.length === 0 ? prev : EMPTY_TOUR_STEPS));
+}
+
 function useTourReady(steps: TourStepConfig[], enabled: boolean) {
-  const [readySteps, setReadySteps] = useState<TourStepConfig[]>([]);
+  const [readySteps, setReadySteps] = useState<TourStepConfig[]>(EMPTY_TOUR_STEPS);
+  const stepsKey = steps.map((step) => step.target).join("|");
 
   useEffect(() => {
     if (!enabled || steps.length === 0) {
-      setReadySteps([]);
+      clearReadySteps(setReadySteps);
       return;
     }
 
@@ -60,9 +69,9 @@ function useTourReady(steps: TourStepConfig[], enabled: boolean) {
     return () => {
       cancelled = true;
       window.clearInterval(interval);
-      setReadySteps([]);
+      clearReadySteps(setReadySteps);
     };
-  }, [enabled, steps]);
+  }, [enabled, steps, stepsKey]);
 
   return readySteps;
 }
@@ -168,7 +177,7 @@ function SupabaseOnboardingGate() {
     tour,
   );
 
-  const readySteps = useTourReady(tour?.steps ?? [], armed);
+  const readySteps = useTourReady(tour?.steps ?? EMPTY_TOUR_STEPS, armed);
 
   const handleStepChange = useCallback(
     (step: TourStepConfig) => {
@@ -250,7 +259,7 @@ function ConvexOnboardingGate() {
     tour,
   );
 
-  const readySteps = useTourReady(tour?.steps ?? [], armed);
+  const readySteps = useTourReady(tour?.steps ?? EMPTY_TOUR_STEPS, armed);
 
   const handleStepChange = useCallback(
     (step: TourStepConfig) => {

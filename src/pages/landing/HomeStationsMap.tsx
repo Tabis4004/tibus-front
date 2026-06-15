@@ -156,6 +156,7 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     () => cityOptionsFromGares(mappableGares),
     [mappableGares],
   );
+  const cityOptionsKey = cityOptions.join("|");
 
   const needsCityZoom = useMemo(
     () => garesSpreadKm(mappableGares) > CITY_MAP_ZOOM_THRESHOLD_KM,
@@ -170,7 +171,7 @@ export default function HomeStationsMap({ embedded = false }: { embedded?: boole
     setSelectedCity((current) =>
       current !== "all" && cityOptions.includes(current) ? current : cityOptions[0],
     );
-  }, [selectedCountry, needsCityZoom, cityOptions]);
+  }, [selectedCountry, needsCityZoom, cityOptionsKey, cityOptions]);
 
   const mapGares = useMemo(() => {
     if (!needsCityZoom || selectedCity === "all") return mappableGares;

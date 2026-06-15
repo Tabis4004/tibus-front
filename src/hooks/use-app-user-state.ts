@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { resolveAdminSandboxRoles } from "@/lib/auth/admin-sandbox.ts";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
@@ -94,6 +94,7 @@ export function useAppUserState() {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const previousAppUserIdRef = useRef<string | null>(null);
 
   const refresh = useCallback(() => {
     setIsLoading(true);
@@ -107,21 +108,24 @@ export function useAppUserState() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!appUserId) return;
-    setIsReady(false);
-    setProfile(null);
-    setRoles([]);
-    setMerchantAgentApplicationStatus(null);
-  }, [appUserId]);
-
-  useEffect(() => {
     if (!isSupabaseAuth() || !appUserId) {
+      previousAppUserIdRef.current = null;
       setProfile(null);
       setRoles([]);
       setMerchantAgentApplicationStatus(null);
       setIsReady(!session);
       setIsLoading(false);
       return;
+    }
+
+    const userChanged = previousAppUserIdRef.current !== appUserId;
+    previousAppUserIdRef.current = appUserId;
+
+    if (userChanged) {
+      setIsReady(false);
+      setProfile(null);
+      setRoles([]);
+      setMerchantAgentApplicationStatus(null);
     }
 
     let cancelled = false;
@@ -231,11 +235,14 @@ export function useAppUserState() {
     return () => {
       cancelled = true;
     };
-  }, [appUserId, session, refreshKey]);
+  }, [appUserId, session?.user?.id, refreshKey]);
 
-  const { roles: effectiveRoles, isSandboxActive: isAdminSandbox } = resolveAdminSandboxRoles(
-    roles,
-    Boolean(session) && isReady,
+  const sessionUserId = session?.user?.id ?? null;
+  const isAuthenticatedForProfile = Boolean(sessionUserId) && isReady;
+
+  const { roles: effectiveRoles, isSandboxActive: isAdminSandbox } = useMemo(
+    () => resolveAdminSandboxRoles(roles, isAuthenticatedForProfile),
+    [roles, isAuthenticatedForProfile],
   );
 
   const primaryRole =
@@ -248,7 +255,7 @@ export function useAppUserState() {
   const dashboardRoleUi = resolveDashboardRoleUi(effectiveRoles);
 
   const waitingForProfile =
-    !!session && !isReady && (authLoading || isBootstrapping || !appUserId);
+    !!sessionUserId && !isReady && (authLoading || isBootstrapping || !appUserId);
   const hasMerchantAgentApplication =
     merchantAgentApplicationStatus !== null &&
     MERCHANT_AGENT_CTA_BLOCKING_APPLICATION_STATUSES.includes(

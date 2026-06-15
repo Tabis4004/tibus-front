@@ -19,6 +19,7 @@ import {
   printTicketReceipt,
   shareTicketReceiptText,
   shareTicketReceiptImageViaWhatsapp,
+  warmTicketReceiptImageBlob,
   buildTicketReceiptShareCaption,
   type SellerCompanyReceiptInfo,
   type TicketReceiptInput,
@@ -78,6 +79,14 @@ export default function SellerTicketReceiptPanel({
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(null));
   }, [mergedInput.reference, mergedInput.verifyToken, mergedInput.lng]);
+
+  useEffect(() => {
+    if (!qrDataUrl) return;
+    const frame = requestAnimationFrame(() => {
+      warmTicketReceiptImageBlob(receiptRef.current, mergedInput.reference);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [qrDataUrl, mergedInput.reference]);
 
   const handleThermalPrint = useCallback(
     (paperWidth: ThermalPaperWidth) => {

@@ -86,30 +86,54 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
   },
   {
     id: "scanner",
-    title: "5. Scanner un billet — 4 résultats",
+    title: "5. Scanner un billet — parcours à l'embarquement",
     intro:
-      "À l'embarquement, scannez le QR code du billet ou saisissez la référence TB-…. L'écran affiche toujours l'un de ces quatre cas.",
+      "À l'embarquement, scannez le QR code du billet ou saisissez la référence TB-…. Voici le déroulé type avec les écrans affichés dans l'application.",
     subsections: [
       {
-        title: "✅ Billet valide",
-        body: "Carte verte — embarquement autorisé. Le passager peut monter. Vous pouvez appuyer sur « Marquer à bord » pour confirmer définitivement sa présence.",
-        bullets: ["Vibration courte sur mobile.", "Détails affichés : passager, trajet, siège, prix."],
+        title: "✅ 1er scan — billet valide",
+        body: "Carte verte — embarquement autorisé. Le passager peut monter. Appuyez sur « Marquer à bord » pour confirmer sa présence dans le bus.",
+        bullets: [
+          "Vibration courte sur mobile.",
+          "Détails affichés : passager, trajet, siège, prix, statut payé.",
+        ],
+        figure: {
+          src: "/manuel/captures/seller-scan-valid.png",
+          caption: "Premier scan : billet valide, embarquement autorisé",
+        },
       },
       {
-        title: "⚠️ Scan en doublon",
+        title: "✅ Confirmation — passager à bord",
+        body: "Après « Marquer à bord », l'écran confirme que le passager est enregistré comme embarqué. Vous pouvez enchaîner avec un autre billet.",
+        bullets: ["Bouton « Scanner un autre billet » pour reprendre le contrôle."],
+        figure: {
+          src: "/manuel/captures/seller-scan-onboard-confirmed.png",
+          caption: "Passager confirmé à bord",
+        },
+      },
+      {
+        title: "⚠️ 2e scan — alerte doublon",
         body: "Carte orange — le billet a déjà été scanné une première fois à l'embarquement. Vérifiez l'heure du premier scan affichée.",
         bullets: [
           "Double vibration sur mobile.",
           "Refusez un second embarquement avec le même billet.",
         ],
+        figure: {
+          src: "/manuel/captures/seller-scan-duplicate.png",
+          caption: "Second scan : billet déjà scanné à l'embarquement",
+        },
       },
       {
-        title: "🚫 Déjà à bord",
+        title: "🚫 Scan suivant — déjà à bord",
         body: "Carte rouge — le passager a déjà été confirmé « à bord ». Embarquement refusé.",
         bullets: ["L'heure de confirmation à bord est indiquée."],
+        figure: {
+          src: "/manuel/captures/seller-scan-already-onboard.png",
+          caption: "Passager déjà confirmé — embarquement refusé",
+        },
       },
       {
-        title: "❌ Embarquement refusé",
+        title: "❌ Embarquement refusé (autres cas)",
         body: "Carte rouge — billet introuvable, annulé, non payé, ou compagnie / gare de départ incorrecte.",
         bullets: [
           "Message fréquent : « Ticket non valide, vérifiez la compagnie d'achat et la gare de départ ».",

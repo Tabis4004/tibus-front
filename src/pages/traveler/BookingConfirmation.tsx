@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import QRCode from "qrcode";
 import { toPng } from "html-to-image";
-import { shareTicketReceiptImageViaWhatsapp } from "@/lib/ticket-receipt-print.ts";
+import { shareTicketReceiptImageViaWhatsapp, scheduleWarmTicketReceiptImageBlob } from "@/lib/ticket-receipt-print.ts";
 import { generateReceiptPDF, type ReceiptFormat, type ReceiptData } from "@/lib/receipt-pdf.ts";
 import {
   CheckCircleIcon,
@@ -317,6 +317,11 @@ export default function BookingConfirmation() {
       phoneNumber: booking.passengerPhone,
     });
   }, [booking]);
+
+  useEffect(() => {
+    if (!booking?.bookingReference) return;
+    scheduleWarmTicketReceiptImageBlob(receiptRef.current, booking.bookingReference);
+  }, [booking?.bookingReference]);
 
   const downloadCorporatePDF = useCallback((format: ReceiptFormat) => {
     if (!booking) return;

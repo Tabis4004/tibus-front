@@ -167,11 +167,13 @@ export default function SupabaseAdminPanel() {
   const [commissionAccordionSections, setCommissionAccordionSections] = useState<string[]>([]);
   const canAccessAdminPanel = appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
 
+  const isAdminPays = appUser.roles.includes("admin_pays");
+
   useEffect(() => {
-    if (appUser.isReady && !appUser.isSuperAdmin && appUser.roles.includes("admin_pays")) {
+    if (appUser.isReady && !appUser.isSuperAdmin && isAdminPays) {
       setTab("commissions");
     }
-  }, [appUser.isReady, appUser.isSuperAdmin, appUser.roles]);
+  }, [appUser.isReady, appUser.isSuperAdmin, isAdminPays]);
 
   useEffect(() => {
     if (!appUser.isReady) return;

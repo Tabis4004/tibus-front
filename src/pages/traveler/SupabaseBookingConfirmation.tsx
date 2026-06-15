@@ -2,7 +2,7 @@ import { useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import QRCode from "qrcode";
 import { buildTicketVerifyUrl } from "@/lib/ticket-verify-url.ts";
-import { shareTicketReceiptImageViaWhatsapp } from "@/lib/ticket-receipt-print.ts";
+import { shareTicketReceiptImageViaWhatsapp, scheduleWarmTicketReceiptImageBlob } from "@/lib/ticket-receipt-print.ts";
 import { toPng } from "html-to-image";
 import { generateReceiptPDF, type ReceiptFormat } from "@/lib/receipt-pdf.ts";
 import {
@@ -286,6 +286,11 @@ export default function SupabaseBookingConfirmation() {
       phoneNumber: booking.passengerPhone,
     });
   }, [booking, lng]);
+
+  useEffect(() => {
+    if (!booking?.bookingReference) return;
+    scheduleWarmTicketReceiptImageBlob(receiptRef.current, booking.bookingReference);
+  }, [booking?.bookingReference, booking?.verifyToken]);
 
   const downloadCorporatePDF = useCallback(
     (pdfFormat: ReceiptFormat) => {

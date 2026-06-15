@@ -23,6 +23,7 @@ import { isSupabaseAuth } from "@/lib/auth/config";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import ManualNavLinks from "@/components/manual/ManualNavLinks.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
+import { resolveUserHomePath } from "@/lib/auth/role-routing.ts";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
   const url = "https://www.tibusafrica.com";
@@ -168,11 +169,12 @@ function UserMenu() {
 
 export default function AppHeader() {
   const { lng } = useParams<{ lng: string }>();
+  const homePath = resolveUserHomePath(lng ?? "fr");
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to={`/${lng}`} className="flex items-center gap-2 font-bold text-lg">
+        <Link to={homePath} className="flex items-center gap-2 font-bold text-lg">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <BusIcon className="w-4 h-4 text-primary-foreground" />
           </div>

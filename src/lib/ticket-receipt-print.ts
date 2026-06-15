@@ -62,7 +62,15 @@ export type ThermalPaperWidth = "80mm" | "56mm";
 type TibusP3Bridge = {
   printReceipt58?: (title: string, payload: string) => void;
   printReceipt80?: (title: string, payload: string) => void;
+  shareWhatsAppImage?: (base64: string, phoneNumber?: string) => void;
+  shareImage?: (base64: string, mimeType: string, phoneNumber?: string) => void;
 };
+
+const receiptBlobCache = new Map<string, Promise<Blob | null>>();
+
+function receiptBlobCacheKey(reference: string): string {
+  return reference.trim() || "ticket-receipt";
+}
 
 function fmt(iso: string, pattern: string): string {
   try {
@@ -303,11 +311,6 @@ export async function downloadTicketReceiptImage(
   return blob;
 }
 
-function openWhatsappChat(phoneNumber?: string): void {
-  const digits = phoneNumber?.replace(/\D/g, "") ?? "";
-  const url = digits ? `https://wa.me/${digits}` : "https://wa.me/";
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
 async function waitForReceiptImages(node: HTMLElement): Promise<void> {
   const images = node.querySelectorAll("img");
@@ -348,6 +351,193 @@ export async function createTicketReceiptImageBlob(
   return renderReceiptImageBlob(node);
 }
 
+export function warmTicketReceiptImageBlob(
+  node: HTMLElement | null,
+  reference: string,
+): void {
+  if (!node || !reference.trim()) return;
+  const key = receiptBlobCacheKey(reference);
+  if (receiptBlobCache.has(key)) return;
+  receiptBlobCache.set(key, createTicketReceiptImageBlob(node));
+}
+
+export function scheduleWarmTicketReceiptImageBlob(
+  node: HTMLElement | null,
+  reference: string,
+  maxAttempts = 24,
+): void {
+  if (!node || !reference.trim()) return;
+  let attempts = 0;
+  const tryWarm = () => {
+    const qrImg = node.querySelector(".receipt-qr");
+    if (
+      qrImg instanceof HTMLImageElement &&
+      qrImg.complete &&
+      qrImg.naturalWidth > 0
+    ) {
+      warmTicketReceiptImageBlob(node, reference);
+      return;
+    }
+    attempts += 1;
+    if (attempts < maxAttempts) {
+      requestAnimationFrame(tryWarm);
+      return;
+    }
+    warmTicketReceiptImageBlob(node, reference);
+  };
+  requestAnimationFrame(tryWarm);
+}
+
+async function resolveTicketReceiptImageBlob(
+  node: HTMLElement | null,
+  reference: string,
+): Promise<Blob | null> {
+  if (!node) return null;
+  const key = receiptBlobCacheKey(reference);
+  const cached = receiptBlobCache.get(key);
+  if (cached) return cached;
+  const promise = createTicketReceiptImageBlob(node);
+  receiptBlobCache.set(key, promise);
+  return promise;
+}
+
+async function blobToJpeg(blob: Blob, quality = 0.92): Promise<Blob | null> {
+  if (typeof createImageBitmap !== "function") return null;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return await new Promise((resolve) => {
+      canvas.toBlob((jpeg) => resolve(jpeg), "image/jpeg", quality);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function buildShareableReceiptFiles(
+  blob: Blob,
+  reference: string,
+): Promise<File[]> {
+  const safeRef = reference.replace(/[^\w-]+/g, "_");
+  const files: File[] = [];
+  const jpegBlob = await blobToJpeg(blob);
+  if (jpegBlob && jpegBlob.size > 0) {
+    files.push(new File([jpegBlob], `ticket-${safeRef}.jpg`, { type: "image/jpeg" }));
+  }
+  files.push(new File([blob], `ticket-${safeRef}.png`, { type: "image/png" }));
+  return files;
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("base64 conversion failed"));
+        return;
+      }
+      resolve(result.split(",")[1] ?? result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("base64 conversion failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function shareViaNativeBridge(
+  blob: Blob,
+  phoneNumber?: string,
+): Promise<boolean> {
+  const bridge = tibusP3();
+  if (!bridge?.shareWhatsAppImage && !bridge?.shareImage) return false;
+  try {
+    const base64 = await blobToBase64(blob);
+    if (bridge.shareWhatsAppImage) {
+      bridge.shareWhatsAppImage(base64, phoneNumber?.replace(/\D/g, "") || undefined);
+      return true;
+    }
+    if (bridge.shareImage) {
+      bridge.shareImage(base64, "image/png", phoneNumber?.replace(/\D/g, "") || undefined);
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+async function shareFilesWithNativeSheet(files: File[]): Promise<boolean> {
+  if (typeof navigator.share !== "function" || files.length === 0) return false;
+
+  for (const file of files) {
+    const payload = { files: [file] };
+    try {
+      if (typeof navigator.canShare === "function" && !navigator.canShare(payload)) {
+        continue;
+      }
+      await navigator.share(payload);
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return true;
+    }
+  }
+
+  for (const file of files) {
+    try {
+      await navigator.share({ files: [file] });
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return true;
+    }
+  }
+
+  return false;
+}
+
+function downloadReceiptImageBlob(blob: Blob, reference: string): void {
+  const safeRef = reference.replace(/[^\w-]+/g, "_");
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = `ticket-${safeRef}.png`;
+  link.href = objectUrl;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
+async function copyReceiptImageToClipboard(blob: Blob): Promise<boolean> {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+    return false;
+  }
+  try {
+    const jpegBlob = (await blobToJpeg(blob)) ?? blob;
+    const type = jpegBlob.type || "image/png";
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        [type]: jpegBlob,
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export function buildTicketReceiptShareCaption(input: TicketReceiptInput): string {
   return [
     `Ticket Tibus - ${input.reference}`,
@@ -360,31 +550,6 @@ export function buildTicketReceiptShareCaption(input: TicketReceiptInput): strin
     `Verification: ${buildVerifyUrl(input)}`,
     "Powered by Tibus",
   ].join("\n");
-}
-
-async function copyReceiptImageToClipboard(blob: Blob): Promise<boolean> {
-  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-    return false;
-  }
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "image/png": blob,
-      }),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function downloadReceiptImageBlob(blob: Blob, reference: string): void {
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.download = `ticket-${reference}.png`;
-  link.href = objectUrl;
-  link.click();
-  URL.revokeObjectURL(objectUrl);
 }
 
 export async function shareTicketReceiptImageViaWhatsapp(
@@ -400,38 +565,42 @@ export async function shareTicketReceiptImageViaWhatsapp(
     return;
   }
 
-  const blob = await createTicketReceiptImageBlob(node);
-  if (!blob) {
+  const blob = await resolveTicketReceiptImageBlob(node, options.reference);
+  if (!blob || blob.size === 0) {
     toast.error("Impossible de generer l'image du ticket");
     return;
   }
 
-  const file = new File([blob], `ticket-${options.reference}.png`, {
-    type: "image/png",
-  });
+  if (await shareViaNativeBridge(blob, options.phoneNumber)) {
+    return;
+  }
 
-  // WhatsApp ignore souvent le fichier si title/text sont presents (surtout iOS).
-  if (typeof navigator.share === "function" && typeof navigator.canShare === "function") {
-    const shareData = { files: [file] };
-    if (navigator.canShare(shareData)) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") return;
-      }
-    }
+  const files = await buildShareableReceiptFiles(blob, options.reference);
+  if (await shareFilesWithNativeSheet(files)) {
+    return;
+  }
+
+  if (isMobileDevice()) {
+    downloadReceiptImageBlob(blob, options.reference);
+    toast.success(
+      "Image enregistree. Ouvrez WhatsApp, choisissez le contact, puis joignez l'image depuis la galerie ou Telechargements.",
+      { duration: 9000 },
+    );
+    return;
   }
 
   if (await copyReceiptImageToClipboard(blob)) {
-    openWhatsappChat(options.phoneNumber);
-    toast.success("Image copiee. Collez-la dans WhatsApp.");
+    toast.success("Image copiee. Ouvrez WhatsApp et collez l'image (Ctrl+V).", {
+      duration: 7000,
+    });
     return;
   }
 
   downloadReceiptImageBlob(blob, options.reference);
-  openWhatsappChat(options.phoneNumber);
-  toast.success("Image telechargee. Joignez-la dans WhatsApp.");
+  toast.success(
+    "Image telechargee. Joignez le fichier PNG dans WhatsApp avant d'envoyer.",
+    { duration: 8000 },
+  );
 }
 
 export async function shareTicketReceiptText(input: TicketReceiptInput): Promise<void> {

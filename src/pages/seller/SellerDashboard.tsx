@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import QRCode from "qrcode";
 import { toPng } from "html-to-image";
-import { shareTicketReceiptImageViaWhatsapp } from "@/lib/ticket-receipt-print.ts";
+import { shareTicketReceiptImageViaWhatsapp, warmTicketReceiptImageBlob } from "@/lib/ticket-receipt-print.ts";
 import { printer } from "@/lib/printer.ts";
 import { generateReceiptPDF, type ReceiptFormat, type ReceiptData } from "@/lib/receipt-pdf.ts";
 import SeatPicker from "@/components/seat-picker.tsx";
@@ -584,6 +584,14 @@ function ReceiptPage({ trip, confirmedRef, passengerName, passengerPhone, parcel
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(null));
   }, [confirmedRef, lng]);
+
+  useEffect(() => {
+    if (!qrDataUrl) return;
+    const frame = requestAnimationFrame(() => {
+      warmTicketReceiptImageBlob(receiptRef.current, confirmedRef);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [qrDataUrl, confirmedRef]);
 
   const handleDownload = useCallback(() => { downloadReceiptImage(receiptRef, confirmedRef); }, [confirmedRef]);
   const handleShare = useCallback(() => { shareTicketText(trip, confirmedRef, passengerName, lng ?? "fr", companyName); }, [trip, confirmedRef, passengerName, lng, companyName]);

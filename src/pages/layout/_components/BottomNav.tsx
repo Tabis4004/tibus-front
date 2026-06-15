@@ -6,10 +6,13 @@ import { cn } from "@/lib/utils.ts";
 import { useTranslation } from "react-i18next";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAppUser } from "@/hooks/use-app-user.ts";
+import { resolveUserHomePath } from "@/lib/auth/role-routing.ts";
 
 export default function BottomNav() {
   const { t } = useTranslation("common");
   const { lng } = useParams<{ lng: string }>();
+  const locale = lng ?? "fr";
+  const homePath = resolveUserHomePath(locale);
   const appUser = useAppUser();
   const convexUser = useQuery(api.users.getCurrentUser, isSupabaseAuth() ? "skip" : {});
 
@@ -18,23 +21,23 @@ export default function BottomNav() {
     : (convexUser?.role ?? "traveler");
 
   const travelerLinks = [
-    { to: `/${lng}`, icon: HomeIcon, label: t("nav.home") },
-    { to: `/${lng}/traveler`, icon: TicketIcon, label: t("nav.trips") },
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/traveler`, icon: TicketIcon, label: t("nav.trips") },
   ];
 
   const ownerLinks = [
-    { to: `/${lng}`, icon: HomeIcon, label: t("nav.home") },
-    { to: `/${lng}/owner`, icon: LayoutDashboardIcon, label: t("nav.dashboard") },
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/owner`, icon: LayoutDashboardIcon, label: t("nav.dashboard") },
   ];
 
   const sellerLinks = [
-    { to: `/${lng}`, icon: HomeIcon, label: t("nav.home") },
-    { to: `/${lng}/seller`, icon: TicketIcon, label: t("nav.sell") },
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/seller`, icon: TicketIcon, label: t("nav.sell") },
   ];
 
   const adminLinks = [
-    { to: `/${lng}`, icon: HomeIcon, label: t("nav.home") },
-    { to: `/${lng}/admin`, icon: ShieldIcon, label: t("nav.admin") },
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/admin`, icon: ShieldIcon, label: t("nav.admin") },
   ];
 
   const hasSellerNav = isSupabaseAuth()
@@ -63,7 +66,7 @@ export default function BottomNav() {
           <NavLink
             key={to}
             to={to}
-            end={to === `/${lng}`}
+            end={to === homePath}
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all",

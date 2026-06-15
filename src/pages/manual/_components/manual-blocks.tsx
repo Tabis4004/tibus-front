@@ -65,7 +65,10 @@ export function ManualSectionBlock({ section }: { section: ManualSection }) {
       {section.subsections?.length ? (
         <div
           className={
-            section.id === "owner" || section.id === "commissions" || section.id === "finance"
+            section.id === "owner" ||
+            section.id === "commissions" ||
+            section.id === "finance" ||
+            section.id === "scanner"
               ? "grid gap-4 md:grid-cols-2"
               : "space-y-3"
           }

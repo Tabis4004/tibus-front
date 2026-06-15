@@ -39,6 +39,10 @@ export function resolveDashboardRoleUi(roles: readonly string[]): string {
   return normalizeRoleForUi(resolveDashboardRole(roles));
 }
 
+export function resolveUserHomePath(lng: string): string {
+  return `/${lng || "fr"}`;
+}
+
 export function resolveDashboardPath(lng: string, roles: readonly string[]): string {
   const locale = lng || "fr";
   const role = resolveDashboardRole(roles);
