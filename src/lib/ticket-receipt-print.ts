@@ -502,40 +502,85 @@ async function shareFilesWithNativeSheet(files: File[]): Promise<boolean> {
   return false;
 }
 
-function downloadReceiptImageBlob(blob: Blob, reference: string): void {
-  const safeRef = reference.replace(/[^\w-]+/g, "_");
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.download = `ticket-${safeRef}.png`;
-  link.href = objectUrl;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function isDesktopBrowser(): boolean {
+  return !isMobileDevice();
+}
+
+function openWhatsappChatForImageShare(phoneNumber?: string): void {
+  const digits = phoneNumber?.replace(/\D/g, "") ?? "";
+  const url = digits
+    ? isDesktopBrowser()
+      ? `https://web.whatsapp.com/send?phone=${digits}`
+      : `https://wa.me/${digits}`
+    : isDesktopBrowser()
+      ? "https://web.whatsapp.com/"
+      : "https://wa.me/";
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 async function copyReceiptImageToClipboard(blob: Blob): Promise<boolean> {
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
     return false;
   }
-  try {
-    const jpegBlob = (await blobToJpeg(blob)) ?? blob;
-    const type = jpegBlob.type || "image/png";
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        [type]: jpegBlob,
-      }),
-    ]);
-    return true;
-  } catch {
-    return false;
+
+  const candidates: Blob[] = [];
+  const jpegBlob = await blobToJpeg(blob);
+  if (jpegBlob && jpegBlob.size > 0) candidates.push(jpegBlob);
+  if (!candidates.some((item) => item.type === blob.type)) {
+    candidates.push(blob);
   }
+
+  for (const candidate of candidates) {
+    const type = candidate.type || "image/png";
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [type]: candidate,
+        }),
+      ]);
+      return true;
+    } catch {
+      /* try next format */
+    }
+  }
+
+  return false;
 }
 
-function isMobileDevice(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+async function shareImageViaClipboardAndWhatsapp(
+  blob: Blob,
+  phoneNumber?: string,
+): Promise<boolean> {
+  if (!(await copyReceiptImageToClipboard(blob))) {
+    return false;
+  }
+
+  openWhatsappChatForImageShare(phoneNumber);
+  toast.success(
+    isDesktopBrowser()
+      ? "Image copiee. Collez-la dans WhatsApp Web (Ctrl+V ou Cmd+V)."
+      : "Image copiee. Ouvrez WhatsApp et collez l'image dans la conversation.",
+    { duration: 9000 },
+  );
+  return true;
+}
+
+function openReceiptImagePreviewForWhatsapp(blob: Blob, phoneNumber?: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  openWhatsappChatForImageShare(phoneNumber);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 300_000);
+  toast.success(
+    isDesktopBrowser()
+      ? "WhatsApp Web ouvert. Glissez l'image depuis l'autre onglet ou copiez-la (clic droit), sans telecharger de fichier."
+      : "WhatsApp ouvert. Joignez l'image depuis l'onglet du ticket.",
+    { duration: 10_000 },
+  );
 }
 
 export function buildTicketReceiptShareCaption(input: TicketReceiptInput): string {
@@ -580,27 +625,11 @@ export async function shareTicketReceiptImageViaWhatsapp(
     return;
   }
 
-  if (isMobileDevice()) {
-    downloadReceiptImageBlob(blob, options.reference);
-    toast.success(
-      "Image enregistree. Ouvrez WhatsApp, choisissez le contact, puis joignez l'image depuis la galerie ou Telechargements.",
-      { duration: 9000 },
-    );
+  if (await shareImageViaClipboardAndWhatsapp(blob, options.phoneNumber)) {
     return;
   }
 
-  if (await copyReceiptImageToClipboard(blob)) {
-    toast.success("Image copiee. Ouvrez WhatsApp et collez l'image (Ctrl+V).", {
-      duration: 7000,
-    });
-    return;
-  }
-
-  downloadReceiptImageBlob(blob, options.reference);
-  toast.success(
-    "Image telechargee. Joignez le fichier PNG dans WhatsApp avant d'envoyer.",
-    { duration: 8000 },
-  );
+  openReceiptImagePreviewForWhatsapp(blob, options.phoneNumber);
 }
 
 export async function shareTicketReceiptText(input: TicketReceiptInput): Promise<void> {
