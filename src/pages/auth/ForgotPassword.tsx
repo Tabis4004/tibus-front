@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
+import { recoveryEmailErrorMessage } from "@/lib/auth/recovery-email-error.ts";
 import { ArrowLeftIcon, MailIcon } from "lucide-react";
 
 export default function ForgotPasswordPage() {
@@ -40,7 +41,8 @@ export default function ForgotPasswordPage() {
         }),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.generic"));
+      console.error("[auth] resetPasswordForEmail failed", err);
+      toast.error(recoveryEmailErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

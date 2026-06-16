@@ -54,6 +54,7 @@ import {
   getStakeholderPaymentProofUrl,
 } from "@/lib/supabase/stakeholder-commissions.ts";
 import StakeholderSettlementApprovalFields from "./StakeholderSettlementApprovalFields.tsx";
+import { supabaseErrorMessage } from "@/lib/supabase/errors";
 import { cn } from "@/lib/utils.ts";
 
 type CountryOption = { id: string; name: string };
@@ -76,7 +77,7 @@ function buildEmptyRateDrafts(): Record<string, string> {
 }
 
 const STAKEHOLDER_ROLE_USER_FILTER: Partial<Record<StakeholderRole, string[]>> = {
-  recruiter: ["admin_pays", "owner"],
+  recruiter: ["demarcheur", "admin_pays", "owner"],
 };
 
 /** Rôles pays : pas de bénéficiaire fixe — répartition automatique par vente / rôle. */
@@ -304,12 +305,12 @@ export default function StakeholderCommissionPanel({
       })
       .catch((err) => {
         setCountryUsers([]);
-        const message =
-          err instanceof Error
-            ? err.message
-            : t("stakeholder_commissions.users_load_error", {
-                defaultValue: "Impossible de charger les utilisateurs pour ce pays.",
-              });
+        const message = supabaseErrorMessage(
+          err,
+          t("stakeholder_commissions.users_load_error", {
+            defaultValue: "Impossible de charger les utilisateurs pour ce pays.",
+          }),
+        );
         setCountryUsersError(message);
         toast.error(message);
       })
