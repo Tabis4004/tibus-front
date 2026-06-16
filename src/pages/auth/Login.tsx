@@ -164,7 +164,15 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Mot de passe</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="signin-password">Mot de passe</Label>
+                    <Link
+                      to={`/${locale}/auth/forgot-password`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {t("auth.forgot_password", { defaultValue: "Mot de passe oublié ?" })}
+                    </Link>
+                  </div>
                   <Input
                     id="signin-password"
                     type="password"

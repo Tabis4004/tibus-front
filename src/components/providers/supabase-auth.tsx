@@ -38,6 +38,8 @@ type SupabaseAuthContextValue = {
     password: string,
     profile?: SignUpProfile,
   ) => Promise<SupabaseSignUpResult>;
+  requestPasswordReset: (email: string, redirectTo: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -179,6 +181,18 @@ export function SupabaseAuthProvider({
     };
   }, [bootstrapProfile]);
 
+  const requestPasswordReset = useCallback(async (email: string, redirectTo: string) => {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    });
+    if (resetError) throw resetError;
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) throw updateError;
+  }, []);
+
   const signOut = useCallback(async () => {
     setAppUserId(null);
     await supabase.auth.signOut();
@@ -194,6 +208,8 @@ export function SupabaseAuthProvider({
       error: enabled ? error : null,
       signInWithPassword: enabled ? signInWithPassword : noop,
       signUpWithPassword: enabled ? signUpWithPassword : noop,
+      requestPasswordReset: enabled ? requestPasswordReset : noop,
+      updatePassword: enabled ? updatePassword : noop,
       signOut: enabled ? signOut : async () => {},
     }),
     [
@@ -205,6 +221,8 @@ export function SupabaseAuthProvider({
       error,
       signInWithPassword,
       signUpWithPassword,
+      requestPasswordReset,
+      updatePassword,
       signOut,
     ],
   );

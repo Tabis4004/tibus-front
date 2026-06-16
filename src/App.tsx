@@ -14,6 +14,8 @@ import NotFound from "./pages/NotFound.tsx";
 import AppLayout from "./pages/layout/AppLayout.tsx";
 import OwnerLayout from "./pages/owner/OwnerLayout.tsx";
 import LoginPage from "./pages/auth/Login.tsx";
+import ForgotPasswordPage from "./pages/auth/ForgotPassword.tsx";
+import ResetPasswordPage from "./pages/auth/ResetPassword.tsx";
 import {
   AdminCompanyManager,
   AdminPanel,
@@ -100,6 +102,8 @@ function AppShell() {
             >
               <Route path="complete-profile" element={<CompleteProfileRedirect />} />
               <Route path="auth/login" element={<LoginPage />} />
+              <Route path="auth/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="auth/reset-password" element={<ResetPasswordPage />} />
               <Route index element={<Index />} />
               <Route path="gares" element={<NosGaresPage />} />
 
