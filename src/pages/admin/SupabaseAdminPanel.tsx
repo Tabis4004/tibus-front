@@ -32,6 +32,7 @@ import { useAppUser } from "@/hooks/use-app-user.ts";
 import { canAccessCommercialOffer } from "@/lib/auth/commercial-offer-access.ts";
 import {
   deleteCommissionSettingSupabase,
+  resolveCompanyPlatformCommission,
   upsertCommissionSettingSupabase,
   type CommissionSetting,
 } from "@/lib/supabase/accounting.ts";
@@ -89,15 +90,8 @@ function resolveCompanyCommissionDisplay(
   company: SupabaseCompanyRow,
   settings: CommissionSetting[],
 ) {
-  const companyOverride = settings.find(
-    (setting) => setting.scope === "company" && setting.companyId === company.id,
-  );
-  const countrySetting = settings.find(
-    (setting) => setting.scope === "country" && setting.countryId === company.countryId,
-  );
-  const rate = companyOverride?.rate ?? countrySetting?.rate ?? company.commissionRate;
-  const paidBy = companyOverride?.paidBy ?? countrySetting?.paidBy ?? "company";
-  return { rate, paidBy };
+  const resolved = resolveCompanyPlatformCommission(company, settings);
+  return { rate: resolved.rate, paidBy: resolved.paidBy };
 }
 
 type TabId = AdminTabId;
@@ -667,6 +661,7 @@ export default function SupabaseAdminPanel() {
                             name: company.name,
                             countryId: company.countryId,
                             recruitedByUserId: company.recruitedByUserId,
+                            commissionRate: company.commissionRate,
                           }))}
                           commissionSettings={data.commissionSettings ?? []}
                           onCommissionSettingsChanged={reloadCurrentTab}

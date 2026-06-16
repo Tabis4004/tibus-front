@@ -97,6 +97,47 @@ export type PlatformCommissionSummary = {
 
 export type CommissionSettingScope = "country" | "company";
 
+export type ResolvedPlatformCommission = {
+  rate: number;
+  paidBy: "company" | "traveler";
+  source: "company_setting" | "company_profile" | "default";
+};
+
+/**
+ * Taux commission plateforme pour le revenue sharing : toujours celui de la compagnie.
+ * Le réglage pays (CommissionSettings scope country) n'est pas utilisé ici.
+ */
+export function resolveCompanyPlatformCommission(
+  company: { id: string; commissionRate?: number | null },
+  settings: CommissionSetting[],
+): ResolvedPlatformCommission {
+  const companySetting = settings.find(
+    (setting) =>
+      setting.scope === "company" &&
+      setting.companyId === company.id &&
+      setting.isActive !== false,
+  );
+  if (companySetting) {
+    return {
+      rate: companySetting.rate,
+      paidBy: companySetting.paidBy,
+      source: "company_setting",
+    };
+  }
+  if (company.commissionRate != null && Number.isFinite(company.commissionRate)) {
+    return {
+      rate: company.commissionRate,
+      paidBy: "traveler",
+      source: "company_profile",
+    };
+  }
+  return {
+    rate: 5,
+    paidBy: "traveler",
+    source: "default",
+  };
+}
+
 export type CommissionSetting = {
   id: string | null;
   scope: CommissionSettingScope;

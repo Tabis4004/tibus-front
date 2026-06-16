@@ -32,7 +32,7 @@ import {
 } from "@/lib/supabase/stakeholder-commissions.ts";
 import {
   type CommissionSetting,
-  upsertCommissionSettingSupabase,
+  resolveCompanyPlatformCommission,
 } from "@/lib/supabase/accounting.ts";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import { parseFeeInputOrZero } from "@/lib/fee-input.ts";
@@ -62,6 +62,7 @@ type CompanyOption = {
   name: string;
   countryId: string | null;
   recruitedByUserId?: string | null;
+  commissionRate?: number | null;
 };
 
 type CompanyRecruiterDraft = {
@@ -186,10 +187,32 @@ export default function StakeholderCommissionPanel({
     () => countryId || defaultCountryId || countries[0]?.id || "",
     [countryId, defaultCountryId, countries],
   );
-  const countryCompanies = useMemo(
-    () => panelCompanies.filter((company) => company.countryId === activeCountryId),
-    [activeCountryId, panelCompanies],
+  const countryCompanies = useMemo(() => {
+    const byId = new Map(companies.map((company) => [company.id, company]));
+    return panelCompanies
+      .filter((company) => company.countryId === activeCountryId)
+      .map((company) => {
+        const fromParent = byId.get(company.id);
+        return {
+          ...company,
+          commissionRate: fromParent?.commissionRate ?? company.commissionRate ?? null,
+          recruitedByUserId: company.recruitedByUserId ?? fromParent?.recruitedByUserId ?? null,
+        };
+      });
+  }, [activeCountryId, companies, panelCompanies]);
+
+  const selectedCompany = useMemo(
+    () =>
+      companyFilterId === "__all"
+        ? null
+        : countryCompanies.find((company) => company.id === companyFilterId) ?? null,
+    [companyFilterId, countryCompanies],
   );
+
+  const simulationCompany = selectedCompany ?? countryCompanies[0] ?? null;
+  const simulationCommission = simulationCompany
+    ? resolveCompanyPlatformCommission(simulationCompany, commissionSettings)
+    : null;
 
   const activeCountryName = useMemo(
     () => countries.find((country) => country.id === activeCountryId)?.name ?? "",
@@ -240,64 +263,7 @@ export default function StakeholderCommissionPanel({
       cancelled = true;
     };
   }, [activeCountryId, canManageStakeholderRates, t]);
-  const activeCountryCommissionSetting = useMemo(
-    () =>
-      commissionSettings.find(
-        (setting) =>
-          setting.scope === "country" &&
-          setting.countryId === activeCountryId &&
-          setting.isActive !== false,
-      ),
-    [activeCountryId, commissionSettings],
-  );
 
-  const needsTravelerCommissionSetting = useMemo(
-    () =>
-      !activeCountryCommissionSetting || activeCountryCommissionSetting.paidBy !== "traveler",
-    [activeCountryCommissionSetting],
-  );
-
-  const resolvedCountryCommissionRate = useMemo(() => {
-    return activeCountryCommissionSetting?.rate != null
-      ? String(activeCountryCommissionSetting.rate)
-      : "5";
-  }, [activeCountryCommissionSetting]);
-
-  useEffect(() => {
-    if (!canManageStakeholderRates || !activeCountryId || !needsTravelerCommissionSetting) {
-      return;
-    }
-
-    let cancelled = false;
-    void upsertCommissionSettingSupabase({
-      scope: "country",
-      countryId: activeCountryId,
-      companyId: null,
-      rate: activeCountryCommissionSetting?.rate ?? 5,
-      paidBy: "traveler",
-      isActive: true,
-    })
-      .then(() => {
-        if (!cancelled) onCommissionSettingsChanged?.();
-      })
-      .catch(() => {
-        // Migration 116 may already have seeded the setting; ignore bootstrap errors.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeCountryCommissionSetting?.rate,
-    activeCountryId,
-    canManageStakeholderRates,
-    needsTravelerCommissionSetting,
-    onCommissionSettingsChanged,
-  ]);
-
-  useEffect(() => {
-    setPreviewCommissionRate(resolvedCountryCommissionRate);
-  }, [resolvedCountryCommissionRate]);
   const [balances, setBalances] = useState<StakeholderCommissionBalance[] | undefined>(undefined);
   const [balancesError, setBalancesError] = useState<string | null>(null);
   const [history, setHistory] = useState<StakeholderCommissionSettlement[] | undefined>(undefined);
@@ -312,6 +278,12 @@ export default function StakeholderCommissionPanel({
   const [customRate, setCustomRate] = useState("0");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(() => {
+    if (simulationCommission) {
+      setPreviewCommissionRate(String(simulationCommission.rate));
+    }
+  }, [simulationCommission?.rate, simulationCompany?.id]);
 
   useEffect(() => {
     if (defaultCountryId) setCountryId(defaultCountryId);
@@ -781,7 +753,11 @@ export default function StakeholderCommissionPanel({
         </Button>
         {countryCompanies.length > 0 ? (
           <div className="space-y-1.5 min-w-[200px]">
-            <Label>{t("stakeholder_commissions.company_filter", { defaultValue: "Compagnie" })}</Label>
+            <Label>
+              {t("stakeholder_commissions.company_filter", {
+                defaultValue: "Compagnie (filtre pays)",
+              })}
+            </Label>
             <Select value={companyFilterId} onValueChange={setCompanyFilterId}>
               <SelectTrigger>
                 <SelectValue />
@@ -804,23 +780,37 @@ export default function StakeholderCommissionPanel({
       <p className="text-xs text-muted-foreground">
         {t("stakeholder_commissions.realtime_hint", {
           defaultValue:
-            "Soldes calculés à partir des commissions plateforme capturées sur les billets voyageur payés en ligne.",
+            "Le partage est calculé sur la commission plateforme de chaque compagnie (taux compagnie prioritaire). Le filtre pays sert à lister les compagnies et attribuer le % recruteur par compagnie.",
         })}
       </p>
 
-      {needsTravelerCommissionSetting ? (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          {t("stakeholder_commissions.traveler_commission_required", {
-            defaultValue:
-              "Ce pays n'a pas de commission plateforme « payée par le voyageur ». Sans cela, aucun revenu stakeholder n'est capturé. Un taux par défaut (5 %) sera créé automatiquement.",
-          })}
-        </p>
-      ) : activeCountryCommissionSetting ? (
+      {simulationCommission && simulationCompany ? (
         <p className="rounded-lg border border-emerald-300/60 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-900">
-          {t("stakeholder_commissions.traveler_commission_active", {
-            defaultValue:
-              "Commission plateforme pays : {{rate}} % (payée par le voyageur). Les revenus et soldes ci-dessous sont calculés sur cette base.",
-            rate: activeCountryCommissionSetting.rate,
+          {selectedCompany
+            ? t("stakeholder_commissions.company_commission_active", {
+                defaultValue:
+                  "{{company}} : commission plateforme {{rate}} % ({{paidBy}}). Ce taux compagnie s'applique au revenue sharing, indépendamment du réglage pays.",
+                company: simulationCompany.name,
+                rate: simulationCommission.rate,
+                paidBy:
+                  simulationCommission.paidBy === "traveler"
+                    ? t("commissions.paid_by_traveler_short", { defaultValue: "voyageur" })
+                    : t("commissions.paid_by_company_short", { defaultValue: "compagnie" }),
+              })
+            : t("stakeholder_commissions.country_filter_hint", {
+                defaultValue:
+                  "Pays {{country}} : {{count}} compagnie(s). Sélectionnez une compagnie pour voir son taux (ex. {{example}} : {{rate}} %).",
+                country: activeCountryName,
+                count: countryCompanies.length,
+                example: simulationCompany.name,
+                rate: simulationCommission.rate,
+              })}
+        </p>
+      ) : countryCompanies.length === 0 ? (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {t("stakeholder_commissions.no_companies_for_recruiters", {
+            country: activeCountryName || activeCountryId,
+            defaultValue: "Aucune compagnie pour {{country}}.",
           })}
         </p>
       ) : null}
@@ -852,7 +842,7 @@ export default function StakeholderCommissionPanel({
           <p className="text-xs text-muted-foreground">
             {t("stakeholder_commissions.global_config_hint", {
               defaultValue:
-                "Taux pays uniques (plateforme, admin pays, master, vendeur) puis une ligne recruteur par compagnie pour compléter le partage à 100 %.",
+                "Taux pays pour plateforme, admin pays, master et vendeur. Une ligne recruteur par compagnie (bénéficiaire dynamique). Un même utilisateur peut cumuler plusieurs rôles (ex. admin pays + recruteur) : chaque solde est retirable selon son seuil.",
             })}
           </p>
           {totalRate + maxCompanyRecruiterRate > 100 ? (
@@ -1134,8 +1124,15 @@ export default function StakeholderCommissionPanel({
       <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
             <div>
               <p className="text-sm font-medium">{t("stakeholder_commissions.simulator_title")}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {t("stakeholder_commissions.simulator_desc")}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {simulationCompany
+                  ? t("stakeholder_commissions.simulator_company_desc", {
+                      defaultValue:
+                        "Simulation pour {{company}} — commission compagnie {{rate}} % (le taux pays est ignoré).",
+                      company: simulationCompany.name,
+                      rate: simulationCommission?.rate ?? previewCommissionRate,
+                    })
+                  : t("stakeholder_commissions.simulator_desc")}
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

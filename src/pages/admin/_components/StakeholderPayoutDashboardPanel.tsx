@@ -203,7 +203,8 @@ export default function StakeholderPayoutDashboardPanel({
       ) : balances.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t("stakeholder_commissions.my_dashboard_empty", {
-            defaultValue: "Aucune commission stakeholder enregistrée pour votre compte.",
+            defaultValue:
+              "Aucune commission stakeholder enregistrée pour votre compte. Si vous cumulez plusieurs rôles (admin pays, recruteur, etc.), chaque ligne apparaît ici avec son seuil de retrait.",
           })}
         </p>
       ) : (
