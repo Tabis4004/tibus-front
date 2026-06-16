@@ -79,6 +79,8 @@ import IncomeStatementPage from "./owner/IncomeStatementPage.tsx";
 import CompanyManualPage from "./manual/CompanyManualPage.tsx";
 import CountryAdminManualPage from "./manual/CountryAdminManualPage.tsx";
 import SellerManualPage from "./manual/SellerManualPage.tsx";
+import CommercialOfferPage from "./admin/CommercialOfferPage.tsx";
+import DemarcheurDashboardPage from "./admin/DemarcheurDashboardPage.tsx";
 
 function useSupabaseBranch<T>(supabase: T, convex: T): T {
   return isSupabaseAuth() ? supabase : convex;
@@ -130,6 +132,14 @@ export function CompanyManual() {
 
 export function CountryAdminManual() {
   return <CountryAdminManualPage />;
+}
+
+export function CommercialOffer() {
+  return <CommercialOfferPage />;
+}
+
+export function DemarcheurDashboard() {
+  return <DemarcheurDashboardPage />;
 }
 
 export function SellerManual() {

@@ -152,7 +152,7 @@ export default function SupabaseAdminCompanyManager() {
           users
             .filter((user: PlatformAdminUserRow) =>
               user.roles.some((role: string) =>
-                ["vendeur_independant", "vendeur_master", "vendeur_reseau", "master", "master_independant"].includes(role),
+                ["vendeur_independant", "vendeur_master", "vendeur_reseau", "demarcheur", "master", "master_independant"].includes(role),
               ),
             )
             .map((user: PlatformAdminUserRow) => ({
@@ -246,6 +246,12 @@ export default function SupabaseAdminCompanyManager() {
         <Badge variant={company.isActive ? "default" : "secondary"} className="ml-auto">
           {company.isActive ? t("status.active") : t("status.inactive")}
         </Badge>
+        {canManageModules ? (
+          <Badge variant="outline" className="hidden sm:inline-flex">
+            Modules A–F
+          </Badge>
+        ) : null}
+        {isSuperAdmin ? (
         <Button
           type="button"
           size="sm"
@@ -255,7 +261,10 @@ export default function SupabaseAdminCompanyManager() {
           <LayoutDashboardIcon className="w-4 h-4 mr-1" />
           Gérer
         </Button>
+        ) : null}
       </div>
+
+      <CompanyFeatureModulesPanel companyId={company.id} readOnly={!canManageModules} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
@@ -283,8 +292,6 @@ export default function SupabaseAdminCompanyManager() {
           <CardContent className="text-2xl font-bold">{company.sellerCount}</CardContent>
         </Card>
       </div>
-
-      <CompanyFeatureModulesPanel companyId={company.id} readOnly={!canManageModules} />
 
       {isSuperAdmin ? (
       <Card>

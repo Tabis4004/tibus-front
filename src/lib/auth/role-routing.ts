@@ -10,6 +10,7 @@ const DASHBOARD_ROLE_PRIORITY = [
   "owner",
   "super_admin",
   "admin_pays",
+  "demarcheur",
   "master_independant",
   "master",
   "vendeur_master",
@@ -49,6 +50,7 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
 
   if (role === "owner") return `/${locale}/owner`;
   if (role === "super_admin" || role === "admin_pays") return `/${locale}/admin`;
+  if (role === "demarcheur") return `/${locale}/admin/demarcheur`;
   if (
     role === "vendeur" ||
     role === "vendeur_independant" ||

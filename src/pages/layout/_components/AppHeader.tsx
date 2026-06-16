@@ -71,6 +71,9 @@ function UserMenu() {
   const hasPlatformAdmin =
     isSupabaseAuth() &&
     (appUser.isSuperAdmin || appUser.roles.includes("admin_pays"));
+  const hasDemarcheurDashboard =
+    isSupabaseAuth() &&
+    (appUser.roles.includes("demarcheur") || appUser.isSuperAdmin);
   const canCreateCompany =
     isSupabaseAuth() &&
     appUser.isReady &&
@@ -114,6 +117,14 @@ function UserMenu() {
             <Link to={`/${lng}/admin`} className="cursor-pointer">
               <ShieldIcon className="w-4 h-4 mr-2 text-primary" />
               {t("header.admin_panel")}
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {hasDemarcheurDashboard && !hasPlatformAdmin && (
+          <DropdownMenuItem asChild>
+            <Link to={`/${lng}/admin/demarcheur`} className="cursor-pointer">
+              <LayoutDashboardIcon className="w-4 h-4 mr-2 text-primary" />
+              {t("header.demarcheur_dashboard", { defaultValue: "Espace démarcheur" })}
             </Link>
           </DropdownMenuItem>
         )}

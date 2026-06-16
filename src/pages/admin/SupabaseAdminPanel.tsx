@@ -22,12 +22,14 @@ import {
   GiftIcon,
   FileTextIcon,
   ActivityIcon,
+  LayersIcon,
   TrendingUpIcon,
   type LucideIcon,
   BookOpenIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
+import { canAccessCommercialOffer } from "@/lib/auth/commercial-offer-access.ts";
 import {
   deleteCommissionSettingSupabase,
   upsertCommissionSettingSupabase,
@@ -168,10 +170,11 @@ export default function SupabaseAdminPanel() {
   const canAccessAdminPanel = appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
 
   const isAdminPays = appUser.roles.includes("admin_pays");
+  const adminCountryId = appUser.profile?.countryId ?? null;
 
   useEffect(() => {
     if (appUser.isReady && !appUser.isSuperAdmin && isAdminPays) {
-      setTab("commissions");
+      setTab((current) => (current === "companies" ? "companies" : "commissions"));
     }
   }, [appUser.isReady, appUser.isSuperAdmin, isAdminPays]);
 
@@ -182,7 +185,7 @@ export default function SupabaseAdminPanel() {
     if (!isTabId(tabParam)) return;
 
     if (!appUser.isSuperAdmin) {
-      if (tabParam === "commissions" || tabParam === "guarantee_fund") {
+      if (tabParam === "commissions" || tabParam === "guarantee_fund" || tabParam === "companies") {
         setTab(tabParam);
       }
       return;
@@ -239,7 +242,12 @@ export default function SupabaseAdminPanel() {
     let cancelled = false;
     setIsLoading(true);
 
-    void loadAdminTabData(tab, appUser.isSuperAdmin, appUser.hasDbSuperAdmin)
+    void loadAdminTabData(
+      tab,
+      appUser.isSuperAdmin,
+      appUser.hasDbSuperAdmin,
+      appUser.isSuperAdmin ? null : adminCountryId,
+    )
       .then((result) => {
         if (cancelled) return;
         setData((current) => ({ ...current, ...result.data }));
@@ -253,6 +261,7 @@ export default function SupabaseAdminPanel() {
       cancelled = true;
     };
   }, [
+    adminCountryId,
     appUser.hasDbSuperAdmin,
     appUser.isReady,
     appUser.isSuperAdmin,
@@ -281,7 +290,7 @@ export default function SupabaseAdminPanel() {
   ];
   const visibleTabs = appUser.isSuperAdmin
     ? tabs
-    : tabs.filter((item) => item.id === "commissions" || item.id === "guarantee_fund");
+    : tabs.filter((item) => item.id === "commissions" || item.id === "guarantee_fund" || item.id === "companies");
   return (
     <AdminAccessGate>
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -309,6 +318,14 @@ export default function SupabaseAdminPanel() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {canAccessCommercialOffer(appUser.roles, appUser.isSuperAdmin) && (
+            <Link to={`/${lng ?? "fr"}/admin/commercial-offer`}>
+              <Button variant="outline" size="sm" className="gap-2">
+                <FileTextIcon className="w-4 h-4" />
+                {t("commercial_offer.nav_title", { defaultValue: "Offre commerciale" })}
+              </Button>
+            </Link>
+          )}
           {(appUser.isSuperAdmin || appUser.roles.includes("admin_pays")) && (
             <Link to={`/${lng ?? "fr"}/manual/admin-pays`}>
               <Button variant="outline" size="sm" className="gap-2">
@@ -455,6 +472,20 @@ export default function SupabaseAdminPanel() {
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-end items-center gap-1">
+                      {(appUser.isSuperAdmin || isAdminPays) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          asChild
+                        >
+                          <Link to={`/${lng ?? "fr"}/admin/company/${company.id}`}>
+                            <LayersIcon className="w-3.5 h-3.5 mr-1" />
+                            {t("feature_modules.configure", { defaultValue: "Modules" })}
+                          </Link>
+                        </Button>
+                      )}
                       {appUser.isSuperAdmin ? (
                         <Button
                           type="button"

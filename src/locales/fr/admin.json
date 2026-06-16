@@ -445,6 +445,14 @@
     "saved": "Modules mis à jour.",
     "load_error": "Modules indisponibles (migration SQL 120 requise).",
     "requires_a": "Le module A (billetterie) doit être activé en premier.",
-    "requires_a_badge": "Requiert A"
+    "requires_a_badge": "Requiert A",
+    "configure": "Modules"
+  },
+  "demarcheur": {
+    "title": "Espace démarcheur",
+    "subtitle": "Performance des compagnies recrutées et commissions recruteur.",
+    "period": "Période",
+    "companies_title": "Mes compagnies recrutées",
+    "no_companies": "Aucune compagnie ne vous est attribuée comme recruteur."
   }
 }

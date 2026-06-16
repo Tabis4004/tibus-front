@@ -55,6 +55,7 @@ function normalizeRoleForUi(role: string): string {
 const ROLE_PRIORITY = [
   "super_admin",
   "admin_pays",
+  "demarcheur",
   "master_independant",
   "master",
   "owner",

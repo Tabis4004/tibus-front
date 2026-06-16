@@ -445,6 +445,14 @@
     "saved": "Modules updated.",
     "load_error": "Modules unavailable (SQL migration 120 required).",
     "requires_a": "Module A (ticketing) must be enabled first.",
-    "requires_a_badge": "Requires A"
+    "requires_a_badge": "Requires A",
+    "configure": "Modules"
+  },
+  "demarcheur": {
+    "title": "Recruiter workspace",
+    "subtitle": "Performance of recruited companies and recruiter commissions.",
+    "period": "Period",
+    "companies_title": "My recruited companies",
+    "no_companies": "No company is assigned to you as recruiter."
   }
 }

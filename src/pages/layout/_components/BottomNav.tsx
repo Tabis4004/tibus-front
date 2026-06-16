@@ -1,7 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { NavLink, useParams } from "react-router-dom";
-import { HomeIcon, TicketIcon, LayoutDashboardIcon, ShieldIcon } from "lucide-react";
+import { HomeIcon, TicketIcon, LayoutDashboardIcon, ShieldIcon, TrendingUpIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { useTranslation } from "react-i18next";
 import { isSupabaseAuth } from "@/lib/auth/config";
@@ -44,9 +44,16 @@ export default function BottomNav() {
     ? appUser.hasSellerRole
     : dashboardRole === "seller";
 
+  const demarcheurLinks = [
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/admin/demarcheur`, icon: TrendingUpIcon, label: t("nav.demarcheur", { defaultValue: "Démarcheur" }) },
+  ];
+
   const links =
     dashboardRole === "owner"
       ? ownerLinks
+      : dashboardRole === "demarcheur"
+        ? demarcheurLinks
       : dashboardRole === "super_admin" ||
           dashboardRole === "admin_pays" ||
           dashboardRole === "superadmin"

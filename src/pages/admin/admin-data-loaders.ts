@@ -126,7 +126,7 @@ function joinedOne<T>(value: T | T[] | null | undefined): T | null {
 
 export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminDataKey[] {
   if (!isSuperAdmin) {
-    if (tab === "commissions") {
+    if (tab === "commissions" || tab === "companies") {
       return ["countries", "companies", "commissions", "platformCommissions", "commissionSettings"];
     }
     if (tab === "guarantee_fund") {
@@ -273,11 +273,17 @@ async function loadUsers(hasDbSuperAdmin: boolean): Promise<Pick<AdminDataSlice,
   }
 }
 
-async function loadCompanies(): Promise<Pick<AdminDataSlice, "companies">> {
-  const { data: rows, error } = await supabase
+async function loadCompanies(countryId?: string | null): Promise<Pick<AdminDataSlice, "companies">> {
+  let query = supabase
     .from("Companies")
     .select("id, name, countryId, isActive, commissionRate, managerName, recruitedByUserId, Countries(name, currency)")
     .order("createdAt", { ascending: false });
+
+  if (countryId) {
+    query = query.eq("countryId", countryId);
+  }
+
+  const { data: rows, error } = await query;
 
   if (error) throw error;
 
@@ -443,6 +449,7 @@ async function loadCommissions(): Promise<
 
 type LoaderContext = {
   hasDbSuperAdmin: boolean;
+  countryId?: string | null;
 };
 
 const LOADER_BY_KEY: Record<
@@ -451,7 +458,7 @@ const LOADER_BY_KEY: Record<
 > = {
   users: (context) => loadUsers(context.hasDbSuperAdmin),
   rolesByUser: (context) => loadUsers(context.hasDbSuperAdmin),
-  companies: () => loadCompanies(),
+  companies: (context) => loadCompanies(context.countryId),
   countries: () => loadCountries(),
   cities: () => loadCities(),
   roles: () => loadRoles(),
@@ -466,11 +473,12 @@ export async function loadAdminTabData(
   tab: AdminTabId,
   isSuperAdmin: boolean,
   hasDbSuperAdmin: boolean,
+  countryId?: string | null,
 ): Promise<{ data: Partial<AdminDataSlice>; errors: Partial<Record<AdminDataKey, string>> }> {
   const keys = [...new Set(adminTabDataKeys(tab, isSuperAdmin))];
   const data: Partial<AdminDataSlice> = {};
   const errors: Partial<Record<AdminDataKey, string>> = {};
-  const context: LoaderContext = { hasDbSuperAdmin };
+  const context: LoaderContext = { hasDbSuperAdmin, countryId };
 
   await Promise.all(
     keys.map(async (key) => {

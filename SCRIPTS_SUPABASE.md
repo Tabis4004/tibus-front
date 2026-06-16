@@ -396,3 +396,15 @@ npm run supabase:push
 **Frontend** : panneau admin sur fiche compagnie (`CompanyFeatureModulesPanel`), filtre console owner + sidebar, garde `/seller` (A) et `/verify/scan` (B).
 
 **Déploiement Vercel** : `npm run build` puis push branche (i18n `feature_modules`, `scaling_metrics`).
+
+## Lot 122 — Rôle démarcheur + dashboard
+
+```bash
+npm run supabase:push
+```
+
+| Fichier | Contenu |
+|---------|---------|
+| `122_demarcheur_role_dashboard.sql` | Rôle `demarcheur`, RPC `get_demarcheur_dashboard`, `is_demarcheur()` |
+
+Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commissions stakeholder recruteur.

@@ -27,6 +27,8 @@ import {
   CreateCompany,
   CompanyManual,
   CountryAdminManual,
+  CommercialOffer,
+  DemarcheurDashboard,
   SellerManual,
   CompleteProfileRedirect,
   UserProfile,
@@ -154,6 +156,8 @@ function AppShell() {
                 <Route path="admin/users/new" element={<AdminUserForm />} />
                 <Route path="admin/users/:userId/edit" element={<AdminUserForm />} />
                 <Route path="admin/guarantee-fund" element={<AdminGuaranteeFund />} />
+                <Route path="admin/commercial-offer" element={<CommercialOffer />} />
+                <Route path="admin/demarcheur" element={<DemarcheurDashboard />} />
                 <Route path="admin/company/:companyId" element={<AdminCompanyManager />} />
               </Route>
               <Route path="*" element={<NotFound />} />

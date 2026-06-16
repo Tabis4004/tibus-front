@@ -42,6 +42,7 @@ type CountryRow = { id: string; name: string };
 const ASSIGNABLE_ROLES = [
   "super_admin",
   "admin_pays",
+  "demarcheur",
   "master",
   "master_independant",
   "vendeur_master",
@@ -156,7 +157,10 @@ export default function AdminUserFormPage() {
     () => selectedRoles.some((r) => isCompanyScopedRole(r)),
     [selectedRoles],
   );
-  const needsCountry = useMemo(() => selectedRoles.includes("admin_pays"), [selectedRoles]);
+  const needsCountry = useMemo(
+    () => selectedRoles.includes("admin_pays") || selectedRoles.includes("demarcheur"),
+    [selectedRoles],
+  );
 
   const toggleRole = (roleName: string, checked: boolean) => {
     setSelectedRoles((prev) =>
