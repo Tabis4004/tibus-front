@@ -8,7 +8,9 @@
     "plans": "Plans",
     "commissions": "Commissions",
     "geography": "Countries & Cities",
-    "roles": "Roles & Permissions"
+    "roles": "Roles & Permissions",
+    "scaling_metrics": "Scaling metrics",
+    "investor_plan": "Investor plan"
   },
   "total_users": "Total Users",
   "owners": "Owners",
@@ -369,5 +371,60 @@
   "investor_plan.sections.roadmap": "36-month roadmap",
   "investor_plan.sections.advantages": "Competitive advantages",
   "investor_plan.sections.risks": "Risks & mitigations",
-  "scaling_metrics.investor_plan_hint": "The full business plan with ROI simulator is in the « Investor plan » tab (PDF, JSON and print)."
+  "scaling_metrics": {
+    "title": "Tibus infra metrics & tier",
+    "subtitle": "Supabase project {{project}} — estimated costs and TabiPay recommendations",
+    "load_error": "Could not load scaling metrics",
+    "migration_hint": "Apply SQL migration 118 (get_platform_scaling_metrics) on Supabase, then retry.",
+    "refresh": "Refresh",
+    "export_json": "Export JSON",
+    "export_pdf": "Print / PDF",
+    "export_json_done": "JSON export downloaded",
+    "current_tier": "Recommended tier",
+    "gauges_title": "Load vs current tier limits",
+    "grid_title": "Infra decision grid",
+    "grid_desc": "Indicative monthly costs (Vercel + Supabase Cloud + Edge Functions). Hetzner migration at high-traffic tier.",
+    "col": {
+      "scenario": "Scenario",
+      "sellers": "Sellers",
+      "reservations": "Bookings / day",
+      "connections": "Peak connections",
+      "reco": "Recommendation",
+      "cost": "Monthly cost"
+    },
+    "you_are_here": "You are here",
+    "canvas_export_title": "Documentation",
+    "stats": {
+      "sellers": "Active sellers",
+      "tickets_today": "Tickets today",
+      "avg_daily_30d": "Avg tickets / day (30d)",
+      "est_connections": "Est. peak connections",
+      "tickets_30d": "Tickets (30d)",
+      "db_size": "Database size"
+    },
+    "tiers": {
+      "demarrage": "Launch",
+      "croissance": "Growth",
+      "fort_trafic": "High traffic",
+      "national": "National",
+      "tres_haut_volume": "Very high volume"
+    },
+    "reco": {
+      "demarrage": "Supabase Free/Pro, Vercel Hobby/Pro. Monitor FedaPay webhooks and Supabase backups.",
+      "croissance": "Upgrade to Supabase Pro, enable PITR. Optimize counter RPCs and Reservations indexes.",
+      "fort_trafic": "Consider Supabase Team or self-hosted (Hetzner). Prepare staging + pg_dump.",
+      "national": "Self-hosted recommended: Hetzner Postgres + dedicated Edge Functions. Vercel load balancing.",
+      "tres_haut_volume": "Multi-region architecture, read replicas, asset CDN. Audit RLS and partner API rate limits."
+    },
+    "infra_title": "Tibus / TabiPay stack (today)",
+    "infra_desc": "Vercel (front) → Supabase Cloud (auth, PG, RLS, ~15 Edge Functions) → GeniusPay/FedaPay (TabisPay). Infra alerts appear in the superadmin header bell.",
+    "infra_items": {
+      "vercel": "React/Vite front on Vercel",
+      "supabase": "Auth + PostgreSQL + RLS + Edge Functions (payments, SMS, push)",
+      "tabispay": "TabisPay: webhooks, POS, partner API — critical under load",
+      "backup": "Verify Supabase snapshots (Pro plan) before high-traffic tier"
+    },
+    "checklist_title": "Migration checklist (JSON export)",
+    "investor_plan_hint": "The full business plan with ROI simulator is in the « Investor plan » tab (PDF, JSON and print)."
+  }
 }

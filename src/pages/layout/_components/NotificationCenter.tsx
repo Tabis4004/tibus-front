@@ -17,6 +17,8 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { usePushNotifications } from "@/hooks/use-push-notifications.ts";
 import { toast } from "sonner";
 import { isSupabaseAuth } from "@/lib/auth/config";
+import { useAppUser } from "@/hooks/use-app-user.ts";
+import SupabaseSuperAdminNotificationCenter from "./SupabaseSuperAdminNotificationCenter.tsx";
 
 const NOTIFICATION_ICONS: Record<string, typeof BellIcon> = {
   booking_confirmed: TicketIcon,
@@ -35,7 +37,12 @@ const NOTIFICATION_COLORS: Record<string, string> = {
 };
 
 export default function NotificationCenter() {
+  const appUser = useAppUser();
+
   if (isSupabaseAuth()) {
+    if (appUser.isReady && appUser.isSuperAdmin) {
+      return <SupabaseSuperAdminNotificationCenter />;
+    }
     return null;
   }
 

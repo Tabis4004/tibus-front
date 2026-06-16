@@ -1,5 +1,14 @@
 # Règles de réduction de contexte pour la migration Supabase
 
+## Trois projets — ne pas mélanger
+| Projet | Où | Migrations SQL tibus-front |
+|--------|-----|---------------------------|
+| **Tibus 1.0** | Supabase `kqudaqtydimjclwaihqr` · repo `tibus-front` | OUI — `./scripts/supabase-db-push.sh` |
+| **TabisPay** | Supabase `lxgzgkeibtqfuzpjizrv` (paiement séparé) | NON — pas de table Users |
+| **Gestabis/HBR** | Heroku + Hetzner · `hbr_frontend` + `code` | NON — pas Supabase |
+
+Avant toute migration : `./scripts/supabase-project-check.sh`. SQL Editor dashboard : vérifier le projet sélectionné en haut à gauche.
+
 ## Gestion du contexte (Token Saving)
 - NE TOUCHEZ PAS et ne lisez pas les dossiers volumineux comme .next, node_modules, build ou dist.
 - N'analysez pas les fichiers d'assets (.png, .svg, .css, .json comme package-lock.json) sauf demande explicite.

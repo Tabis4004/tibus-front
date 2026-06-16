@@ -9,7 +9,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "prettier-fix": "prettier --write .",
-    "prettier-check": "prettier --check ."
+    "prettier-check": "prettier --check .",
+    "supabase:check": "./scripts/supabase-project-check.sh",
+    "supabase:push": "./scripts/supabase-db-push.sh",
+    "supabase:link-tibus": "./scripts/supabase-link-tibus.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

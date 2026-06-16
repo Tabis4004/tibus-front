@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIcon,
+  CloudIcon,
+  CreditCardIcon,
   DownloadIcon,
+  HardDriveIcon,
   PrinterIcon,
   RefreshCwIcon,
   ShieldAlertIcon,
@@ -49,6 +52,15 @@ function downloadJson(filename: string, payload: unknown) {
   URL.revokeObjectURL(url);
 }
 
+function formatScalingLoadError(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message.trim()) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    const message = (err as { message: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
 type MetricGaugeProps = {
   label: string;
   value: number;
@@ -85,8 +97,7 @@ export default function PlatformScalingMetricsPanel() {
     void getPlatformScalingMetricsSupabase()
       .then(setMetrics)
       .catch((err) => {
-        const message = err instanceof Error ? err.message : t("scaling_metrics.load_error");
-        setError(message);
+        setError(formatScalingLoadError(err, t("scaling_metrics.load_error")));
         setMetrics(null);
       })
       .finally(() => setLoading(false));
@@ -275,6 +286,20 @@ export default function PlatformScalingMetricsPanel() {
         </CardContent>
       </Card>
 
+      <Card className="print:shadow-none print:border">
+        <CardHeader>
+          <CardTitle className="text-base">{t("scaling_metrics.infra_title")}</CardTitle>
+          <p className="text-xs text-muted-foreground">{t("scaling_metrics.infra_desc")}</p>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <InfraItem icon={CloudIcon} label={t("scaling_metrics.infra_items.vercel")} />
+          <InfraItem icon={ActivityIcon} label={t("scaling_metrics.infra_items.supabase")} />
+          <InfraItem icon={CreditCardIcon} label={t("scaling_metrics.infra_items.tabispay")} />
+          <InfraItem icon={HardDriveIcon} label={t("scaling_metrics.infra_items.backup")} />
+          <p className="text-xs text-muted-foreground pt-2">{t("scaling_metrics.checklist_title")}</p>
+        </CardContent>
+      </Card>
+
       <Card className="print:hidden">
         <CardHeader>
           <CardTitle className="text-base">{t("scaling_metrics.canvas_export_title")}</CardTitle>
@@ -302,6 +327,21 @@ function StatTile({
       <p className="text-xl font-bold tabular-nums mt-1">
         {raw ? value : typeof value === "number" ? value.toLocaleString() : value}
       </p>
+    </div>
+  );
+}
+
+function InfraItem({
+  icon: Icon,
+  label,
+}: {
+  icon: typeof CloudIcon;
+  label: string;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+      <span>{label}</span>
     </div>
   );
 }

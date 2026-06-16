@@ -1,0 +1,25 @@
+{
+  "repo": "tibus-front",
+  "description": "Ce dépôt ne migre QUE le projet Tibus 1.0. TabisPay et Gestabis sont des projets séparés.",
+  "target": {
+    "name": "Tibus 1.0",
+    "ref": "kqudaqtydimjclwaihqr",
+    "url": "https://kqudaqtydimjclwaihqr.supabase.co"
+  },
+  "forbidden": [
+    {
+      "name": "TabisPay",
+      "ref": "lxgzgkeibtqfuzpjizrv",
+      "reason": "Projet paiement séparé — pas de tables Users/ReservationBus. Erreur typique : relation \"Users\" does not exist."
+    }
+  ],
+  "otherProjects": [
+    {
+      "name": "Gestabis / HBR",
+      "stack": "Vercel + Heroku (hbr) + PostgreSQL Hetzner",
+      "repo": "hbr_frontend + code",
+      "note": "Pas Supabase — ne pas coller les migrations SQL de tibus-front."
+    }
+  ],
+  "preflightTables": ["Users", "ReservationBus", "Companies"]
+}
