@@ -426,5 +426,25 @@
     },
     "checklist_title": "Migration checklist (JSON export)",
     "investor_plan_hint": "The full business plan with ROI simulator is in the « Investor plan » tab (PDF, JSON and print)."
+  },
+  "commercial_offer": {
+    "nav_title": "Commercial offer",
+    "title": "Tibus commercial offer template",
+    "subtitle": "Cover letter, technical offer and financial offer — carrier outreach",
+    "card_title": "Word document (3 pages)",
+    "desc": "Template to customize before sending to prospects: cover letter, technical module grid A–F, and financial grid.",
+    "includes_letter": "Page 1 — Cover letter",
+    "includes_technical": "Page 2 — Technical offer (modules and architecture)",
+    "includes_financial": "Page 3 — Financial offer (amounts to complete)",
+    "download": "Download template (.docx)",
+    "restricted": "Restricted to super_admin and admin_pays roles."
+  },
+  "feature_modules": {
+    "title": "Commercial modules",
+    "desc": "Enable Tibus commercial blocks A–F for this company. Modules B, C and E require module A.",
+    "saved": "Modules updated.",
+    "load_error": "Modules unavailable (SQL migration 120 required).",
+    "requires_a": "Module A (ticketing) must be enabled first.",
+    "requires_a_badge": "Requires A"
   }
 }

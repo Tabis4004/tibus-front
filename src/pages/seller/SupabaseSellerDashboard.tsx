@@ -71,6 +71,7 @@ import CompanyLoyaltyUserLookup, {
   type SelectedLoyaltyUser,
 } from "@/components/CompanyLoyaltyUserLookup.tsx";
 import { hasSellerManualAccess } from "@/lib/seller-manual-access.ts";
+import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
 
 type SalePassengerDraft = {
   passengerName: string;
@@ -641,6 +642,9 @@ export default function SupabaseSellerDashboard() {
   const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(null);
   const [colisModuleEnabled, setColisModuleEnabled] = useState(false);
   const companyName = profile?.company?.name ?? companyReceiptInfo?.name ?? "Tibus";
+  const sellerCompanyId = profile?.company?.id ?? null;
+  const { hasModule: hasFeatureModule, isLoading: featureModulesLoading } =
+    useCompanyFeatureModules(sellerCompanyId);
   const { onReprint, reprintView, isReprinting } = useCompanyTicketReprint(
     profile?.company?.id ?? "",
     companyName,
@@ -681,7 +685,7 @@ export default function SupabaseSellerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUserId]);
 
-  if (appUser.isLoading || profile === undefined || trips === undefined) {
+  if (appUser.isLoading || profile === undefined || trips === undefined || featureModulesLoading) {
     return (
       <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, index) => (
@@ -697,6 +701,18 @@ export default function SupabaseSellerDashboard() {
         <TicketIcon className="w-10 h-10 mx-auto opacity-30" />
         <p className="font-medium">Acces vendeur refuse</p>
         <p className="text-sm">Votre compte n'a pas de role vendeur sur une compagnie.</p>
+      </div>
+    );
+  }
+
+  if (sellerCompanyId && !hasFeatureModule("A")) {
+    return (
+      <div className="rounded-xl border p-8 text-center text-muted-foreground space-y-2">
+        <TicketIcon className="w-10 h-10 mx-auto opacity-30" />
+        <p className="font-medium">Billetterie guichet désactivée</p>
+        <p className="text-sm">
+          Le module A (billetterie) n'est pas activé pour votre compagnie. Contactez l'administration Tibus.
+        </p>
       </div>
     );
   }

@@ -501,5 +501,6 @@
   "income_statement.operating_result": "Operating result",
   "income_statement.financial_result": "Financial result",
   "income_statement.net_result": "Net result",
-  "income_statement.load_error": "Could not load income statement"
+  "income_statement.load_error": "Could not load income statement",
+  "feature_modules.disabled": "This module is not enabled for your company."
 }

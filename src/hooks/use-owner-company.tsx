@@ -15,6 +15,8 @@ import {
   setOwnerActiveCompanySupabase,
   type OwnerCompanyOption,
 } from "@/lib/supabase/owner-company";
+import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
+import type { CompanyFeatureModules } from "@/lib/company-feature-modules.ts";
 
 export const OWNER_COMPANY_REFRESH_EVENT = "tibus:owner-company-refresh";
 
@@ -27,6 +29,8 @@ type OwnerCompanyContextValue = {
   selectedCompanyId: string | null;
   selectedCompany: OwnerCompanyOption | null;
   companyId: string | null;
+  featureModules: CompanyFeatureModules | null;
+  featureModulesLoading: boolean;
   isReady: boolean;
   isLoading: boolean;
   setSelectedCompanyId: (companyId: string) => Promise<void>;
@@ -134,12 +138,19 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
     [companies, selectedCompanyId],
   );
 
+  const {
+    modules: featureModules,
+    isLoading: featureModulesLoading,
+  } = useCompanyFeatureModules(selectedCompanyId);
+
   const value = useMemo<OwnerCompanyContextValue>(
     () => ({
       companies,
       selectedCompanyId,
       selectedCompany,
       companyId: selectedCompanyId,
+      featureModules,
+      featureModulesLoading,
       isReady,
       isLoading,
       setSelectedCompanyId,
@@ -149,6 +160,8 @@ export function OwnerCompanyProvider({ children }: { children: ReactNode }) {
       companies,
       selectedCompanyId,
       selectedCompany,
+      featureModules,
+      featureModulesLoading,
       isReady,
       isLoading,
       setSelectedCompanyId,
@@ -167,4 +180,8 @@ export function useOwnerCompany() {
     throw new Error("useOwnerCompany must be used within OwnerCompanyProvider");
   }
   return ctx;
+}
+
+export function useOwnerCompanyOptional() {
+  return useContext(OwnerCompanyContext);
 }

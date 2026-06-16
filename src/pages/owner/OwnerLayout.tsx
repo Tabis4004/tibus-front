@@ -35,7 +35,8 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAppUser } from "@/hooks/use-app-user.ts";
-import { canAccessGuaranteeFund } from "@/lib/owner-console-modules.tsx";
+import type { CompanyFeatureModules } from "@/lib/company-feature-modules.ts";
+import { canAccessGuaranteeFund, isOwnerNavPathEnabled } from "@/lib/owner-console-modules.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getMyCompanySupabase, type OwnerCompany } from "@/lib/supabase/owner-company";
 import { OwnerCompanyProvider, useOwnerCompany } from "@/hooks/use-owner-company.tsx";
@@ -204,7 +205,7 @@ function ConvexSidebarContent({ onClose }: { onClose?: () => void }) {
 function SupabaseSidebarContent({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
-  const { selectedCompany, isLoading } = useOwnerCompany();
+  const { selectedCompany, isLoading, featureModules } = useOwnerCompany();
   const appUser = useAppUser();
 
   return (
@@ -238,6 +239,7 @@ function SupabaseSidebarContent({ onClose }: { onClose?: () => void }) {
         t={t}
         roles={appUser.roles}
         isSuperAdmin={appUser.isSuperAdmin}
+        featureModules={featureModules}
       />
     </div>
   );
@@ -249,12 +251,14 @@ function OwnerSidebarNav({
   t,
   roles,
   isSuperAdmin,
+  featureModules,
 }: {
   onClose?: () => void;
   lng?: string;
   t: (key: string, options?: Record<string, string>) => string;
   roles?: string[];
   isSuperAdmin?: boolean;
+  featureModules?: CompanyFeatureModules | null;
 }) {
   const canSeeGuaranteeFund =
     roles && isSuperAdmin !== undefined
@@ -270,6 +274,7 @@ function OwnerSidebarNav({
           if (item.toSuffix === "/manual/compagnie") {
             return Boolean(isSuperAdmin || roles?.includes("owner"));
           }
+          if (!isOwnerNavPathEnabled(item.toSuffix, featureModules)) return false;
           return true;
         });
         if (items.length === 0) return null;

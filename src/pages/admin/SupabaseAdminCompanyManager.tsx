@@ -28,16 +28,19 @@ import { supabase } from "@/lib/supabase";
 import { updateCompanyRecruitedBySupabase } from "@/lib/supabase/accounting.ts";
 import { listPlatformUsersForAdminSupabase, type PlatformAdminUserRow } from "@/lib/supabase/admin-users.ts";
 import { useAppUser } from "@/hooks/use-app-user";
+import { canManageCompanyFeatureModules } from "@/lib/auth/commercial-offer-access.ts";
 import { enterSuperAdminOwnerCompanyContext } from "@/lib/supabase/owner-company.ts";
 import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminAuditHub from "./_components/AdminAuditHub.tsx";
+import CompanyFeatureModulesPanel from "./_components/CompanyFeatureModulesPanel.tsx";
 
 type CompanyOverview = {
   id: string;
   name: string;
   managerName: string | null;
   isActive: boolean;
+  countryId: string | null;
   countryName: string | null;
   recruitedByUserId: string | null;
   recruitedByName: string | null;
@@ -50,7 +53,9 @@ export default function SupabaseAdminCompanyManager() {
   const { lng, companyId } = useParams<{ lng: string; companyId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("common");
-  const { isSuperAdmin, isReady, profile } = useAppUser();
+  const { isSuperAdmin, isReady, profile, roles } = useAppUser();
+  const canManageModules = canManageCompanyFeatureModules(roles, isSuperAdmin);
+  const canAccessCompanyAdmin = isSuperAdmin || canManageModules;
   const [company, setCompany] = useState<CompanyOverview | null | undefined>(undefined);
   const [recruiterOptions, setRecruiterOptions] = useState<{ id: string; label: string }[]>([]);
   const [recruiterDraft, setRecruiterDraft] = useState<string>("__none");
@@ -58,10 +63,10 @@ export default function SupabaseAdminCompanyManager() {
   const [openingOwnerConsole, setOpeningOwnerConsole] = useState(false);
 
   useEffect(() => {
-    if (isReady && !isSuperAdmin) {
+    if (isReady && !canAccessCompanyAdmin) {
       navigate(`/${lng ?? "fr"}`, { replace: true });
     }
-  }, [isReady, isSuperAdmin, lng, navigate]);
+  }, [isReady, canAccessCompanyAdmin, lng, navigate]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -70,7 +75,7 @@ export default function SupabaseAdminCompanyManager() {
     void (async () => {
       const { data: row, error } = await supabase
         .from("Companies")
-        .select("id, name, managerName, isActive, recruitedByUserId, Countries(name), recruitedBy:Users!Companies_recruitedByUserId_fkey(firstName, lastName, email)")
+        .select("id, name, managerName, isActive, countryId, recruitedByUserId, Countries(name), recruitedBy:Users!Companies_recruitedByUserId_fkey(firstName, lastName, email)")
         .eq("id", companyId)
         .maybeSingle();
 
@@ -80,6 +85,7 @@ export default function SupabaseAdminCompanyManager() {
       }
 
       const country = Array.isArray(row.Countries) ? row.Countries[0] : row.Countries;
+      const countryId = (row.countryId as string | null) ?? null;
       const recruitedBy = Array.isArray(row.recruitedBy) ? row.recruitedBy[0] : row.recruitedBy;
       const recruitedByUserId = (row.recruitedByUserId as string | null) ?? null;
       const recruitedByName = recruitedBy
@@ -104,11 +110,23 @@ export default function SupabaseAdminCompanyManager() {
       }).length;
 
       if (!cancelled) {
+        if (
+          !isSuperAdmin &&
+          canManageModules &&
+          profile?.countryId &&
+          countryId &&
+          profile.countryId !== countryId
+        ) {
+          setCompany(null);
+          return;
+        }
+
         setCompany({
           id: row.id as string,
           name: row.name as string,
           managerName: (row.managerName as string | null) ?? null,
           isActive: Boolean(row.isActive),
+          countryId,
           countryName: (country as { name?: string } | null)?.name ?? null,
           recruitedByUserId,
           recruitedByName: recruitedByName ?? null,
@@ -125,7 +143,7 @@ export default function SupabaseAdminCompanyManager() {
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, [companyId, isSuperAdmin, canManageModules, profile?.countryId]);
 
   useEffect(() => {
     void listPlatformUsersForAdminSupabase(500)
@@ -207,7 +225,7 @@ export default function SupabaseAdminCompanyManager() {
   }
 
   return (
-    <AdminAccessGate requireSuperAdmin>
+    <AdminAccessGate>
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
@@ -266,6 +284,9 @@ export default function SupabaseAdminCompanyManager() {
         </Card>
       </div>
 
+      <CompanyFeatureModulesPanel companyId={company.id} readOnly={!canManageModules} />
+
+      {isSuperAdmin ? (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -302,6 +323,7 @@ export default function SupabaseAdminCompanyManager() {
           </Button>
         </CardContent>
       </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

@@ -367,3 +367,32 @@ supabase db query --linked -f supabase/migrations/094_expense_categories_all_com
 
 - Seed automatique pour **toutes les compagnies existantes** (`seed_all_companies_expense_categories`).
 - Trigger `companies_seed_expense_categories` : chaque **nouvelle compagnie** reçoit les 11 types à l'inscription.
+
+## Lot 118–119 — Métriques scaling & notifications super_admin
+
+```bash
+npm run supabase:push
+# ou : supabase db push (projet Tibus kqudaqtydimjclwaihqr uniquement)
+```
+
+| Fichier | Contenu |
+|---------|---------|
+| `118_platform_scaling_superadmin_notifications.sql` | Tables `PlatformScalingState`, `PlatformSuperAdminNotifications`, RPC métriques + sync notifications |
+| `119_fix_platform_scaling_metrics.sql` | Correctif `upcomingTrips7d` (colonne `Reservations.date`) |
+
+## Lot 120–121 — Modules commerciaux A–F par compagnie
+
+Voir aussi `docs/COMPANY_FEATURE_MODULES.md`.
+
+```bash
+npm run supabase:push
+```
+
+| Fichier | Contenu |
+|---------|---------|
+| `120_company_feature_modules.sql` | Table `CompanyFeatureModules`, RLS, RPC `company_has_module`, `get/set_company_feature_modules`, backfill A–E=true |
+| `121_company_feature_module_guards.sql` | Garde RPC/triggers : guichet (A), scan (B), compta (C), colis (D), promo (E) |
+
+**Frontend** : panneau admin sur fiche compagnie (`CompanyFeatureModulesPanel`), filtre console owner + sidebar, garde `/seller` (A) et `/verify/scan` (B).
+
+**Déploiement Vercel** : `npm run build` puis push branche (i18n `feature_modules`, `scaling_metrics`).

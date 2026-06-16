@@ -22,6 +22,11 @@ import {
   PlugIcon,
   UsersIcon,
 } from "lucide-react";
+import {
+  companyModuleEnabled,
+  type CompanyFeatureModules,
+} from "@/lib/company-feature-modules.ts";
+import { OWNER_CONSOLE_MODULE_FEATURE, OWNER_NAV_SUFFIX_FEATURE } from "@/lib/company-feature-module-map.ts";
 
 export const GUARANTEE_FUND_ACCESS_ROLES = [
   "owner",
@@ -358,14 +363,39 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
 export function filterOwnerConsoleModules(
   roles: string[],
   isSuperAdmin: boolean,
+  featureModules?: CompanyFeatureModules | null,
 ): OwnerConsoleModule[] {
   return OWNER_CONSOLE_MODULES.filter((module) => {
     if (module.adminOnly) return isSuperAdmin;
     if (module.roles && module.roles.length > 0) {
-      return module.roles.some((role) => roles.includes(role));
+      if (!module.roles.some((role) => roles.includes(role))) return false;
+    } else if (
+      !roles.includes("owner") &&
+      !roles.includes("comptable_compagnie") &&
+      !isSuperAdmin
+    ) {
+      return false;
     }
-    return roles.includes("owner") || roles.includes("comptable_compagnie") || isSuperAdmin;
+
+    if (featureModules) {
+      const commercialModule = OWNER_CONSOLE_MODULE_FEATURE[module.id];
+      if (commercialModule && !companyModuleEnabled(featureModules, commercialModule)) {
+        return false;
+      }
+    }
+
+    return true;
   });
+}
+
+export function isOwnerNavPathEnabled(
+  toSuffix: string,
+  featureModules?: CompanyFeatureModules | null,
+): boolean {
+  if (!featureModules) return true;
+  const commercialModule = OWNER_NAV_SUFFIX_FEATURE[toSuffix];
+  if (!commercialModule) return true;
+  return companyModuleEnabled(featureModules, commercialModule);
 }
 
 export function groupOwnerConsoleModules(

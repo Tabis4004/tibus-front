@@ -501,5 +501,6 @@
   "income_statement.operating_result": "Résultat d'exploitation",
   "income_statement.financial_result": "Résultat financier",
   "income_statement.net_result": "Résultat net",
-  "income_statement.load_error": "Impossible de charger le compte de résultat"
+  "income_statement.load_error": "Impossible de charger le compte de résultat",
+  "feature_modules.disabled": "Ce module n'est pas activé pour votre compagnie."
 }

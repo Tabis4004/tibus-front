@@ -15,8 +15,10 @@ import {
   canAccessGuaranteeFund,
   filterOwnerConsoleModules,
   groupOwnerConsoleModules,
+  isOwnerNavPathEnabled,
   type OwnerConsoleModule,
 } from "@/lib/owner-console-modules.tsx";
+import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import type { OwnerCompany } from "@/lib/supabase/owner-company";
 import GuaranteeFundOverviewCard from "./GuaranteeFundOverviewCard.tsx";
 
@@ -157,8 +159,13 @@ export default function OwnerConsoleModules({ company }: Props) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const appUser = useAppUser();
+  const { featureModules } = useOwnerCompany();
 
-  const modules = filterOwnerConsoleModules(appUser.roles, appUser.isSuperAdmin);
+  const modules = filterOwnerConsoleModules(
+    appUser.roles,
+    appUser.isSuperAdmin,
+    featureModules,
+  );
   const sections = groupOwnerConsoleModules(modules);
   const showGuaranteeFund = canAccessGuaranteeFund(appUser.roles, appUser.isSuperAdmin);
 

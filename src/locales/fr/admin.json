@@ -426,5 +426,25 @@
     },
     "checklist_title": "Checklist migration (export JSON)",
     "investor_plan_hint": "Le plan d'affaires complet avec simulateur ROI est disponible dans l'onglet « Plan investisseur » (PDF, JSON et impression)."
+  },
+  "commercial_offer": {
+    "nav_title": "Offre commerciale",
+    "title": "Modèle d'offre commerciale Tibus",
+    "subtitle": "Lettre, offre technique et offre financière — démarchage compagnies",
+    "card_title": "Document Word (3 pages)",
+    "desc": "Modèle à personnaliser avant envoi au prospect : lettre commerciale, grille technique des modules A–F et grille financière.",
+    "includes_letter": "Page 1 — Lettre commerciale",
+    "includes_technical": "Page 2 — Offre technique (modules et architecture)",
+    "includes_financial": "Page 3 — Offre financière (montants à compléter)",
+    "download": "Télécharger le modèle (.docx)",
+    "restricted": "Accès réservé aux rôles super_admin et admin_pays."
+  },
+  "feature_modules": {
+    "title": "Modules commerciaux",
+    "desc": "Activez les blocs A–F de l'offre commerciale Tibus pour cette compagnie. Les prérequis B, C et E imposent le module A.",
+    "saved": "Modules mis à jour.",
+    "load_error": "Modules indisponibles (migration SQL 120 requise).",
+    "requires_a": "Le module A (billetterie) doit être activé en premier.",
+    "requires_a_badge": "Requiert A"
   }
 }
