@@ -4,6 +4,8 @@ import {
   getOccupiedSeatsSupabase,
   type TripDetailResult,
 } from "@/lib/supabase/trip-detail";
+import { getLocalOccupiedSeats } from "@/lib/offline/counter-sale-offline.ts";
+import { subscribeNetworkStatus } from "@/lib/offline/network.ts";
 
 export function useSupabaseTripDetail(reservationId: string | undefined) {
   const [data, setData] = useState<TripDetailResult | null | undefined>(
@@ -46,18 +48,30 @@ export function useSupabaseOccupiedSeats(reservationId: string | undefined) {
     }
 
     let cancelled = false;
-    setData(undefined);
 
-    void getOccupiedSeatsSupabase(reservationId)
-      .then((seats) => {
-        if (!cancelled) setData(seats);
-      })
-      .catch(() => {
-        if (!cancelled) setData([]);
-      });
+    const load = async () => {
+      setData(undefined);
+      const localSeats = await getLocalOccupiedSeats(reservationId);
+      try {
+        const remoteSeats = await getOccupiedSeatsSupabase(reservationId);
+        if (!cancelled) {
+          setData(Array.from(new Set([...remoteSeats, ...localSeats])));
+        }
+      } catch {
+        if (!cancelled) {
+          setData(localSeats);
+        }
+      }
+    };
+
+    void load();
+    const unsubscribe = subscribeNetworkStatus(() => {
+      void load();
+    });
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [reservationId]);
 

@@ -33,7 +33,6 @@ import {
   getSellerProfileSupabase,
   getSellerCompanyReceiptInfoSupabase,
   listSellerTripsSupabase,
-  sellCounterTicketSupabase,
   type CounterSaleTicket,
   type SellerCompanyReceiptInfo,
   type SellerCounterTrip,
@@ -72,6 +71,14 @@ import CompanyLoyaltyUserLookup, {
 } from "@/components/CompanyLoyaltyUserLookup.tsx";
 import { hasSellerManualAccess } from "@/lib/seller-manual-access.ts";
 import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
+import OfflineStatusBanner from "@/components/OfflineStatusBanner.tsx";
+import { useOfflineSync } from "@/hooks/use-offline-sync.tsx";
+import { isBrowserOnline } from "@/lib/offline/network.ts";
+import {
+  cacheSellerTripsOffline,
+  listCachedSellerTrips,
+  sellCounterTicketWithOffline,
+} from "@/lib/offline/counter-sale-offline.ts";
 
 type SalePassengerDraft = {
   passengerName: string;
@@ -134,6 +141,7 @@ function SaleForm({
   const { t } = useTranslation("seller");
   const { lng } = useParams<{ lng: string }>();
   const occupiedSeats = useSupabaseOccupiedSeats(trip._id);
+  const { refreshPendingCount } = useOfflineSync();
   const isDirectSale = profile.canSellDirect;
   const maxPassengers = Math.max(1, Math.min(trip.seatsAvailable, trip.totalSeats || trip.seatsAvailable));
   const [passengerCount, setPassengerCount] = useState(1);
@@ -183,7 +191,7 @@ function SaleForm({
         setCashPendingReversal(Boolean(cash.pendingReversal));
       })
       .catch(() => {
-        if (!cancelled) setCashOpen(false);
+        if (!cancelled) setCashOpen(isBrowserOnline() ? false : null);
       });
 
     return () => {
@@ -301,6 +309,11 @@ function SaleForm({
       return;
     }
 
+    if (!isDirectSale && !isBrowserOnline()) {
+      toast.error("Les réservations en ligne nécessitent une connexion internet");
+      return;
+    }
+
     if (!isDirectSale && !passengerPhone.trim()) {
       toast.error("Téléphone requis pour le paiement en ligne");
       return;
@@ -316,12 +329,12 @@ function SaleForm({
       return;
     }
 
-    if (isDirectSale && cashOpen === false) {
+    if (isDirectSale && cashOpen === false && isBrowserOnline()) {
       toast.error("Ouvrez votre caisse avant toute vente guichet (onglet Guichet → Session caisse journalière)");
       return;
     }
 
-    if (isDirectSale && cashPendingReversal) {
+    if (isDirectSale && cashPendingReversal && isBrowserOnline()) {
       toast.error("Vente bloquée : un reversement est en attente de validation comptable");
       return;
     }
@@ -360,8 +373,10 @@ function SaleForm({
 
       const tickets: CounterSaleTicket[] = [];
       for (const traveler of normalized) {
-        const ticket = await sellCounterTicketSupabase({
+        const ticket = await sellCounterTicketWithOffline({
+          sellerUserId: profile.user.id,
           reservationId: trip._id,
+          trip,
           traveler: {
             passengerName: traveler.passengerName,
             passengerPhone: traveler.passengerPhone || undefined,
@@ -374,7 +389,15 @@ function SaleForm({
         tickets.push(ticket);
       }
 
-      toast.success(`${tickets.length} ticket(s) vendu(s)`);
+      const offlineCount = tickets.filter((ticket) => ticket.bookingId.startsWith("offline:")).length;
+      if (offlineCount > 0) {
+        toast.success(
+          `${tickets.length} ticket(s) enregistré(s) localement — synchronisation à la reconnexion`,
+        );
+        void refreshPendingCount();
+      } else {
+        toast.success(`${tickets.length} ticket(s) vendu(s)`);
+      }
       onSold(tickets);
     } catch (err) {
       toast.error(supabaseErrorMessage(err, "Vente impossible"));
@@ -385,6 +408,7 @@ function SaleForm({
 
   return (
     <div className="space-y-4">
+      <OfflineStatusBanner />
       <button
         type="button"
         onClick={onBack}
@@ -671,9 +695,22 @@ export default function SupabaseSellerDashboard() {
           : Promise.resolve(null),
       ]);
       setTrips(nextTrips);
+      await cacheSellerTripsOffline(appUserId, nextTrips);
       setColisModuleEnabled(Boolean(colisSettings?.colisAutonomeEnabled));
       setCompanyReceiptInfo(receiptInfo);
     } catch (err) {
+      try {
+        const cachedTrips = await listCachedSellerTrips(appUserId);
+        if (cachedTrips.length > 0) {
+          const nextProfile = await getSellerProfileSupabase(appUserId).catch(() => null);
+          if (nextProfile) setProfile(nextProfile);
+          setTrips(cachedTrips);
+          toast.message("Départs chargés depuis le cache local");
+          return;
+        }
+      } catch {
+        // ignore cache fallback errors
+      }
       toast.error(supabaseErrorMessage(err, "Chargement vendeur impossible"));
       setProfile(null);
       setTrips([]);
@@ -811,6 +848,7 @@ export default function SupabaseSellerDashboard() {
 
   const counterContent = (
     <div className="space-y-4">
+      <OfflineStatusBanner />
       <div data-tour="seller-header" className="flex items-center justify-between gap-2">
         <p className="text-sm font-bold">Espace guichet</p>
         <div className="flex items-center gap-2">

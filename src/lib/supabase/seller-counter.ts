@@ -183,9 +183,10 @@ export async function listSellerTripsSupabase(
 export async function sellCounterTicketSupabase(input: {
   reservationId: string;
   traveler: CounterTravelerInput;
+  clientMutationId?: string;
 }): Promise<CounterSaleTicket> {
   const traveler = input.traveler;
-  const { data, error } = await supabase.rpc("seller_counter_sale", {
+  const rpcPayload = {
     p_reservation_id: input.reservationId,
     p_passenger_name: traveler.passengerName.trim(),
     p_passenger_phone: traveler.passengerPhone?.trim() || null,
@@ -193,7 +194,41 @@ export async function sellCounterTicketSupabase(input: {
     p_parcel_count: traveler.parcelCount ?? 0,
     p_parcel_weight: traveler.parcelWeight ?? 0,
     p_parcel_amount: traveler.parcelAmount ?? 0,
-  });
+  };
+
+  if (input.clientMutationId) {
+    const { data, error } = await supabase.rpc("seller_counter_sale_idempotent", {
+      p_client_mutation_id: input.clientMutationId,
+      ...rpcPayload,
+    });
+
+    if (!error && data) {
+      const row = typeof data === "string" ? JSON.parse(data) : data;
+      const payload = row as Record<string, unknown>;
+      return {
+        bookingId: String(payload.booking_id),
+        reference: String(payload.reference),
+        verifyToken: (payload.verify_token as string | null) ?? null,
+        totalPrice: Number(payload.total_price),
+        currency: String(payload.currency),
+        passengerName: traveler.passengerName.trim(),
+        passengerPhone: traveler.passengerPhone?.trim() || undefined,
+        seatNumber: traveler.seatNumber?.trim() || undefined,
+        parcelCount: traveler.parcelCount ?? 0,
+        parcelWeight: traveler.parcelWeight ?? 0,
+        parcelAmount: traveler.parcelAmount ?? 0,
+      };
+    }
+
+    const missingIdempotentRpc =
+      error &&
+      /seller_counter_sale_idempotent|could not find the function|PGRST202/i.test(error.message);
+    if (!missingIdempotentRpc) {
+      throwSupabaseError(error, "Vente guichet impossible");
+    }
+  }
+
+  const { data, error } = await supabase.rpc("seller_counter_sale", rpcPayload);
 
   if (error) throwSupabaseError(error, "Vente guichet impossible");
 

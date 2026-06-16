@@ -7,17 +7,20 @@ import { SupabaseAuthProvider } from "./supabase-auth.tsx";
 import { ThemeProvider } from "./theme.tsx";
 import { Toaster } from "../ui/sonner.tsx";
 import { TooltipProvider } from "../ui/tooltip.tsx";
+import { OfflineSyncProvider } from "@/hooks/use-offline-sync.tsx";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ConvexProvider>
       <QueryClientProvider>
-        <TooltipProvider>
-          <ThemeProvider>
-            <Toaster />
-            {children}
-          </ThemeProvider>
-        </TooltipProvider>
+        <OfflineSyncProvider>
+          <TooltipProvider>
+            <ThemeProvider>
+              <Toaster />
+              {children}
+            </ThemeProvider>
+          </TooltipProvider>
+        </OfflineSyncProvider>
       </QueryClientProvider>
     </ConvexProvider>
   );
