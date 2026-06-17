@@ -17,6 +17,7 @@ export function useCompanyTicketReprint(companyId: string, companyName: string) 
   const [companyInfo, setCompanyInfo] = useState<SellerCompanyReceiptInfo | null>(null);
 
   useEffect(() => {
+    if (!companyId?.trim()) return;
     let cancelled = false;
     void getSellerCompanyReceiptInfoSupabase(companyId)
       .then((info) => {

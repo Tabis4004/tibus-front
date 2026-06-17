@@ -51,11 +51,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Colis introuvable" }, 404);
     }
 
-    const { data: companyRow } = await admin
+    const { data: companyRow, error: companyError } = await admin
       .from("Companies")
-      .select("Countries(name)")
+      .select("countryId, Countries(name)")
       .eq("id", colis.company_id as string)
       .maybeSingle();
+
+    if (companyError) {
+      console.error("[colis-sms] company lookup failed", companyError);
+    }
 
     const countryName = String(
       (companyRow?.Countries as { name?: string } | null)?.name ?? "",
@@ -81,10 +85,25 @@ Deno.serve(async (req) => {
     });
 
     if (!allowed) {
+      console.error("[colis-sms] forbidden", { appUserId, companyId: colis.company_id });
       return jsonResponse({ error: "Droits insuffisants" }, 403);
     }
 
     const uniquePhones = [...new Set(phones)];
+
+    const atUsername = Deno.env.get("AT_USERNAME")?.trim();
+    if (!atUsername || !Deno.env.get("AT_API_KEY")?.trim()) {
+      console.error("[colis-sms] missing AT secrets");
+      return jsonResponse({ error: "Configuration SMS Africa's Talking manquante (AT_USERNAME / AT_API_KEY)" }, 500);
+    }
+
+    console.info("[colis-sms] send", {
+      colisId,
+      statut: body.statut,
+      phones: uniquePhones.length,
+      atUser: atUsername,
+    });
+
     const deliveryResults: Array<{ phone: string; ok: boolean; error?: string }> = [];
 
     for (const rawPhone of uniquePhones) {

@@ -95,6 +95,7 @@ async function maybeSendColisSms(
   sms: ColisSmsPayload,
 ) {
   if (!sms.send || !sms.message) {
+    console.info("[colis-sms-skipped]", { statut, skipReason: sms.skipReason, send: sms.send });
     if (sms.skipReason === "admin_gate") {
       toast.message(
         "SMS non envoyé — l'administrateur Tibus doit activer « Configuration SMS colis » pour votre compagnie.",
@@ -119,7 +120,9 @@ async function maybeSendColisSms(
       toast.success(`SMS envoyé à ${result.sent} numéro(s)`);
     }
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : "Échec envoi SMS colis");
+    const message = err instanceof Error ? err.message : "Échec envoi SMS colis";
+    console.error("[colis-sms-client]", message, err);
+    toast.error(message, { duration: 12000 });
   }
 }
 
@@ -198,6 +201,29 @@ export default function ColisAutonomesPage({
     if (cashGareId) setGareDepartId(cashGareId);
     else setGareDepartId("");
     setGareDestinationId("");
+  };
+
+  const refreshListSilently = async (cid = companyId) => {
+    if (!cid) return;
+    try {
+      const nextRows = await listColisAutonomesSupabase(cid);
+      setRows(nextRows);
+    } catch {
+      // liste rafraîchie au prochain chargement complet
+    }
+  };
+
+  const notifyCashRefresh = () => {
+    window.dispatchEvent(new CustomEvent("tibus:station-cash-refresh"));
+  };
+
+  const closeReceipt = (options?: { newShipment?: boolean }) => {
+    setReceiptDetail(null);
+    void refreshListSilently();
+    notifyCashRefresh();
+    if (options?.newShipment) {
+      resetExpeditionForm();
+    }
   };
 
   const load = async () => {
@@ -342,13 +368,14 @@ export default function ColisAutonomesPage({
         montantFret: Number(montantFret) || 0,
         natureIds: [selectedNatureId],
       });
-      await maybeSendColisSms(result.id, result.statutColis, result.sms);
-      toast.success(t("colis.registered", { defaultValue: "Colis enregistré — encaissement guichet" }));
-      window.dispatchEvent(new CustomEvent("tibus:station-cash-refresh"));
       const detail = await getColisAutonomeDetailSupabase(result.id);
+      if (!detail) {
+        throw new Error("Colis enregistré mais reçu indisponible — consultez l'onglet Suivi.");
+      }
       resetExpeditionForm();
-      if (detail) setReceiptDetail(detail);
-      await load();
+      setReceiptDetail(detail);
+      void maybeSendColisSms(result.id, result.statutColis, result.sms);
+      toast.success(t("colis.registered", { defaultValue: "Colis enregistré — encaissement guichet" }));
     } catch (err) {
       toast.error(
         supabaseErrorMessage(err, t("errors.generic", { ns: "common" })),
@@ -381,6 +408,21 @@ export default function ColisAutonomesPage({
     }
   };
 
+  if (receiptDetail) {
+    return (
+      <ColisReceiptPanel
+        detail={receiptDetail}
+        autoPrint
+        onBack={() => {
+          closeReceipt();
+          onBack?.();
+        }}
+        onNewShipment={() => closeReceipt({ newShipment: true })}
+        onDone={() => closeReceipt()}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -403,21 +445,6 @@ export default function ColisAutonomesPage({
           ) : null}
         </CardContent>
       </Card>
-    );
-  }
-
-  if (receiptDetail) {
-    return (
-      <ColisReceiptPanel
-        detail={receiptDetail}
-        autoPrint
-        onBack={() => {
-          setReceiptDetail(null);
-          onBack?.();
-        }}
-        onNewShipment={() => setReceiptDetail(null)}
-        onDone={() => setReceiptDetail(null)}
-      />
     );
   }
 

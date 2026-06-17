@@ -374,13 +374,16 @@ export async function sendColisSmsSupabase(payload: {
 
   if (!response.ok) {
     const detail = body.failures?.[0]?.error;
-    throw new Error(detail ?? body.error ?? `Envoi SMS impossible (${response.status})`);
+    const message = detail ?? body.error ?? `Envoi SMS impossible (${response.status})`;
+    console.error("[colis-sms-client] HTTP error", response.status, body);
+    throw new Error(message);
   }
 
   const sent = Number(body.sent ?? 0);
   const failed = Number(body.failed ?? 0);
   if (sent === 0) {
     const detail = body.failures?.[0]?.error ?? body.error ?? "Aucun SMS délivré";
+    console.error("[colis-sms-client] zero sent", body);
     throw new Error(detail);
   }
 

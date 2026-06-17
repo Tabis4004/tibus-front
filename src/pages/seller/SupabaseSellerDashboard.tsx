@@ -765,12 +765,24 @@ export default function SupabaseSellerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUserId]);
 
+  const refreshCashSession = async () => {
+    if (!appUserId) return;
+    try {
+      const nextProfile = profile ?? (await getSellerProfileSupabase(appUserId));
+      if (!nextProfile?.canSellDirect) return;
+      const nextCash = await getOpenStationCashSupabase().catch(() => ({ open: false }));
+      setCashSession(nextCash);
+    } catch {
+      // ignore — StationCashPanel recharge ses propres données
+    }
+  };
+
   useEffect(() => {
-    const onCashRefresh = () => void load();
+    const onCashRefresh = () => void refreshCashSession();
     window.addEventListener("tibus:station-cash-refresh", onCashRefresh);
     return () => window.removeEventListener("tibus:station-cash-refresh", onCashRefresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUserId]);
+  }, [appUserId, profile]);
 
   if (appUser.isLoading || profile === undefined || trips === undefined || cashSession === undefined || featureModulesLoading) {
     return (

@@ -152,10 +152,13 @@ export async function getSellerProfileSupabase(
 export async function getSellerCompanyReceiptInfoSupabase(
   companyId: string,
 ): Promise<SellerCompanyReceiptInfo | null> {
+  const id = companyId?.trim();
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+
   const { data, error } = await supabase
     .from("Companies")
     .select("name, logo, managerName, voyageColisMsg")
-    .eq("id", companyId)
+    .eq("id", id)
     .maybeSingle();
 
   if (error) throw error;
