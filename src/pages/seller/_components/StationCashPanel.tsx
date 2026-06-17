@@ -79,6 +79,12 @@ export default function StationCashPanel({
   }, [load]);
 
   useEffect(() => {
+    const onRefresh = () => void load(true);
+    window.addEventListener("tibus:station-cash-refresh", onRefresh);
+    return () => window.removeEventListener("tibus:station-cash-refresh", onRefresh);
+  }, [load]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => void load(true), POLL_MS);
     return () => window.clearInterval(timer);
   }, [load]);

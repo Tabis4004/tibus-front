@@ -418,3 +418,4 @@ Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commi
 | `130_colis_cash_and_sales_journal.sql` | Encaissement caisse (`encaissement_colis`) à l'enregistrement + journal des ventes (`colis_autonome`) |
 | `131_module_d_colis_sms_owner_config.sql` | Option admin : owner autorisé à configurer les SMS colis (`moduleDColisSmsConfig`) |
 | `132_colis_sms_send_gate.sql` | Envoi SMS colis conditionné à l'option admin + étapes activées par l'owner |
+| `133_colis_caisse_journal_print.sql` | Caisse session vendeur, journal canal Guichet (CL-…), encaissement guichet unifié |

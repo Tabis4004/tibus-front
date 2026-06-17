@@ -47,7 +47,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   traveler: "Voyageur",
   seller_reservation: "Réservation tiers",
   counter_sale: "Guichet",
-  colis_autonome: "Colis guichet",
+  colis_autonome: "Guichet",
 };
 
 const COLIS_STATUS_LABELS: Record<string, string> = {
@@ -57,12 +57,7 @@ const COLIS_STATUS_LABELS: Record<string, string> = {
   livre: "Livré",
 };
 
-type SaleChannelFilter =
-  | "all"
-  | "traveler"
-  | "counter_sale"
-  | "seller_reservation"
-  | "colis_autonome";
+type SaleChannelFilter = "all" | "traveler" | "counter_sale" | "seller_reservation";
 type PeriodFilter = "all" | "today" | "7d" | "30d" | "month";
 
 function periodToRange(period: PeriodFilter): Pick<CompanyTicketSalesFilters, "createdFrom" | "createdTo"> {
@@ -248,8 +243,7 @@ export default function CompanySalesLedger({
               <SelectContent>
                 <SelectItem value="all">Tous les canaux</SelectItem>
                 <SelectItem value="traveler">Voyageur</SelectItem>
-                <SelectItem value="counter_sale">Guichet billets</SelectItem>
-                <SelectItem value="colis_autonome">Colis guichet</SelectItem>
+                <SelectItem value="counter_sale">Guichet</SelectItem>
                 <SelectItem value="seller_reservation">Réservation tiers</SelectItem>
               </SelectContent>
             </Select>
@@ -331,7 +325,7 @@ export default function CompanySalesLedger({
                     </td>
                     <td className="px-3 py-2">
                       <Badge variant={row.ticketStatus === "cancelled" ? "destructive" : "secondary"}>
-                        {row.saleChannel === "colis_autonome"
+                        {row.routeLabel.startsWith("[Colis]")
                           ? (COLIS_STATUS_LABELS[row.ticketStatus] ?? row.ticketStatus)
                           : row.ticketStatus}
                       </Badge>

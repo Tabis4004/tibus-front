@@ -242,6 +242,13 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       await maybeSendColisSms(result.id, result.statutColis, result.sms);
       setLastRegisteredId(result.id);
       toast.success(t("colis.registered", { defaultValue: "Colis enregistré — encaissement guichet" }));
+      window.dispatchEvent(new CustomEvent("tibus:station-cash-refresh"));
+      try {
+        const detail = await getColisAutonomeDetailSupabase(result.id);
+        if (detail) await printColisReceipt(detail);
+      } catch {
+        toast.message("Colis enregistré — impression manuelle via le bouton Imprimer");
+      }
       await load();
     } catch (err) {
       toast.error(

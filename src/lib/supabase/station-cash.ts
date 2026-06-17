@@ -66,8 +66,8 @@ export type StationCashReversal = {
 };
 
 export const STATION_CASH_MOVEMENT_LABELS: Record<StationCashMovementType, string> = {
-  encaissement_billet: "Encaissement billet",
-  encaissement_colis: "Encaissement colis",
+  encaissement_billet: "Encaissement guichet",
+  encaissement_colis: "Encaissement guichet",
   decaissement_annulation: "Décaissement annulation",
   reversement_comptable: "Reversement comptable",
 };
