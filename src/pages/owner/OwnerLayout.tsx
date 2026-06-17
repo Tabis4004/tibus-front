@@ -43,6 +43,9 @@ import { OwnerCompanyProvider, useOwnerCompany } from "@/hooks/use-owner-company
 import OwnerCompanySwitcher from "./_components/OwnerCompanySwitcher.tsx";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 
+const OWNER_SIDEBAR_CLASS =
+  "bg-sky-50 dark:bg-sky-950/35 border-sky-200/70 dark:border-sky-800/40";
+
 type NavItem = {
   toSuffix: string;
   labelKey: string;
@@ -281,7 +284,7 @@ function OwnerSidebarNav({
 
         return (
         <div key={section.titleKey}>
-          <p className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground px-3 mb-1.5">
+          <p className="text-[10px] uppercase font-semibold tracking-wider text-sky-700/60 dark:text-sky-300/70 px-3 mb-1.5">
             {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
           </p>
           <div className="space-y-0.5">
@@ -295,8 +298,8 @@ function OwnerSidebarNav({
                   cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      ? "bg-sky-500 text-white shadow-sm"
+                      : "text-sky-900/75 dark:text-sky-100/80 hover:bg-sky-100/90 dark:hover:bg-sky-900/35 hover:text-sky-950 dark:hover:text-white",
                   )
                 }
               >
@@ -305,14 +308,14 @@ function OwnerSidebarNav({
                     <div
                       className={cn(
                         "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
-                        isActive ? "bg-primary-foreground/15" : "bg-primary/10",
+                        isActive ? "bg-white/20" : "bg-sky-400/15",
                       )}
                     >
-                      <Icon className={cn("w-3.5 h-3.5", isActive ? "" : "text-primary")} />
+                      <Icon className={cn("w-3.5 h-3.5", isActive ? "" : "text-sky-600 dark:text-sky-300")} />
                     </div>
                     <span className="truncate">{t(labelKey)}</span>
                     {isActive && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground/80" />
+                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white/80" />
                     )}
                   </>
                 )}
@@ -348,7 +351,7 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
-      <aside className="hidden md:flex flex-col w-60 bg-background border-r border-border shrink-0">
+      <aside className={cn("hidden md:flex flex-col w-60 border-r shrink-0", OWNER_SIDEBAR_CLASS)}>
         <SidebarContent />
       </aside>
 
@@ -358,7 +361,7 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-background border-r border-border flex flex-col shadow-2xl">
+          <aside className={cn("absolute left-0 top-0 bottom-0 w-72 border-r flex flex-col shadow-2xl", OWNER_SIDEBAR_CLASS)}>
             <div className="flex items-center justify-between px-4 pt-4">
               <span className="font-bold text-sm">{t("header.menu", { ns: "common" })}</span>
               <button

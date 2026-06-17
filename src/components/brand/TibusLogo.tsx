@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils.ts";
+import { APP_NAME } from "@/lib/brand.ts";
 
 type TibusLogoProps = {
   className?: string;
@@ -9,7 +10,7 @@ type TibusLogoProps = {
 
 export function TibusLogo({
   className,
-  alt = "Tibus",
+  alt = APP_NAME,
   variant = "mark",
 }: TibusLogoProps) {
   const src =

@@ -26,6 +26,8 @@ import {
 import { motion } from "motion/react";
 import LocaleSwitcher from "@/components/ui/locale-switcher.tsx";
 import ManualNavLinks from "@/components/manual/ManualNavLinks.tsx";
+import { AppBrand } from "@/components/brand/AppBrand.tsx";
+import { APP_NAME } from "@/lib/brand.ts";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAuth } from "@/hooks/use-auth.ts";
 import SupabaseHome from "./home/SupabaseHome.tsx";
@@ -187,12 +189,7 @@ function LandingPage() {
       {/* Navigation */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-extrabold text-lg">T</span>
-            </div>
-            <span className="font-bold text-lg tracking-tight">Tibus</span>
-          </div>
+          <AppBrand logoClassName="h-9 w-9" titleClassName="text-lg" />
           <div className="flex items-center gap-3">
             <LocaleSwitcher />
             <ManualNavLinks />
@@ -568,7 +565,7 @@ function LandingPage() {
               <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-xs">T</span>
               </div>
-              <span className="font-semibold text-sm">Tibus</span>
+              <span className="font-semibold text-sm">{APP_NAME}</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <Link to={`/${locale}/contact`} className="hover:text-foreground transition-colors cursor-pointer">
@@ -579,7 +576,7 @@ function LandingPage() {
               </Link>
             </div>
             <p className="text-xs text-muted-foreground">
-              {`© ${new Date().getFullYear()} Tibus. ${t("landing.footer_rights", { defaultValue: "All rights reserved." })}`}
+              {`© ${new Date().getFullYear()} ${APP_NAME}. ${t("landing.footer_rights", { defaultValue: "All rights reserved." })}`}
             </p>
           </div>
         </div>

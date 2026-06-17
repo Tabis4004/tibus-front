@@ -4,7 +4,7 @@ import { Authenticated, Unauthenticated } from "@/components/auth/AuthBoundary.t
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Link, useParams } from "react-router-dom";
-import { BusIcon, LogOutIcon, UserIcon, ShieldIcon, Share2Icon, PlusIcon, LayoutDashboardIcon } from "lucide-react";
+import { LogOutIcon, UserIcon, ShieldIcon, Share2Icon, PlusIcon, LayoutDashboardIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,12 +25,14 @@ import ManualNavLinks from "@/components/manual/ManualNavLinks.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { resolveUserHomePath } from "@/lib/auth/role-routing.ts";
 import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
+import { APP_NAME, APP_SITE_URL } from "@/lib/brand.ts";
+import { AppBrand } from "@/components/brand/AppBrand.tsx";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
-  const url = "https://www.tibusafrica.com";
+  const url = APP_SITE_URL;
   const shareData = {
-    title: "Tibus",
-    text: t("share.message", { defaultValue: "Download Tibus — book bus tickets easily!" }),
+    title: APP_NAME,
+    text: t("share.message", { defaultValue: "Download Tibus Africa — book bus tickets easily!" }),
     url,
   };
 
@@ -186,12 +188,7 @@ export default function AppHeader() {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to={homePath} className="flex items-center gap-2 font-bold text-lg">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <BusIcon className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-extrabold tracking-tight">Tibus</span>
-        </Link>
+        <AppBrand to={homePath} logoClassName="h-8 w-8" titleClassName="text-lg" />
         <div className="flex items-center gap-2">
           <LocaleSwitcher />
           <ManualNavLinks />

@@ -1,11 +1,11 @@
 {
-  "name": "Tibus — Bus Transportation",
-  "short_name": "Tibus",
+  "name": "Tibus Africa — Bus Transportation",
+  "short_name": "Tibus Africa",
   "description": "Réservez vos billets de bus interurbains — www.tibusafrica.com",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1565a0",
+  "theme_color": "#38bdf8",
   "orientation": "portrait-primary",
   "icons": [
     {
