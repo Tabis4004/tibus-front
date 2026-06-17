@@ -46,8 +46,46 @@ import {
 } from "@/lib/supabase/colis-autonomes.ts";
 import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
 import { getCompanyFeatureModulesSupabase } from "@/lib/supabase/company-feature-modules.ts";
+import { cn } from "@/lib/utils.ts";
 
 type GareOption = { id: string; name: string };
+
+function GareNativeSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: GareOption[];
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      className={cn(
+        "border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
+        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        !value && "text-muted-foreground",
+      )}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      disabled={disabled}
+    >
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {options.map((gare) => (
+        <option key={gare.id} value={gare.id}>
+          {gare.name}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 async function maybeSendColisSms(
   colisId: string,
@@ -75,7 +113,15 @@ async function maybeSendColisSms(
   }
 }
 
-export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) {
+export default function ColisAutonomesPage({
+  onBack,
+  companyId: companyIdProp,
+  companyName: companyNameProp,
+}: {
+  onBack?: () => void;
+  companyId?: string;
+  companyName?: string;
+}) {
   const { t } = useTranslation("seller");
   const { appUserId } = useSupabaseAuth();
   const [loading, setLoading] = useState(true);
@@ -126,18 +172,28 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
   }, [rows, filterStatut]);
 
   const load = async () => {
-    if (!appUserId) return;
+    if (!appUserId && !companyIdProp) return;
     setLoading(true);
     try {
-      const profile = await getSellerProfileSupabase(appUserId);
-      if (!profile?.company?.id) {
+      let cid = companyIdProp ?? null;
+      if (!cid && appUserId) {
+        const profile = await getSellerProfileSupabase(appUserId);
+        if (!profile?.company?.id) {
+          setModuleEnabled(false);
+          setCompanyId(null);
+          return;
+        }
+        cid = profile.company.id;
+        setCompanyName(profile.company.name);
+      } else if (companyNameProp) {
+        setCompanyName(companyNameProp);
+      }
+      if (!cid) {
         setModuleEnabled(false);
         setCompanyId(null);
         return;
       }
-      const cid = profile.company.id;
       setCompanyId(cid);
-      setCompanyName(profile.company.name);
 
       const [settings, featureModules] = await Promise.all([
         getCompanyColisSettingsSupabase(cid),
@@ -195,7 +251,7 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
 
   useEffect(() => {
     void load();
-  }, [appUserId]);
+  }, [appUserId, companyIdProp, companyNameProp]);
 
   const handleRegister = async () => {
     if (!companyId) return;
@@ -364,26 +420,36 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>{t("colis.gare_depart", { defaultValue: "Gare de départ" })}</Label>
-                  <Select value={gareDepartId} onValueChange={setGareDepartId}>
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                    <SelectContent>
-                      {gares.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <GareNativeSelect
+                    value={gareDepartId}
+                    onChange={setGareDepartId}
+                    options={gares}
+                    placeholder={t("colis.gare_placeholder", { defaultValue: "Choisir une gare" })}
+                    disabled={!gares.length}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>{t("colis.gare_destination", { defaultValue: "Gare de destination" })}</Label>
-                  <Select value={gareDestinationId} onValueChange={setGareDestinationId}>
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                    <SelectContent>
-                      {destinationGares.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <GareNativeSelect
+                    value={gareDestinationId}
+                    onChange={setGareDestinationId}
+                    options={destinationGares}
+                    placeholder={
+                      gareDepartId
+                        ? t("colis.gare_placeholder", { defaultValue: "Choisir une gare" })
+                        : t("colis.gare_depart_first", { defaultValue: "Choisissez d'abord le départ" })
+                    }
+                    disabled={!gareDepartId || destinationGares.length === 0}
+                  />
                 </div>
+                {!gares.length ? (
+                  <p className="sm:col-span-2 text-xs text-amber-700 dark:text-amber-400">
+                    {t("colis.no_gares_hint", {
+                      defaultValue:
+                        "Aucune gare chargée. Vérifiez la connexion ou ajoutez des gares dans la console owner.",
+                    })}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
@@ -407,11 +473,11 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
 
               <div className="space-y-1.5">
                 <Label>{t("colis.nature", { defaultValue: "Nature de colis" })}</Label>
-                <Select value={selectedNatureId} onValueChange={setSelectedNatureId}>
-                  <SelectTrigger>
+                <Select value={selectedNatureId || undefined} onValueChange={setSelectedNatureId}>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder={t("colis.nature_placeholder", { defaultValue: "Choisir une nature" })} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[200] max-h-72">
                     {activeNatures.map((nature) => (
                       <SelectItem key={nature.id} value={nature.id}>
                         {nature.libelle}

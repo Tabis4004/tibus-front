@@ -10,14 +10,17 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   getOpenStationCashSupabase,
+  listCompanyStationGaresSupabase,
   listStationCashMovementsSupabase,
   openStationCashRegisterSupabase,
   submitStationCashReversalSupabase,
   STATION_CASH_MOVEMENT_LABELS,
   type OpenStationCash,
   type StationCashMovement,
+  type StationGareOption,
 } from "@/lib/supabase/station-cash.ts";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
+import { cn } from "@/lib/utils.ts";
 
 const POLL_MS = 15_000;
 
@@ -37,6 +40,9 @@ export default function StationCashPanel({
   canOpen?: boolean;
 }) {
   const [openingFloat, setOpeningFloat] = useState("0");
+  const [gares, setGares] = useState<StationGareOption[]>([]);
+  const [garesLoading, setGaresLoading] = useState(true);
+  const [selectedGareId, setSelectedGareId] = useState("");
   const [cash, setCash] = useState<OpenStationCash | null | undefined>(undefined);
   const [movements, setMovements] = useState<StationCashMovement[] | undefined>(undefined);
   const [reversalAmount, setReversalAmount] = useState("");
@@ -89,7 +95,33 @@ export default function StationCashPanel({
     return () => window.clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setGaresLoading(true);
+    void listCompanyStationGaresSupabase(companyId)
+      .then((rows) => {
+        if (cancelled) return;
+        setGares(rows);
+        if (rows.length === 1) setSelectedGareId(rows[0].id);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setGares([]);
+        toast.error(supabaseErrorMessage(err, "Impossible de charger les gares"));
+      })
+      .finally(() => {
+        if (!cancelled) setGaresLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
   const handleOpen = async () => {
+    if (!selectedGareId) {
+      toast.error("Sélectionnez la gare où vous ouvrez la caisse");
+      return;
+    }
     const parsed = Number(openingFloat);
     if (!Number.isFinite(parsed) || parsed < 0) {
       toast.error("Indiquez un fond de roulement valide");
@@ -99,6 +131,7 @@ export default function StationCashPanel({
     try {
       await openStationCashRegisterSupabase({
         companyId,
+        gareId: selectedGareId,
         openingFloat: parsed,
       });
       toast.success("Caisse ouverte");
@@ -157,8 +190,8 @@ export default function StationCashPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
-          <p><strong>1.</strong> Ouverture — vous démarrez avec un fond en caisse (session du jour).</p>
-          <p><strong>2.</strong> Ventes — chaque billet/colis cash crédite votre session (tous trajets).</p>
+          <p><strong>1.</strong> Ouverture — choisissez votre gare et le fond de caisse du jour.</p>
+          <p><strong>2.</strong> Ventes — chaque billet/colis cash crédite votre session.</p>
           <p><strong>3.</strong> Fin de service — vous soumettez le reversement vers le compte consolidé compagnie.</p>
           <p><strong>4.</strong> Validation — un comptable ou l&apos;owner approuve et clôture définitivement.</p>
         </div>
@@ -175,9 +208,38 @@ export default function StationCashPanel({
           canOpen ? (
           <div className="rounded-xl border border-dashed p-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Indiquez le fond de roulement en espèces présent à l&apos;ouverture. Aucun trajet à choisir :
-              la session couvre toutes vos ventes cash de la journée.
+              Sélectionnez la gare où vous travaillez aujourd&apos;hui, puis indiquez le fond de roulement
+              en espèces présent à l&apos;ouverture.
             </p>
+            <div className="space-y-1.5 max-w-md">
+              <Label>Gare du guichet *</Label>
+              {garesLoading ? (
+                <Skeleton className="h-9 w-full" />
+              ) : gares.length ? (
+                <select
+                  className={cn(
+                    "border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
+                    "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    !selectedGareId && "text-muted-foreground",
+                  )}
+                  value={selectedGareId}
+                  onChange={(event) => setSelectedGareId(event.target.value)}
+                >
+                  <option value="" disabled>
+                    Choisir une gare
+                  </option>
+                  {gares.map((gare) => (
+                    <option key={gare.id} value={gare.id}>
+                      {gare.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-amber-700 dark:text-amber-400 rounded-md border border-amber-200 bg-amber-50/80 p-2">
+                  Aucune gare disponible. Ajoutez des gares dans la console owner (menu Gares).
+                </p>
+              )}
+            </div>
             <div className="space-y-1.5 max-w-xs">
               <Label>Fond de roulement (FCFA)</Label>
               <Input
@@ -188,7 +250,11 @@ export default function StationCashPanel({
                 onChange={(e) => setOpeningFloat(e.target.value)}
               />
             </div>
-            <Button onClick={handleOpen} disabled={saving} className="cursor-pointer">
+            <Button
+              onClick={handleOpen}
+              disabled={saving || garesLoading || !gares.length || !selectedGareId}
+              className="cursor-pointer"
+            >
               <LandmarkIcon className="w-4 h-4 mr-1.5" />
               Ouvrir la caisse du jour
             </Button>

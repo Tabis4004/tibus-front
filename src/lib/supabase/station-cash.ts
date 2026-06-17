@@ -106,11 +106,12 @@ export async function getOpenStationCashSupabase(
 
 export async function openStationCashRegisterSupabase(input: {
   companyId: string;
+  gareId: string;
   openingFloat: number;
 }): Promise<OpenStationCash> {
   void input.companyId;
   const { data, error } = await supabase.rpc("open_station_cash_register", {
-    p_gare_id: null,
+    p_gare_id: input.gareId,
     p_fond_roulement: Math.max(0, Math.round(input.openingFloat)),
   });
   if (error) throw error;
@@ -182,10 +183,12 @@ export async function listCompanyStationGaresSupabase(
     p_company_id: companyId,
   });
   if (error) throw error;
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-  }));
+  return ((data ?? []) as Record<string, unknown>[])
+    .map((row) => ({
+      id: String(row.id ?? row.Id ?? ""),
+      name: String(row.name ?? row.Name ?? ""),
+    }))
+    .filter((row) => row.id && row.name && !row.name.startsWith("__"));
 }
 
 export async function listCompanyOpenStationCashSupabase(

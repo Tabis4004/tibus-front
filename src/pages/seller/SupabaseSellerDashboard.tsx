@@ -1031,7 +1031,10 @@ export default function SupabaseSellerDashboard() {
         </TabsContent>
         {colisModuleEnabled && profile.canSellDirect ? (
           <TabsContent value="colis" className="mt-4">
-            <ColisAutonomesPage />
+            <ColisAutonomesPage
+              companyId={profile.company.id}
+              companyName={profile.company.name}
+            />
           </TabsContent>
         ) : null}
       </Tabs>
