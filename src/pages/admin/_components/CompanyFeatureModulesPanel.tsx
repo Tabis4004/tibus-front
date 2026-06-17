@@ -144,7 +144,7 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
               "Activez les blocs A–F de l'offre commerciale Tibus pour cette compagnie. Les prérequis B, C et E imposent le module A.",
           })}
         </p>
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {MODULE_ORDER.map((id) => {
             const meta = COMMERCIAL_MODULE_LABELS[id];
             const key = flagKey(id);
@@ -153,12 +153,15 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
 
             return (
               <div key={id} className="space-y-2">
-                <div
-                  className="flex items-start justify-between gap-4 rounded-lg border p-3"
-                >
+                <div className="flex h-full flex-col justify-between gap-3 rounded-xl border border-[#2a82c9]/20 tibus-blue-surface p-3">
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Label className="font-medium text-sm">{meta.title}</Label>
+                      <span className="w-7 h-7 rounded-lg tibus-blue-gradient text-white text-xs font-bold flex items-center justify-center shrink-0">
+                        {id}
+                      </span>
+                      <Label className="font-medium text-sm text-[#1a508b] dark:text-[#7ec8ff]">
+                        {meta.title}
+                      </Label>
                       {needsA ? (
                         <Badge variant="outline" className="text-[10px]">
                           {t("feature_modules.requires_a_badge", { defaultValue: "Requiert A" })}
@@ -167,12 +170,14 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
                     </div>
                     <p className="text-xs text-muted-foreground">{meta.desc}</p>
                   </div>
-                  <Switch
-                    checked={enabled}
-                    disabled={readOnly || saving || needsA}
-                    onCheckedChange={(checked) => void toggle(key, checked)}
-                    aria-label={meta.title}
-                  />
+                  <div className="flex justify-end">
+                    <Switch
+                      checked={enabled}
+                      disabled={readOnly || saving || needsA}
+                      onCheckedChange={(checked) => void toggle(key, checked)}
+                      aria-label={meta.title}
+                    />
+                  </div>
                 </div>
                 {id === "D" && enabled ? (
                   <div className="ml-3 flex items-start justify-between gap-4 rounded-lg border border-dashed bg-muted/20 p-3">

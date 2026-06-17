@@ -38,20 +38,23 @@ function ModuleBlock({
   const Icon = module.icon;
 
   return (
-    <Link to={`/${lng}${module.toSuffix}`} className="block" data-tour={module.tourTarget}>
-      <div className="rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/40 hover:shadow-sm transition-all group">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="w-5 h-5 text-primary" />
+    <Link to={`/${lng}${module.toSuffix}`} className="block h-full" data-tour={module.tourTarget}>
+      <div className="h-full rounded-xl border border-[#2a82c9]/25 tibus-blue-surface p-4 flex flex-col gap-3 hover:border-[#1fb5ff]/50 hover:shadow-md transition-all group">
+        <div className="w-11 h-11 rounded-xl tibus-blue-gradient flex items-center justify-center shrink-0 shadow-sm">
+          <Icon className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-snug">
+          <h3 className="font-semibold text-sm leading-snug text-[#1a508b] dark:text-[#7ec8ff]">
             {t(module.titleKey, { defaultValue: module.titleDefault })}
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
             {t(module.descKey, { defaultValue: module.descDefault })}
           </p>
         </div>
-        <ArrowRightIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+        <div className="flex items-center gap-1 text-[11px] font-medium text-[#2a82c9] group-hover:text-[#1a508b]">
+          Ouvrir
+          <ArrowRightIcon className="w-3.5 h-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+        </div>
       </div>
     </Link>
   );
@@ -176,7 +179,7 @@ export default function OwnerConsoleModules({ company }: Props) {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
             {t(section.sectionKey, { defaultValue: section.sectionDefault })}
           </h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {section.items.map((module) =>
               module.id === "guarantee" && showGuaranteeFund ? (
                 <GuaranteeFundOverviewCard key={module.id} companyId={company.id} />

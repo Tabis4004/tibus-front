@@ -190,11 +190,42 @@ export default function StationCashPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
-          <p><strong>1.</strong> Ouverture — choisissez votre gare et le fond de caisse du jour.</p>
-          <p><strong>2.</strong> Ventes — chaque billet/colis cash crédite votre session.</p>
-          <p><strong>3.</strong> Fin de service — vous soumettez le reversement vers le compte consolidé compagnie.</p>
-          <p><strong>4.</strong> Validation — un comptable ou l&apos;owner approuve et clôture définitivement.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {[
+            {
+              step: "1",
+              title: "Ouverture",
+              text: "Choisissez votre gare et le fond de caisse du jour.",
+            },
+            {
+              step: "2",
+              title: "Ventes",
+              text: "Chaque billet ou colis cash crédite votre session.",
+            },
+            {
+              step: "3",
+              title: "Fin de service",
+              text: "Soumettez le reversement vers le compte consolidé compagnie.",
+            },
+            {
+              step: "4",
+              title: "Validation",
+              text: "Le comptable ou l'owner approuve et clôture la session.",
+            },
+          ].map((item) => (
+            <div
+              key={item.step}
+              className="rounded-lg border border-[#2a82c9]/20 tibus-blue-surface p-3 text-xs"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-6 h-6 rounded-md tibus-blue-gradient text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  {item.step}
+                </span>
+                <span className="font-semibold text-[#1a508b] dark:text-[#7ec8ff]">{item.title}</span>
+              </div>
+              <p className="text-muted-foreground leading-snug pl-8">{item.text}</p>
+            </div>
+          ))}
         </div>
 
         {openCash.pendingReversal && !openCash.open ? (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -10,8 +10,9 @@ import {
 } from "@/lib/gare-map-utils.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
+import { lazyWithRetry } from "@/lib/lazy-with-retry.ts";
 
-const GaresLeafletMap = lazy(() => import("@/pages/landing/GaresLeafletMap.tsx"));
+const GaresLeafletMap = lazyWithRetry(() => import("@/pages/landing/GaresLeafletMap.tsx"));
 
 type GoogleLatLng = { lat: number; lng: number };
 type GoogleMapInstance = {

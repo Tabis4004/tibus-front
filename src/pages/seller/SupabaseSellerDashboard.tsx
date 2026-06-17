@@ -953,13 +953,13 @@ export default function SupabaseSellerDashboard() {
 
       <div data-tour="seller-kpis" className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {dashboardCards.map(({ label, value, icon: Icon }) => (
-          <Card key={label}>
+          <Card key={label} className="border-[#2a82c9]/15 tibus-blue-surface">
             <CardContent className="p-4">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-                <Icon className="w-4 h-4 text-primary" />
+              <div className="w-8 h-8 rounded-lg tibus-blue-gradient flex items-center justify-center mb-2 shadow-sm">
+                <Icon className="w-4 h-4 text-white" />
               </div>
               <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="font-black text-lg truncate">{value}</p>
+              <p className="font-black text-lg truncate text-[#1a508b] dark:text-[#7ec8ff]">{value}</p>
             </CardContent>
           </Card>
         ))}
@@ -1017,8 +1017,9 @@ export default function SupabaseSellerDashboard() {
           </p>
         </div>
       ) : (
-        trips.map((trip, tripIndex) => (
-          <Card key={trip._id}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {trips.map((trip, tripIndex) => (
+          <Card key={trip._id} className="border-[#2a82c9]/15 tibus-blue-surface">
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1063,7 +1064,8 @@ export default function SupabaseSellerDashboard() {
               </Button>
             </CardContent>
           </Card>
-        ))
+        ))}
+        </div>
       )}
 
       <p className="text-[11px] text-muted-foreground">

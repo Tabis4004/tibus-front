@@ -163,7 +163,7 @@ export default function SupabaseOwnerOverview() {
   ];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -192,15 +192,15 @@ export default function SupabaseOwnerOverview() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.04 * i }}
-              className="rounded-xl border bg-card p-4 hover:border-primary/30 hover:bg-muted/30 transition-all"
+              className="rounded-xl border border-[#2a82c9]/20 tibus-blue-surface p-4 hover:border-[#1fb5ff]/40 transition-all"
             >
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-primary" />
+                <div className="w-8 h-8 rounded-lg tibus-blue-gradient flex items-center justify-center shadow-sm">
+                  <Icon className="w-4 h-4 text-white" />
                 </div>
                 <span className="text-[11px] text-muted-foreground leading-tight">{label}</span>
               </div>
-              <div className="text-base font-bold text-primary truncate">{value}</div>
+              <div className="text-base font-bold text-[#1a508b] dark:text-[#7ec8ff] truncate">{value}</div>
             </motion.div>
           ))}
         </div>

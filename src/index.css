@@ -120,6 +120,19 @@
   --sidebar-ring: oklch(0.65 0.14 175);
 }
 
+.tibus-blue-gradient {
+  background: linear-gradient(135deg, #1a508b 0%, #2a82c9 52%, #1fb5ff 100%);
+}
+
+.tibus-blue-surface {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, #1a508b 14%, transparent) 0%,
+    color-mix(in oklab, #2a82c9 10%, transparent) 48%,
+    color-mix(in oklab, #1fb5ff 16%, transparent) 100%
+  );
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

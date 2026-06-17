@@ -21,7 +21,12 @@ export function normalizePhoneForInfobip(
 function infobipBaseUrl(): string {
   const raw = Deno.env.get("INFOBIP_BASE_URL")?.trim();
   if (!raw) return "https://api.infobip.com";
-  return raw.replace(/\/$/, "");
+  const withoutTrailingSlash = raw.replace(/\/$/, "");
+  if (/^https?:\/\//i.test(withoutTrailingSlash)) {
+    return withoutTrailingSlash;
+  }
+  // Secret souvent saisi sans schéma : jrw3rv.api.infobip.com
+  return `https://${withoutTrailingSlash}`;
 }
 
 /** Statuts Infobip acceptés à l'envoi (PENDING_* ou DELIVERED_*). */
