@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
   Select,
   SelectContent,
@@ -86,7 +85,7 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
   const [poidsKg, setPoidsKg] = useState("");
   const [nombrePieces, setNombrePieces] = useState("1");
   const [montantFret, setMontantFret] = useState("");
-  const [selectedNatureIds, setSelectedNatureIds] = useState<string[]>([]);
+  const [selectedNatureId, setSelectedNatureId] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastRegisteredId, setLastRegisteredId] = useState<string | null>(null);
 
@@ -175,20 +174,14 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
     void load();
   }, [appUserId]);
 
-  const toggleNature = (natureId: string, checked: boolean) => {
-    setSelectedNatureIds((prev) =>
-      checked ? [...new Set([...prev, natureId])] : prev.filter((id) => id !== natureId),
-    );
-  };
-
   const handleRegister = async () => {
     if (!companyId) return;
     if (!gareDepartId || !gareDestinationId) {
       toast.error(t("colis.gares_required", { defaultValue: "Sélectionnez les gares" }));
       return;
     }
-    if (!selectedNatureIds.length) {
-      toast.error(t("colis.natures_required", { defaultValue: "Sélectionnez au moins une nature" }));
+    if (!selectedNatureId) {
+      toast.error(t("colis.nature_required", { defaultValue: "Sélectionnez une nature de colis" }));
       return;
     }
     setSaving(true);
@@ -205,7 +198,7 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
         poidsKg: poidsKg ? Number(poidsKg) : undefined,
         nombrePieces: Number(nombrePieces) || 1,
         montantFret: Number(montantFret) || 0,
-        natureIds: selectedNatureIds,
+        natureIds: [selectedNatureId],
       });
       await maybeSendColisSms(result.id, result.statutColis, result.sms);
       setLastRegisteredId(result.id);
@@ -364,19 +357,20 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>{t("colis.natures", { defaultValue: "Natures de colis" })}</Label>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {activeNatures.map((nature) => (
-                    <label key={nature.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Checkbox
-                        checked={selectedNatureIds.includes(nature.id)}
-                        onCheckedChange={(v) => toggleNature(nature.id, Boolean(v))}
-                      />
-                      {nature.libelle}
-                    </label>
-                  ))}
-                </div>
+              <div className="space-y-1.5">
+                <Label>{t("colis.nature", { defaultValue: "Nature de colis" })}</Label>
+                <Select value={selectedNatureId} onValueChange={setSelectedNatureId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("colis.nature_placeholder", { defaultValue: "Choisir une nature" })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeNatures.map((nature) => (
+                      <SelectItem key={nature.id} value={nature.id}>
+                        {nature.libelle}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">

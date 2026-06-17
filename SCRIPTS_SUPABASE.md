@@ -408,3 +408,10 @@ npm run supabase:push
 | `122_demarcheur_role_dashboard.sql` | Rôle `demarcheur`, RPC `get_demarcheur_dashboard`, `is_demarcheur()` |
 
 Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commissions stakeholder recruteur.
+
+## Lot 128–129 — Colis autonomes
+
+| Fichier | Contenu |
+|---------|---------|
+| `128_sync_colis_module_d.sql` | Sync `colis_autonome_enabled` ↔ module commercial D |
+| `129_fix_list_colis_autonomes_order.sql` | Fix RPC `list_colis_autonomes` (`ORDER BY sub."createdAt"`) |

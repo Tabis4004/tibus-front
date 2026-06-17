@@ -4,7 +4,7 @@ import { COLIS_STATUT_LABELS } from "@/lib/supabase/colis-autonomes.ts";
 
 export async function printColisReceipt(detail: ColisAutonomeDetail, currency = "XOF") {
   const retraitCode = detail.id;
-  const natures = detail.natures.length ? detail.natures.join(", ") : "—";
+  const natureLabel = detail.natures[0] ?? "—";
 
   await printer.printReceipt({
     header: detail.companyName || "TIBUS COLIS",
@@ -27,7 +27,7 @@ export async function printColisReceipt(detail: ColisAutonomeDetail, currency = 
       { text: detail.nomDestinataire },
       { text: detail.telephoneDestinataire, size: "small" },
       { text: "" },
-      { text: `Natures: ${natures}`, size: "small" },
+      { text: `Nature: ${natureLabel}`, bold: true },
       { text: `Pieces: ${detail.nombrePieces}` },
       { text: detail.poidsKg ? `Poids: ${detail.poidsKg} kg` : "Poids: —" },
       { text: detail.descriptionContenu ? `Contenu: ${detail.descriptionContenu}` : "" },
