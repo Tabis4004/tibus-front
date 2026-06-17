@@ -44,7 +44,7 @@ import OwnerCompanySwitcher from "./_components/OwnerCompanySwitcher.tsx";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 
 const OWNER_SIDEBAR_CLASS =
-  "bg-sky-50 dark:bg-sky-950/35 border-sky-200/70 dark:border-sky-800/40";
+  "bg-orange-50 dark:bg-orange-950/35 border-orange-200/70 dark:border-orange-800/40";
 
 type NavItem = {
   toSuffix: string;
@@ -157,17 +157,19 @@ function SidebarCompanyCard({
   return (
     <div className="px-3 mb-5">
       <div className="flex items-center gap-3 p-3 rounded-xl border bg-muted/30">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-orange-400/15 flex items-center justify-center shrink-0">
           {logoUrl ? (
             <img src={logoUrl} alt="logo" className="w-9 h-9 rounded-lg object-cover" />
           ) : (
-            <BuildingIcon className="w-4 h-4 text-primary" />
+            <BuildingIcon className="w-4 h-4 text-orange-600 dark:text-orange-300" />
           )}
         </div>
         <div className="min-w-0">
           <div className="font-semibold text-sm truncate">{name ?? "—"}</div>
           {planLabel ? (
-            <Badge className="text-[9px] h-3.5 px-1 mt-0.5">{planLabel}</Badge>
+            <Badge className="text-[9px] h-3.5 px-1 mt-0.5 bg-orange-500 hover:bg-orange-500 text-white border-0">
+              {planLabel}
+            </Badge>
           ) : (
             <span className="text-[10px] text-muted-foreground">{noPlanLabel}</span>
           )}
@@ -213,7 +215,7 @@ function SupabaseSidebarContent({ onClose }: { onClose?: () => void }) {
 
   return (
     <div className="flex flex-col h-full py-4">
-      <OwnerCompanySwitcher />
+      <OwnerCompanySwitcher sidebarTone />
       {isLoading ? (
         <div className="px-3 mb-5">
           <Skeleton className="h-16 w-full rounded-xl" />
@@ -284,7 +286,7 @@ function OwnerSidebarNav({
 
         return (
         <div key={section.titleKey}>
-          <p className="text-[10px] uppercase font-semibold tracking-wider text-sky-700/60 dark:text-sky-300/70 px-3 mb-1.5">
+          <p className="text-[10px] uppercase font-semibold tracking-wider text-orange-700/60 dark:text-orange-300/70 px-3 mb-1.5">
             {t(section.titleKey, { defaultValue: section.titleKey.split(".")[1] })}
           </p>
           <div className="space-y-0.5">
@@ -298,8 +300,8 @@ function OwnerSidebarNav({
                   cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150",
                     isActive
-                      ? "bg-sky-500 text-white shadow-sm"
-                      : "text-sky-900/75 dark:text-sky-100/80 hover:bg-sky-100/90 dark:hover:bg-sky-900/35 hover:text-sky-950 dark:hover:text-white",
+                      ? "bg-orange-500 text-white shadow-sm"
+                      : "text-orange-900/75 dark:text-orange-100/80 hover:bg-orange-100/90 dark:hover:bg-orange-900/35 hover:text-orange-950 dark:hover:text-white",
                   )
                 }
               >
@@ -308,10 +310,10 @@ function OwnerSidebarNav({
                     <div
                       className={cn(
                         "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
-                        isActive ? "bg-white/20" : "bg-sky-400/15",
+                        isActive ? "bg-white/20" : "bg-orange-400/15",
                       )}
                     >
-                      <Icon className={cn("w-3.5 h-3.5", isActive ? "" : "text-sky-600 dark:text-sky-300")} />
+                      <Icon className={cn("w-3.5 h-3.5", isActive ? "" : "text-orange-600 dark:text-orange-300")} />
                     </div>
                     <span className="truncate">{t(labelKey)}</span>
                     {isActive && (
@@ -382,7 +384,7 @@ function OwnerLayoutShell({ children }: { children: React.ReactNode }) {
             <MenuIcon className="w-5 h-5" />
           </button>
           {isSupabaseAuth() ? (
-            <OwnerCompanySwitcher compact />
+            <OwnerCompanySwitcher compact sidebarTone />
           ) : (
             <span className="font-semibold text-sm">{t("header.owner_dashboard", { ns: "common" })}</span>
           )}

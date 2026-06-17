@@ -15,9 +15,11 @@ import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 
 export default function OwnerCompanySwitcher({
   compact = false,
+  sidebarTone = false,
   className,
 }: {
   compact?: boolean;
+  sidebarTone?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation("owner");
@@ -33,11 +35,18 @@ export default function OwnerCompanySwitcher({
       ? `${company.name} — ${company.countryName}`
       : company.name;
 
+  const accentLink = sidebarTone
+    ? "text-orange-700 hover:text-orange-800 dark:text-orange-300"
+    : "text-primary";
+  const accentIconWrap = sidebarTone ? "bg-orange-400/15" : "bg-primary/10";
+  const accentIcon = sidebarTone ? "text-orange-600 dark:text-orange-300" : "text-primary";
+
   const addCompanyLink = (
     <Link
       to={createAnotherPath}
       className={cn(
-        "flex items-center gap-2 text-xs font-medium text-primary hover:underline",
+        "flex items-center gap-2 text-xs font-medium hover:underline",
+        accentLink,
         compact ? "px-0" : "mt-2 px-1",
       )}
     >
@@ -121,8 +130,13 @@ export default function OwnerCompanySwitcher({
                 className="w-6 h-6 rounded-md object-cover shrink-0"
               />
             ) : (
-              <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                <BuildingIcon className="w-3.5 h-3.5 text-primary" />
+              <div
+                className={cn(
+                  "w-6 h-6 rounded-md flex items-center justify-center shrink-0",
+                  accentIconWrap,
+                )}
+              >
+                <BuildingIcon className={cn("w-3.5 h-3.5", accentIcon)} />
               </div>
             )}
             <SelectValue placeholder={t("company.select")} />
