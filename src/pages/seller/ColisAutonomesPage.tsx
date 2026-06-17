@@ -159,6 +159,11 @@ export default function ColisAutonomesPage({
     () => gares.filter((g) => g.id !== gareDepartId),
     [gares, gareDepartId],
   );
+  const departureGares = useMemo(
+    () => (gareDepartId ? gares.filter((g) => g.id === gareDepartId) : gares),
+    [gares, gareDepartId],
+  );
+  const departureLocked = Boolean(gareDepartId);
 
   useEffect(() => {
     if (gareDestinationId && gareDestinationId === gareDepartId) {
@@ -419,11 +424,27 @@ export default function ColisAutonomesPage({
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{t("colis.gare_depart", { defaultValue: "Gare de départ" })}</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>{t("colis.gare_depart", { defaultValue: "Gare de départ" })}</Label>
+                    {departureLocked ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs cursor-pointer"
+                        onClick={() => {
+                          setGareDepartId("");
+                          setGareDestinationId("");
+                        }}
+                      >
+                        Changer
+                      </Button>
+                    ) : null}
+                  </div>
                   <GareNativeSelect
                     value={gareDepartId}
                     onChange={setGareDepartId}
-                    options={gares}
+                    options={departureGares}
                     placeholder={t("colis.gare_placeholder", { defaultValue: "Choisir une gare" })}
                     disabled={!gares.length}
                   />
