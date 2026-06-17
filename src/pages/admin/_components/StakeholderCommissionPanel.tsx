@@ -5,6 +5,7 @@ import {
   HistoryIcon,
   PercentIcon,
   RefreshCwIcon,
+  Trash2Icon,
   WalletIcon,
   XIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   rejectStakeholderCommissionSettlementSupabase,
   listStakeholderCountryUsersSupabase,
   listStakeholderCountryCompaniesSupabase,
+  deleteStakeholderCommissionSettingSupabase,
   upsertStakeholderCommissionSettingSupabase,
   upsertStakeholderPayoutMinimumSupabase,
   type StakeholderCommissionBalance,
@@ -70,6 +72,13 @@ type CompanyRecruiterDraft = {
   rate: string;
   beneficiaryId: string;
   settingId: string | null;
+};
+
+type CustomStakeholderDraft = {
+  settingId: string;
+  label: string;
+  beneficiaryId: string;
+  rate: string;
 };
 
 function buildEmptyRateDrafts(): Record<string, string> {
@@ -281,6 +290,7 @@ export default function StakeholderCommissionPanel({
   const [revenueSharing, setRevenueSharing] = useState<StakeholderRevenueSharingRow[] | undefined>(
     undefined,
   );
+  const [customDrafts, setCustomDrafts] = useState<CustomStakeholderDraft[]>([]);
   const [customLabel, setCustomLabel] = useState("");
   const [customBeneficiaryId, setCustomBeneficiaryId] = useState("");
   const [customRate, setCustomRate] = useState("0");
@@ -357,6 +367,13 @@ export default function StakeholderCommissionPanel({
             row.countryId === activeCountryId &&
             row.stakeholderRole !== "custom",
         );
+        const customCountryRows = rows.filter(
+          (row) =>
+            row.scope === "country" &&
+            row.countryId === activeCountryId &&
+            row.stakeholderRole === "custom" &&
+            row.id,
+        );
         const companyRecruiterRows = rows.filter(
           (row) =>
             row.scope === "company" &&
@@ -377,6 +394,14 @@ export default function StakeholderCommissionPanel({
         }
         setRateDrafts(rates);
         setBeneficiaryDrafts(beneficiaries);
+        setCustomDrafts(
+          customCountryRows.map((row) => ({
+            settingId: row.id!,
+            label: row.label ?? row.beneficiaryName ?? "",
+            beneficiaryId: row.beneficiaryUserId ?? "",
+            rate: String(row.rate),
+          })),
+        );
 
         const recruiterDrafts: Record<string, CompanyRecruiterDraft> = {};
         for (const company of countryCompanies) {
@@ -470,13 +495,22 @@ export default function StakeholderCommissionPanel({
     reloadAll();
   }, [reloadAll, activeCountryId, enabled, countries.length]);
 
+  const customRatesTotal = useMemo(
+    () =>
+      customDrafts.reduce((sum, draft) => {
+        const parsed = parseFeeInputOrZero(draft.rate ?? "0");
+        return sum + (parsed ?? 0);
+      }, 0),
+    [customDrafts],
+  );
+
   const totalRate = useMemo(
     () =>
       STAKEHOLDER_COUNTRY_ROLES.reduce((sum, role) => {
         const parsed = parseFeeInputOrZero(rateDrafts[role] ?? "0");
         return sum + (parsed ?? 0);
-      }, 0),
-    [rateDrafts],
+      }, 0) + customRatesTotal,
+    [customRatesTotal, rateDrafts],
   );
 
   const maxCompanyRecruiterRate = useMemo(() => {
@@ -552,6 +586,131 @@ export default function StakeholderCommissionPanel({
         summary: `Taux ${role} → ${rate}% (country)`,
         metadata: { role, rate, scope: "country", countryId: activeCountryId },
       });
+      void loadSettings();
+      void loadBalances();
+      void loadRevenueSharing();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.save_error"));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleSaveCustomStakeholder = async (draft: CustomStakeholderDraft) => {
+    const rate = parseFeeInputOrZero(draft.rate ?? "0");
+    if (rate == null || rate < 0) {
+      toast.error(t("stakeholder_commissions.invalid_rate"));
+      return;
+    }
+    if (!draft.label.trim()) {
+      toast.error(
+        t("stakeholder_commissions.custom_label_required", {
+          defaultValue: "Indiquez un libellé pour ce stakeholder.",
+        }),
+      );
+      return;
+    }
+    if (!draft.beneficiaryId.trim()) {
+      toast.error(
+        t("stakeholder_commissions.custom_user_required", {
+          defaultValue: "Sélectionnez un utilisateur bénéficiaire.",
+        }),
+      );
+      return;
+    }
+
+    setSavingSettings(true);
+    try {
+      await upsertStakeholderCommissionSettingSupabase({
+        scope: "country",
+        countryId: activeCountryId,
+        companyId: null,
+        stakeholderRole: "custom",
+        label: draft.label.trim(),
+        beneficiaryUserId: draft.beneficiaryId.trim(),
+        rate,
+        baseType: "platform_commission",
+        isActive: rate > 0,
+        settingId: draft.settingId,
+      });
+      toast.success(t("stakeholder_commissions.settings_saved"));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.commissions.stakeholder_attribution",
+        action: "update",
+        summary: `Stakeholder pays ${draft.label.trim()} → ${rate}%`,
+        metadata: {
+          role: "custom",
+          rate,
+          scope: "country",
+          countryId: activeCountryId,
+          beneficiaryUserId: draft.beneficiaryId,
+        },
+      });
+      void loadSettings();
+      void loadBalances();
+      void loadRevenueSharing();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.save_error"));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleAddCustomStakeholder = async () => {
+    const rate = parseFeeInputOrZero(customRate);
+    if (rate == null || rate < 0) {
+      toast.error(t("stakeholder_commissions.invalid_rate"));
+      return;
+    }
+    if (!customLabel.trim()) {
+      toast.error(
+        t("stakeholder_commissions.custom_label_required", {
+          defaultValue: "Indiquez un libellé pour ce stakeholder.",
+        }),
+      );
+      return;
+    }
+    if (!customBeneficiaryId.trim()) {
+      toast.error(
+        t("stakeholder_commissions.custom_user_required", {
+          defaultValue: "Sélectionnez un utilisateur bénéficiaire.",
+        }),
+      );
+      return;
+    }
+
+    setSavingSettings(true);
+    try {
+      await upsertStakeholderCommissionSettingSupabase({
+        scope: "country",
+        countryId: activeCountryId,
+        companyId: null,
+        stakeholderRole: "custom",
+        label: customLabel.trim(),
+        beneficiaryUserId: customBeneficiaryId.trim(),
+        rate,
+        baseType: "platform_commission",
+        isActive: rate > 0,
+      });
+      toast.success(t("stakeholder_commissions.settings_saved"));
+      setCustomLabel("");
+      setCustomBeneficiaryId("");
+      setCustomRate("0");
+      void loadSettings();
+      void loadBalances();
+      void loadRevenueSharing();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.save_error"));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleDeleteCustomStakeholder = async (settingId: string) => {
+    setSavingSettings(true);
+    try {
+      await deleteStakeholderCommissionSettingSupabase(settingId);
+      toast.success(t("stakeholder_commissions.settings_saved"));
       void loadSettings();
       void loadBalances();
       void loadRevenueSharing();
@@ -922,6 +1081,103 @@ export default function StakeholderCommissionPanel({
                     </tr>
                   ))}
 
+                  {customDrafts.map((draft) => (
+                    <tr key={`custom:${draft.settingId}`} className="bg-muted/10">
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {t("stakeholder_commissions.scope_country")}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">—</td>
+                      <td className="px-3 py-2 min-w-[160px]">
+                        <Input
+                          className="h-8"
+                          value={draft.label}
+                          onChange={(e) =>
+                            setCustomDrafts((current) =>
+                              current.map((row) =>
+                                row.settingId === draft.settingId
+                                  ? { ...row, label: e.target.value }
+                                  : row,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-2 min-w-[220px]">
+                        <Select
+                          value={draft.beneficiaryId || "__none"}
+                          onValueChange={(value) =>
+                            setCustomDrafts((current) =>
+                              current.map((row) =>
+                                row.settingId === draft.settingId
+                                  ? {
+                                      ...row,
+                                      beneficiaryId: value === "__none" ? "" : value,
+                                    }
+                                  : row,
+                              ),
+                            )
+                          }
+                          disabled={countryUsersLoading}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue
+                              placeholder={t("stakeholder_commissions.select_user", {
+                                defaultValue: "Choisir un utilisateur",
+                              })}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">—</SelectItem>
+                            {countryUsers.map((user) => (
+                              <SelectItem key={user.userId} value={user.userId}>
+                                {user.fullName ?? user.email ?? user.userId}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-24"
+                          value={draft.rate}
+                          onChange={(e) =>
+                            setCustomDrafts((current) =>
+                              current.map((row) =>
+                                row.settingId === draft.settingId
+                                  ? { ...row, rate: e.target.value }
+                                  : row,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={savingSettings}
+                            onClick={() => void handleSaveCustomStakeholder(draft)}
+                          >
+                            {tc("buttons.save")}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive"
+                            disabled={savingSettings}
+                            onClick={() => void handleDeleteCustomStakeholder(draft.settingId)}
+                            aria-label={t("stakeholder_commissions.delete_custom", {
+                              defaultValue: "Supprimer",
+                            })}
+                          >
+                            <Trash2Icon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+
                   {countryCompanies.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-3 py-4 text-sm text-muted-foreground">
@@ -1026,17 +1282,41 @@ export default function StakeholderCommissionPanel({
             <p className="text-sm font-medium">
               {t("stakeholder_commissions.add_custom", { defaultValue: "Ajouter un stakeholder" })}
             </p>
+            <p className="text-xs text-muted-foreground">
+              {t("stakeholder_commissions.add_custom_hint", {
+                defaultValue:
+                  "Ajoute une ligne au paramétrage pays (scope pays). Le bénéficiaire est choisi parmi les utilisateurs du pays.",
+              })}
+            </p>
             <div className="grid gap-2 md:grid-cols-4">
               <Input
                 placeholder={t("stakeholder_commissions.custom_label", { defaultValue: "Libellé" })}
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
               />
-              <Input
-                placeholder={t("stakeholder_commissions.custom_user_id", { defaultValue: "ID utilisateur" })}
-                value={customBeneficiaryId}
-                onChange={(e) => setCustomBeneficiaryId(e.target.value)}
-              />
+              <Select
+                value={customBeneficiaryId || "__none"}
+                onValueChange={(value) =>
+                  setCustomBeneficiaryId(value === "__none" ? "" : value)
+                }
+                disabled={countryUsersLoading || countryUsers.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={t("stakeholder_commissions.select_user", {
+                      defaultValue: "Choisir un utilisateur",
+                    })}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">—</SelectItem>
+                  {countryUsers.map((user) => (
+                    <SelectItem key={user.userId} value={user.userId}>
+                      {user.fullName ?? user.email ?? user.userId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 placeholder="%"
                 value={customRate}
@@ -1044,38 +1324,13 @@ export default function StakeholderCommissionPanel({
               />
               <Button
                 variant="outline"
-                disabled={savingSettings || !customLabel.trim() || !customBeneficiaryId.trim()}
-                onClick={() => {
-                  const rate = parseFeeInputOrZero(customRate);
-                  if (rate == null) {
-                    toast.error(t("stakeholder_commissions.invalid_rate"));
-                    return;
-                  }
-                  void (async () => {
-                    setSavingSettings(true);
-                    try {
-                      await upsertStakeholderCommissionSettingSupabase({
-                        scope: "country",
-                        countryId: activeCountryId,
-                        companyId: null,
-                        stakeholderRole: "custom",
-                        label: customLabel.trim(),
-                        beneficiaryUserId: customBeneficiaryId.trim(),
-                        rate,
-                        baseType: "platform_commission",
-                      });
-                      toast.success(t("stakeholder_commissions.settings_saved"));
-                      setCustomLabel("");
-                      setCustomBeneficiaryId("");
-                      setCustomRate("0");
-                      reloadAll();
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : t("stakeholder_commissions.save_error"));
-                    } finally {
-                      setSavingSettings(false);
-                    }
-                  })();
-                }}
+                disabled={
+                  savingSettings
+                  || !customLabel.trim()
+                  || !customBeneficiaryId.trim()
+                  || countryUsersLoading
+                }
+                onClick={() => void handleAddCustomStakeholder()}
               >
                 {t("stakeholder_commissions.add_custom_btn", { defaultValue: "Ajouter" })}
               </Button>
