@@ -9,8 +9,10 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import {
   colisPublicReference,
+  colisQrPayload,
   isColisPosPrinterAvailable,
   printColisReceipt,
+  printColisReceiptBrowser,
 } from "@/lib/colis-receipt.ts";
 import type { ColisAutonomeDetail } from "@/lib/supabase/colis-autonomes.ts";
 import { COLIS_STATUT_LABELS } from "@/lib/supabase/colis-autonomes.ts";
@@ -54,7 +56,7 @@ export default function ColisReceiptPanel({
   const companyName = companyInfo?.name || detail.companyName || "Tibus";
 
   useEffect(() => {
-    void QRCode.toDataURL(detail.id, {
+    void QRCode.toDataURL(colisQrPayload(detail), {
       width: 180,
       margin: 1,
       color: { dark: "#000000", light: "#ffffff" },
@@ -73,7 +75,11 @@ export default function ColisReceiptPanel({
 
   const handleThermalPrint = useCallback(
     (paperWidth: ThermalPaperWidth) => {
-      printColisReceipt(detail, currency, paperWidth);
+      if (isColisPosPrinterAvailable()) {
+        printColisReceipt(detail, currency, paperWidth);
+        return;
+      }
+      printColisReceiptBrowser(paperWidth);
     },
     [currency, detail],
   );

@@ -170,11 +170,14 @@
 
   /* Show only the receipt area */
   #printable-receipt,
-  #printable-receipt * {
+  #printable-colis-receipt,
+  #printable-receipt *,
+  #printable-colis-receipt * {
     visibility: visible;
   }
 
-  #printable-receipt {
+  #printable-receipt,
+  #printable-colis-receipt {
     position: fixed;
     left: 0;
     top: 0;
@@ -192,25 +195,29 @@
   }
 
   /* 56mm paper: narrower width */
-  html.print-56mm #printable-receipt {
+  html.print-56mm #printable-receipt,
+  html.print-56mm #printable-colis-receipt {
     width: 52mm;
     font-size: 9px;
     line-height: 1.25;
   }
 
   /* Print images (QR codes) */
-  #printable-receipt img {
+  #printable-receipt img,
+  #printable-colis-receipt img {
     max-width: 100%;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   /* QR code sizing for thermal */
-  #printable-receipt img[alt="QR"] {
+  #printable-receipt img[alt="QR"],
+  #printable-colis-receipt img[alt="QR retrait"] {
     width: 28mm !important;
     height: 28mm !important;
   }
-  html.print-56mm #printable-receipt img[alt="QR"] {
+  html.print-56mm #printable-receipt img[alt="QR"],
+  html.print-56mm #printable-colis-receipt img[alt="QR retrait"] {
     width: 22mm !important;
     height: 22mm !important;
   }

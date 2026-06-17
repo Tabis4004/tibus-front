@@ -423,3 +423,4 @@ Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commi
 | `135_mouvements_caisse_colis_autonome_fk.sql` | Encaissement colis autonome via `colis_autonome_id` (FK `colis_autonomes`, plus `ReservationBus`) |
 | `136_cash_sale_departure_gare_only.sql` | Vente cash limitée aux départs de la gare de caisse ouverte (`assert_seller_cash_departure_gare`) |
 | `137_colis_retrait_qr_reference.sql` | Retrait colis via QR (UUID) ou référence `CL-XXXXXXXX` (`resolve_colis_retrait_code`, `deliver_colis_autonome(text)`) |
+| `138_colis_sms_gate_sync.sql` | Sync porte admin SMS colis / flags owner, `build_colis_sms_payload` + `skipReason` |

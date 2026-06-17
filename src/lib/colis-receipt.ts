@@ -2,11 +2,16 @@ import { toast } from "sonner";
 import { printer, type PrintLine } from "@/lib/printer.ts";
 import type { ColisAutonomeDetail } from "@/lib/supabase/colis-autonomes.ts";
 import { COLIS_STATUT_LABELS } from "@/lib/supabase/colis-autonomes.ts";
-import { isPosPrinterAvailable, type ThermalPaperWidth } from "@/lib/ticket-receipt-print.ts";
+import { readTibusBridgeFlags } from "@/lib/webview-bridge.ts";
+import type { ThermalPaperWidth } from "@/lib/ticket-receipt-print.ts";
 
 export function colisPublicReference(colisId: string): string {
   const compact = colisId.replace(/-/g, "").toUpperCase();
   return `CL-${compact.slice(0, 8)}`;
+}
+
+export function colisQrPayload(detail: ColisAutonomeDetail): string {
+  return colisPublicReference(detail.id);
 }
 
 export type ColisReceiptInput = {
@@ -65,14 +70,17 @@ function printViaTibusP3(
   paperWidth: ThermalPaperWidth,
 ): boolean {
   const p3 = tibusP3();
-  if (!printer.isNative || !p3) return false;
+  if (!p3?.printReceipt58 && !p3?.printReceipt80) return false;
 
+  const qr = colisQrPayload(detail);
   const payload = JSON.stringify({
     title: detail.companyName || "TIBUS COLIS",
     text: lines.map((line) => line.text).join("\n"),
-    qr: detail.id,
+    qr,
+    reference: qr,
     score: 999,
     source: "colis-receipt",
+    kind: "colis",
   });
 
   if (paperWidth === "80mm" && p3.printReceipt80) {
@@ -90,26 +98,35 @@ function printViaTibusP3(
   return false;
 }
 
+export function printColisReceiptBrowser(paperWidth: ThermalPaperWidth = "80mm"): void {
+  const htmlEl = document.documentElement;
+  htmlEl.classList.remove("print-80mm", "print-56mm");
+  htmlEl.classList.add(paperWidth === "56mm" ? "print-56mm" : "print-80mm");
+  window.print();
+  window.setTimeout(() => htmlEl.classList.remove("print-80mm", "print-56mm"), 1000);
+}
+
 export function printColisReceipt(
   detail: ColisAutonomeDetail,
   currency = "XOF",
   paperWidth: ThermalPaperWidth = "80mm",
 ): void {
   const lines = buildColisReceiptLines(detail, currency);
+  const qr = colisQrPayload(detail);
   try {
     if (printViaTibusP3(detail, lines, paperWidth)) return;
     if (printer.isNative) {
       void printer.printReceipt({
         header: detail.companyName || "TIBUS COLIS",
         lines,
-        qr: detail.id,
+        qr,
         qrSize: 220,
         feedLines: 4,
         cut: true,
       });
       return;
     }
-    toast.message("Impression POS indisponible — utilisez le bouton Imprimer ci-dessous");
+    printColisReceiptBrowser(paperWidth);
   } catch (error) {
     console.error("Colis print error:", error);
     toast.error("Impression impossible");
@@ -117,5 +134,10 @@ export function printColisReceipt(
 }
 
 export function isColisPosPrinterAvailable(): boolean {
-  return isPosPrinterAvailable();
+  const flags = readTibusBridgeFlags();
+  return (
+    flags.tibusP3 ||
+    flags.wisePrinter ||
+    Boolean(tibusP3()?.printReceipt58 || tibusP3()?.printReceipt80)
+  );
 }

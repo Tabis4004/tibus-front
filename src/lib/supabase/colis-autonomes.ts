@@ -52,6 +52,7 @@ export type ColisSmsPayload = {
   message?: string;
   expediteurPhone?: string;
   destinatairePhone?: string;
+  skipReason?: "admin_gate" | "owner_disabled" | null;
 };
 
 export type RegisterColisResult = {
@@ -209,6 +210,10 @@ export async function registerColisAutonomeSupabase(
       message: sms.message ? String(sms.message) : undefined,
       expediteurPhone: sms.expediteurPhone ? String(sms.expediteurPhone) : undefined,
       destinatairePhone: sms.destinatairePhone ? String(sms.destinatairePhone) : undefined,
+      skipReason:
+        sms.skipReason === "admin_gate" || sms.skipReason === "owner_disabled"
+          ? sms.skipReason
+          : undefined,
     },
   };
 }
@@ -272,6 +277,10 @@ export async function updateColisStatutSupabase(
       message: sms.message ? String(sms.message) : undefined,
       expediteurPhone: sms.expediteurPhone ? String(sms.expediteurPhone) : undefined,
       destinatairePhone: sms.destinatairePhone ? String(sms.destinatairePhone) : undefined,
+      skipReason:
+        sms.skipReason === "admin_gate" || sms.skipReason === "owner_disabled"
+          ? sms.skipReason
+          : undefined,
     },
   };
 }
@@ -307,6 +316,10 @@ export async function deliverColisAutonomeSupabase(retraitCode: string): Promise
       message: sms.message ? String(sms.message) : undefined,
       expediteurPhone: sms.expediteurPhone ? String(sms.expediteurPhone) : undefined,
       destinatairePhone: sms.destinatairePhone ? String(sms.destinatairePhone) : undefined,
+      skipReason:
+        sms.skipReason === "admin_gate" || sms.skipReason === "owner_disabled"
+          ? sms.skipReason
+          : undefined,
     },
   };
 }

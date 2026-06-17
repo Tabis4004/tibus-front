@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeftIcon,
-  CheckCircleIcon,
-  KeyboardIcon,
   PackageIcon,
   PrinterIcon,
-  SearchIcon,
   TruckIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +22,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import ColisReceiptPanel from "@/components/seller/ColisReceiptPanel.tsx";
-import QrScanner from "@/pages/verify/_components/QrScanner.tsx";
+import ColisScanWorkflow from "@/pages/verify/_components/ColisScanWorkflow.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getSellerProfileSupabase } from "@/lib/supabase/seller-counter";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
@@ -33,18 +30,14 @@ import {
   getOpenStationCashSupabase,
   listCompanyStationGaresSupabase,
 } from "@/lib/supabase/station-cash.ts";
-import { colisPublicReference } from "@/lib/colis-receipt.ts";
-import { parseColisQrPayload } from "@/lib/colis-verify.ts";
 import {
   COLIS_NEXT_STATUT,
   COLIS_STATUT_LABELS,
-  deliverColisAutonomeSupabase,
   getColisAutonomeDetailSupabase,
   getCompanyColisSettingsSupabase,
   listColisAutonomesSupabase,
   listColisNaturesSupabase,
   registerColisAutonomeSupabase,
-  resolveColisRetraitCodeSupabase,
   sendColisSmsSupabase,
   updateColisStatutSupabase,
   type ColisAutonomeDetail,
@@ -102,7 +95,15 @@ async function maybeSendColisSms(
   sms: ColisSmsPayload,
 ) {
   if (!sms.send || !sms.message) {
-    toast.message("SMS non envoyé — activez « Enregistrement au guichet » dans Paramètres colis (owner).");
+    if (sms.skipReason === "admin_gate") {
+      toast.message(
+        "SMS non envoyé — l'administrateur Tibus doit activer « Configuration SMS colis » pour votre compagnie.",
+      );
+      return;
+    }
+    toast.message(
+      "SMS non envoyé — activez l'étape correspondante dans Paramètres colis (owner).",
+    );
     return;
   }
   const phones = [sms.expediteurPhone, sms.destinatairePhone].filter(Boolean) as string[];
@@ -156,11 +157,6 @@ export default function ColisAutonomesPage({
   const [selectedNatureId, setSelectedNatureId] = useState("");
   const [saving, setSaving] = useState(false);
   const [receiptDetail, setReceiptDetail] = useState<ColisAutonomeDetail | null>(null);
-
-  const [retraitCode, setRetraitCode] = useState("");
-  const [pickupPreview, setPickupPreview] = useState<ColisAutonomeDetail | null>(null);
-  const [pickupLoading, setPickupLoading] = useState(false);
-  const [delivering, setDelivering] = useState(false);
 
   const activeNatures = useMemo(
     () => natures.filter((n) => n.isActive),
@@ -372,47 +368,6 @@ export default function ColisAutonomesPage({
     }
   };
 
-  const lookupPickupColis = async (raw: string) => {
-    const parsed = parseColisQrPayload(raw);
-    if (!parsed) {
-      toast.error(t("colis.invalid_code", { defaultValue: "Code invalide — scannez le QR ou saisissez CL-XXXXXXXX" }));
-      return;
-    }
-    setPickupLoading(true);
-    try {
-      const colisId = await resolveColisRetraitCodeSupabase(parsed);
-      if (!colisId) {
-        throw new Error(t("colis.invalid_code", { defaultValue: "Code invalide" }));
-      }
-      const detail = await getColisAutonomeDetailSupabase(colisId);
-      if (!detail) throw new Error("Colis introuvable");
-      if (detail.statutColis !== "arrive") {
-        throw new Error(
-          t("colis.not_ready_pickup", {
-            defaultValue: "Colis non disponible au retrait (statut : {{statut}})",
-            statut: COLIS_STATUT_LABELS[detail.statutColis],
-          }),
-        );
-      }
-      setPickupPreview(detail);
-      setRetraitCode(colisPublicReference(detail.id));
-    } catch (err) {
-      setPickupPreview(null);
-      toast.error(supabaseErrorMessage(err, t("colis.invalid_code", { defaultValue: "Code invalide" })));
-    } finally {
-      setPickupLoading(false);
-    }
-  };
-
-  const handlePickupScan = (payload: string) => {
-    void lookupPickupColis(payload);
-  };
-
-  const handlePickupLookupManual = () => {
-    if (!retraitCode.trim()) return;
-    void lookupPickupColis(retraitCode.trim());
-  };
-
   const handleAdvanceStatus = async (row: ColisAutonomeRow) => {
     const next = COLIS_NEXT_STATUT[row.statutColis];
     if (!next || next === "livre") return;
@@ -423,31 +378,6 @@ export default function ColisAutonomesPage({
       await load();
     } catch (err) {
       toast.error(supabaseErrorMessage(err, t("errors.generic", { ns: "common" })));
-    }
-  };
-
-  const handleDeliver = async () => {
-    if (!pickupPreview) {
-      toast.error(t("colis.scan_first", { defaultValue: "Scannez ou vérifiez le colis avant la remise" }));
-      return;
-    }
-    setDelivering(true);
-    try {
-      const result = await deliverColisAutonomeSupabase(retraitCode.trim() || pickupPreview.id);
-      await maybeSendColisSms(result.id, result.statutColis, result.sms);
-      toast.success(
-        t("colis.delivered", {
-          defaultValue: "Colis remis à {{name}}",
-          name: result.nomDestinataire,
-        }),
-      );
-      setRetraitCode("");
-      setPickupPreview(null);
-      await load();
-    } catch (err) {
-      toast.error(supabaseErrorMessage(err, t("colis.invalid_code", { defaultValue: "Code invalide" })));
-    } finally {
-      setDelivering(false);
     }
   };
 
@@ -686,77 +616,16 @@ export default function ColisAutonomesPage({
         <TabsContent value="retrait" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{t("colis.pickup_title", { defaultValue: "Remise au destinataire" })}</CardTitle>
+              <CardTitle className="text-base">
+                {t("colis.pickup_title", { defaultValue: "Contrôle colis (scan)" })}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                {t("colis.pickup_hint", {
-                  defaultValue:
-                    "Scannez le QR du reçu ou saisissez la référence CL-XXXXXXXX. Le colis doit être au statut « Arrivé ».",
-                })}
+                Scannez le QR ou la référence CL- pour faire avancer le colis : en soute → arrivé →
+                remis au destinataire.
               </p>
-
-              <QrScanner onScan={handlePickupScan} paused={pickupLoading || delivering} />
-
-              <div className="space-y-2">
-                <Label htmlFor="colis-pickup-ref" className="flex items-center gap-1.5 text-sm">
-                  <KeyboardIcon className="w-4 h-4" />
-                  Référence manuelle
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="colis-pickup-ref"
-                    className="font-mono text-xs uppercase"
-                    placeholder="CL-XXXXXXXX"
-                    value={retraitCode}
-                    onChange={(e) => {
-                      setRetraitCode(e.target.value.toUpperCase());
-                      setPickupPreview(null);
-                    }}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <Button
-                    variant="secondary"
-                    className="cursor-pointer shrink-0 gap-2"
-                    disabled={pickupLoading || !retraitCode.trim()}
-                    onClick={() => void handlePickupLookupManual()}
-                  >
-                    <SearchIcon className="w-4 h-4" />
-                    {pickupLoading ? "…" : "Vérifier"}
-                  </Button>
-                </div>
-              </div>
-
-              {pickupPreview ? (
-                <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3 space-y-2">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <CheckCircleIcon className="w-4 h-4 text-green-600" />
-                    Colis prêt au retrait — {colisPublicReference(pickupPreview.id)}
-                  </p>
-                  <p className="text-xs">
-                    {pickupPreview.gareDepart} → {pickupPreview.gareDestination}
-                  </p>
-                  <p className="text-xs">
-                    Destinataire : <span className="font-semibold">{pickupPreview.nomDestinataire}</span>
-                  </p>
-                  <p className="text-xs">
-                    Nature : {pickupPreview.natures.join(", ") || "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground break-words">
-                    Description : {pickupPreview.descriptionContenu?.trim() || "—"}
-                  </p>
-                  <Button
-                    className="w-full cursor-pointer gap-2"
-                    disabled={delivering}
-                    onClick={() => void handleDeliver()}
-                  >
-                    <TruckIcon className="w-4 h-4" />
-                    {delivering ? "…" : t("colis.deliver_btn", { defaultValue: "Remettre au destinataire" })}
-                  </Button>
-                </div>
-              ) : null}
+              <ColisScanWorkflow onAdvanced={() => void load()} />
             </CardContent>
           </Card>
         </TabsContent>

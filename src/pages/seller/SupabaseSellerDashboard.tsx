@@ -914,9 +914,17 @@ export default function SupabaseSellerDashboard() {
           <Button variant="outline" size="sm" className="h-8 cursor-pointer" asChild>
             <Link to={`/${lng ?? "fr"}/verify/scan`} data-tour="seller-scan">
               <ScanLineIcon className="w-4 h-4 mr-1.5" />
-              Scanner
+              Billets
             </Link>
           </Button>
+          {colisModuleEnabled ? (
+            <Button variant="outline" size="sm" className="h-8 cursor-pointer" asChild>
+              <Link to={`/${lng ?? "fr"}/verify/scan-colis`}>
+                <PackageIcon className="w-4 h-4 mr-1.5" />
+                Colis
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
       <div className="rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4 flex items-center gap-3">

@@ -64,6 +64,7 @@ import SupabaseCompanyProfile from "./traveler/SupabaseCompanyProfile.tsx";
 import TicketVerifyPage from "./verify/TicketVerify.tsx";
 import SupabaseTicketVerify from "./verify/SupabaseTicketVerify.tsx";
 import TicketScannerPage from "./verify/TicketScannerPage.tsx";
+import ColisScannerPage from "./verify/ColisScannerPage.tsx";
 import ReferralPage from "./traveler/ReferralPage.tsx";
 import GuaranteeFundPage from "./owner/GuaranteeFundPage.tsx";
 import CompanySalesPage from "./owner/CompanySalesPage.tsx";
@@ -343,4 +344,16 @@ export function TicketScanner() {
     );
   }
   return <TicketScannerPage />;
+}
+
+export function ColisScanner() {
+  if (!isSupabaseAuth()) {
+    return (
+      <SupabaseMigrationNotice
+        title="Scanner colis"
+        description="Le scanner colis Supabase n'est pas disponible en mode Convex."
+      />
+    );
+  }
+  return <ColisScannerPage />;
 }

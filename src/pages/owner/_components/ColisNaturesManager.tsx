@@ -17,7 +17,7 @@ import {
   type ColisNature,
   type CompanyColisSettings,
 } from "@/lib/supabase/colis-autonomes.ts";
-import { isColisAutonomeModuleActive, colisSmsOwnerConfigEnabled } from "@/lib/company-feature-modules.ts";
+import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
 import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
 
 export default function ColisNaturesManager({ companyId }: { companyId: string }) {
@@ -109,8 +109,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
   }
 
   const colisModuleActive = isColisAutonomeModuleActive(settings, featureModules);
-  const smsConfigAllowed =
-    settings.colisSmsConfigEnabled || colisSmsOwnerConfigEnabled(featureModules);
+  const smsConfigAllowed = settings.colisSmsConfigEnabled;
 
   if (!colisModuleActive) {
     return (

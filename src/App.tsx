@@ -63,6 +63,7 @@ import {
   SubscriptionSuccess,
   TicketReports,
   TicketScanner,
+  ColisScanner,
   TicketVerify,
   TravelerHome,
   TravelersPage,
@@ -120,6 +121,7 @@ function AppShell() {
                 <Route path="payment/setup" element={<PaymentSetup />} />
                 <Route path="payment/verify" element={<PaymentVerify />} />
                 <Route path="verify/scan" element={<TicketScanner />} />
+                <Route path="verify/scan-colis" element={<ColisScanner />} />
                 <Route path="verify/:reference" element={<TicketVerify />} />
                 <Route path="company/:companyId" element={<CompanyProfile />} />
                 <Route path="owner" element={<OwnerLayout />}>
