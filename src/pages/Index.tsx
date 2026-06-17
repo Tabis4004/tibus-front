@@ -562,10 +562,7 @@ function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs">T</span>
-              </div>
-              <span className="font-semibold text-sm">{APP_NAME}</span>
+              <AppBrand logoClassName="h-7 w-7" titleClassName="text-sm" />
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <Link to={`/${locale}/contact`} className="hover:text-foreground transition-colors cursor-pointer">

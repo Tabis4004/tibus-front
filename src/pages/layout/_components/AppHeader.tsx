@@ -188,7 +188,7 @@ export default function AppHeader() {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <AppBrand to={homePath} logoClassName="h-8 w-8" titleClassName="text-lg" />
+        <AppBrand to={homePath} logoClassName="h-9 w-9" titleClassName="text-lg" />
         <div className="flex items-center gap-2">
           <LocaleSwitcher />
           <ManualNavLinks />

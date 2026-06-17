@@ -425,6 +425,7 @@ Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commi
 | `137_colis_retrait_qr_reference.sql` | Retrait colis via QR (UUID) ou référence `CL-XXXXXXXX` (`resolve_colis_retrait_code`, `deliver_colis_autonome(text)`) |
 | `138_colis_sms_gate_sync.sql` | Sync porte admin SMS colis / flags owner, `build_colis_sms_payload` + `skipReason` |
 | `139_colis_sms_message_cl_reference.sql` | SMS colis avec référence `CL-XXXXXXXX` (plus UUID complet) |
+| `140_record_station_cash_movement_unique.sql` | ✅ Exécuté — supprime la surcharge `record_station_cash_movement` (fix vente guichet « function is not unique ») |
 
 ## SMS colis — Infobip (essai 60 jours)
 

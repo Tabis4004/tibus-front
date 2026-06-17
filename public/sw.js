@@ -1,5 +1,5 @@
-const CACHE_VERSION = "tibus-static-v3";
-const STATIC_ASSETS = ["/icon/icon-192.png", "/icon/icon-512.png"];
+const CACHE_VERSION = "tibus-static-v4";
+const STATIC_ASSETS = ["/icon/tibus-mark.png", "/icon/icon-192.png", "/icon/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
