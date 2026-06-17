@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCwIcon, WalletIcon } from "lucide-react";
+import { CircleDollarSignIcon, ClockIcon, RefreshCwIcon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
@@ -17,6 +17,7 @@ import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.t
 import StakeholderSettlementApprovalFields from "./StakeholderSettlementApprovalFields.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 
 function formatMoney(value: number, currency: string) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${currency}`;
@@ -246,25 +247,25 @@ export default function StakeholderPayoutDashboardPanel({
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       ) : (
         <>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">{t("stakeholder_commissions.col_earned")}</p>
-              <p className="text-lg font-semibold tabular-nums">
-                {formatMoney(totals.earned, totals.currency)}
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">{t("stakeholder_commissions.col_balance")}</p>
-              <p className="text-lg font-semibold tabular-nums">
-                {formatMoney(totals.due, totals.currency)}
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">{t("stakeholder_commissions.col_pending")}</p>
-              <p className="text-lg font-semibold tabular-nums text-amber-700">
-                {formatMoney(totals.pending, totals.currency)}
-              </p>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ConsoleGridTile
+              tileIndex={0}
+              icon={CircleDollarSignIcon}
+              label={t("stakeholder_commissions.col_earned")}
+              value={formatMoney(totals.earned, totals.currency)}
+            />
+            <ConsoleGridTile
+              tileIndex={1}
+              icon={WalletIcon}
+              label={t("stakeholder_commissions.col_balance")}
+              value={formatMoney(totals.due, totals.currency)}
+            />
+            <ConsoleGridTile
+              tileIndex={2}
+              icon={ClockIcon}
+              label={t("stakeholder_commissions.col_pending")}
+              value={formatMoney(totals.pending, totals.currency)}
+            />
           </div>
 
           <div className="overflow-x-auto rounded-lg border">

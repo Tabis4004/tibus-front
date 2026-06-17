@@ -21,6 +21,8 @@ import {
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import type { OwnerCompany } from "@/lib/supabase/owner-company";
 import GuaranteeFundOverviewCard from "./GuaranteeFundOverviewCard.tsx";
+import { cn } from "@/lib/utils.ts";
+import { consoleTileStyle } from "@/lib/console-grid-tiles.ts";
 
 type Props = {
   company: OwnerCompany;
@@ -30,30 +32,40 @@ function ModuleBlock({
   module,
   lng,
   t,
+  tileIndex,
 }: {
   module: OwnerConsoleModule;
   lng: string;
   t: (key: string, options?: Record<string, string>) => string;
+  tileIndex: number;
 }) {
   const Icon = module.icon;
+  const style = consoleTileStyle(tileIndex);
 
   return (
     <Link to={`/${lng}${module.toSuffix}`} className="block h-full" data-tour={module.tourTarget}>
-      <div className="h-full rounded-xl border border-[#2a82c9]/25 tibus-blue-surface p-4 flex flex-col gap-3 hover:border-[#1fb5ff]/50 hover:shadow-md transition-all group">
-        <div className="w-11 h-11 rounded-xl tibus-blue-gradient flex items-center justify-center shrink-0 shadow-sm">
-          <Icon className="w-5 h-5 text-white" />
+      <div
+        className={cn(
+          "h-full min-h-[132px] rounded-2xl border p-4 flex flex-col items-center justify-center text-center gap-2.5",
+          "hover:shadow-md transition-all group",
+          style.tile,
+          style.border,
+        )}
+      >
+        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", style.iconWrap)}>
+          <Icon className={cn("w-6 h-6", style.icon)} />
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-snug text-[#1a508b] dark:text-[#7ec8ff]">
+        <div className="min-w-0 w-full">
+          <h3 className={cn("font-semibold text-sm leading-snug", style.title)}>
             {t(module.titleKey, { defaultValue: module.titleDefault })}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+          <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
             {t(module.descKey, { defaultValue: module.descDefault })}
           </p>
         </div>
-        <div className="flex items-center gap-1 text-[11px] font-medium text-[#2a82c9] group-hover:text-[#1a508b]">
+        <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground group-hover:text-foreground">
           Ouvrir
-          <ArrowRightIcon className="w-3.5 h-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+          <ArrowRightIcon className="w-3 h-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </div>
       </div>
     </Link>
@@ -179,12 +191,12 @@ export default function OwnerConsoleModules({ company }: Props) {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
             {t(section.sectionKey, { defaultValue: section.sectionDefault })}
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {section.items.map((module) =>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {section.items.map((module, index) =>
               module.id === "guarantee" && showGuaranteeFund ? (
                 <GuaranteeFundOverviewCard key={module.id} companyId={company.id} />
               ) : (
-                <ModuleBlock key={module.id} module={module} lng={lng ?? "fr"} t={t} />
+                <ModuleBlock key={module.id} module={module} lng={lng ?? "fr"} t={t} tileIndex={index} />
               ),
             )}
           </div>

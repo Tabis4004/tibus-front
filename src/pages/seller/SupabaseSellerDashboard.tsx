@@ -73,6 +73,9 @@ import CompanyLoyaltyUserLookup, {
 } from "@/components/CompanyLoyaltyUserLookup.tsx";
 import { hasSellerManualAccess } from "@/lib/seller-manual-access.ts";
 import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
+import { cn } from "@/lib/utils.ts";
+import { consoleTileStyle } from "@/lib/console-grid-tiles.ts";
 import OfflineStatusBanner from "@/components/OfflineStatusBanner.tsx";
 import { useOfflineSync } from "@/hooks/use-offline-sync.tsx";
 import { isBrowserOnline } from "@/lib/offline/network.ts";
@@ -952,16 +955,8 @@ export default function SupabaseSellerDashboard() {
       </div>
 
       <div data-tour="seller-kpis" className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {dashboardCards.map(({ label, value, icon: Icon }) => (
-          <Card key={label} className="border-[#2a82c9]/15 tibus-blue-surface">
-            <CardContent className="p-4">
-              <div className="w-8 h-8 rounded-lg tibus-blue-gradient flex items-center justify-center mb-2 shadow-sm">
-                <Icon className="w-4 h-4 text-white" />
-              </div>
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="font-black text-lg truncate text-[#1a508b] dark:text-[#7ec8ff]">{value}</p>
-            </CardContent>
-          </Card>
+        {dashboardCards.map(({ label, value, icon }, i) => (
+          <ConsoleGridTile key={label} tileIndex={i} icon={icon} label={label} value={value} />
         ))}
       </div>
 
@@ -1018,8 +1013,10 @@ export default function SupabaseSellerDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {trips.map((trip, tripIndex) => (
-          <Card key={trip._id} className="border-[#2a82c9]/15 tibus-blue-surface">
+        {trips.map((trip, tripIndex) => {
+          const tile = consoleTileStyle(tripIndex);
+          return (
+          <Card key={trip._id} className={cn("border shadow-sm", tile.tile, tile.border)}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1064,7 +1061,8 @@ export default function SupabaseSellerDashboard() {
               </Button>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
         </div>
       )}
 
@@ -1114,6 +1112,7 @@ export default function SupabaseSellerDashboard() {
             <ColisAutonomesPage
               companyId={profile.company.id}
               companyName={profile.company.name}
+              companyReceiptInfo={companyReceiptInfo}
             />
           </TabsContent>
         ) : null}

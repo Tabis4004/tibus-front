@@ -21,6 +21,7 @@ import {
 } from "@/lib/supabase/station-cash.ts";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 import { cn } from "@/lib/utils.ts";
+import { consoleTileStyle } from "@/lib/console-grid-tiles.ts";
 
 const POLL_MS = 15_000;
 
@@ -212,20 +213,23 @@ export default function StationCashPanel({
               title: "Validation",
               text: "Le comptable ou l'owner approuve et clôture la session.",
             },
-          ].map((item) => (
+          ].map((item, index) => {
+            const tile = consoleTileStyle(index);
+            return (
             <div
               key={item.step}
-              className="rounded-lg border border-[#2a82c9]/20 tibus-blue-surface p-3 text-xs"
+              className={cn("rounded-2xl border p-3 text-xs text-center", tile.tile, tile.border)}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-6 h-6 rounded-md tibus-blue-gradient text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+              <div className="flex flex-col items-center gap-1.5">
+                <span className={cn("w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm", tile.iconWrap)}>
                   {item.step}
                 </span>
-                <span className="font-semibold text-[#1a508b] dark:text-[#7ec8ff]">{item.title}</span>
+                <span className={cn("font-semibold text-sm", tile.title)}>{item.title}</span>
+                <p className="text-muted-foreground leading-snug">{item.text}</p>
               </div>
-              <p className="text-muted-foreground leading-snug pl-8">{item.text}</p>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {openCash.pendingReversal && !openCash.open ? (

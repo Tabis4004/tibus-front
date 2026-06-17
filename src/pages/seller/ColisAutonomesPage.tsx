@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.t
 import ColisReceiptPanel from "@/components/seller/ColisReceiptPanel.tsx";
 import ColisScanWorkflow from "@/pages/verify/_components/ColisScanWorkflow.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
-import { getSellerProfileSupabase } from "@/lib/supabase/seller-counter";
+import { getSellerProfileSupabase, getSellerCompanyReceiptInfoSupabase, type SellerCompanyReceiptInfo } from "@/lib/supabase/seller-counter";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 import {
   getOpenStationCashSupabase,
@@ -130,10 +130,12 @@ export default function ColisAutonomesPage({
   onBack,
   companyId: companyIdProp,
   companyName: companyNameProp,
+  companyReceiptInfo: companyReceiptInfoProp,
 }: {
   onBack?: () => void;
   companyId?: string;
   companyName?: string;
+  companyReceiptInfo?: SellerCompanyReceiptInfo | null;
 }) {
   const { t } = useTranslation("seller");
   const { appUserId } = useSupabaseAuth();
@@ -160,6 +162,9 @@ export default function ColisAutonomesPage({
   const [selectedNatureId, setSelectedNatureId] = useState("");
   const [saving, setSaving] = useState(false);
   const [receiptDetail, setReceiptDetail] = useState<ColisAutonomeDetail | null>(null);
+  const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(
+    companyReceiptInfoProp ?? null,
+  );
 
   const activeNatures = useMemo(
     () => natures.filter((n) => n.isActive),
@@ -250,10 +255,16 @@ export default function ColisAutonomesPage({
       }
       setCompanyId(cid);
 
-      const [settings, featureModules] = await Promise.all([
+      const receiptInfoPromise = companyReceiptInfoProp
+        ? Promise.resolve(companyReceiptInfoProp)
+        : getSellerCompanyReceiptInfoSupabase(cid).catch(() => null);
+
+      const [settings, featureModules, receiptInfo] = await Promise.all([
         getCompanyColisSettingsSupabase(cid),
         getCompanyFeatureModulesSupabase(cid).catch(() => null),
+        receiptInfoPromise,
       ]);
+      setCompanyReceiptInfo(receiptInfo);
       const moduleActive = isColisAutonomeModuleActive(settings, featureModules);
       setModuleEnabled(moduleActive);
       if (!moduleActive) return;
@@ -412,6 +423,7 @@ export default function ColisAutonomesPage({
     return (
       <ColisReceiptPanel
         detail={receiptDetail}
+        companyInfo={companyReceiptInfo ?? undefined}
         autoPrint
         onBack={() => {
           closeReceipt();

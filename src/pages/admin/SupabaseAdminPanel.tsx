@@ -74,6 +74,7 @@ import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import {
@@ -365,10 +366,30 @@ export default function SupabaseAdminPanel() {
 
       {appUser.isSuperAdmin ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard icon={UsersIcon} label={t("total_users")} value={stats.users} />
-          <StatCard icon={BuildingIcon} label={t("total_companies")} value={stats.companies} />
-          <StatCard icon={CreditCardIcon} label={t("active_subs")} value={stats.activeSubscriptions} />
-          <StatCard icon={GlobeIcon} label={t("geo.cities", { defaultValue: "Villes" })} value={stats.cities} />
+          <ConsoleGridTile
+            tileIndex={0}
+            icon={UsersIcon}
+            label={t("total_users")}
+            value={stats.users.toLocaleString()}
+          />
+          <ConsoleGridTile
+            tileIndex={1}
+            icon={BuildingIcon}
+            label={t("total_companies")}
+            value={stats.companies.toLocaleString()}
+          />
+          <ConsoleGridTile
+            tileIndex={2}
+            icon={CreditCardIcon}
+            label={t("active_subs")}
+            value={stats.activeSubscriptions.toLocaleString()}
+          />
+          <ConsoleGridTile
+            tileIndex={3}
+            icon={GlobeIcon}
+            label={t("geo.cities", { defaultValue: "Villes" })}
+            value={stats.cities.toLocaleString()}
+          />
         </div>
       ) : null}
 
@@ -589,28 +610,33 @@ export default function SupabaseAdminPanel() {
             ) : (
               <>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                  <StatCard
+                  <ConsoleGridTile
+                    tileIndex={0}
                     icon={CircleDollarSignIcon}
-                    label={t("commissions.traveler_online_captured", { defaultValue: "Commissions voyageur en ligne" })}
-                    value={data.platformCommissions?.travelerOnlineCaptured ?? data.platformCommissions?.capturedTotal ?? 0}
-                    suffix={` ${data.platformCommissions?.currency ?? data.commissions?.currency ?? "XOF"}`}
+                    label={t("commissions.traveler_online_captured", {
+                      defaultValue: "Commissions voyageur en ligne",
+                    })}
+                    value={`${(data.platformCommissions?.travelerOnlineCaptured ?? data.platformCommissions?.capturedTotal ?? 0).toLocaleString()} ${data.platformCommissions?.currency ?? data.commissions?.currency ?? "XOF"}`}
                   />
-                  <StatCard
+                  <ConsoleGridTile
+                    tileIndex={1}
                     icon={CircleDollarSignIcon}
-                    label={t("commissions.counter_company_captured", { defaultValue: "Commissions guichet (compagnie)" })}
-                    value={data.platformCommissions?.counterCompanyCaptured ?? 0}
-                    suffix={` ${data.platformCommissions?.currency ?? "XOF"}`}
+                    label={t("commissions.counter_company_captured", {
+                      defaultValue: "Commissions guichet (compagnie)",
+                    })}
+                    value={`${(data.platformCommissions?.counterCompanyCaptured ?? 0).toLocaleString()} ${data.platformCommissions?.currency ?? "XOF"}`}
                   />
-                  <StatCard
+                  <ConsoleGridTile
+                    tileIndex={2}
                     icon={CircleDollarSignIcon}
                     label={t("commissions.stakeholder_due", { defaultValue: "Solde stakeholders" })}
-                    value={data.platformCommissions?.stakeholderPending ?? 0}
-                    suffix={` ${data.platformCommissions?.currency ?? "XOF"}`}
+                    value={`${(data.platformCommissions?.stakeholderPending ?? 0).toLocaleString()} ${data.platformCommissions?.currency ?? "XOF"}`}
                   />
-                  <StatCard
+                  <ConsoleGridTile
+                    tileIndex={3}
                     icon={PercentIcon}
                     label={t("commissions.traveler_tickets", { defaultValue: "Billets voyageur payés" })}
-                    value={data.platformCommissions?.ticketCount ?? 0}
+                    value={(data.platformCommissions?.ticketCount ?? 0).toLocaleString()}
                   />
                 </div>
                 <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
@@ -988,30 +1014,6 @@ function RoleBadges({ roles }: { roles: string[] }) {
         </Badge>
       )}
     </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  suffix = "",
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-  suffix?: string;
-}) {
-  return (
-    <Card className="p-4">
-      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center mb-2">
-        <Icon className="w-4 h-4 text-primary" />
-      </div>
-      <div className="text-2xl font-bold">
-        {value.toLocaleString()}{suffix}
-      </div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </Card>
   );
 }
 

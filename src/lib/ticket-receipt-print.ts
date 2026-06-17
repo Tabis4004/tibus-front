@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
+import { RECEIPT_POWERED_BY_LINE } from "@/lib/receipt-branding.ts";
 import { toPng } from "html-to-image";
 import { printer, type PrintLine } from "@/lib/printer.ts";
 import {
@@ -191,7 +192,7 @@ export function buildTicketReceiptLines(
     lines.push({ text: sep }, { text: `! ${boarding}`, size: "small" });
   }
 
-  lines.push({ text: sep }, { text: "Powered By Tibus", align: "center", size: "small" });
+  lines.push({ text: sep }, { text: RECEIPT_POWERED_BY_LINE, align: "center", size: "small" });
   return lines;
 }
 
@@ -593,7 +594,7 @@ export function buildTicketReceiptShareCaption(input: TicketReceiptInput): strin
     `${input.trip.currency} ${input.totalPrice.toLocaleString()}`,
     "",
     `Verification: ${buildVerifyUrl(input)}`,
-    "Powered by Tibus",
+    RECEIPT_POWERED_BY_LINE,
   ].join("\n");
 }
 
@@ -642,7 +643,7 @@ export async function shareTicketReceiptText(input: TicketReceiptInput): Promise
     `${input.trip.currency} ${input.totalPrice.toLocaleString()}`,
     "",
     `Verification: ${buildVerifyUrl(input)}`,
-    "Powered by Tibus",
+    RECEIPT_POWERED_BY_LINE,
   ].join("\n");
 
   if (typeof navigator.share === "function") {

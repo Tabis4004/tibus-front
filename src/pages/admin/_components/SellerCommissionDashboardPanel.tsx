@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PercentIcon, RefreshCwIcon, WalletIcon } from "lucide-react";
+import { CircleDollarSignIcon, PercentIcon, RefreshCwIcon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 
 type SellerOption = { id: string; label: string };
 
@@ -199,10 +200,30 @@ export default function SellerCommissionDashboardPanel({
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label={t("seller_commissions.total", { defaultValue: "Total" })} value={dashboard.totalAmount} currency={dashboard.currency} />
-            <StatCard label={t("seller_commissions.pending", { defaultValue: "Encours non payé" })} value={dashboard.pendingAmount} currency={dashboard.currency} />
-            <StatCard label={t("seller_commissions.requested", { defaultValue: "Demande de paiement" })} value={dashboard.paymentRequestedAmount} currency={dashboard.currency} />
-            <StatCard label={t("seller_commissions.paid", { defaultValue: "Payé" })} value={dashboard.paidAmount} currency={dashboard.currency} />
+            <ConsoleGridTile
+              tileIndex={0}
+              icon={CircleDollarSignIcon}
+              label={t("seller_commissions.total", { defaultValue: "Total" })}
+              value={formatMoney(dashboard.totalAmount, dashboard.currency)}
+            />
+            <ConsoleGridTile
+              tileIndex={1}
+              icon={WalletIcon}
+              label={t("seller_commissions.pending", { defaultValue: "Encours non payé" })}
+              value={formatMoney(dashboard.pendingAmount, dashboard.currency)}
+            />
+            <ConsoleGridTile
+              tileIndex={2}
+              icon={PercentIcon}
+              label={t("seller_commissions.requested", { defaultValue: "Demande de paiement" })}
+              value={formatMoney(dashboard.paymentRequestedAmount, dashboard.currency)}
+            />
+            <ConsoleGridTile
+              tileIndex={3}
+              icon={CircleDollarSignIcon}
+              label={t("seller_commissions.paid", { defaultValue: "Payé" })}
+              value={formatMoney(dashboard.paidAmount, dashboard.currency)}
+            />
           </div>
           <p className="text-xs text-muted-foreground">{dashboard.ticketCount} vente(s) tiers sur la période</p>
           {allowPaymentRequest && dashboard.pendingAmount > 0 ? (
@@ -293,18 +314,6 @@ export default function SellerCommissionDashboardPanel({
           {t("seller_commissions.no_entries", { defaultValue: "Aucune commission sur cette période." })}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function StatCard({ label, value, currency }: { label: string; value: number; currency: string }) {
-  return (
-    <div className="rounded-lg border bg-background p-3">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-        <PercentIcon className="w-3.5 h-3.5" />
-        {label}
-      </div>
-      <p className="text-xl font-black tabular-nums">{formatMoney(value, currency)}</p>
     </div>
   );
 }

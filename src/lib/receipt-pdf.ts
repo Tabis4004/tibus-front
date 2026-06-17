@@ -6,6 +6,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
+import { RECEIPT_POWERED_BY_LINE } from "@/lib/receipt-branding.ts";
 
 export type ReceiptFormat = "a4" | "a5";
 
@@ -312,7 +313,7 @@ export async function generateReceiptPDF(data: ReceiptData, format: ReceiptForma
   y += isA5 ? 4 : 5;
   doc.setFontSize(isA5 ? 7 : 8);
   doc.setFont("helvetica", "bold");
-  doc.text("Powered By Tibus", pageWidth / 2, y, { align: "center" });
+  doc.text(RECEIPT_POWERED_BY_LINE, pageWidth / 2, y, { align: "center" });
 
   // ─── Page border ───
   doc.setDrawColor(200, 200, 210);

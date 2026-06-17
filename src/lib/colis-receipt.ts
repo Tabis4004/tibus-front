@@ -4,6 +4,7 @@ import type { ColisAutonomeDetail } from "@/lib/supabase/colis-autonomes.ts";
 import { COLIS_STATUT_LABELS } from "@/lib/supabase/colis-autonomes.ts";
 import { readTibusBridgeFlags } from "@/lib/webview-bridge.ts";
 import type { ThermalPaperWidth } from "@/lib/ticket-receipt-print.ts";
+import { RECEIPT_POWERED_BY_LINE } from "@/lib/receipt-branding.ts";
 
 export function colisPublicReference(colisId: string): string {
   const compact = colisId.replace(/-/g, "").toUpperCase();
@@ -60,7 +61,7 @@ export function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: st
     { text: `Montant fret: ${detail.montantFret.toLocaleString()} ${currency}`, bold: true },
     { text: "" },
     { text: "Scannez le QR ou saisissez la reference CL- au retrait.", align: "center", size: "small" },
-    { text: "Powered By Tibus", align: "center", size: "small" },
+    { text: RECEIPT_POWERED_BY_LINE, align: "center", size: "small" },
   ];
 }
 

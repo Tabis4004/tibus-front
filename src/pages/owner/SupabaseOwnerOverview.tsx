@@ -26,6 +26,7 @@ import OwnerConsoleModules, {
   OwnerCompanyBanner,
   OwnerProfileCard,
 } from "./_components/OwnerConsoleModules.tsx";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 
 export default function SupabaseOwnerOverview() {
   const { t } = useTranslation("owner");
@@ -185,22 +186,15 @@ export default function SupabaseOwnerOverview() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
           {t("console.kpi_section", { defaultValue: "Indicateurs" })}
         </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {stats.map(({ label, icon: Icon, value }, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {stats.map(({ label, icon, value }, i) => (
             <motion.div
               key={label}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.04 * i }}
-              className="rounded-xl border border-[#2a82c9]/20 tibus-blue-surface p-4 hover:border-[#1fb5ff]/40 transition-all"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg tibus-blue-gradient flex items-center justify-center shadow-sm">
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-[11px] text-muted-foreground leading-tight">{label}</span>
-              </div>
-              <div className="text-base font-bold text-[#1a508b] dark:text-[#7ec8ff] truncate">{value}</div>
+              <ConsoleGridTile tileIndex={i} icon={icon} label={label} value={value} />
             </motion.div>
           ))}
         </div>

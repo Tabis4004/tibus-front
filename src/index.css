@@ -299,6 +299,29 @@
     border-top: 1px dashed #000 !important;
     margin-top: 1.5mm;
     padding-top: 1.5mm;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5mm;
+  }
+  #printable-receipt .receipt-footer img {
+    max-height: 5mm !important;
+    width: auto !important;
+  }
+  #printable-colis-receipt .receipt-footer {
+    text-align: center;
+    font-size: 8px;
+    border-top: 1px dashed #000 !important;
+    margin-top: 1.5mm;
+    padding-top: 1.5mm;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5mm;
+  }
+  #printable-colis-receipt .receipt-footer img {
+    max-height: 5mm !important;
+    width: auto !important;
   }
 
   /* Override all background colors for clean thermal print */

@@ -18,6 +18,7 @@ import type { ColisAutonomeDetail } from "@/lib/supabase/colis-autonomes.ts";
 import { COLIS_STATUT_LABELS } from "@/lib/supabase/colis-autonomes.ts";
 import type { ThermalPaperWidth } from "@/lib/ticket-receipt-print.ts";
 import type { SellerCompanyReceiptInfo } from "@/lib/supabase/seller-counter";
+import ReceiptPoweredByFooter from "@/components/seller/ReceiptPoweredByFooter.tsx";
 
 function fmt(iso: string, pattern: string) {
   try {
@@ -186,9 +187,7 @@ export default function ColisReceiptPanel({
           </div>
         </div>
 
-        <div className="border-t border-dashed border-black/30 pt-2 mt-2 text-[9px] font-bold tracking-wider">
-          Powered By Tibus
-        </div>
+        <ReceiptPoweredByFooter companyLogoUrl={companyInfo?.logoUrl} />
       </div>
 
       <div className="space-y-2 print-hide">

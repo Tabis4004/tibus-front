@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIcon,
+  BuildingIcon,
   CloudIcon,
   CreditCardIcon,
   DownloadIcon,
@@ -9,6 +10,8 @@ import {
   PrinterIcon,
   RefreshCwIcon,
   ShieldAlertIcon,
+  TicketIcon,
+  UsersIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -16,6 +19,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 import { cn } from "@/lib/utils.ts";
 import {
   buildMetricsExportPayload,
@@ -199,23 +203,53 @@ export default function PlatformScalingMetricsPanel() {
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatTile label={t("scaling_metrics.stats.sellers")} value={metrics.sellersTotal} />
-            <StatTile label={t("scaling_metrics.stats.tickets_today")} value={metrics.ticketsToday} />
-            <StatTile
+            <ConsoleGridTile
+              tileIndex={0}
+              icon={UsersIcon}
+              label={t("scaling_metrics.stats.sellers")}
+              value={metrics.sellersTotal.toLocaleString()}
+            />
+            <ConsoleGridTile
+              tileIndex={1}
+              icon={TicketIcon}
+              label={t("scaling_metrics.stats.tickets_today")}
+              value={metrics.ticketsToday.toLocaleString()}
+            />
+            <ConsoleGridTile
+              tileIndex={2}
+              icon={ActivityIcon}
               label={t("scaling_metrics.stats.avg_daily_30d")}
-              value={metrics.avgTicketsPerDay30d}
+              value={metrics.avgTicketsPerDay30d.toLocaleString()}
             />
-            <StatTile
+            <ConsoleGridTile
+              tileIndex={3}
+              icon={ActivityIcon}
               label={t("scaling_metrics.stats.est_connections")}
-              value={metrics.estimatedPeakConnections}
+              value={metrics.estimatedPeakConnections.toLocaleString()}
             />
-            <StatTile label={t("total_users")} value={metrics.usersTotal} />
-            <StatTile label={t("total_companies")} value={metrics.companiesActive} />
-            <StatTile label={t("scaling_metrics.stats.tickets_30d")} value={metrics.tickets30d} />
-            <StatTile
+            <ConsoleGridTile
+              tileIndex={4}
+              icon={UsersIcon}
+              label={t("total_users")}
+              value={metrics.usersTotal.toLocaleString()}
+            />
+            <ConsoleGridTile
+              tileIndex={5}
+              icon={BuildingIcon}
+              label={t("total_companies")}
+              value={metrics.companiesActive.toLocaleString()}
+            />
+            <ConsoleGridTile
+              tileIndex={6}
+              icon={TicketIcon}
+              label={t("scaling_metrics.stats.tickets_30d")}
+              value={metrics.tickets30d.toLocaleString()}
+            />
+            <ConsoleGridTile
+              tileIndex={7}
+              icon={HardDriveIcon}
               label={t("scaling_metrics.stats.db_size")}
               value={formatBytes(metrics.databaseSizeBytes)}
-              raw
             />
           </div>
 
@@ -308,25 +342,6 @@ export default function PlatformScalingMetricsPanel() {
           <p>{t("scaling_metrics.investor_plan_hint")}</p>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  raw = false,
-}: {
-  label: string;
-  value: number | string;
-  raw?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xl font-bold tabular-nums mt-1">
-        {raw ? value : typeof value === "number" ? value.toLocaleString() : value}
-      </p>
     </div>
   );
 }

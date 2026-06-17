@@ -1,6 +1,8 @@
+import { Children, cloneElement, isValidElement, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightIcon, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import { consoleTileStyle } from "@/lib/console-grid-tiles.ts";
 
 type Props = {
   to: string;
@@ -9,6 +11,7 @@ type Props = {
   icon: LucideIcon;
   highlighted?: boolean;
   tour?: string;
+  tileIndex?: number;
 };
 
 export function HomeActionBlock({
@@ -18,28 +21,26 @@ export function HomeActionBlock({
   icon: Icon,
   highlighted,
   tour,
+  tileIndex = 0,
 }: Props) {
+  const style = consoleTileStyle(tileIndex);
+
   return (
-    <Link to={to} className="block" data-tour={tour}>
+    <Link to={to} className="block h-full" data-tour={tour}>
       <div
         className={cn(
-          "rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/40 hover:shadow-sm transition-all group",
-          highlighted && "border-primary/30 bg-primary/5",
+          "rounded-2xl border p-4 flex flex-col items-center justify-center text-center gap-2 min-h-[108px] h-full",
+          "hover:shadow-md transition-shadow",
+          style.tile,
+          style.border,
+          highlighted && "ring-2 ring-primary/35",
         )}
       >
-        <div
-          className={cn(
-            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-            highlighted ? "bg-primary text-primary-foreground" : "bg-primary/10",
-          )}
-        >
-          <Icon className={cn("w-5 h-5", !highlighted && "text-primary")} />
+        <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm", style.iconWrap)}>
+          <Icon className={cn("w-5 h-5", style.icon)} />
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-snug">{title}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
-        </div>
-        <ArrowRightIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+        <h3 className={cn("font-semibold text-sm leading-snug", style.title)}>{title}</h3>
+        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">{description}</p>
       </div>
     </Link>
   );
@@ -47,16 +48,24 @@ export function HomeActionBlock({
 
 type HomeBlockSectionProps = {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export function HomeBlockSection({ title, children }: HomeBlockSectionProps) {
+  const items = Children.toArray(children).filter(Boolean);
+
   return (
     <div className="space-y-2">
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
         {title}
       </h2>
-      <div className="space-y-3">{children}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {items.map((child, index) =>
+          isValidElement(child)
+            ? cloneElement(child as React.ReactElement<{ tileIndex?: number }>, { tileIndex: index })
+            : child,
+        )}
+      </div>
     </div>
   );
 }

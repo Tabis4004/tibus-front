@@ -70,7 +70,7 @@ export default function SupabaseHome() {
     <div className="flex flex-col min-h-screen">
       <AppHeader />
       <main className="flex-1 pb-20 md:pb-0">
-        <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
+        <div className="max-w-4xl mx-auto px-4 pt-6 pb-4">
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -87,7 +87,7 @@ export default function SupabaseHome() {
           </motion.div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
           {(showTicketScanner ||
             !appUser.shouldHideMerchantAgentCta ||
             showOwnerDashboard ||

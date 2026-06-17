@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeftIcon, BuildingIcon, RefreshCwIcon, TrendingUpIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  BuildingIcon,
+  CircleDollarSignIcon,
+  RefreshCwIcon,
+  TicketIcon,
+  TrendingUpIcon,
+} from "lucide-react";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 import AppHeader from "../layout/_components/AppHeader.tsx";
 import BottomNav from "../layout/_components/BottomNav.tsx";
 import { toast } from "sonner";
@@ -177,32 +185,25 @@ export default function DemarcheurDashboardPage() {
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <div className="text-2xl font-bold">{totals.companies}</div>
-            <div className="text-xs text-muted-foreground">Compagnies</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <div className="text-2xl font-bold">{totals.tickets}</div>
-            <div className="text-xs text-muted-foreground">Billets</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <div className="text-2xl font-bold">{formatMoney(totals.sales, totals.currency)}</div>
-            <div className="text-xs text-muted-foreground">Ventes</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <div className="text-2xl font-bold text-primary">
-              {formatMoney(totals.commissions, totals.currency)}
-            </div>
-            <div className="text-xs text-muted-foreground">Commissions recruteur</div>
-          </CardContent>
-        </Card>
+        <ConsoleGridTile
+          tileIndex={0}
+          icon={BuildingIcon}
+          label="Compagnies"
+          value={String(totals.companies)}
+        />
+        <ConsoleGridTile tileIndex={1} icon={TicketIcon} label="Billets" value={String(totals.tickets)} />
+        <ConsoleGridTile
+          tileIndex={2}
+          icon={CircleDollarSignIcon}
+          label="Ventes"
+          value={formatMoney(totals.sales, totals.currency)}
+        />
+        <ConsoleGridTile
+          tileIndex={3}
+          icon={TrendingUpIcon}
+          label="Commissions recruteur"
+          value={formatMoney(totals.commissions, totals.currency)}
+        />
       </div>
 
       <Card>

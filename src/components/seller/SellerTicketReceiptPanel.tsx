@@ -28,6 +28,7 @@ import {
   type ThermalPaperWidth,
 } from "@/lib/ticket-receipt-print.ts";
 import { buildTicketVerifyUrl } from "@/lib/ticket-verify-url.ts";
+import ReceiptPoweredByFooter from "@/components/seller/ReceiptPoweredByFooter.tsx";
 
 function fmt(iso: string, pattern: string) {
   try {
@@ -253,9 +254,7 @@ export default function SellerTicketReceiptPanel({
           </div>
         )}
 
-        <div className="border-t border-dashed border-black/30 pt-2 mt-2 text-[9px] font-bold tracking-wider">
-          Powered By Tibus
-        </div>
+        <ReceiptPoweredByFooter companyLogoUrl={info?.logoUrl} />
       </div>
 
       <div className="space-y-2 print-hide">

@@ -24,9 +24,9 @@ import {
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { cn } from "@/lib/utils.ts";
 import {
   getCompanyAccountingDashboardSupabase,
   type CompanyAccountingDashboard,
@@ -259,69 +259,31 @@ export default function SupabaseAnalyticsDashboard() {
 
   const kpis = dashboard.kpis;
   const kpiCards = [
-    {
-      label: t("kpi.total_tickets"),
-      value: kpis.totalBookings,
-      icon: TicketIcon,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50 dark:bg-blue-950/30",
-    },
-    {
-      label: t("kpi.confirmed"),
-      value: kpis.confirmedBookings,
-      icon: UserCheckIcon,
-      color: "text-green-600",
-      bgColor: "bg-green-50 dark:bg-green-950/30",
-    },
+    { label: t("kpi.total_tickets"), value: String(kpis.totalBookings), icon: TicketIcon },
+    { label: t("kpi.confirmed"), value: String(kpis.confirmedBookings), icon: UserCheckIcon },
     {
       label: t("kpi.total_revenue"),
       value: `${kpis.totalRevenue.toLocaleString()} ${kpis.currency}`,
       icon: TrendingUpIcon,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
     },
     {
       label: t("kpi.today_revenue"),
       value: `${kpis.todayRevenue.toLocaleString()} ${kpis.currency}`,
       icon: ArrowUpRightIcon,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50 dark:bg-orange-950/30",
     },
     {
       label: "Caisse",
       value: `${kpis.caisseRevenue.toLocaleString()} ${kpis.currency}`,
       icon: ReceiptTextIcon,
-      color: "text-amber-600",
-      bgColor: "bg-amber-50 dark:bg-amber-950/30",
     },
     {
       label: "Commissions",
       value: `${kpis.sellerCommissionsPending.toLocaleString()} ${kpis.currency}`,
       icon: ArrowDownRightIcon,
-      color: "text-red-600",
-      bgColor: "bg-red-50 dark:bg-red-950/30",
     },
-    {
-      label: t("kpi.upcoming_trips"),
-      value: kpis.upcomingTrips,
-      icon: CalendarIcon,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50 dark:bg-purple-950/30",
-    },
-    {
-      label: t("kpi.active_buses"),
-      value: kpis.totalBuses,
-      icon: BusIcon,
-      color: "text-rose-600",
-      bgColor: "bg-rose-50 dark:bg-rose-950/30",
-    },
-    {
-      label: t("kpi.travelers"),
-      value: kpis.totalTravelers,
-      icon: UsersIcon,
-      color: "text-cyan-600",
-      bgColor: "bg-cyan-50 dark:bg-cyan-950/30",
-    },
+    { label: t("kpi.upcoming_trips"), value: String(kpis.upcomingTrips), icon: CalendarIcon },
+    { label: t("kpi.active_buses"), value: String(kpis.totalBuses), icon: BusIcon },
+    { label: t("kpi.travelers"), value: String(kpis.totalTravelers), icon: UsersIcon },
   ];
 
   return (
@@ -344,17 +306,9 @@ export default function SupabaseAnalyticsDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {kpiCards.map(({ label, value, icon: Icon, color, bgColor }) => (
-          <Card key={label} className="p-4 relative overflow-hidden">
-            <div className={cn("absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center", bgColor)}>
-              <Icon className={cn("w-4 h-4", color)} />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">{label}</p>
-              <p className="text-xl font-bold tracking-tight">{value}</p>
-            </div>
-          </Card>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {kpiCards.map(({ label, value, icon }, i) => (
+          <ConsoleGridTile key={label} tileIndex={i} icon={icon} label={label} value={value} />
         ))}
       </div>
 
