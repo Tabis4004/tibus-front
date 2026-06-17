@@ -1,8 +1,10 @@
 import { getUserFromRequest } from "../_shared/auth.ts";
+import { normalizePhoneForAt, sendAfricasTalkingSms } from "../_shared/africastalking-sms.ts";
 import {
-  normalizePhoneForAt,
-  sendAfricasTalkingSms,
-} from "../_shared/africastalking-sms.ts";
+  normalizePhoneForInfobip,
+  resolveSmsProvider,
+  sendInfobipSms,
+} from "../_shared/infobip-sms.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient, resolveAppUserId } from "../_shared/issue-ticket.ts";
 
@@ -76,7 +78,7 @@ Deno.serve(async (req) => {
       if (countryName.includes("togo")) return "TG";
       if (countryName.includes("mali")) return "ML";
       if (countryName.includes("ghana")) return "GH";
-      return Deno.env.get("AT_DEFAULT_COUNTRY") ?? "CI";
+      return Deno.env.get("SMS_DEFAULT_COUNTRY") ?? Deno.env.get("AT_DEFAULT_COUNTRY") ?? "CI";
     })();
 
     const { data: allowed } = await admin.rpc("is_company_role_user", {
@@ -90,9 +92,14 @@ Deno.serve(async (req) => {
     }
 
     const uniquePhones = [...new Set(phones)];
+    const provider = resolveSmsProvider();
 
-    const atUsername = Deno.env.get("AT_USERNAME")?.trim();
-    if (!atUsername || !Deno.env.get("AT_API_KEY")?.trim()) {
+    if (provider === "infobip") {
+      if (!Deno.env.get("INFOBIP_API_KEY")?.trim()) {
+        console.error("[colis-sms] missing INFOBIP_API_KEY");
+        return jsonResponse({ error: "Configuration SMS Infobip manquante (INFOBIP_API_KEY)" }, 500);
+      }
+    } else if (!Deno.env.get("AT_USERNAME")?.trim() || !Deno.env.get("AT_API_KEY")?.trim()) {
       console.error("[colis-sms] missing AT secrets");
       return jsonResponse({ error: "Configuration SMS Africa's Talking manquante (AT_USERNAME / AT_API_KEY)" }, 500);
     }
@@ -101,27 +108,43 @@ Deno.serve(async (req) => {
       colisId,
       statut: body.statut,
       phones: uniquePhones.length,
-      atUser: atUsername,
+      provider,
     });
 
-    const deliveryResults: Array<{ phone: string; ok: boolean; error?: string }> = [];
+    const deliveryResults: Array<{
+      phone: string;
+      ok: boolean;
+      error?: string;
+      messageId?: string;
+    }> = [];
 
     for (const rawPhone of uniquePhones) {
-      const to = normalizePhoneForAt(rawPhone, countryCode);
+      const toE164 = normalizePhoneForAt(rawPhone, countryCode);
+      const toInfobip = normalizePhoneForInfobip(rawPhone, countryCode);
+      const to = provider === "infobip" ? toInfobip : toE164;
+
       if (!to) {
         deliveryResults.push({ phone: rawPhone, ok: false, error: "Numéro invalide" });
         continue;
       }
 
-      const result = await sendAfricasTalkingSms(to, message);
+      const result =
+        provider === "infobip"
+          ? await sendInfobipSms(to, message)
+          : await sendAfricasTalkingSms(toE164!, message);
+
       if (result.ok) {
-        deliveryResults.push({ phone: to, ok: true });
+        deliveryResults.push({
+          phone: provider === "infobip" ? `+${to}` : toE164!,
+          ok: true,
+          messageId: "messageId" in result ? result.messageId : undefined,
+        });
         continue;
       }
 
-      console.error("[colis-sms]", { colisId, phone: to, error: result.body });
+      console.error("[colis-sms]", { colisId, phone: to, provider, error: result.body });
       deliveryResults.push({
-        phone: to,
+        phone: provider === "infobip" ? `+${to}` : toE164!,
         ok: false,
         error: result.errorMessage ?? "Échec envoi SMS",
       });

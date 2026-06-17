@@ -425,3 +425,38 @@ Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commi
 | `137_colis_retrait_qr_reference.sql` | Retrait colis via QR (UUID) ou référence `CL-XXXXXXXX` (`resolve_colis_retrait_code`, `deliver_colis_autonome(text)`) |
 | `138_colis_sms_gate_sync.sql` | Sync porte admin SMS colis / flags owner, `build_colis_sms_payload` + `skipReason` |
 | `139_colis_sms_message_cl_reference.sql` | SMS colis avec référence `CL-XXXXXXXX` (plus UUID complet) |
+
+## SMS colis — Infobip (essai 60 jours)
+
+Provider sélectionné par `SMS_PROVIDER=infobip` ou présence de `INFOBIP_API_KEY`.
+
+```bash
+./scripts/supabase-project-check.sh
+
+supabase secrets set \
+  SMS_PROVIDER=infobip \
+  INFOBIP_API_KEY="votre_cle_api" \
+  INFOBIP_SENDER="ServiceSMS" \
+  INFOBIP_BASE_URL="https://VOTRE_SUBDOMAIN.api.infobip.com"
+
+supabase functions deploy colis-sms-notify --no-verify-jwt
+```
+
+| Secret | Où le trouver (portail Infobip) |
+|--------|--------------------------------|
+| `INFOBIP_API_KEY` | Developers → API keys → clé avec scope `sms:message:send` |
+| `INFOBIP_BASE_URL` | Developers → API base URL (souvent `https://xxxxx.api.infobip.com`) |
+| `INFOBIP_SENDER` | Essai gratuit : **`ServiceSMS`** (sender test Infobip) |
+
+**Limites essai gratuit :** envoi uniquement vers le **numéro vérifié** sur le compte Infobip ; crédit limité 60 jours.
+
+Test curl :
+
+```bash
+curl -s -X POST "https://VOTRE_SUBDOMAIN.api.infobip.com/sms/3/messages" \
+  -H "Authorization: App VOTRE_CLE" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"sender":"ServiceSMS","destinations":[{"to":"225712960000"}],"content":{"text":"Test Tibus colis"}}]}'
+```
+
+Réponse OK : `messages[0].messageId` + statut `PENDING_ACCEPTED`.
