@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.t
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { StoreIcon } from "lucide-react";
 import CguAcceptanceCheckbox from "@/components/legal/CguAcceptanceCheckbox.tsx";
+import PhoneOtpPanel from "@/pages/auth/PhoneOtpPanel.tsx";
 
 export default function LoginPage() {
   const { t } = useTranslation("common");
@@ -142,12 +143,15 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="signin">
                 {t("auth.sign_in", { defaultValue: "Connexion" })}
               </TabsTrigger>
               <TabsTrigger value="signup">
                 {t("auth.sign_up", { defaultValue: "Inscription" })}
+              </TabsTrigger>
+              <TabsTrigger value="phone">
+                {t("auth.phone", { defaultValue: "Téléphone" })}
               </TabsTrigger>
             </TabsList>
 
@@ -266,6 +270,10 @@ export default function LoginPage() {
                   </Button>
                 </div>
               </form>
+            </TabsContent>
+
+            <TabsContent value="phone">
+              <PhoneOtpPanel onSuccess={redirectAfterAuth} />
             </TabsContent>
           </Tabs>
 

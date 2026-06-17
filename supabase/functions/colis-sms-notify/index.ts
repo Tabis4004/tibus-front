@@ -1,4 +1,8 @@
 import { getUserFromRequest } from "../_shared/auth.ts";
+import {
+  normalizePhoneForAt,
+  sendAfricasTalkingSms,
+} from "../_shared/africastalking-sms.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { createAdminClient, resolveAppUserId } from "../_shared/issue-ticket.ts";
 
@@ -56,20 +60,52 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Droits insuffisants" }, 403);
     }
 
-    // Provider SMS : brancher ici (Twilio, Africa's Talking, etc.)
-    // Pour l'instant journalisation serveur + accusé de réception.
-    console.log("[colis-sms]", {
-      colisId,
-      statut: body.statut,
-      phones,
-      message,
-      sentBy: appUserId,
-    });
+    const uniquePhones = [...new Set(phones)];
+    const deliveryResults: Array<{ phone: string; ok: boolean; error?: string }> = [];
+
+    for (const rawPhone of uniquePhones) {
+      const to = normalizePhoneForAt(rawPhone);
+      if (!to) {
+        deliveryResults.push({ phone: rawPhone, ok: false, error: "Numéro invalide" });
+        continue;
+      }
+
+      const result = await sendAfricasTalkingSms(to, message);
+      if (result.ok) {
+        deliveryResults.push({ phone: to, ok: true });
+        continue;
+      }
+
+      console.error("[colis-sms]", { colisId, phone: to, error: result.body });
+      deliveryResults.push({
+        phone: to,
+        ok: false,
+        error: result.errorMessage ?? "Échec envoi SMS",
+      });
+    }
+
+    const sent = deliveryResults.filter((r) => r.ok).length;
+    const failed = deliveryResults.filter((r) => !r.ok);
+
+    if (sent === 0) {
+      return jsonResponse(
+        {
+          error: "Aucun SMS envoyé",
+          colisId,
+          statut: body.statut,
+          failures: failed,
+        },
+        502,
+      );
+    }
 
     return jsonResponse({
       success: true,
-      queued: phones.length,
-      note: "SMS journalise — connecter le fournisseur SMS dans colis-sms-notify",
+      sent,
+      failed: failed.length,
+      failures: failed.length ? failed : undefined,
+      colisId,
+      statut: body.statut,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur SMS colis";

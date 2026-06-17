@@ -17,10 +17,13 @@ import {
   type ColisNature,
   type CompanyColisSettings,
 } from "@/lib/supabase/colis-autonomes.ts";
+import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
+import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
 
 export default function ColisNaturesManager({ companyId }: { companyId: string }) {
   const { t } = useTranslation("owner");
   const { t: tc } = useTranslation("common");
+  const { modules: featureModules, isLoading: modulesLoading } = useCompanyFeatureModules(companyId);
   const [settings, setSettings] = useState<CompanyColisSettings | null>(null);
   const [natures, setNatures] = useState<ColisNature[] | null>(null);
   const [newLibelle, setNewLibelle] = useState("");
@@ -101,11 +104,13 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
     }
   };
 
-  if (settings === null || natures === null) {
+  if (settings === null || natures === null || modulesLoading) {
     return <Skeleton className="h-72 w-full" />;
   }
 
-  if (!settings.colisAutonomeEnabled) {
+  const colisModuleActive = isColisAutonomeModuleActive(settings, featureModules);
+
+  if (!colisModuleActive) {
     return (
       <Card>
         <CardContent className="p-6 text-sm text-muted-foreground">

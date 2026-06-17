@@ -42,7 +42,8 @@ export async function ensureUserProfile(authUser: User) {
   );
   const email = authUser.email ?? "";
   const username = buildUsername(email || authUser.id, authUser.id);
-  const phone = String(meta.phone ?? "").trim() || null;
+  const phone =
+    String(meta.phone ?? authUser.phone ?? "").trim() || null;
   const profileCompleted =
     Boolean(phone && phone.replace(/\D/g, "").length >= 9) &&
     !(firstName === "Utilisateur" && lastName === "Tibus");

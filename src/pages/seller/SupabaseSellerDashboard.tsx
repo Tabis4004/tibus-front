@@ -61,6 +61,8 @@ import StationCashPanel from "@/pages/seller/_components/StationCashPanel.tsx";
 import { formatTripItineraryLabel } from "@/lib/trip-display.ts";
 import ColisAutonomesPage from "@/pages/seller/ColisAutonomesPage.tsx";
 import { getCompanyColisSettingsSupabase } from "@/lib/supabase/colis-autonomes.ts";
+import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
+import { getCompanyFeatureModulesSupabase } from "@/lib/supabase/company-feature-modules.ts";
 import SellerTicketReceiptPanel, {
   counterTicketToReceiptInput,
 } from "@/components/seller/SellerTicketReceiptPanel.tsx";
@@ -685,10 +687,13 @@ export default function SupabaseSellerDashboard() {
         setTrips([]);
         return;
       }
-      const [nextTrips, colisSettings, receiptInfo] = await Promise.all([
+      const [nextTrips, colisSettings, featureModules, receiptInfo] = await Promise.all([
         listSellerTripsSupabase(nextProfile),
         nextProfile.company
           ? getCompanyColisSettingsSupabase(nextProfile.company.id).catch(() => null)
+          : Promise.resolve(null),
+        nextProfile.company
+          ? getCompanyFeatureModulesSupabase(nextProfile.company.id).catch(() => null)
           : Promise.resolve(null),
         nextProfile.company
           ? getSellerCompanyReceiptInfoSupabase(nextProfile.company.id).catch(() => null)
@@ -696,7 +701,11 @@ export default function SupabaseSellerDashboard() {
       ]);
       setTrips(nextTrips);
       await cacheSellerTripsOffline(appUserId, nextTrips);
-      setColisModuleEnabled(Boolean(colisSettings?.colisAutonomeEnabled));
+      setColisModuleEnabled(
+        colisSettings
+          ? isColisAutonomeModuleActive(colisSettings, featureModules)
+          : false,
+      );
       setCompanyReceiptInfo(receiptInfo);
     } catch (err) {
       try {

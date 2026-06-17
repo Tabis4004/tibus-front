@@ -44,6 +44,8 @@ import {
   type ColisSmsPayload,
   type ColisStatut,
 } from "@/lib/supabase/colis-autonomes.ts";
+import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
+import { getCompanyFeatureModulesSupabase } from "@/lib/supabase/company-feature-modules.ts";
 
 type GareOption = { id: string; name: string };
 
@@ -114,9 +116,13 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       setCompanyId(cid);
       setCompanyName(profile.company.name);
 
-      const settings = await getCompanyColisSettingsSupabase(cid);
-      setModuleEnabled(settings.colisAutonomeEnabled);
-      if (!settings.colisAutonomeEnabled) return;
+      const [settings, featureModules] = await Promise.all([
+        getCompanyColisSettingsSupabase(cid),
+        getCompanyFeatureModulesSupabase(cid).catch(() => null),
+      ]);
+      const moduleActive = isColisAutonomeModuleActive(settings, featureModules);
+      setModuleEnabled(moduleActive);
+      if (!moduleActive) return;
 
       const [garesRes, naturesRes, listRes] = await Promise.all([
         supabase.from("Gares").select("id, name").eq("companyId", cid).order("name"),

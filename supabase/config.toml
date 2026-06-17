@@ -1,3 +1,6 @@
+[functions.auth-send-sms]
+verify_jwt = false
+
 [functions.fedapay-initialize]
 verify_jwt = false
 

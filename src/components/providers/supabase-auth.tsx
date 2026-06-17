@@ -40,6 +40,8 @@ type SupabaseAuthContextValue = {
   ) => Promise<SupabaseSignUpResult>;
   requestPasswordReset: (email: string, redirectTo: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
+  signInWithPhoneOtp: (phone: string) => Promise<void>;
+  verifyPhoneOtp: (phone: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -193,6 +195,23 @@ export function SupabaseAuthProvider({
     if (updateError) throw updateError;
   }, []);
 
+  const signInWithPhoneOtp = useCallback(async (phone: string) => {
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      phone,
+      options: { channel: "sms" },
+    });
+    if (otpError) throw otpError;
+  }, []);
+
+  const verifyPhoneOtp = useCallback(async (phone: string, token: string) => {
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      phone,
+      token,
+      type: "sms",
+    });
+    if (verifyError) throw verifyError;
+  }, []);
+
   const signOut = useCallback(async () => {
     setAppUserId(null);
     await supabase.auth.signOut();
@@ -210,6 +229,8 @@ export function SupabaseAuthProvider({
       signUpWithPassword: enabled ? signUpWithPassword : noop,
       requestPasswordReset: enabled ? requestPasswordReset : noop,
       updatePassword: enabled ? updatePassword : noop,
+      signInWithPhoneOtp: enabled ? signInWithPhoneOtp : noop,
+      verifyPhoneOtp: enabled ? verifyPhoneOtp : noop,
       signOut: enabled ? signOut : async () => {},
     }),
     [
@@ -223,6 +244,8 @@ export function SupabaseAuthProvider({
       signUpWithPassword,
       requestPasswordReset,
       updatePassword,
+      signInWithPhoneOtp,
+      verifyPhoneOtp,
       signOut,
     ],
   );

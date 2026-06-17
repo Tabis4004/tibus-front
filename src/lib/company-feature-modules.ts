@@ -41,6 +41,17 @@ export function companyModuleEnabled(
   return true;
 }
 
+/** Colis autonomes : module commercial D (source admin) ou legacy `colis_autonome_enabled`. */
+export function isColisAutonomeModuleActive(
+  colisSettings: { colisAutonomeEnabled: boolean },
+  featureModules: CompanyFeatureModules | null | undefined,
+): boolean {
+  if (featureModules) {
+    return companyModuleEnabled(featureModules, "D");
+  }
+  return colisSettings.colisAutonomeEnabled;
+}
+
 export function normalizeCompanyFeatureModules(
   companyId: string,
   data: unknown,
