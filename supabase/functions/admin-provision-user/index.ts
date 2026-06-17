@@ -26,6 +26,46 @@ function buildUsername(email: string, authUserId: string) {
   return `${base}_${authUserId.replace(/-/g, "").slice(0, 12)}`.toLowerCase();
 }
 
+type AdminPaysHolder = {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
+function formatAdminPaysTakenError(holder: AdminPaysHolder): string {
+  const who = holder.full_name?.trim() || holder.email?.trim() || "un autre compte";
+  const emailSuffix = holder.email && holder.full_name ? ` (${holder.email})` : "";
+  return `Ce pays a déjà un admin pays : ${who}${emailSuffix}. Retirez le rôle à ce compte avant d'en attribuer un autre.`;
+}
+
+function mapAssignErrorMessage(message: string): string {
+  if (message.includes("ADMIN_PAYS_COUNTRY_TAKEN")) {
+    const parts = message.split("|");
+    return formatAdminPaysTakenError({
+      user_id: "",
+      full_name: parts[1] || null,
+      email: parts[2] || null,
+    });
+  }
+  return message;
+}
+
+async function getCountryAdminPaysHolder(
+  admin: ReturnType<typeof createAdminClient>,
+  countryId: string,
+  excludeUserId?: string | null,
+): Promise<AdminPaysHolder | null> {
+  const { data, error } = await admin.rpc("get_country_admin_pays_holder", {
+    p_country_id: countryId,
+    p_exclude_user_id: excludeUserId ?? null,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  const holder = row as AdminPaysHolder;
+  return holder.user_id ? holder : null;
+}
+
 async function isSuperAdmin(
   admin: ReturnType<typeof createAdminClient>,
   appUserId: string,
@@ -188,6 +228,12 @@ Deno.serve(async (req) => {
       if (roles.includes("admin_pays") && !countryId) {
         return jsonResponse({ error: "Pays requis pour admin_pays" }, 400);
       }
+      if (roles.includes("admin_pays") && countryId) {
+        const holder = await getCountryAdminPaysHolder(admin, countryId);
+        if (holder) {
+          return jsonResponse({ error: formatAdminPaysTakenError(holder) }, 409);
+        }
+      }
     } else {
       return jsonResponse({ error: "Droits insuffisants pour ces rôles" }, 403);
     }
@@ -302,7 +348,8 @@ Deno.serve(async (req) => {
       if (assignError && !assignError.message.includes("duplicate")) {
         await admin.auth.admin.deleteUser(authData.user.id);
         await admin.from("Users").delete().eq("id", userId);
-        return jsonResponse({ error: assignError.message }, 500);
+        const status = assignError.message.includes("ADMIN_PAYS_COUNTRY_TAKEN") ? 409 : 500;
+        return jsonResponse({ error: mapAssignErrorMessage(assignError.message) }, status);
       }
       assignedRoles.push(roleName);
     }

@@ -7,6 +7,7 @@ import {
   OWNER_ASSIGNABLE_TEAM_ROLES,
   type OwnerAssignableTeamRole,
 } from "@/lib/owner-team-roles.ts";
+import { formatAdminPaysTakenMessage, type CountryAdminPaysHolder } from "@/lib/auth/admin-pays-assign.ts";
 
 export const OWNER_TEAM_ROLES = OWNER_ASSIGNABLE_TEAM_ROLES;
 export type OwnerTeamRole = OwnerAssignableTeamRole;
@@ -177,6 +178,40 @@ export async function removeCompanyRoleSupabase(input: {
     p_role_name: input.roleName,
   });
   if (error) throw error;
+}
+
+export async function getCountryAdminPaysHolderSupabase(
+  countryId: string,
+  excludeUserId?: string | null,
+): Promise<CountryAdminPaysHolder | null> {
+  const { data, error } = await supabase.rpc("get_country_admin_pays_holder", {
+    p_country_id: countryId,
+    p_exclude_user_id: excludeUserId ?? null,
+  });
+  if (error) throw error;
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+
+  const payload = row as Record<string, unknown>;
+  const userId = String(payload.user_id ?? payload.userId ?? "");
+  if (!userId) return null;
+
+  return {
+    userId,
+    fullName: payload.full_name ? String(payload.full_name) : payload.fullName ? String(payload.fullName) : null,
+    email: payload.email ? String(payload.email) : null,
+  };
+}
+
+export async function assertCountryAdminPaysAvailable(
+  countryId: string,
+  options?: { excludeUserId?: string | null; countryLabel?: string },
+): Promise<void> {
+  const holder = await getCountryAdminPaysHolderSupabase(countryId, options?.excludeUserId);
+  if (!holder) return;
+
+  throw new Error(formatAdminPaysTakenMessage(holder, options?.countryLabel));
 }
 
 export async function adminAssignUserRoleSupabase(input: {

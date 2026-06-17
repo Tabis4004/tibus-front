@@ -12,12 +12,14 @@ import { supabase } from "@/lib/supabase";
 import {
   adminAssignUserRoleSupabase,
   adminRemoveUserRoleSupabase,
+  assertCountryAdminPaysAvailable,
   isCompanyScopedRole,
   listUserRoleAssignmentsSupabase,
   provisionUserSupabase,
   roleAssignmentKey,
   type UserRoleAssignment,
 } from "@/lib/supabase/user-management.ts";
+import { mapRoleAssignErrorMessage } from "@/lib/auth/admin-pays-assign.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -162,6 +164,27 @@ export default function AdminUserFormPage() {
     [selectedRoles],
   );
 
+  const countryLabel = useMemo(
+    () => countries.find((c) => c.id === countryId)?.name ?? undefined,
+    [countries, countryId],
+  );
+
+  const ensureAdminPaysAssignable = async () => {
+    if (!selectedRoles.includes("admin_pays") || !countryId) return;
+
+    const alreadyHasExact =
+      isEdit
+      && initialAssignments.some(
+        (a) => a.roleName === "admin_pays" && a.countryId === countryId,
+      );
+    if (alreadyHasExact) return;
+
+    await assertCountryAdminPaysAvailable(countryId, {
+      excludeUserId: userId,
+      countryLabel,
+    });
+  };
+
   const toggleRole = (roleName: string, checked: boolean) => {
     setSelectedRoles((prev) =>
       checked ? [...new Set([...prev, roleName])] : prev.filter((r) => r !== roleName),
@@ -184,6 +207,7 @@ export default function AdminUserFormPage() {
 
     setSaving(true);
     try {
+      await ensureAdminPaysAssignable();
       await provisionUserSupabase({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -203,7 +227,7 @@ export default function AdminUserFormPage() {
       });
       navigate(`${base}/admin?tab=users`, { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("users.save_error"));
+      toast.error(mapRoleAssignErrorMessage(err, countryLabel));
     } finally {
       setSaving(false);
     }
@@ -225,6 +249,7 @@ export default function AdminUserFormPage() {
 
     setSaving(true);
     try {
+      await ensureAdminPaysAssignable();
       const desired = new Set(
         selectedRoles.map((roleName) =>
           roleAssignmentKey({
@@ -276,7 +301,7 @@ export default function AdminUserFormPage() {
       });
       navigate(`${base}/admin?tab=users`, { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("users.save_error"));
+      toast.error(mapRoleAssignErrorMessage(err, countryLabel));
     } finally {
       setSaving(false);
     }
