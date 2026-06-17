@@ -46,7 +46,11 @@ export function normalizePhoneForAt(
 
   if (cleaned.startsWith("+")) {
     const digits = cleaned.slice(1).replace(/\D/g, "");
-    return digits.length >= 9 && digits.length <= 15 ? `+${digits}` : null;
+    if (!digits) return null;
+    // +22507… → +2257… (double zéro après indicatif pays)
+    const fixed = digits.replace(/^(225|226|221|229|223|228)0(\d+)$/, "$1$2");
+    const normalized = fixed.length >= 9 && fixed.length <= 15 ? fixed : digits;
+    return normalized.length >= 9 && normalized.length <= 15 ? `+${normalized}` : null;
   }
 
   const digits = cleaned.replace(/\D/g, "");

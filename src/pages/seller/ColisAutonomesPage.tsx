@@ -109,6 +109,17 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
     [natures],
   );
 
+  const destinationGares = useMemo(
+    () => gares.filter((g) => g.id !== gareDepartId),
+    [gares, gareDepartId],
+  );
+
+  useEffect(() => {
+    if (gareDestinationId && gareDestinationId === gareDepartId) {
+      setGareDestinationId("");
+    }
+  }, [gareDepartId, gareDestinationId]);
+
   const filteredRows = useMemo(() => {
     if (filterStatut === "all") return rows;
     return rows.filter((r) => r.statutColis === filterStatut);
@@ -192,6 +203,22 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       toast.error(t("colis.gares_required", { defaultValue: "Sélectionnez les gares" }));
       return;
     }
+    if (gareDepartId === gareDestinationId) {
+      toast.error(
+        t("colis.same_gare", {
+          defaultValue: "La gare de destination doit être différente de la gare de départ.",
+        }),
+      );
+      return;
+    }
+    if (!nomExpediteur.trim() || !nomDestinataire.trim()) {
+      toast.error(t("colis.names_required", { defaultValue: "Nom expéditeur et destinataire requis" }));
+      return;
+    }
+    if (!telephoneExpediteur.trim() || !telephoneDestinataire.trim()) {
+      toast.error(t("colis.phones_required", { defaultValue: "Téléphones expéditeur et destinataire requis" }));
+      return;
+    }
     if (!selectedNatureId) {
       toast.error(t("colis.nature_required", { defaultValue: "Sélectionnez une nature de colis" }));
       return;
@@ -217,7 +244,9 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       toast.success(t("colis.registered", { defaultValue: "Colis enregistré — encaissement guichet" }));
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.generic", { ns: "common" }));
+      toast.error(
+        supabaseErrorMessage(err, t("errors.generic", { ns: "common" })),
+      );
     } finally {
       setSaving(false);
     }
@@ -242,7 +271,7 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       toast.success(`${COLIS_STATUT_LABELS[result.statutColis]}`);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.generic", { ns: "common" }));
+      toast.error(supabaseErrorMessage(err, t("errors.generic", { ns: "common" })));
     }
   };
 
@@ -261,7 +290,7 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       setRetraitCode("");
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("colis.invalid_code", { defaultValue: "Code invalide" }));
+      toast.error(supabaseErrorMessage(err, t("colis.invalid_code", { defaultValue: "Code invalide" })));
     } finally {
       setDelivering(false);
     }
@@ -342,7 +371,7 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
                   <Select value={gareDestinationId} onValueChange={setGareDestinationId}>
                     <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                     <SelectContent>
-                      {gares.map((g) => (
+                      {destinationGares.map((g) => (
                         <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                       ))}
                     </SelectContent>

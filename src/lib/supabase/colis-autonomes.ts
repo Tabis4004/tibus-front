@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { throwSupabaseError } from "@/lib/supabase/errors.ts";
 
 export type ColisStatut = "enregistre" | "charge" | "arrive" | "livre";
 
@@ -196,7 +197,7 @@ export async function registerColisAutonomeSupabase(
     p_montant_fret: input.montantFret,
     p_nature_ids: input.natureIds,
   });
-  if (error) throw error;
+  if (error) throwSupabaseError(error, "Enregistrement colis impossible");
   const row = (data ?? {}) as Record<string, unknown>;
   const sms = (row.sms ?? {}) as Record<string, unknown>;
   return {
