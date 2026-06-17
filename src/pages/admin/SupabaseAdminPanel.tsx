@@ -652,7 +652,12 @@ export default function SupabaseAdminPanel() {
                 <AdminTabSuspense>
                   <StakeholderPayoutDashboardPanel
                     embedded
-                    countryId={data.countries[0]?.id ?? null}
+                    alwaysVisible
+                    countryId={
+                      appUser.isSuperAdmin
+                        ? null
+                        : adminCountryId ?? data.countries[0]?.id ?? null
+                    }
                   />
                 </AdminTabSuspense>
                 <Accordion type="multiple" value={commissionAccordionSections} onValueChange={setCommissionAccordionSections} className="flex flex-col gap-2">

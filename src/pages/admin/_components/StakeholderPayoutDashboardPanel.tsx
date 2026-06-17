@@ -24,10 +24,20 @@ function formatMoney(value: number, currency: string) {
 
 export default function StakeholderPayoutDashboardPanel({
   embedded = false,
+  alwaysVisible = false,
   countryId,
+  companyId,
+  companyName,
+  beneficiaryUserId,
 }: {
   embedded?: boolean;
+  /** Affiche le bloc même sans solde (super admin, admin pays, vue compagnie). */
+  alwaysVisible?: boolean;
   countryId?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  /** Filtre les lignes sur un bénéficiaire (ex. recruteur de la compagnie). */
+  beneficiaryUserId?: string | null;
 }) {
   const { t } = useTranslation("admin");
   const appUser = useAppUser();
@@ -83,6 +93,19 @@ export default function StakeholderPayoutDashboardPanel({
 
   const myUserId = appUser.profile?.id;
 
+  const shouldAlwaysShow =
+    alwaysVisible ||
+    appUser.isSuperAdmin ||
+    appUser.roles.includes("admin_pays") ||
+    appUser.roles.includes("demarcheur") ||
+    Boolean(companyId);
+
+  const visibleBalances = useMemo(() => {
+    const rows = balances ?? [];
+    if (!beneficiaryUserId) return rows;
+    return rows.filter((row) => row.beneficiaryUserId === beneficiaryUserId);
+  }, [balances, beneficiaryUserId]);
+
   const canRequestForRow = useCallback(
     (row: StakeholderCommissionBalance) => {
       if (row.pendingAmount > 0) return false;
@@ -95,12 +118,12 @@ export default function StakeholderPayoutDashboardPanel({
   );
 
   const totals = useMemo(() => {
-    const earned = (balances ?? []).reduce((sum, row) => sum + row.earnedAmount, 0);
-    const due = (balances ?? []).reduce((sum, row) => sum + row.balanceDue, 0);
-    const pending = (balances ?? []).reduce((sum, row) => sum + row.pendingAmount, 0);
-    const currency = balances?.[0]?.currency ?? "XOF";
+    const earned = visibleBalances.reduce((sum, row) => sum + row.earnedAmount, 0);
+    const due = visibleBalances.reduce((sum, row) => sum + row.balanceDue, 0);
+    const pending = visibleBalances.reduce((sum, row) => sum + row.pendingAmount, 0);
+    const currency = visibleBalances[0]?.currency ?? balances?.[0]?.currency ?? "XOF";
     return { earned, due, pending, currency };
-  }, [balances]);
+  }, [balances, visibleBalances]);
 
   const handleRequest = async (row: StakeholderCommissionBalance) => {
     const key = `req:${row.stakeholderRole}:${row.beneficiaryUserId ?? "x"}`;
@@ -174,7 +197,8 @@ export default function StakeholderPayoutDashboardPanel({
   };
 
   const showPanel =
-    (balances?.length ?? 0) > 0 ||
+    shouldAlwaysShow ||
+    (visibleBalances.length ?? 0) > 0 ||
     (pendingApprovals?.length ?? 0) > 0 ||
     canApprove ||
     balances === undefined;
@@ -183,14 +207,32 @@ export default function StakeholderPayoutDashboardPanel({
     return null;
   }
 
+  const dashboardTitle = companyName
+    ? t("stakeholder_commissions.my_dashboard_company_title", {
+        defaultValue: "Mes commissions plateforme — {{company}}",
+        company: companyName,
+      })
+    : t("stakeholder_commissions.my_dashboard_title", {
+        defaultValue: "Mes commissions plateforme",
+      });
+
+  const emptyMessage = companyName
+    ? t("stakeholder_commissions.my_dashboard_company_empty", {
+        defaultValue:
+          "Aucune commission stakeholder enregistrée pour {{company}}. Les lignes recruteur et rôles cumulés apparaissent ici avec leur seuil de retrait.",
+        company: companyName,
+      })
+    : t("stakeholder_commissions.my_dashboard_empty", {
+        defaultValue:
+          "Aucune commission stakeholder enregistrée pour votre compte. Si vous cumulez plusieurs rôles (admin pays, recruteur, etc.), chaque ligne apparaît ici avec son seuil de retrait.",
+      });
+
   return (
     <div className={embedded ? "space-y-4" : "space-y-4 p-0"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <WalletIcon className="w-4 h-4" />
-          {t("stakeholder_commissions.my_dashboard_title", {
-            defaultValue: "Mes commissions plateforme",
-          })}
+          {dashboardTitle}
         </div>
         <Button size="sm" variant="outline" className="gap-1" onClick={() => void loadDashboard()}>
           <RefreshCwIcon className="w-3 h-3" />
@@ -200,13 +242,8 @@ export default function StakeholderPayoutDashboardPanel({
 
       {balances === undefined ? (
         <Skeleton className="h-32 w-full" />
-      ) : balances.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {t("stakeholder_commissions.my_dashboard_empty", {
-            defaultValue:
-              "Aucune commission stakeholder enregistrée pour votre compte. Si vous cumulez plusieurs rôles (admin pays, recruteur, etc.), chaque ligne apparaît ici avec son seuil de retrait.",
-          })}
-        </p>
+      ) : visibleBalances.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       ) : (
         <>
           <div className="grid gap-2 sm:grid-cols-3">
@@ -243,7 +280,7 @@ export default function StakeholderPayoutDashboardPanel({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {balances.map((row) => (
+                {visibleBalances.map((row) => (
                   <tr key={`${row.stakeholderRole}:${row.beneficiaryUserId ?? "x"}`}>
                     <td className="px-3 py-2">
                       {t(`stakeholder_commissions.roles.${row.stakeholderRole}`)}

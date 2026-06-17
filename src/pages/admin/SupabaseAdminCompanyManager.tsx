@@ -38,6 +38,7 @@ import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 import CompanyFeatureModulesPanel from "./_components/CompanyFeatureModulesPanel.tsx";
+import StakeholderPayoutDashboardPanel from "./_components/StakeholderPayoutDashboardPanel.tsx";
 
 type CompanyOverview = {
   id: string;
@@ -286,6 +287,27 @@ export default function SupabaseAdminCompanyManager() {
       </div>
 
       <CompanyFeatureModulesPanel companyId={company.id} readOnly={!canManageModules} />
+
+      {(isSuperAdmin ||
+        (isAdminPays && company.countryId === profile?.countryId) ||
+        (isDemarcheur && company.recruitedByUserId === profile?.id)) ? (
+        <Card>
+          <CardContent className="pt-6">
+            <StakeholderPayoutDashboardPanel
+              embedded
+              alwaysVisible
+              countryId={company.countryId}
+              companyId={company.id}
+              companyName={company.name}
+              beneficiaryUserId={
+                isDemarcheur && !isSuperAdmin
+                  ? company.recruitedByUserId ?? profile?.id ?? null
+                  : null
+              }
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>

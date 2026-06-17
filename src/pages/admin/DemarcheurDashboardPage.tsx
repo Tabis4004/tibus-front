@@ -234,6 +234,7 @@ export default function DemarcheurDashboardPage() {
 
       <StakeholderPayoutDashboardPanel
         embedded
+        alwaysVisible
         countryId={dashboard?.countryId ?? appUser.profile?.countryId ?? null}
       />
     </div>
