@@ -170,14 +170,21 @@ export async function getSellerCompanyReceiptInfoSupabase(
 
 export async function listSellerTripsSupabase(
   profile: SellerProfileSupabase,
+  options?: { departureGareId?: string },
 ): Promise<SellerCounterTrip[]> {
-  const trips = await searchTripsSupabase(
-    profile.company && !profile.canSellAllCompanies
+  const trips = await searchTripsSupabase({
+    ...(profile.company && !profile.canSellAllCompanies
       ? { companyId: profile.company.id }
-      : {},
-  );
+      : {}),
+    ...(options?.departureGareId ? { departureGareId: options.departureGareId } : {}),
+  });
 
-  return trips.filter((trip) => trip.seatsAvailable > 0);
+  return trips
+    .filter((trip) => trip.seatsAvailable > 0)
+    .map((trip) => ({
+      ...trip,
+      companyId: trip.companyId ?? profile.company?.id,
+    }));
 }
 
 export async function sellCounterTicketSupabase(input: {

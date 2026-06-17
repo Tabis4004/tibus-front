@@ -135,6 +135,7 @@ export default function StationCashPanel({
         openingFloat: parsed,
       });
       toast.success("Caisse ouverte");
+      window.dispatchEvent(new CustomEvent("tibus:station-cash-refresh"));
       await load();
     } catch (err) {
       toast.error(supabaseErrorMessage(err, "Ouverture impossible"));

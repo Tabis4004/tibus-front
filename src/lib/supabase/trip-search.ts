@@ -8,6 +8,7 @@ export type SearchTripsParams = {
   companyId?: string;
   countryId?: string;
   reservationId?: string;
+  departureGareId?: string;
 };
 
 export type TripSearchResult = {
@@ -18,6 +19,8 @@ export type TripSearchResult = {
   totalSeats: number;
   priceAmount: number;
   currency: string;
+  originGareId: string;
+  companyId: string;
   originLoc: { city: string } | null;
   destLoc: { city: string } | null;
   origin: { name: string } | null;
@@ -243,6 +246,7 @@ export async function searchTripsSupabase(
 
     if (params.companyId && company.id !== params.companyId) continue;
     if (params.countryId && company.countryId !== params.countryId) continue;
+    if (params.departureGareId && originGare.id !== params.departureGareId) continue;
 
     const originCity = cityFromGare(originGare, cityNames);
     const destCity = cityFromGare(destGare, cityNames);
@@ -288,6 +292,8 @@ export async function searchTripsSupabase(
       totalSeats,
       priceAmount: arret.price,
       currency: country?.currency ?? "XOF",
+      originGareId: originGare.id,
+      companyId: company.id,
       originLoc: { city: originCity },
       destLoc: { city: destCity },
       origin: { name: originGare.name },

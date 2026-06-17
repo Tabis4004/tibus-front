@@ -43,7 +43,7 @@ import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
 import { usePaymentCountryNetworks } from "@/hooks/use-payment-country-networks";
 import { calculateTravelerPaymentSupabase } from "@/lib/supabase/payment-fees";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
-import { getOpenStationCashSupabase } from "@/lib/supabase/station-cash";
+import { getOpenStationCashSupabase, type OpenStationCash } from "@/lib/supabase/station-cash";
 import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
 import { paymentNetworkLabel } from "@/lib/payment-networks.ts";
 import {
@@ -161,6 +161,7 @@ function SaleForm({
   const [loyaltyLookupUser, setLoyaltyLookupUser] = useState<SelectedLoyaltyUser | null>(null);
   const [cashOpen, setCashOpen] = useState<boolean | null>(null);
   const [cashPendingReversal, setCashPendingReversal] = useState(false);
+  const [cashGareId, setCashGareId] = useState<string | null>(null);
 
   const companyId = trip.companyId ?? profile.company?.id ?? "";
 
@@ -191,6 +192,7 @@ function SaleForm({
         if (cancelled) return;
         setCashOpen(cash.open);
         setCashPendingReversal(Boolean(cash.pendingReversal));
+        setCashGareId(cash.gareId ?? null);
       })
       .catch(() => {
         if (!cancelled) setCashOpen(isBrowserOnline() ? false : null);
@@ -338,6 +340,18 @@ function SaleForm({
 
     if (isDirectSale && cashPendingReversal && isBrowserOnline()) {
       toast.error("Vente bloquée : un reversement est en attente de validation comptable");
+      return;
+    }
+
+    if (
+      isDirectSale &&
+      cashGareId &&
+      trip.originGareId &&
+      trip.originGareId !== cashGareId
+    ) {
+      toast.error(
+        "Ce départ n'est pas vendable en cash depuis votre gare. Le voyageur doit réserver en ligne avec paiement Mobile Money.",
+      );
       return;
     }
 
@@ -667,6 +681,7 @@ export default function SupabaseSellerDashboard() {
   const [receiptTickets, setReceiptTickets] = useState<CounterSaleTicket[] | null>(null);
   const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(null);
   const [colisModuleEnabled, setColisModuleEnabled] = useState(false);
+  const [cashSession, setCashSession] = useState<OpenStationCash | null | undefined>(undefined);
   const companyName = profile?.company?.name ?? companyReceiptInfo?.name ?? "Tibus";
   const sellerCompanyId = profile?.company?.id ?? null;
   const { hasModule: hasFeatureModule, isLoading: featureModulesLoading } =
@@ -680,15 +695,31 @@ export default function SupabaseSellerDashboard() {
     if (!appUserId) return;
     setProfile(undefined);
     setTrips(undefined);
+    setCashSession(undefined);
     try {
       const nextProfile = await getSellerProfileSupabase(appUserId);
       setProfile(nextProfile);
       if (!nextProfile) {
         setTrips([]);
+        setCashSession(null);
         return;
       }
+
+      let nextCash: OpenStationCash | null = null;
+      if (nextProfile.canSellDirect) {
+        nextCash = await getOpenStationCashSupabase().catch(() => ({ open: false }));
+      }
+      setCashSession(nextCash);
+
+      const departureGareId =
+        nextProfile.canSellDirect && nextCash?.open && nextCash.gareId
+          ? nextCash.gareId
+          : undefined;
+
       const [nextTrips, colisSettings, featureModules, receiptInfo] = await Promise.all([
-        listSellerTripsSupabase(nextProfile),
+        nextProfile.canSellDirect && !departureGareId
+          ? Promise.resolve([])
+          : listSellerTripsSupabase(nextProfile, departureGareId ? { departureGareId } : undefined),
         nextProfile.company
           ? getCompanyColisSettingsSupabase(nextProfile.company.id).catch(() => null)
           : Promise.resolve(null),
@@ -700,7 +731,9 @@ export default function SupabaseSellerDashboard() {
           : Promise.resolve(null),
       ]);
       setTrips(nextTrips);
-      await cacheSellerTripsOffline(appUserId, nextTrips);
+      if (departureGareId) {
+        await cacheSellerTripsOffline(appUserId, nextTrips);
+      }
       setColisModuleEnabled(
         colisSettings
           ? isColisAutonomeModuleActive(colisSettings, featureModules)
@@ -723,6 +756,7 @@ export default function SupabaseSellerDashboard() {
       toast.error(supabaseErrorMessage(err, "Chargement vendeur impossible"));
       setProfile(null);
       setTrips([]);
+      setCashSession(null);
     }
   };
 
@@ -731,7 +765,14 @@ export default function SupabaseSellerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUserId]);
 
-  if (appUser.isLoading || profile === undefined || trips === undefined || featureModulesLoading) {
+  useEffect(() => {
+    const onCashRefresh = () => void load();
+    window.addEventListener("tibus:station-cash-refresh", onCashRefresh);
+    return () => window.removeEventListener("tibus:station-cash-refresh", onCashRefresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appUserId]);
+
+  if (appUser.isLoading || profile === undefined || trips === undefined || cashSession === undefined || featureModulesLoading) {
     return (
       <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, index) => (
@@ -929,14 +970,31 @@ export default function SupabaseSellerDashboard() {
         />
       ) : null}
 
-      <div id="third-party-booking" data-tour="seller-departures" className="scroll-mt-20">
+      <div id="third-party-booking" data-tour="seller-departures" className="scroll-mt-20 space-y-2">
         <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Departs disponibles</h2>
+        {profile.canSellDirect && cashSession && !cashSession.open ? (
+          <p className="text-xs text-muted-foreground">
+            Ouvrez votre caisse sur votre gare pour afficher les départs cash de cette gare.
+            Pour une autre gare, le voyageur doit réserver en ligne avec paiement Mobile Money.
+          </p>
+        ) : null}
+        {profile.canSellDirect && cashSession?.open && cashSession.gareName ? (
+          <p className="text-xs text-muted-foreground">
+            Caisse ouverte — ventes cash uniquement au départ de <strong>{cashSession.gareName}</strong>.
+          </p>
+        ) : null}
       </div>
 
       {trips.length === 0 ? (
         <div className="rounded-xl border p-8 text-center text-muted-foreground">
           <BusIcon className="w-10 h-10 mx-auto opacity-30 mb-2" />
-          <p className="font-medium">Aucun depart disponible</p>
+          <p className="font-medium">
+            {profile.canSellDirect && cashSession && !cashSession.open
+              ? "Ouvrez votre caisse pour voir les départs"
+              : profile.canSellDirect && cashSession?.open
+                ? `Aucun départ depuis ${cashSession.gareName ?? "votre gare"}`
+                : "Aucun depart disponible"}
+          </p>
         </div>
       ) : (
         trips.map((trip, tripIndex) => (

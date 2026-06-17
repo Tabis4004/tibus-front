@@ -26,7 +26,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.t
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getSellerProfileSupabase } from "@/lib/supabase/seller-counter";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
-import { listCompanyStationGaresSupabase } from "@/lib/supabase/station-cash.ts";
+import {
+  getOpenStationCashSupabase,
+  listCompanyStationGaresSupabase,
+} from "@/lib/supabase/station-cash.ts";
 import { printColisReceipt } from "@/lib/colis-receipt.ts";
 import {
   COLIS_NEXT_STATUT,
@@ -135,6 +138,7 @@ export default function ColisAutonomesPage({
 
   const [gareDepartId, setGareDepartId] = useState("");
   const [gareDestinationId, setGareDestinationId] = useState("");
+  const [cashGareId, setCashGareId] = useState<string | null>(null);
   const [nomExpediteur, setNomExpediteur] = useState("");
   const [telephoneExpediteur, setTelephoneExpediteur] = useState("");
   const [nomDestinataire, setNomDestinataire] = useState("");
@@ -164,6 +168,7 @@ export default function ColisAutonomesPage({
     [gares, gareDepartId],
   );
   const departureLocked = Boolean(gareDepartId);
+  const departureLockedByCash = Boolean(cashGareId && gareDepartId === cashGareId);
 
   useEffect(() => {
     if (gareDestinationId && gareDestinationId === gareDepartId) {
@@ -208,10 +213,11 @@ export default function ColisAutonomesPage({
       setModuleEnabled(moduleActive);
       if (!moduleActive) return;
 
-      const [garesResult, naturesResult, listResult] = await Promise.allSettled([
+      const [garesResult, naturesResult, listResult, openCashResult] = await Promise.allSettled([
         listCompanyStationGaresSupabase(cid),
         listColisNaturesSupabase(cid),
         listColisAutonomesSupabase(cid),
+        getOpenStationCashSupabase(),
       ]);
 
       const nextGares = garesResult.status === "fulfilled" ? garesResult.value : [];
@@ -232,6 +238,15 @@ export default function ColisAutonomesPage({
       setGares(nextGares);
       setNatures(nextNatures.filter((n) => n.isActive));
       setRows(nextRows);
+
+      const openCash =
+        openCashResult.status === "fulfilled" ? openCashResult.value : null;
+      if (openCash?.open && openCash.gareId) {
+        setCashGareId(openCash.gareId);
+        setGareDepartId(openCash.gareId);
+      } else {
+        setCashGareId(null);
+      }
 
       if (loadErrors.length) {
         toast.error(loadErrors.join(" · "));
@@ -262,6 +277,14 @@ export default function ColisAutonomesPage({
     if (!companyId) return;
     if (!gareDepartId || !gareDestinationId) {
       toast.error(t("colis.gares_required", { defaultValue: "Sélectionnez les gares" }));
+      return;
+    }
+    if (cashGareId && gareDepartId !== cashGareId) {
+      toast.error(
+        t("colis.cash_gare_only", {
+          defaultValue: "L'expédition cash doit partir de votre gare de caisse ouverte.",
+        }),
+      );
       return;
     }
     if (gareDepartId === gareDestinationId) {
@@ -426,7 +449,7 @@ export default function ColisAutonomesPage({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <Label>{t("colis.gare_depart", { defaultValue: "Gare de départ" })}</Label>
-                    {departureLocked ? (
+                    {departureLocked && !departureLockedByCash ? (
                       <Button
                         type="button"
                         variant="ghost"
