@@ -649,6 +649,16 @@ export default function SupabaseAdminPanel() {
                     <span className="text-destructive">{errors.commissions}</span>
                   </p>
                 )}
+                {canAccessCommercialOffer(appUser.roles, appUser.isSuperAdmin) ? (
+                  <div className="flex justify-end print:hidden">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/${lng ?? "fr"}/admin/commercial-offer`}>
+                        <FileTextIcon className="w-4 h-4 mr-1.5" />
+                        {t("commercial_offer.nav_title", { defaultValue: "Offre commerciale" })}
+                      </Link>
+                    </Button>
+                  </div>
+                ) : null}
                 <AdminTabSuspense>
                   <StakeholderPayoutDashboardPanel
                     embedded

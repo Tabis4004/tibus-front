@@ -18,4 +18,4 @@ export function canManageCompanyFeatureModules(
   return roles.includes("owner") && ownedCompanyIds.includes(companyId);
 }
 
-export const COMMERCIAL_OFFER_FILENAME = "offre-commerciale-tibus.docx";
+export const COMMERCIAL_OFFER_EXPORT_BASENAME = "offre-commerciale-tibus";
