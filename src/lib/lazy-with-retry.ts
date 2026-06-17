@@ -1,4 +1,4 @@
-import { lazy, type ComponentType } from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 export function isChunkLoadError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -12,9 +12,9 @@ export function isChunkLoadError(error: unknown): boolean {
 const CHUNK_RELOAD_KEY = "tibus-chunk-reload";
 
 /** Recharge une fois après déploiement si un chunk lazy a un hash obsolète. */
-export function lazyWithRetry<T extends ComponentType<unknown>>(
-  factory: () => Promise<{ default: T }>,
-) {
+export function lazyWithRetry<P>(
+  factory: () => Promise<{ default: ComponentType<P> }>,
+): LazyExoticComponent<ComponentType<P>> {
   return lazy(async () => {
     try {
       return await factory();
