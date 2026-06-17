@@ -47,9 +47,22 @@ const CHANNEL_LABELS: Record<string, string> = {
   traveler: "Voyageur",
   seller_reservation: "Réservation tiers",
   counter_sale: "Guichet",
+  colis_autonome: "Colis guichet",
 };
 
-type SaleChannelFilter = "all" | "traveler" | "counter_sale" | "seller_reservation";
+const COLIS_STATUS_LABELS: Record<string, string> = {
+  enregistre: "Enregistré",
+  charge: "Chargé",
+  arrive: "Arrivé",
+  livre: "Livré",
+};
+
+type SaleChannelFilter =
+  | "all"
+  | "traveler"
+  | "counter_sale"
+  | "seller_reservation"
+  | "colis_autonome";
 type PeriodFilter = "all" | "today" | "7d" | "30d" | "month";
 
 function periodToRange(period: PeriodFilter): Pick<CompanyTicketSalesFilters, "createdFrom" | "createdTo"> {
@@ -200,7 +213,7 @@ export default function CompanySalesLedger({
         <div>
           <h2 className="text-lg font-bold">Journal des ventes</h2>
           <p className="text-sm text-muted-foreground">
-            Réservations en ligne, guichet et tiers — toutes les ventes de la compagnie.
+            Réservations en ligne, guichet, colis et tiers — toutes les ventes de la compagnie.
           </p>
           {guaranteeBalance && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -220,7 +233,7 @@ export default function CompanySalesLedger({
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Rechercher par nom voyageur ou n° de ticket…"
+            placeholder="Rechercher par voyageur, colis ou n° de ticket…"
             className="pl-9"
           />
         </div>
@@ -235,7 +248,8 @@ export default function CompanySalesLedger({
               <SelectContent>
                 <SelectItem value="all">Tous les canaux</SelectItem>
                 <SelectItem value="traveler">Voyageur</SelectItem>
-                <SelectItem value="counter_sale">Guichet</SelectItem>
+                <SelectItem value="counter_sale">Guichet billets</SelectItem>
+                <SelectItem value="colis_autonome">Colis guichet</SelectItem>
                 <SelectItem value="seller_reservation">Réservation tiers</SelectItem>
               </SelectContent>
             </Select>
@@ -317,7 +331,9 @@ export default function CompanySalesLedger({
                     </td>
                     <td className="px-3 py-2">
                       <Badge variant={row.ticketStatus === "cancelled" ? "destructive" : "secondary"}>
-                        {row.ticketStatus}
+                        {row.saleChannel === "colis_autonome"
+                          ? (COLIS_STATUS_LABELS[row.ticketStatus] ?? row.ticketStatus)
+                          : row.ticketStatus}
                       </Badge>
                     </td>
                     <td className="px-3 py-2">
