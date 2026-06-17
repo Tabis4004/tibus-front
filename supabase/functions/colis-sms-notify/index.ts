@@ -51,6 +51,30 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Colis introuvable" }, 404);
     }
 
+    const { data: companyRow } = await admin
+      .from("Companies")
+      .select("Countries(name)")
+      .eq("id", colis.company_id as string)
+      .maybeSingle();
+
+    const countryName = String(
+      (companyRow?.Countries as { name?: string } | null)?.name ?? "",
+    )
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "");
+
+    const countryCode = (() => {
+      if (countryName.includes("ivoire") || countryName.includes("ivory")) return "CI";
+      if (countryName.includes("benin")) return "BJ";
+      if (countryName.includes("burkina")) return "BF";
+      if (countryName.includes("senegal")) return "SN";
+      if (countryName.includes("togo")) return "TG";
+      if (countryName.includes("mali")) return "ML";
+      if (countryName.includes("ghana")) return "GH";
+      return Deno.env.get("AT_DEFAULT_COUNTRY") ?? "CI";
+    })();
+
     const { data: allowed } = await admin.rpc("is_company_role_user", {
       p_user_id: appUserId,
       p_company_id: colis.company_id as string,
@@ -64,7 +88,7 @@ Deno.serve(async (req) => {
     const deliveryResults: Array<{ phone: string; ok: boolean; error?: string }> = [];
 
     for (const rawPhone of uniquePhones) {
-      const to = normalizePhoneForAt(rawPhone);
+      const to = normalizePhoneForAt(rawPhone, countryCode);
       if (!to) {
         deliveryResults.push({ phone: rawPhone, ok: false, error: "Numéro invalide" });
         continue;

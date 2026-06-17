@@ -1,5 +1,26 @@
 const AT_MESSAGING_URL = "https://api.africastalking.com/version1/messaging";
 
+const PHONE_COUNTRY_PREFIXES = [
+  "225", "226", "221", "229", "223", "228", "237", "241", "233", "224", "245",
+  "254", "265", "227", "234", "256", "243", "242", "250", "232", "255", "260", "258",
+].sort((a, b) => b.length - a.length);
+
+const DEFAULT_DIAL_BY_COUNTRY: Record<string, string> = {
+  CI: "225",
+  BF: "226",
+  SN: "221",
+  BJ: "229",
+  ML: "223",
+  TG: "228",
+  CM: "237",
+  GA: "241",
+  GH: "233",
+  GN: "224",
+  GW: "245",
+};
+
+const AT_SUCCESS_STATUSES = new Set(["Success", "Sent", "Buffered", "Submitted"]);
+
 export type AfricasTalkingSendResult = {
   ok: boolean;
   statusCode: number;
@@ -7,9 +28,20 @@ export type AfricasTalkingSendResult = {
   errorMessage?: string;
 };
 
-/** Normalise vers E.164 pour l'API Africa's Talking. */
-export function normalizePhoneForAt(phone: string): string | null {
-  const cleaned = phone.trim().replace(/[^\d+]/g, "");
+function dialCodeForCountry(countryCode?: string | null): string {
+  const code = (countryCode ?? Deno.env.get("AT_DEFAULT_COUNTRY") ?? "CI")
+    .trim()
+    .toUpperCase();
+  return DEFAULT_DIAL_BY_COUNTRY[code] ?? "225";
+}
+
+/** Normalise vers E.164 pour l'API Africa's Talking (Afrique de l'Ouest). */
+export function normalizePhoneForAt(
+  phone: string,
+  defaultCountryCode?: string | null,
+): string | null {
+  const trimmed = phone.trim();
+  const cleaned = trimmed.replace(/[^\d+]/g, "");
   if (!cleaned) return null;
 
   if (cleaned.startsWith("+")) {
@@ -18,7 +50,31 @@ export function normalizePhoneForAt(phone: string): string | null {
   }
 
   const digits = cleaned.replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 15 ? `+${digits}` : null;
+  if (!digits) return null;
+
+  for (const prefix of PHONE_COUNTRY_PREFIXES) {
+    if (digits.startsWith(prefix) && digits.length >= prefix.length + 8) {
+      return `+${digits}`;
+    }
+  }
+
+  const dial = dialCodeForCountry(defaultCountryCode);
+
+  // Côte d'Ivoire : 07 00 00 00 00 (10 chiffres)
+  if (dial === "225" && /^0[1-9]\d{8}$/.test(digits)) {
+    return `+225${digits.slice(1)}`;
+  }
+
+  // Numéro local avec 0 initial (8–9 chiffres après le 0)
+  if (/^0\d{7,9}$/.test(digits)) {
+    return `+${dial}${digits.slice(1)}`;
+  }
+
+  if (digits.length >= 8 && digits.length <= 15) {
+    return `+${digits}`;
+  }
+
+  return null;
 }
 
 export async function sendAfricasTalkingSms(
@@ -65,7 +121,9 @@ export async function sendAfricasTalkingSms(
 
   const recipients = (parsed as { SMSMessageData?: { Recipients?: Array<{ status?: string }> } })
     ?.SMSMessageData?.Recipients;
-  const recipientOk = recipients?.some((r) => r.status === "Success") ?? false;
+  const recipientOk =
+    !recipients?.length ||
+    recipients.some((r) => AT_SUCCESS_STATUSES.has(String(r.status ?? "")));
 
   if (!response.ok || !recipientOk) {
     const apiMessage =

@@ -54,12 +54,24 @@ async function maybeSendColisSms(
   statut: ColisStatut,
   sms: ColisSmsPayload,
 ) {
-  if (!sms.send || !sms.message) return;
+  if (!sms.send || !sms.message) {
+    toast.message("SMS non envoyé — activez « Enregistrement au guichet » dans Paramètres colis (owner).");
+    return;
+  }
   const phones = [sms.expediteurPhone, sms.destinatairePhone].filter(Boolean) as string[];
+  if (!phones.length) {
+    toast.error("Numéros expéditeur / destinataire manquants pour le SMS");
+    return;
+  }
   try {
-    await sendColisSmsSupabase({ colisId, statut, message: sms.message, phones });
-  } catch {
-    // SMS non bloquant
+    const result = await sendColisSmsSupabase({ colisId, statut, message: sms.message, phones });
+    if (result.failed > 0) {
+      toast.warning(`SMS : ${result.sent} envoyé(s), ${result.failed} échec(s)`);
+    } else {
+      toast.success(`SMS envoyé à ${result.sent} numéro(s)`);
+    }
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Échec envoi SMS colis");
   }
 }
 

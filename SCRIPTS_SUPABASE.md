@@ -417,3 +417,4 @@ Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commi
 | `129_fix_list_colis_autonomes_order.sql` | Fix RPC `list_colis_autonomes` (`ORDER BY sub."createdAt"`) |
 | `130_colis_cash_and_sales_journal.sql` | Encaissement caisse (`encaissement_colis`) à l'enregistrement + journal des ventes (`colis_autonome`) |
 | `131_module_d_colis_sms_owner_config.sql` | Option admin : owner autorisé à configurer les SMS colis (`moduleDColisSmsConfig`) |
+| `132_colis_sms_send_gate.sql` | Envoi SMS colis conditionné à l'option admin + étapes activées par l'owner |

@@ -305,20 +305,30 @@ export async function deliverColisAutonomeSupabase(retraitCode: string): Promise
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
+export type ColisSmsSendResult = {
+  sent: number;
+  failed: number;
+  failures?: Array<{ phone: string; error?: string }>;
+};
+
 export async function sendColisSmsSupabase(payload: {
   colisId: string;
   statut: ColisStatut;
   message: string;
   phones: string[];
-}): Promise<void> {
+}): Promise<ColisSmsSendResult> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
-  if (!token) return;
+  if (!token) {
+    throw new Error("Session expirée — reconnectez-vous");
+  }
 
   const uniquePhones = [...new Set(payload.phones.map((p) => p.trim()).filter(Boolean))];
-  if (!uniquePhones.length) return;
+  if (!uniquePhones.length) {
+    throw new Error("Aucun numéro de téléphone renseigné");
+  }
 
-  await fetch(`${supabaseUrl}/functions/v1/colis-sms-notify`, {
+  const response = await fetch(`${supabaseUrl}/functions/v1/colis-sms-notify`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -332,6 +342,27 @@ export async function sendColisSmsSupabase(payload: {
       phones: uniquePhones,
     }),
   });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    sent?: number;
+    failed?: number;
+    failures?: Array<{ phone: string; error?: string }>;
+  };
+
+  if (!response.ok) {
+    const detail = body.failures?.[0]?.error;
+    throw new Error(detail ?? body.error ?? `Envoi SMS impossible (${response.status})`);
+  }
+
+  const sent = Number(body.sent ?? 0);
+  const failed = Number(body.failed ?? 0);
+  if (sent === 0) {
+    const detail = body.failures?.[0]?.error ?? body.error ?? "Aucun SMS délivré";
+    throw new Error(detail);
+  }
+
+  return { sent, failed, failures: body.failures };
 }
 
 export const COLIS_STATUT_LABELS: Record<ColisStatut, string> = {
