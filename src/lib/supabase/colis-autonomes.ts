@@ -276,6 +276,14 @@ export async function updateColisStatutSupabase(
   };
 }
 
+export async function resolveColisRetraitCodeSupabase(code: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc("resolve_colis_retrait_code", {
+    p_code: code.trim(),
+  });
+  if (error) throw error;
+  return data ? String(data) : null;
+}
+
 export async function deliverColisAutonomeSupabase(retraitCode: string): Promise<{
   id: string;
   statutColis: ColisStatut;

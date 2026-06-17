@@ -1,11 +1,18 @@
+import { toast } from "sonner";
 import { printer, type PrintLine } from "@/lib/printer.ts";
 import type { ColisAutonomeDetail } from "@/lib/supabase/colis-autonomes.ts";
 import { COLIS_STATUT_LABELS } from "@/lib/supabase/colis-autonomes.ts";
+import { isPosPrinterAvailable, type ThermalPaperWidth } from "@/lib/ticket-receipt-print.ts";
 
 export function colisPublicReference(colisId: string): string {
   const compact = colisId.replace(/-/g, "").toUpperCase();
   return `CL-${compact.slice(0, 8)}`;
 }
+
+export type ColisReceiptInput = {
+  detail: ColisAutonomeDetail;
+  currency?: string;
+};
 
 type TibusP3Bridge = {
   printReceipt58?: (title: string, payload: string) => void;
@@ -17,21 +24,20 @@ function tibusP3(): TibusP3Bridge | undefined {
   return (window as unknown as Record<string, unknown>).TibusP3 as TibusP3Bridge | undefined;
 }
 
-function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: string): PrintLine[] {
+export function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: string): PrintLine[] {
   const ref = colisPublicReference(detail.id);
-  const natureLabel = detail.natures[0] ?? "—";
+  const natureLabel = detail.natures.filter(Boolean).join(", ") || "—";
+  const description = detail.descriptionContenu?.trim() || "—";
 
   return [
     { text: "RECU EXPEDITION COLIS", align: "center", bold: true },
-    { text: "CONFIDENTIEL — CODE RETRAIT", align: "center", size: "small" },
+    { text: "Code de retrait — presentez a la gare destination", align: "center", size: "small" },
     { text: "" },
-    { text: `Ref: ${ref}`, bold: true },
-    { text: `Code retrait:`, bold: true },
-    { text: detail.id, align: "center", size: "large", bold: true },
-    { text: "" },
+    { text: `Ref: ${ref}`, align: "center", bold: true, size: "large" },
     { text: `Statut: ${COLIS_STATUT_LABELS[detail.statutColis]}` },
-    { text: `Depart: ${detail.gareDepart}` },
-    { text: `Destination: ${detail.gareDestination}` },
+    { text: "" },
+    { text: `Depart: ${detail.gareDepart}`, bold: true },
+    { text: `Destination: ${detail.gareDestination}`, bold: true },
     { text: "" },
     { text: "EXPEDITEUR", bold: true },
     { text: detail.nomExpediteur },
@@ -42,17 +48,22 @@ function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: string): 
     { text: detail.telephoneDestinataire, size: "small" },
     { text: "" },
     { text: `Nature: ${natureLabel}`, bold: true },
+    { text: `Description: ${description}` },
     { text: `Pieces: ${detail.nombrePieces}` },
     { text: detail.poidsKg ? `Poids: ${detail.poidsKg} kg` : "Poids: —" },
-    { text: detail.descriptionContenu ? `Contenu: ${detail.descriptionContenu}` : "" },
     { text: "" },
     { text: `Montant fret: ${detail.montantFret.toLocaleString()} ${currency}`, bold: true },
     { text: "" },
-    { text: "Scannez le QR ou presentez ce code a la gare de destination.", align: "center", size: "small" },
+    { text: "Scannez le QR ou saisissez la reference CL- au retrait.", align: "center", size: "small" },
+    { text: "Powered By Tibus", align: "center", size: "small" },
   ];
 }
 
-function printViaTibusP3(detail: ColisAutonomeDetail, lines: PrintLine[]): boolean {
+function printViaTibusP3(
+  detail: ColisAutonomeDetail,
+  lines: PrintLine[],
+  paperWidth: ThermalPaperWidth,
+): boolean {
   const p3 = tibusP3();
   if (!printer.isNative || !p3) return false;
 
@@ -64,7 +75,7 @@ function printViaTibusP3(detail: ColisAutonomeDetail, lines: PrintLine[]): boole
     source: "colis-receipt",
   });
 
-  if (p3.printReceipt80) {
+  if (paperWidth === "80mm" && p3.printReceipt80) {
     p3.printReceipt80(detail.companyName || "TIBUS COLIS", payload);
     return true;
   }
@@ -72,20 +83,39 @@ function printViaTibusP3(detail: ColisAutonomeDetail, lines: PrintLine[]): boole
     p3.printReceipt58(detail.companyName || "TIBUS COLIS", payload);
     return true;
   }
+  if (p3.printReceipt80) {
+    p3.printReceipt80(detail.companyName || "TIBUS COLIS", payload);
+    return true;
+  }
   return false;
 }
 
-export async function printColisReceipt(detail: ColisAutonomeDetail, currency = "XOF") {
+export function printColisReceipt(
+  detail: ColisAutonomeDetail,
+  currency = "XOF",
+  paperWidth: ThermalPaperWidth = "80mm",
+): void {
   const lines = buildColisReceiptLines(detail, currency);
+  try {
+    if (printViaTibusP3(detail, lines, paperWidth)) return;
+    if (printer.isNative) {
+      void printer.printReceipt({
+        header: detail.companyName || "TIBUS COLIS",
+        lines,
+        qr: detail.id,
+        qrSize: 220,
+        feedLines: 4,
+        cut: true,
+      });
+      return;
+    }
+    toast.message("Impression POS indisponible — utilisez le bouton Imprimer ci-dessous");
+  } catch (error) {
+    console.error("Colis print error:", error);
+    toast.error("Impression impossible");
+  }
+}
 
-  if (printViaTibusP3(detail, lines)) return;
-
-  await printer.printReceipt({
-    header: detail.companyName || "TIBUS COLIS",
-    lines,
-    qr: detail.id,
-    qrSize: 220,
-    feedLines: 4,
-    cut: true,
-  });
+export function isColisPosPrinterAvailable(): boolean {
+  return isPosPrinterAvailable();
 }
