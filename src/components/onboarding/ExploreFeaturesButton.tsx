@@ -65,7 +65,7 @@ export default function ExploreFeaturesButton({
         type="button"
         onClick={handleClick}
         data-tour="owner-explore-features"
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-orange-300/60 bg-orange-100/80 dark:bg-orange-950/40 px-3 py-2.5 text-sm font-semibold text-orange-800 dark:text-orange-100 transition-colors hover:bg-orange-200/80 dark:hover:bg-orange-900/50"
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-sky-300/60 bg-sky-100/80 dark:bg-sky-950/40 px-3 py-2.5 text-sm font-semibold text-sky-800 dark:text-sky-100 transition-colors hover:bg-sky-200/80 dark:hover:bg-sky-900/50"
       >
         <CompassIcon className="w-4 h-4" />
         {label}

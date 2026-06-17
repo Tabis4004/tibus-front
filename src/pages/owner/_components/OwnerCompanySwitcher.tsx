@@ -36,10 +36,10 @@ export default function OwnerCompanySwitcher({
       : company.name;
 
   const accentLink = sidebarTone
-    ? "text-orange-700 hover:text-orange-800 dark:text-orange-300"
+    ? "text-sky-700 hover:text-sky-800 dark:text-sky-300"
     : "text-primary";
-  const accentIconWrap = sidebarTone ? "bg-orange-400/15" : "bg-primary/10";
-  const accentIcon = sidebarTone ? "text-orange-600 dark:text-orange-300" : "text-primary";
+  const accentIconWrap = sidebarTone ? "bg-sky-400/15" : "bg-primary/10";
+  const accentIcon = sidebarTone ? "text-sky-600 dark:text-sky-300" : "text-primary";
 
   const addCompanyLink = (
     <Link
