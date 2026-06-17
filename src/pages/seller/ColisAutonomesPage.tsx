@@ -26,7 +26,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getSellerProfileSupabase } from "@/lib/supabase/seller-counter";
-import { supabase } from "@/lib/supabase";
+import { supabaseErrorMessage } from "@/lib/supabase/errors";
+import { listCompanyStationGaresSupabase } from "@/lib/supabase/station-cash.ts";
 import { printColisReceipt } from "@/lib/colis-receipt.ts";
 import {
   COLIS_NEXT_STATUT,
@@ -124,17 +125,47 @@ export default function ColisAutonomesPage({ onBack }: { onBack?: () => void }) 
       setModuleEnabled(moduleActive);
       if (!moduleActive) return;
 
-      const [garesRes, naturesRes, listRes] = await Promise.all([
-        supabase.from("Gares").select("id, name").eq("companyId", cid).order("name"),
+      const [garesResult, naturesResult, listResult] = await Promise.allSettled([
+        listCompanyStationGaresSupabase(cid),
         listColisNaturesSupabase(cid),
         listColisAutonomesSupabase(cid),
       ]);
-      if (garesRes.error) throw garesRes.error;
-      setGares((garesRes.data ?? []).map((g) => ({ id: String(g.id), name: String(g.name) })));
-      setNatures(naturesRes.filter((n) => n.isActive));
-      setRows(listRes);
+
+      const nextGares = garesResult.status === "fulfilled" ? garesResult.value : [];
+      const nextNatures = naturesResult.status === "fulfilled" ? naturesResult.value : [];
+      const nextRows = listResult.status === "fulfilled" ? listResult.value : [];
+
+      const loadErrors: string[] = [];
+      if (garesResult.status === "rejected") {
+        loadErrors.push(`Gares : ${supabaseErrorMessage(garesResult.reason)}`);
+      }
+      if (naturesResult.status === "rejected") {
+        loadErrors.push(`Natures : ${supabaseErrorMessage(naturesResult.reason)}`);
+      }
+      if (listResult.status === "rejected") {
+        loadErrors.push(`Liste colis : ${supabaseErrorMessage(listResult.reason)}`);
+      }
+
+      setGares(nextGares);
+      setNatures(nextNatures.filter((n) => n.isActive));
+      setRows(nextRows);
+
+      if (loadErrors.length) {
+        toast.error(loadErrors.join(" · "));
+      } else if (!nextGares.length) {
+        toast.message(
+          t("colis.no_gares", {
+            defaultValue: "Aucune gare configurée. Ajoutez des gares dans la console owner.",
+          }),
+        );
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("colis.load_error", { defaultValue: "Chargement impossible" }));
+      toast.error(
+        supabaseErrorMessage(
+          err,
+          t("colis.load_error", { defaultValue: "Chargement impossible" }),
+        ),
+      );
     } finally {
       setLoading(false);
     }
