@@ -11,13 +11,24 @@ Contenu :
 - **22 fiches pédagogiques** (objectif, URL, capture réelle, procédure)
 - Mise en route compagnie, pilotage quotidien, cycle billet, glossaire
 
-Compte de démonstration pour les captures : **tabiscompany@gmail.com** · Tibus Démo Transport.
+Compte de démonstration pour les captures : **tabiscompany@gmail.com** / `123456` · Tibus Démo Transport.
 
-## Captures Owner (`captures/owner-real-*.png`)
+## Captures layout (`public/manuel/captures/`)
 
-21 captures réelles + `owner-real-scan.png` si disponible.
+Fichiers `owner-real-*.png`, `capture-accueil.png`, `capture-guide.png`, `seller-real-dashboard.png`, `admin-real-*.png`, etc.
 
-## Régénérer
+Les résultats de scan (`scan-controle-*`, `seller-scan-*`) ne sont **pas** écrasés par le script.
+
+```bash
+cd ~/Documents/tibus-front
+npm install
+# Chrome système (recommandé) — pas besoin d'installer Chromium Playwright
+MANUAL_CAPTURE_BASE=https://tibus.app npm run manual:capture-layouts
+```
+
+Le script utilise la navigation SPA (clics / `history.pushState`) : un `page.goto` direct vers `/fr/owner/*` redirige vers l'accueil avant hydratation Supabase.
+
+## Régénérer le DOCX
 
 Depuis n'importe quel dossier :
 
