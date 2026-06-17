@@ -19,7 +19,13 @@ export async function setCompanyFeatureModulesSupabase(
   companyId: string,
   modules: Pick<
     CompanyFeatureModules,
-    "moduleA" | "moduleB" | "moduleC" | "moduleD" | "moduleE" | "moduleF"
+    | "moduleA"
+    | "moduleB"
+    | "moduleC"
+    | "moduleD"
+    | "moduleE"
+    | "moduleF"
+    | "moduleDColisSmsConfig"
   >,
 ): Promise<CompanyFeatureModules> {
   const { data, error } = await supabase.rpc("set_company_feature_modules", {
@@ -30,6 +36,7 @@ export async function setCompanyFeatureModulesSupabase(
     p_module_d: modules.moduleD,
     p_module_e: modules.moduleE,
     p_module_f: modules.moduleF,
+    p_module_d_colis_sms_config: modules.moduleDColisSmsConfig,
   });
   if (error) throw error;
 

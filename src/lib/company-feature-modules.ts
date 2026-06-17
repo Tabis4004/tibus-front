@@ -9,6 +9,8 @@ export type CompanyFeatureModules = {
   moduleD: boolean;
   moduleE: boolean;
   moduleF: boolean;
+  /** Admin : l'owner peut configurer les SMS colis (module D). */
+  moduleDColisSmsConfig: boolean;
   updatedAt?: string;
 };
 
@@ -19,6 +21,7 @@ export const DEFAULT_COMPANY_FEATURE_MODULES: Omit<CompanyFeatureModules, "compa
   moduleD: true,
   moduleE: true,
   moduleF: false,
+  moduleDColisSmsConfig: false,
 };
 
 export function companyModuleEnabled(
@@ -52,6 +55,13 @@ export function isColisAutonomeModuleActive(
   return colisSettings.colisAutonomeEnabled;
 }
 
+export function colisSmsOwnerConfigEnabled(
+  modules: CompanyFeatureModules | null | undefined,
+): boolean {
+  if (!modules) return false;
+  return modules.moduleD && modules.moduleDColisSmsConfig;
+}
+
 export function normalizeCompanyFeatureModules(
   companyId: string,
   data: unknown,
@@ -65,6 +75,7 @@ export function normalizeCompanyFeatureModules(
     moduleD: row.moduleD !== false,
     moduleE: row.moduleE === true,
     moduleF: row.moduleF === true,
+    moduleDColisSmsConfig: row.moduleDColisSmsConfig === true,
     updatedAt: row.updatedAt ? String(row.updatedAt) : undefined,
   };
 }

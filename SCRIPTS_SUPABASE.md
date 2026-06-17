@@ -409,10 +409,11 @@ npm run supabase:push
 
 Route UI : `/admin/demarcheur` — performance des compagnies recrutées + commissions stakeholder recruteur.
 
-## Lot 128–130 — Colis autonomes
+## Lot 128–131 — Colis autonomes
 
 | Fichier | Contenu |
 |---------|---------|
 | `128_sync_colis_module_d.sql` | Sync `colis_autonome_enabled` ↔ module commercial D |
 | `129_fix_list_colis_autonomes_order.sql` | Fix RPC `list_colis_autonomes` (`ORDER BY sub."createdAt"`) |
 | `130_colis_cash_and_sales_journal.sql` | Encaissement caisse (`encaissement_colis`) à l'enregistrement + journal des ventes (`colis_autonome`) |
+| `131_module_d_colis_sms_owner_config.sql` | Option admin : owner autorisé à configurer les SMS colis (`moduleDColisSmsConfig`) |

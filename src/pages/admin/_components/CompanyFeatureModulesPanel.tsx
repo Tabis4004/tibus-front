@@ -48,6 +48,27 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
     };
   }, [companyId]);
 
+  const persist = async (draft: CompanyFeatureModules) => {
+    setSaving(true);
+    try {
+      const saved = await setCompanyFeatureModulesSupabase(companyId, {
+        moduleA: draft.moduleA,
+        moduleB: draft.moduleB,
+        moduleC: draft.moduleC,
+        moduleD: draft.moduleD,
+        moduleE: draft.moduleE,
+        moduleF: draft.moduleF,
+        moduleDColisSmsConfig: draft.moduleDColisSmsConfig,
+      });
+      setModules(saved);
+      toast.success(t("feature_modules.saved", { defaultValue: "Modules mis à jour." }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const toggle = async (key: keyof Pick<
     CompanyFeatureModules,
     "moduleA" | "moduleB" | "moduleC" | "moduleD" | "moduleE" | "moduleF"
@@ -59,6 +80,9 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
       draft.moduleC = false;
       draft.moduleE = false;
     }
+    if (key === "moduleD" && !next) {
+      draft.moduleDColisSmsConfig = false;
+    }
     if ((key === "moduleB" || key === "moduleC" || key === "moduleE") && next && !draft.moduleA) {
       toast.error(
         t("feature_modules.requires_a", {
@@ -67,23 +91,12 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
       );
       return;
     }
-    setSaving(true);
-    try {
-      const saved = await setCompanyFeatureModulesSupabase(companyId, {
-        moduleA: draft.moduleA,
-        moduleB: draft.moduleB,
-        moduleC: draft.moduleC,
-        moduleD: draft.moduleD,
-        moduleE: draft.moduleE,
-        moduleF: draft.moduleF,
-      });
-      setModules(saved);
-      toast.success(t("feature_modules.saved", { defaultValue: "Modules mis à jour." }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Enregistrement impossible.");
-    } finally {
-      setSaving(false);
-    }
+    await persist(draft);
+  };
+
+  const toggleColisSmsConfig = async (next: boolean) => {
+    if (!modules || readOnly || !modules.moduleD) return;
+    await persist({ ...modules, moduleDColisSmsConfig: next });
   };
 
   const flagKey = (
@@ -139,27 +152,53 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
             const needsA = (id === "B" || id === "C" || id === "E") && !modules.moduleA;
 
             return (
-              <div
-                key={id}
-                className="flex items-start justify-between gap-4 rounded-lg border p-3"
-              >
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Label className="font-medium text-sm">{meta.title}</Label>
-                    {needsA ? (
-                      <Badge variant="outline" className="text-[10px]">
-                        {t("feature_modules.requires_a_badge", { defaultValue: "Requiert A" })}
-                      </Badge>
-                    ) : null}
+              <div key={id} className="space-y-2">
+                <div
+                  className="flex items-start justify-between gap-4 rounded-lg border p-3"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Label className="font-medium text-sm">{meta.title}</Label>
+                      {needsA ? (
+                        <Badge variant="outline" className="text-[10px]">
+                          {t("feature_modules.requires_a_badge", { defaultValue: "Requiert A" })}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{meta.desc}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">{meta.desc}</p>
+                  <Switch
+                    checked={enabled}
+                    disabled={readOnly || saving || needsA}
+                    onCheckedChange={(checked) => void toggle(key, checked)}
+                    aria-label={meta.title}
+                  />
                 </div>
-                <Switch
-                  checked={enabled}
-                  disabled={readOnly || saving || needsA}
-                  onCheckedChange={(checked) => void toggle(key, checked)}
-                  aria-label={meta.title}
-                />
+                {id === "D" && enabled ? (
+                  <div className="ml-3 flex items-start justify-between gap-4 rounded-lg border border-dashed bg-muted/20 p-3">
+                    <div className="space-y-1 min-w-0">
+                      <Label className="text-sm font-medium">
+                        {t("feature_modules.colis_sms_config", {
+                          defaultValue: "Configuration SMS par l'owner",
+                        })}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("feature_modules.colis_sms_config_desc", {
+                          defaultValue:
+                            "Si activé, l'owner peut choisir les étapes de notification SMS colis dans son espace.",
+                        })}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={modules.moduleDColisSmsConfig}
+                      disabled={readOnly || saving}
+                      onCheckedChange={(checked) => void toggleColisSmsConfig(checked)}
+                      aria-label={t("feature_modules.colis_sms_config", {
+                        defaultValue: "Configuration SMS par l'owner",
+                      })}
+                    />
+                  </div>
+                ) : null}
               </div>
             );
           })}

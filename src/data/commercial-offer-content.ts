@@ -142,13 +142,17 @@ const EN_MODULES: CommercialOfferModule[] = [
   },
 ];
 
-function modulePricingRows(modules: CommercialOfferModule[]): string[][] {
+function modulePricingRows(
+  modules: CommercialOfferModule[],
+  addonRows: string[][] = [],
+): string[][] {
   const rows = modules.map((module) => [
     module.code,
     module.title,
     COMMERCIAL_OFFER_BLANK,
     COMMERCIAL_OFFER_BLANK,
   ]);
+  rows.push(...addonRows);
   rows.push(["—", "TOTAL modules sélectionnés", COMMERCIAL_OFFER_BLANK, COMMERCIAL_OFFER_BLANK]);
   return rows;
 }
@@ -263,7 +267,9 @@ export const COMMERCIAL_OFFER_DOCUMENT_FR: CommercialOfferDocument = {
       { id: "validity", label: "Date de validité" },
     ],
     modulePricingHeaders: ["Module", "Désignation", "Mise en service (F CFA)", "Abonnement mensuel (F CFA)"],
-    modulePricingRows: modulePricingRows(FR_MODULES),
+    modulePricingRows: modulePricingRows(FR_MODULES, [
+      ["—", "Envoi colis avec notification SMS", COMMERCIAL_OFFER_BLANK, COMMERCIAL_OFFER_BLANK],
+    ]),
     packTable: {
       headers: ["Élément", "Montant (F CFA)"],
       rows: [
@@ -409,7 +415,9 @@ export const COMMERCIAL_OFFER_DOCUMENT_EN: CommercialOfferDocument = {
       { id: "validity", label: "Validity date" },
     ],
     modulePricingHeaders: ["Module", "Label", "Setup fee (XOF)", "Monthly subscription (XOF)"],
-    modulePricingRows: modulePricingRows(EN_MODULES).map((row) =>
+    modulePricingRows: modulePricingRows(EN_MODULES, [
+      ["—", "Parcel shipping with SMS notifications", COMMERCIAL_OFFER_BLANK, COMMERCIAL_OFFER_BLANK],
+    ]).map((row) =>
       row[1] === "TOTAL modules sélectionnés"
         ? ["—", "TOTAL selected modules", row[2], row[3]]
         : row,

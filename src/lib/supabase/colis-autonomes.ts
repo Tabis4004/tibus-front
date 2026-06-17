@@ -12,6 +12,7 @@ export type ColisNature = {
 export type CompanyColisSettings = {
   companyId: string;
   colisAutonomeEnabled: boolean;
+  colisSmsConfigEnabled: boolean;
   smsOnEnregistre: boolean;
   smsOnCharge: boolean;
   smsOnArrive: boolean;
@@ -63,6 +64,7 @@ function mapSettings(data: Record<string, unknown>): CompanyColisSettings {
   return {
     companyId: String(data.companyId ?? ""),
     colisAutonomeEnabled: Boolean(data.colisAutonomeEnabled),
+    colisSmsConfigEnabled: Boolean(data.colisSmsConfigEnabled),
     smsOnEnregistre: Boolean(data.smsOnEnregistre),
     smsOnCharge: Boolean(data.smsOnCharge),
     smsOnArrive: Boolean(data.smsOnArrive),

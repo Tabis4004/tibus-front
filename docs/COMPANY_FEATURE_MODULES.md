@@ -9,7 +9,7 @@ Activation par compagnie des blocs de l'offre commerciale Tibus, alignés sur `d
 | A | Billetterie & exploitation | — | `charge_company_counter_platform_commission` | sales, seller, fleet, trips… |
 | B | Scanner & anti-fraude | A | `verify_ticket_qr`, `confirm_passenger_on_board` | `/verify/scan`, cancellation |
 | C | Comptabilité analytique | A | `get_company_income_statement`, dépenses | expenses, income-statement, analytics |
-| D | Courrier / colis | — | trigger `colis_autonomes` | colis |
+| D | Courrier / colis | — | trigger `colis_autonomes` | colis (+ SMS si `moduleDColisSmsConfig`) |
 | E | Performance (promo, fidélité, API) | A | trigger `PromoCodes` | promo, loyalty, partner-api |
 | F | Équipement TPE | — | (flag DB, sur devis) | admin plateforme |
 

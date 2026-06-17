@@ -214,6 +214,7 @@ def main() -> None:
         ("D", "Portail voyageur (web)"),
         ("E", "Pilotage, caisse & rapports"),
         ("F", "Options avancées"),
+        ("—", "Envoi colis avec notification SMS"),
         ("—", "TOTAL modules sélectionnés"),
     ]
     fin = doc.add_table(rows=1 + len(fin_rows), cols=4)

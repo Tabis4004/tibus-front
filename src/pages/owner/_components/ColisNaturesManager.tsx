@@ -17,7 +17,7 @@ import {
   type ColisNature,
   type CompanyColisSettings,
 } from "@/lib/supabase/colis-autonomes.ts";
-import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
+import { isColisAutonomeModuleActive, colisSmsOwnerConfigEnabled } from "@/lib/company-feature-modules.ts";
 import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
 
 export default function ColisNaturesManager({ companyId }: { companyId: string }) {
@@ -109,6 +109,8 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
   }
 
   const colisModuleActive = isColisAutonomeModuleActive(settings, featureModules);
+  const smsConfigAllowed =
+    settings.colisSmsConfigEnabled || colisSmsOwnerConfigEnabled(featureModules);
 
   if (!colisModuleActive) {
     return (
@@ -186,6 +188,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
         </CardContent>
       </Card>
 
+      {smsConfigAllowed ? (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{t("colis.sms_title", { defaultValue: "Notifications SMS" })}</CardTitle>
@@ -216,6 +219,16 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
           </Button>
         </CardContent>
       </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            {t("colis.sms_admin_locked", {
+              defaultValue:
+                "Les notifications SMS colis ne sont pas activées pour votre offre. Contactez l'administrateur Tibus pour les inclure.",
+            })}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
