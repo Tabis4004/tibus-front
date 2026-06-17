@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Formulaire vente guichet</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1220;
+      color: #0f172a;
+      width: 390px;
+      min-height: 844px;
+      margin: 0 auto;
+      padding: 12px 12px 24px;
+    }
+    .top { color: #e2e8f0; font-size: 13px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .back { width: 28px; height: 28px; border-radius: 8px; background: #1e293b; display: inline-flex; align-items: center; justify-content: center; }
+    .trip {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .trip h1 { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+    .trip p { font-size: 12px; color: #64748b; }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      margin-bottom: 12px;
+      background: #fff;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .passenger { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .passenger span { font-size: 11px; color: #64748b; width: 72px; }
+    .seats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
+    .seat {
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; background: #fff;
+    }
+    .seat.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .seat.off { background: #f1f5f9; color: #94a3b8; }
+    .colis {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+    .colis h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+    .colis-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .colis-grid label { font-size: 10px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="top"><span class="back">←</span> <strong>Vente guichet</strong></div>
+  <div class="trip">
+    <h1>Tibus Démo Transport</h1>
+    <p>Abidjan → Yamoussoukro</p>
+    <p style="margin-top:6px">18 juin 2026 · 06:00 · 39/45 places</p>
+  </div>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Nombre de passagers *</label>
+        <input type="number" value="1" readonly />
+      </div>
+      <div>
+        <label>Téléphone</label>
+        <input type="tel" value="+2250172960000" readonly />
+      </div>
+    </div>
+    <label>Noms des passagers *</label>
+    <div class="passenger"><span>Passager 1</span><input value="Isidore Tabis" readonly /></div>
+    <label>Sièges *</label>
+    <div class="seats">
+      <div class="seat off">1</div><div class="seat off">2</div><div class="seat off">3</div>
+      <div class="seat off">4</div><div class="seat off">5</div><div class="seat on">6</div>
+      <div class="seat off">7</div><div class="seat off">8</div><div class="seat off">9</div>
+      <div class="seat off">10</div><div class="seat off">11</div><div class="seat off">12</div>
+    </div>
+    <div class="colis">
+      <h3>Colis (groupé)</h3>
+      <div class="colis-grid">
+        <div><label>Nombre</label><input value="12" readonly /></div>
+        <div><label>Poids (kg)</label><input value="25" readonly /></div>
+        <div><label>Montant</label><input value="10006" readonly /></div>
+      </div>
+    </div>
+  </div>
+  <button style="width:100%;background:#2563eb;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700">Vendre</button>
+</body>
+</html>

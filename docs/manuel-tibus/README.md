@@ -15,7 +15,7 @@ Compte de démonstration pour les captures : **tabiscompany@gmail.com** / `12345
 
 ## Captures layout (`public/manuel/captures/`)
 
-Fichiers `owner-real-*.png`, `capture-accueil.png`, `capture-guide.png`, `seller-real-dashboard.png`, `admin-real-*.png`, etc.
+Fichiers `owner-real-*.png`, `capture-accueil.png`, `capture-guide.png`, `seller-real-dashboard.png`, `seller-real-sale-form.png`, `seller-real-receipt.png`, `admin-real-*.png`, etc.
 
 Les résultats de scan (`scan-controle-*`, `seller-scan-*`) ne sont **pas** écrasés par le script.
 

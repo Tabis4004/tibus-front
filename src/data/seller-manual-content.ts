@@ -17,6 +17,10 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
       "Le bouton Scanner mène au contrôle d'embarquement (/fr/verify/scan).",
       "Ce document est visible uniquement pour les rôles vendeur et vendeur indépendant.",
     ],
+    figure: {
+      src: "/manuel/captures/seller-real-dashboard.png",
+      caption: "Tableau de bord vendeur — onglet Guichet (Tibus Démo Transport)",
+    },
   },
   {
     id: "counter-sale",
@@ -35,6 +39,24 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
     bullets: [
       "Un reversement en attente de validation comptable bloque les nouvelles ventes cash.",
       "Le mode affiché en haut du tableau de bord est « Guichet » (et non « Tiers »).",
+    ],
+    subsections: [
+      {
+        title: "Formulaire de vente",
+        body: "Après avoir choisi un départ, renseignez les passagers, les sièges (sélection multiple) et le colis groupé le cas échéant, puis validez « Vendre ».",
+        figure: {
+          src: "/manuel/captures/seller-real-sale-form.png",
+          caption: "Formulaire guichet — passagers, sièges et colis (exemple Tibus Démo Transport)",
+        },
+      },
+      {
+        title: "Reçu billet (POS)",
+        body: "Chaque passager reçoit un reçu avec référence TB-…, QR code et détail du trajet. Impression thermique 80 mm / 56 mm ou partage WhatsApp.",
+        figure: {
+          src: "/manuel/captures/seller-real-receipt.png",
+          caption: "Reçu après vente guichet — référence, QR code, colis et total (capture application réelle)",
+        },
+      },
     ],
   },
   {
