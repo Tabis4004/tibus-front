@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -30,6 +30,12 @@ import {
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { canAccessCommercialOffer } from "@/lib/auth/commercial-offer-access.ts";
+import {
+  canAccessPlatformAdminPanel,
+  canMutateCompanyOperationalData,
+  isDemarcheurRole,
+  isAdminPaysRole,
+} from "@/lib/auth/company-access.ts";
 import {
   deleteCommissionSettingSupabase,
   resolveCompanyPlatformCommission,
@@ -161,16 +167,33 @@ export default function SupabaseAdminPanel() {
     setTabRefreshNonce((nonce) => nonce + 1);
   }, []);
   const [commissionAccordionSections, setCommissionAccordionSections] = useState<string[]>([]);
-  const canAccessAdminPanel = appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
+  const canAccessAdminPanel = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
 
-  const isAdminPays = appUser.roles.includes("admin_pays");
+  const isAdminPays = isAdminPaysRole(appUser.roles);
+  const isDemarcheur = isDemarcheurRole(appUser.roles);
   const adminCountryId = appUser.profile?.countryId ?? null;
 
+  const adminDataScope = useMemo(() => {
+    if (appUser.isSuperAdmin) {
+      return { countryId: null as string | null, recruitedByUserId: null as string | null };
+    }
+    if (isDemarcheur) {
+      return {
+        countryId: null as string | null,
+        recruitedByUserId: appUser.profile?.id ?? null,
+      };
+    }
+    if (isAdminPays) {
+      return { countryId: adminCountryId, recruitedByUserId: null as string | null };
+    }
+    return { countryId: null as string | null, recruitedByUserId: null as string | null };
+  }, [adminCountryId, appUser.isSuperAdmin, appUser.profile?.id, isAdminPays, isDemarcheur]);
+
   useEffect(() => {
-    if (appUser.isReady && !appUser.isSuperAdmin && isAdminPays) {
+    if (appUser.isReady && !appUser.isSuperAdmin && (isAdminPays || isDemarcheur)) {
       setTab((current) => (current === "companies" ? "companies" : "commissions"));
     }
-  }, [appUser.isReady, appUser.isSuperAdmin, isAdminPays]);
+  }, [appUser.isReady, appUser.isSuperAdmin, isAdminPays, isDemarcheur]);
 
   useEffect(() => {
     if (!appUser.isReady) return;
@@ -198,7 +221,10 @@ export default function SupabaseAdminPanel() {
     if (!appUserId) return;
     setManagingCompanyId(companyId);
     try {
-      await enterSuperAdminOwnerCompanyContext(appUserId, companyId);
+      await enterSuperAdminOwnerCompanyContext(appUserId, companyId, {
+        isSuperAdmin: appUser.isSuperAdmin,
+        ownedCompanyIds: appUser.ownedCompanyIds,
+      });
       refreshOwnerCompanyContext();
       navigate(`/${lng ?? "fr"}/owner`);
     } catch (err) {
@@ -240,7 +266,7 @@ export default function SupabaseAdminPanel() {
       tab,
       appUser.isSuperAdmin,
       appUser.hasDbSuperAdmin,
-      appUser.isSuperAdmin ? null : adminCountryId,
+      adminDataScope,
     )
       .then((result) => {
         if (cancelled) return;
@@ -255,7 +281,7 @@ export default function SupabaseAdminPanel() {
       cancelled = true;
     };
   }, [
-    adminCountryId,
+    adminDataScope,
     appUser.hasDbSuperAdmin,
     appUser.isReady,
     appUser.isSuperAdmin,
@@ -466,7 +492,13 @@ export default function SupabaseAdminPanel() {
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-end items-center gap-1">
-                      {(appUser.isSuperAdmin || isAdminPays) && (
+                      {(appUser.isSuperAdmin ||
+                        canMutateCompanyOperationalData(
+                          appUser.roles,
+                          appUser.isSuperAdmin,
+                          company.id,
+                          appUser.ownedCompanyIds,
+                        )) && (
                         <Button
                           type="button"
                           size="sm"

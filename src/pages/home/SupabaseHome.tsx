@@ -12,6 +12,7 @@ import {
   ClipboardListIcon,
   BookOpenIcon,
   MapPinIcon,
+  TrendingUpIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { motion } from "motion/react";
@@ -23,6 +24,7 @@ import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton
 import { HomeManualBlocks } from "./_components/HomeManualBlocks.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
 import { canViewNetworkGaresMap } from "@/lib/gares-map-audience.ts";
+import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -39,8 +41,8 @@ export default function SupabaseHome() {
     "Tibus";
 
   const showOwnerDashboard = appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
-  const showCountryAdminPanel =
-    appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
+  const showPlatformAdmin = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
+  const showDemarcheurDashboard = isDemarcheurRole(appUser.roles);
   const showSellerDashboard = appUser.hasSellerRole || appUser.hasMerchantAgentApplication;
   const showThirdPartyBooking = appUser.hasThirdPartySellerRole || appUser.hasMerchantAgentApplication;
   const showTicketScanner = ["owner", "controleur", "vendeur", "chauffeur", "super_admin"].some((role) =>
@@ -91,7 +93,8 @@ export default function SupabaseHome() {
             showOwnerDashboard ||
             showSellerDashboard ||
             showThirdPartyBooking ||
-            showCountryAdminPanel ||
+            showPlatformAdmin ||
+            showDemarcheurDashboard ||
             appUser.isSuperAdmin) && (
             <HomeBlockSection title={t("home.section_pro", { defaultValue: "Espace pro" })}>
               {showTicketScanner && (
@@ -153,7 +156,18 @@ export default function SupabaseHome() {
                 />
               )}
 
-              {(appUser.isSuperAdmin || appUser.roles.includes("admin_pays")) && (
+              {showDemarcheurDashboard && (
+                <HomeActionBlock
+                  to={`/${locale}/admin/demarcheur`}
+                  title={t("header.demarcheur_dashboard", { defaultValue: "Espace démarcheur" })}
+                  description={t("home.demarcheur_desc", {
+                    defaultValue: "Performance et commissions sur vos compagnies recrutées",
+                  })}
+                  icon={TrendingUpIcon}
+                />
+              )}
+
+              {showPlatformAdmin && (
                 <HomeActionBlock
                   to={`/${locale}/admin`}
                   title={t("admin_panel", { defaultValue: "Admin Panel" })}

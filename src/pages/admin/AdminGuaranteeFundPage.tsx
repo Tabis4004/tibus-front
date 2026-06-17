@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import GuaranteeFundManager from "./_components/GuaranteeFundManager.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
+import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
 import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 
 type CompanyRow = {
@@ -30,7 +31,8 @@ export default function AdminGuaranteeFundPage() {
   const appUser = useAppUser();
   const [companies, setCompanies] = useState<CompanyRow[] | undefined>(undefined);
 
-  const canAccess = appUser.isSuperAdmin || appUser.roles.includes("admin_pays");
+  const canAccess = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
+  const isDemarcheur = isDemarcheurRole(appUser.roles);
 
   useEffect(() => {
     if (!appUser.isReady) return;
@@ -40,10 +42,22 @@ export default function AdminGuaranteeFundPage() {
     }
 
     let cancelled = false;
-    void supabase
+    let query = supabase
       .from("Companies")
       .select("id, name, Countries(name, currency)")
-      .order("name")
+      .order("name");
+
+    if (isDemarcheur && !appUser.isSuperAdmin && appUser.profile?.id) {
+      query = query.eq("recruitedByUserId", appUser.profile.id);
+    } else if (
+      !appUser.isSuperAdmin &&
+      appUser.roles.includes("admin_pays") &&
+      appUser.profile?.countryId
+    ) {
+      query = query.eq("countryId", appUser.profile.countryId);
+    }
+
+    void query
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) {
@@ -68,7 +82,7 @@ export default function AdminGuaranteeFundPage() {
     return () => {
       cancelled = true;
     };
-  }, [appUser.isReady, canAccess, navigate, lng]);
+  }, [appUser.isReady, appUser.isSuperAdmin, appUser.profile?.countryId, appUser.profile?.id, appUser.roles, canAccess, isDemarcheur, navigate, lng]);
 
   if (!appUser.isReady || companies === undefined) {
     return (

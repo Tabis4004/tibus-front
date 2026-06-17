@@ -273,14 +273,20 @@ async function loadUsers(hasDbSuperAdmin: boolean): Promise<Pick<AdminDataSlice,
   }
 }
 
-async function loadCompanies(countryId?: string | null): Promise<Pick<AdminDataSlice, "companies">> {
+async function loadCompanies(scope?: {
+  countryId?: string | null;
+  recruitedByUserId?: string | null;
+}): Promise<Pick<AdminDataSlice, "companies">> {
   let query = supabase
     .from("Companies")
     .select("id, name, countryId, isActive, commissionRate, managerName, recruitedByUserId, Countries(name, currency)")
     .order("createdAt", { ascending: false });
 
-  if (countryId) {
-    query = query.eq("countryId", countryId);
+  if (scope?.countryId) {
+    query = query.eq("countryId", scope.countryId);
+  }
+  if (scope?.recruitedByUserId) {
+    query = query.eq("recruitedByUserId", scope.recruitedByUserId);
   }
 
   const { data: rows, error } = await query;
@@ -450,6 +456,7 @@ async function loadCommissions(): Promise<
 type LoaderContext = {
   hasDbSuperAdmin: boolean;
   countryId?: string | null;
+  recruitedByUserId?: string | null;
 };
 
 const LOADER_BY_KEY: Record<
@@ -458,7 +465,11 @@ const LOADER_BY_KEY: Record<
 > = {
   users: (context) => loadUsers(context.hasDbSuperAdmin),
   rolesByUser: (context) => loadUsers(context.hasDbSuperAdmin),
-  companies: (context) => loadCompanies(context.countryId),
+  companies: (context) =>
+    loadCompanies({
+      countryId: context.countryId,
+      recruitedByUserId: context.recruitedByUserId,
+    }),
   countries: () => loadCountries(),
   cities: () => loadCities(),
   roles: () => loadRoles(),
@@ -473,12 +484,16 @@ export async function loadAdminTabData(
   tab: AdminTabId,
   isSuperAdmin: boolean,
   hasDbSuperAdmin: boolean,
-  countryId?: string | null,
+  scope?: { countryId?: string | null; recruitedByUserId?: string | null },
 ): Promise<{ data: Partial<AdminDataSlice>; errors: Partial<Record<AdminDataKey, string>> }> {
   const keys = [...new Set(adminTabDataKeys(tab, isSuperAdmin))];
   const data: Partial<AdminDataSlice> = {};
   const errors: Partial<Record<AdminDataKey, string>> = {};
-  const context: LoaderContext = { hasDbSuperAdmin, countryId };
+  const context: LoaderContext = {
+    hasDbSuperAdmin,
+    countryId: scope?.countryId,
+    recruitedByUserId: scope?.recruitedByUserId,
+  };
 
   await Promise.all(
     keys.map(async (key) => {

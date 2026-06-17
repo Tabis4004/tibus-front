@@ -29,6 +29,10 @@ import { updateCompanyRecruitedBySupabase } from "@/lib/supabase/accounting.ts";
 import { listPlatformUsersForAdminSupabase, type PlatformAdminUserRow } from "@/lib/supabase/admin-users.ts";
 import { useAppUser } from "@/hooks/use-app-user";
 import { canManageCompanyFeatureModules } from "@/lib/auth/commercial-offer-access.ts";
+import {
+  isAdminPaysRole,
+  isDemarcheurRole,
+} from "@/lib/auth/company-access.ts";
 import { enterSuperAdminOwnerCompanyContext } from "@/lib/supabase/owner-company.ts";
 import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
@@ -53,9 +57,14 @@ export default function SupabaseAdminCompanyManager() {
   const { lng, companyId } = useParams<{ lng: string; companyId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("common");
-  const { isSuperAdmin, isReady, profile, roles } = useAppUser();
-  const canManageModules = canManageCompanyFeatureModules(roles, isSuperAdmin);
-  const canAccessCompanyAdmin = isSuperAdmin || canManageModules;
+  const { isSuperAdmin, isReady, profile, roles, ownedCompanyIds } = useAppUser();
+  const isAdminPays = isAdminPaysRole(roles);
+  const isDemarcheur = isDemarcheurRole(roles);
+  const canManageModules =
+    Boolean(companyId) &&
+    canManageCompanyFeatureModules(roles, isSuperAdmin, companyId ?? "", ownedCompanyIds);
+  const canAccessCompanyAdmin =
+    isSuperAdmin || isAdminPays || isDemarcheur || canManageModules;
   const [company, setCompany] = useState<CompanyOverview | null | undefined>(undefined);
   const [recruiterOptions, setRecruiterOptions] = useState<{ id: string; label: string }[]>([]);
   const [recruiterDraft, setRecruiterDraft] = useState<string>("__none");
@@ -112,10 +121,19 @@ export default function SupabaseAdminCompanyManager() {
       if (!cancelled) {
         if (
           !isSuperAdmin &&
-          canManageModules &&
+          isAdminPays &&
           profile?.countryId &&
           countryId &&
           profile.countryId !== countryId
+        ) {
+          setCompany(null);
+          return;
+        }
+
+        if (
+          !isSuperAdmin &&
+          isDemarcheur &&
+          recruitedByUserId !== profile?.id
         ) {
           setCompany(null);
           return;
@@ -143,7 +161,7 @@ export default function SupabaseAdminCompanyManager() {
     return () => {
       cancelled = true;
     };
-  }, [companyId, isSuperAdmin, canManageModules, profile?.countryId]);
+  }, [companyId, isSuperAdmin, isAdminPays, isDemarcheur, profile?.countryId, profile?.id]);
 
   useEffect(() => {
     void listPlatformUsersForAdminSupabase(500)
@@ -169,7 +187,10 @@ export default function SupabaseAdminCompanyManager() {
     if (!company || !appUserId) return;
     setOpeningOwnerConsole(true);
     try {
-      await enterSuperAdminOwnerCompanyContext(appUserId, company.id);
+      await enterSuperAdminOwnerCompanyContext(appUserId, company.id, {
+        isSuperAdmin,
+        ownedCompanyIds,
+      });
       refreshOwnerCompanyContext();
       navigate(`/${lng ?? "fr"}/owner`);
     } catch (err) {
@@ -251,16 +272,16 @@ export default function SupabaseAdminCompanyManager() {
             Modules A–F
           </Badge>
         ) : null}
-        {isSuperAdmin ? (
-        <Button
-          type="button"
-          size="sm"
-          disabled={openingOwnerConsole}
-          onClick={() => void handleOpenOwnerConsole()}
-        >
-          <LayoutDashboardIcon className="w-4 h-4 mr-1" />
-          Gérer
-        </Button>
+        {canManageModules ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={openingOwnerConsole}
+            onClick={() => void handleOpenOwnerConsole()}
+          >
+            <LayoutDashboardIcon className="w-4 h-4 mr-1" />
+            Gérer
+          </Button>
         ) : null}
       </div>
 

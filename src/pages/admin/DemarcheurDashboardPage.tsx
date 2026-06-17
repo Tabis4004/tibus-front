@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeftIcon, BuildingIcon, RefreshCwIcon, TrendingUpIcon } from "lucide-react";
+import AppHeader from "../layout/_components/AppHeader.tsx";
+import BottomNav from "../layout/_components/BottomNav.tsx";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { canAccessDemarcheurDashboard } from "@/lib/auth/demarcheur-access.ts";
@@ -102,14 +104,21 @@ export default function DemarcheurDashboardPage() {
 
   if (!appUser.isReady || !canAccess) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-40 w-full" />
+      <div className="flex flex-col min-h-screen">
+        <AppHeader />
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-4 flex-1">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+        <BottomNav />
       </div>
     );
   }
 
   return (
+    <div className="flex flex-col min-h-screen">
+      <AppHeader />
+      <main className="flex-1 pb-20 md:pb-0">
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -227,6 +236,9 @@ export default function DemarcheurDashboardPage() {
         embedded
         countryId={dashboard?.countryId ?? appUser.profile?.countryId ?? null}
       />
+    </div>
+      </main>
+      <BottomNav />
     </div>
   );
 }

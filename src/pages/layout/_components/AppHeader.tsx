@@ -24,6 +24,7 @@ import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton
 import ManualNavLinks from "@/components/manual/ManualNavLinks.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { resolveUserHomePath } from "@/lib/auth/role-routing.ts";
+import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
 
 async function shareApp(t: (key: string, opts?: Record<string, string>) => string) {
   const url = "https://www.tibusafrica.com";
@@ -70,10 +71,10 @@ function UserMenu() {
   const hasOwnerDashboard = isSupabaseAuth() && appUser.roles.includes("owner");
   const hasPlatformAdmin =
     isSupabaseAuth() &&
-    (appUser.isSuperAdmin || appUser.roles.includes("admin_pays"));
+    canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
   const hasDemarcheurDashboard =
     isSupabaseAuth() &&
-    (appUser.roles.includes("demarcheur") || appUser.isSuperAdmin);
+    (isDemarcheurRole(appUser.roles) || appUser.isSuperAdmin);
   const canCreateCompany =
     isSupabaseAuth() &&
     appUser.isReady &&
@@ -120,7 +121,7 @@ function UserMenu() {
             </Link>
           </DropdownMenuItem>
         )}
-        {hasDemarcheurDashboard && !hasPlatformAdmin && (
+        {hasDemarcheurDashboard && (
           <DropdownMenuItem asChild>
             <Link to={`/${lng}/admin/demarcheur`} className="cursor-pointer">
               <LayoutDashboardIcon className="w-4 h-4 mr-2 text-primary" />

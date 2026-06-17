@@ -154,7 +154,8 @@ export default function StakeholderCommissionPanel({
   const appUser = useAppUser();
   const isSuperAdmin = appUser.isSuperAdmin;
   const isCountryAdmin = appUser.roles.includes("admin_pays");
-  const canManageStakeholderRates = isSuperAdmin || isCountryAdmin;
+  const isDemarcheur = appUser.roles.includes("demarcheur");
+  const canManageStakeholderRates = isSuperAdmin || isCountryAdmin || isDemarcheur;
 
   const defaultCountryId = useMemo(() => {
     const profileCountry = appUser.profile?.countryId;
@@ -192,6 +193,12 @@ export default function StakeholderCommissionPanel({
     const byId = new Map(companies.map((company) => [company.id, company]));
     return panelCompanies
       .filter((company) => company.countryId === activeCountryId)
+      .filter((company) => {
+        if (!isDemarcheur || isSuperAdmin) return true;
+        const recruitedBy =
+          company.recruitedByUserId ?? byId.get(company.id)?.recruitedByUserId ?? null;
+        return recruitedBy === appUser.profile?.id;
+      })
       .map((company) => {
         const fromParent = byId.get(company.id);
         return {
@@ -200,7 +207,7 @@ export default function StakeholderCommissionPanel({
           recruitedByUserId: company.recruitedByUserId ?? fromParent?.recruitedByUserId ?? null,
         };
       });
-  }, [activeCountryId, companies, panelCompanies]);
+  }, [activeCountryId, appUser.profile?.id, companies, isDemarcheur, isSuperAdmin, panelCompanies]);
 
   const selectedCompany = useMemo(
     () =>

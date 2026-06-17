@@ -274,7 +274,18 @@ export async function resolveOwnerCompanyId(
 export async function enterSuperAdminOwnerCompanyContext(
   appUserId: string,
   companyId: string,
+  options?: { isSuperAdmin?: boolean; ownedCompanyIds?: readonly string[] },
 ): Promise<void> {
+  const isSuperAdmin =
+    options?.isSuperAdmin ?? (await isAppUserSuperAdminSupabase(appUserId));
+  const ownedCompanyIds =
+    options?.ownedCompanyIds ??
+    (await listOwnedCompaniesOnlySupabase(appUserId)).map((company) => company.id);
+
+  if (!isSuperAdmin && !ownedCompanyIds.includes(companyId)) {
+    throw new Error("Accès refusé : vous n'êtes pas propriétaire de cette compagnie.");
+  }
+
   const { data, error } = await supabase
     .from("Companies")
     .select("id")

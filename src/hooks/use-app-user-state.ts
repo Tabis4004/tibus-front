@@ -88,6 +88,7 @@ export function useAppUserState() {
   } = useSupabaseAuth();
   const [profile, setProfile] = useState<AppUserProfile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
+  const [ownedCompanyIds, setOwnedCompanyIds] = useState<string[]>([]);
   const [merchantAgentApplicationStatus, setMerchantAgentApplicationStatus] = useState<
     string | null
   >(null);
@@ -113,6 +114,7 @@ export function useAppUserState() {
       previousAppUserIdRef.current = null;
       setProfile(null);
       setRoles([]);
+      setOwnedCompanyIds([]);
       setMerchantAgentApplicationStatus(null);
       setIsReady(!session);
       setIsLoading(false);
@@ -126,6 +128,7 @@ export function useAppUserState() {
       setIsReady(false);
       setProfile(null);
       setRoles([]);
+      setOwnedCompanyIds([]);
       setMerchantAgentApplicationStatus(null);
     }
 
@@ -146,7 +149,7 @@ export function useAppUserState() {
 
       const { data: userRoles, error: urError } = await supabase
         .from("UserRoles")
-        .select("roleId, Role(name)")
+        .select("roleId, companyId, Role(name)")
         .eq("userId", appUserId);
 
       if (urError) throw urError;
@@ -184,6 +187,19 @@ export function useAppUserState() {
           : [];
       const roleNames = joinedRoleNames.length ? joinedRoleNames : fallbackRoleNames;
 
+      const ownedCompanyIds = Array.from(
+        new Set(
+          (userRoles ?? [])
+            .filter((row) => {
+              const name = roleNameFromJoin(
+                row.Role as { name: string } | { name: string }[] | null,
+              );
+              return name === "owner" && Boolean(row.companyId);
+            })
+            .map((row) => row.companyId as string),
+        ),
+      );
+
       const { data: merchantAgentApplication } = await supabase
         .from("MerchantAgentApplications")
         .select("status")
@@ -211,6 +227,7 @@ export function useAppUserState() {
       if (!cancelled) {
         setProfile(profileRow);
         setRoles(roleNames);
+        setOwnedCompanyIds(ownedCompanyIds);
         setMerchantAgentApplicationStatus(
           (merchantAgentApplication?.status as string | null | undefined) ?? null,
         );
@@ -222,6 +239,7 @@ export function useAppUserState() {
           setError(err instanceof Error ? err : new Error("Profil"));
           setProfile(null);
           setRoles([]);
+          setOwnedCompanyIds([]);
           setMerchantAgentApplicationStatus(null);
           setIsReady(true);
         }
@@ -268,6 +286,7 @@ export function useAppUserState() {
     () => ({
       profile,
       roles: effectiveRoles,
+      ownedCompanyIds,
       hasSellerRole: hasAnyRole(effectiveRoles, SELLER_ROLE_NAMES),
       hasSellerAccess: hasAnyRole(effectiveRoles, SELLER_ACCESS_ROLE_NAMES),
       hasThirdPartySellerRole: hasAnyRole(effectiveRoles, THIRD_PARTY_SELLER_ROLE_NAMES),
@@ -299,6 +318,7 @@ export function useAppUserState() {
       isLoading,
       isReady,
       merchantAgentApplicationStatus,
+      ownedCompanyIds,
       primaryRole,
       primaryRoleUi,
       dashboardRole,

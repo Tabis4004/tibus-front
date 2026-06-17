@@ -47,6 +47,7 @@ export default function BottomNav() {
   const demarcheurLinks = [
     { to: homePath, icon: HomeIcon, label: t("nav.home") },
     { to: `/${locale}/admin/demarcheur`, icon: TrendingUpIcon, label: t("nav.demarcheur", { defaultValue: "Démarcheur" }) },
+    { to: `/${locale}/admin`, icon: ShieldIcon, label: t("nav.admin") },
   ];
 
   const links =
