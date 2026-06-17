@@ -1,0 +1,52 @@
+---
+description: Commit/push après modifications et déploiement SQL avec copie locale
+alwaysApply: true
+---
+
+# Workflow git + migrations Supabase (Tibus)
+
+Projet cible : **Tibus 1.0** uniquement (`kqudaqtydimjclwaihqr`). Jamais TabisPay ni Gestabis.
+
+## Après chaque modification utile
+
+Quand une tâche est terminée (fix, feature, migration, edge function) :
+
+1. **Commit + push** sur la branche de travail (`main` ou feature branch).
+2. Exclure du commit : `.env*`, `docs/*.docx`, `docs/~$*`, fichiers binaires non liés.
+3. Message de commit : 1–2 phrases, orienté « pourquoi ».
+4. Pousser pour déclencher le déploiement Vercel du front.
+
+Ne pas laisser des changements code déployables uniquement en local sans commit/push, sauf demande explicite de l'utilisateur.
+
+## Migrations SQL — toujours une copie locale
+
+Toute évolution schéma/RPC/RLS :
+
+1. Créer le fichier dans `supabase/migrations/` :
+   - Format : `NNN_snake_case_description.sql` (numéro séquentiel, ex. `129_…`).
+   - Ne jamais appliquer uniquement via le SQL Editor sans fichier dans le repo.
+2. Vérifier le projet : `./scripts/supabase-project-check.sh`
+3. Déployer : `./scripts/supabase-db-push.sh` (ou `supabase db push --linked --yes`)
+4. Documenter dans `SCRIPTS_SUPABASE.md` (numéro, fichier, statut).
+5. Committer le fichier `.sql` + mise à jour doc **dans le même commit** que le code front qui en dépend, puis push.
+
+## Edge Functions
+
+Si `supabase/functions/**` change :
+
+```bash
+supabase functions deploy <nom-fonction> [--no-verify-jwt si hook auth]
+```
+
+Puis commit/push du code source de la fonction.
+
+## Exemple SQL
+
+```bash
+# 1. Écrire supabase/migrations/129_ma_feature.sql
+./scripts/supabase-project-check.sh
+./scripts/supabase-db-push.sh
+git add supabase/migrations/129_ma_feature.sql SCRIPTS_SUPABASE.md src/...
+git commit -m "feat: …"
+git push origin HEAD
+```
