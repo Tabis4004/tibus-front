@@ -7,6 +7,7 @@ export type ManualSubsection = {
   title: string;
   body: string;
   bullets?: string[];
+  numbered?: string[];
   figure?: ManualFigure;
 };
 

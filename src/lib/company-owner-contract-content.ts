@@ -85,6 +85,30 @@ ARTICLE 12 — LOI APPLICABLE
 
 Le présent contrat est soumis au droit applicable dans le pays d'implantation de la Compagnie, sous réserve des dispositions impératives.
 
+ARTICLE 13 — ACCÈS ET TÉLÉCOMMUNICATIONS
+
+Le Client fait son affaire personnelle, à ses frais exclusifs, de l'acquisition, la mise en place, la maintenance et la connexion des différents éléments de la configuration et des moyens de télécommunications nécessaires à l'accès au Logiciel.
+
+Il lui appartient de même de souscrire les abonnements de télécommunication nécessaires à l'accès au serveur du Prestataire.
+
+ARTICLE 14 — CONFIDENTIALITÉ DES DONNÉES
+
+Le Prestataire s'engage à mettre en œuvre les moyens techniques appropriés pour assurer la sécurité des Données.
+
+Le Prestataire s'interdit de communiquer sous quelque forme que ce soit les Données à un tiers, ou d'en faire une utilisation non prévue par le contrat.
+
+ARTICLE 15 — TRAITEMENT DES DONNÉES
+
+Chacune des parties s'engage à effectuer les déclarations à l'Instance de protection des données à caractère personnel.
+
+Le Client devra notamment mentionner dans les déclarations à l'Instance de protection des données à caractère personnel que les Données sont hébergées par un tiers.
+
+Le Prestataire s'engage à donner au Client toutes les informations nécessaires ou utiles pour réaliser sa déclaration.
+
+ARTICLE 16 — CRYPTOGRAPHIE
+
+Dans le cas où des moyens et des prestations de cryptographie sont employés par le Prestataire et/ou le Client pour sécuriser la transmission des Données, la partie responsable effectuera les déclarations ou demandes d'autorisations nécessaires, en application de la législation en vigueur.
+
 Fait électroniquement sur Tibus.
 
 ————————————————————————————————

@@ -43,7 +43,7 @@ import { initializePaymentSupabase } from "@/lib/supabase/payments.ts";
 import { usePaymentCountryNetworks } from "@/hooks/use-payment-country-networks";
 import { calculateTravelerPaymentSupabase } from "@/lib/supabase/payment-fees";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
-import { getOpenStationCashSupabase, type OpenStationCash } from "@/lib/supabase/station-cash";
+import { type OpenStationCash } from "@/lib/supabase/station-cash";
 import type { PaymentBreakdown, PaymentGateway, PaymentNetwork } from "@/config/commission.ts";
 import { paymentNetworkLabel } from "@/lib/payment-networks.ts";
 import {
@@ -82,8 +82,31 @@ import { isBrowserOnline } from "@/lib/offline/network.ts";
 import {
   cacheSellerTripsOffline,
   listCachedSellerTrips,
+  resolveOpenStationCashForSeller,
   sellCounterTicketWithOffline,
 } from "@/lib/offline/counter-sale-offline.ts";
+
+function sellerProfileCacheKey(userId: string) {
+  return `tibus-offline-seller-profile:${userId}`;
+}
+
+function readCachedSellerProfile(userId: string): SellerProfileSupabase | null {
+  try {
+    const raw = sessionStorage.getItem(sellerProfileCacheKey(userId));
+    if (!raw) return null;
+    return JSON.parse(raw) as SellerProfileSupabase;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSellerProfile(userId: string, profile: SellerProfileSupabase) {
+  try {
+    sessionStorage.setItem(sellerProfileCacheKey(userId), JSON.stringify(profile));
+  } catch {
+    // ignore quota errors
+  }
+}
 
 type SalePassengerDraft = {
   passengerName: string;
@@ -190,7 +213,7 @@ function SaleForm({
     }
 
     let cancelled = false;
-    void getOpenStationCashSupabase()
+    void resolveOpenStationCashForSeller(profile.user.id)
       .then((cash) => {
         if (cancelled) return;
         setCashOpen(cash.open);
@@ -699,9 +722,11 @@ export default function SupabaseSellerDashboard() {
     setProfile(undefined);
     setTrips(undefined);
     setCashSession(undefined);
+    const offline = !isBrowserOnline();
     try {
       const nextProfile = await getSellerProfileSupabase(appUserId);
       setProfile(nextProfile);
+      if (nextProfile) writeCachedSellerProfile(appUserId, nextProfile);
       if (!nextProfile) {
         setTrips([]);
         setCashSession(null);
@@ -710,7 +735,7 @@ export default function SupabaseSellerDashboard() {
 
       let nextCash: OpenStationCash | null = null;
       if (nextProfile.canSellDirect) {
-        nextCash = await getOpenStationCashSupabase().catch(() => ({ open: false }));
+        nextCash = await resolveOpenStationCashForSeller(appUserId);
       }
       setCashSession(nextCash);
 
@@ -719,10 +744,35 @@ export default function SupabaseSellerDashboard() {
           ? nextCash.gareId
           : undefined;
 
-      const [nextTrips, colisSettings, featureModules, receiptInfo] = await Promise.all([
-        nextProfile.canSellDirect && !departureGareId
-          ? Promise.resolve([])
-          : listSellerTripsSupabase(nextProfile, departureGareId ? { departureGareId } : undefined),
+      let nextTrips: SellerCounterTrip[] = [];
+      if (nextProfile.canSellDirect && !departureGareId) {
+        nextTrips = [];
+      } else if (offline) {
+        nextTrips = await listCachedSellerTrips(appUserId, departureGareId);
+        if (nextTrips.length > 0) {
+          toast.message("Départs chargés depuis le cache local");
+        }
+      } else {
+        try {
+          nextTrips = await listSellerTripsSupabase(
+            nextProfile,
+            departureGareId ? { departureGareId } : undefined,
+          );
+          if (departureGareId) {
+            await cacheSellerTripsOffline(appUserId, departureGareId, nextTrips);
+          }
+        } catch (tripErr) {
+          nextTrips = await listCachedSellerTrips(appUserId, departureGareId);
+          if (nextTrips.length > 0) {
+            toast.message("Départs chargés depuis le cache local");
+          } else {
+            throw tripErr;
+          }
+        }
+      }
+      setTrips(nextTrips);
+
+      const [colisSettings, featureModules, receiptInfo] = await Promise.all([
         nextProfile.company
           ? getCompanyColisSettingsSupabase(nextProfile.company.id).catch(() => null)
           : Promise.resolve(null),
@@ -733,10 +783,6 @@ export default function SupabaseSellerDashboard() {
           ? getSellerCompanyReceiptInfoSupabase(nextProfile.company.id).catch(() => null)
           : Promise.resolve(null),
       ]);
-      setTrips(nextTrips);
-      if (departureGareId) {
-        await cacheSellerTripsOffline(appUserId, nextTrips);
-      }
       setColisModuleEnabled(
         colisSettings
           ? isColisAutonomeModuleActive(colisSettings, featureModules)
@@ -745,10 +791,16 @@ export default function SupabaseSellerDashboard() {
       setCompanyReceiptInfo(receiptInfo);
     } catch (err) {
       try {
-        const cachedTrips = await listCachedSellerTrips(appUserId);
+        const cachedCash = await resolveOpenStationCashForSeller(appUserId);
+        const departureGareId =
+          cachedCash.open && cachedCash.gareId ? cachedCash.gareId : undefined;
+        const cachedTrips = await listCachedSellerTrips(appUserId, departureGareId);
         if (cachedTrips.length > 0) {
-          const nextProfile = await getSellerProfileSupabase(appUserId).catch(() => null);
+          const nextProfile =
+            (await getSellerProfileSupabase(appUserId).catch(() => null)) ??
+            readCachedSellerProfile(appUserId);
           if (nextProfile) setProfile(nextProfile);
+          setCashSession(cachedCash);
           setTrips(cachedTrips);
           toast.message("Départs chargés depuis le cache local");
           return;
@@ -771,10 +823,29 @@ export default function SupabaseSellerDashboard() {
   const refreshCashSession = async () => {
     if (!appUserId) return;
     try {
-      const nextProfile = profile ?? (await getSellerProfileSupabase(appUserId));
+      const nextProfile =
+        profile ??
+        (await getSellerProfileSupabase(appUserId).catch(() => readCachedSellerProfile(appUserId)));
       if (!nextProfile?.canSellDirect) return;
-      const nextCash = await getOpenStationCashSupabase().catch(() => ({ open: false }));
+      const nextCash = await resolveOpenStationCashForSeller(appUserId);
       setCashSession(nextCash);
+
+      const departureGareId =
+        nextCash.open && nextCash.gareId ? nextCash.gareId : undefined;
+      if (!departureGareId) {
+        setTrips([]);
+        return;
+      }
+
+      if (!isBrowserOnline()) {
+        const cached = await listCachedSellerTrips(appUserId, departureGareId);
+        setTrips(cached);
+        return;
+      }
+
+      const nextTrips = await listSellerTripsSupabase(nextProfile, { departureGareId });
+      setTrips(nextTrips);
+      await cacheSellerTripsOffline(appUserId, departureGareId, nextTrips);
     } catch {
       // ignore — StationCashPanel recharge ses propres données
     }

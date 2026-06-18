@@ -1,4 +1,5 @@
 import type { CounterSaleTicket, CounterTravelerInput, SellerCounterTrip } from "@/lib/supabase/seller-counter.ts";
+import type { OpenStationCash } from "@/lib/supabase/station-cash.ts";
 
 export type OfflineOutboxStatus = "pending" | "syncing" | "synced" | "failed";
 
@@ -19,7 +20,14 @@ export type OfflineCounterSaleRecord = {
 export type CachedTripRecord = {
   tripId: string;
   sellerUserId: string;
+  departureGareId?: string;
   payload: SellerCounterTrip;
+  cachedAt: string;
+};
+
+export type CachedStationCashRecord = {
+  sellerUserId: string;
+  payload: OpenStationCash;
   cachedAt: string;
 };
 

@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { isBrowserOnline } from "@/lib/offline/network.ts";
+import { resolveOpenStationCashForSeller } from "@/lib/offline/counter-sale-offline.ts";
 import {
   getOpenStationCashSupabase,
   listCompanyStationGaresSupabase,
@@ -40,6 +43,7 @@ export default function StationCashPanel({
   companyId: string;
   canOpen?: boolean;
 }) {
+  const { appUserId: sellerUserId } = useSupabaseAuth();
   const [openingFloat, setOpeningFloat] = useState("0");
   const [gares, setGares] = useState<StationGareOption[]>([]);
   const [garesLoading, setGaresLoading] = useState(true);
@@ -59,9 +63,11 @@ export default function StationCashPanel({
         setRefreshing(true);
       }
       try {
-        const openCash = await getOpenStationCashSupabase();
+        const openCash = sellerUserId
+          ? await resolveOpenStationCashForSeller(sellerUserId)
+          : await getOpenStationCashSupabase();
         setCash(openCash);
-        if (openCash.open && openCash.id) {
+        if (openCash.open && openCash.id && isBrowserOnline()) {
           const rows = await listStationCashMovementsSupabase(openCash.id, 80);
           setMovements(rows);
           if (!reversalAmount && openCash.balance != null) {
@@ -71,6 +77,14 @@ export default function StationCashPanel({
           setMovements([]);
         }
       } catch (err) {
+        if (sellerUserId) {
+          const cached = await resolveOpenStationCashForSeller(sellerUserId);
+          if (cached.open) {
+            setCash(cached);
+            setMovements([]);
+            return;
+          }
+        }
         toast.error(supabaseErrorMessage(err, "Caisse indisponible"));
         setCash({ open: false });
         setMovements([]);
@@ -78,7 +92,7 @@ export default function StationCashPanel({
         setRefreshing(false);
       }
     },
-    [reversalAmount],
+    [reversalAmount, sellerUserId],
   );
 
   useEffect(() => {

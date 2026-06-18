@@ -32,6 +32,13 @@ export function ManualSubsectionBlock({ item }: { item: ManualSubsection }) {
           ))}
         </ul>
       ) : null}
+      {item.numbered?.length ? (
+        <ol className="list-decimal pl-5 space-y-1 text-sm text-muted-foreground">
+          {item.numbered.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      ) : null}
       {item.figure ? <ManualFigureBlock figure={item.figure} /> : null}
     </div>
   );

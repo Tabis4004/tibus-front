@@ -8,6 +8,10 @@ import {
   type CounterTravelerInput,
   type SellerCounterTrip,
 } from "@/lib/supabase/seller-counter.ts";
+import {
+  getOpenStationCashSupabase,
+  type OpenStationCash,
+} from "@/lib/supabase/station-cash.ts";
 
 export type CounterSaleResult = CounterSaleTicket & {
   offline?: boolean;
@@ -61,21 +65,78 @@ export async function getLocalOccupiedSeats(reservationId: string): Promise<stri
   return rows.map((row) => row.seatNumber);
 }
 
-export async function cacheSellerTripsOffline(sellerUserId: string, trips: SellerCounterTrip[]) {
-  const cachedAt = new Date().toISOString();
-  await offlineDb.cachedTrips.bulkPut(
-    trips.map((trip) => ({
-      tripId: trip._id,
-      sellerUserId,
-      payload: trip,
-      cachedAt,
-    })),
-  );
+export async function cacheStationCashOffline(sellerUserId: string, cash: OpenStationCash) {
+  await offlineDb.stationCashSessions.put({
+    sellerUserId,
+    payload: cash,
+    cachedAt: new Date().toISOString(),
+  });
 }
 
-export async function listCachedSellerTrips(sellerUserId: string): Promise<SellerCounterTrip[]> {
+export async function getCachedStationCashOffline(
+  sellerUserId: string,
+): Promise<OpenStationCash | null> {
+  const row = await offlineDb.stationCashSessions.get(sellerUserId);
+  return row?.payload ?? null;
+}
+
+export async function resolveOpenStationCashForSeller(
+  sellerUserId: string,
+): Promise<OpenStationCash> {
+  if (isBrowserOnline()) {
+    try {
+      const cash = await getOpenStationCashSupabase();
+      if (cash.open) {
+        await cacheStationCashOffline(sellerUserId, cash);
+      }
+      return cash;
+    } catch {
+      return (await getCachedStationCashOffline(sellerUserId)) ?? { open: false };
+    }
+  }
+  return (await getCachedStationCashOffline(sellerUserId)) ?? { open: false };
+}
+
+export async function cacheSellerTripsOffline(
+  sellerUserId: string,
+  departureGareId: string,
+  trips: SellerCounterTrip[],
+) {
+  const cachedAt = new Date().toISOString();
+  await offlineDb.transaction("rw", offlineDb.cachedTrips, async () => {
+    const stale = await offlineDb.cachedTrips
+      .where("sellerUserId")
+      .equals(sellerUserId)
+      .filter((row) => row.departureGareId === departureGareId)
+      .toArray();
+    if (stale.length) {
+      await offlineDb.cachedTrips.bulkDelete(stale.map((row) => row.tripId));
+    }
+    await offlineDb.cachedTrips.bulkPut(
+      trips.map((trip) => ({
+        tripId: trip._id,
+        sellerUserId,
+        departureGareId,
+        payload: trip,
+        cachedAt,
+      })),
+    );
+  });
+}
+
+export async function listCachedSellerTrips(
+  sellerUserId: string,
+  departureGareId?: string,
+): Promise<SellerCounterTrip[]> {
   const rows = await offlineDb.cachedTrips.where("sellerUserId").equals(sellerUserId).toArray();
-  return rows.map((row) => row.payload);
+  if (!departureGareId) {
+    return rows.map((row) => row.payload);
+  }
+  const forGare = rows.filter((row) => row.departureGareId === departureGareId);
+  if (forGare.length > 0) {
+    return forGare.map((row) => row.payload);
+  }
+  return rows.filter((row) => !row.departureGareId).map((row) => row.payload);
 }
 
 export async function countPendingCounterSales(): Promise<number> {
