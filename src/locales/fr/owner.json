@@ -502,5 +502,41 @@
   "income_statement.financial_result": "Résultat financier",
   "income_statement.net_result": "Résultat net",
   "income_statement.load_error": "Impossible de charger le compte de résultat",
-  "feature_modules.disabled": "Ce module n'est pas activé pour votre compagnie."
+  "feature_modules.disabled": "Ce module n'est pas activé pour votre compagnie.",
+  "company_owner_contract": {
+    "title": "Contrat propriétaire de compagnie",
+    "accept_prefix": "J'accepte le",
+    "link": "contrat propriétaire de compagnie",
+    "annex_short": " (incluant l'annexe offre technique)",
+    "required": "Veuillez accepter le contrat propriétaire de compagnie.",
+    "back": "Retour",
+    "updated_at": "Dernière mise à jour : {{date}}",
+    "annex_title": "Annexe — Offre technique",
+    "annex_desc": "Section 2 — Architecture technique (incluse dans l'abonnement), alignée sur l'offre commerciale du pays.",
+    "modules_title": "Modules fonctionnels",
+    "requires_module": "requiert module {{code}}",
+    "annex_plain": "Version texte intégrale de l'annexe"
+  },
+  "company_go_live": {
+    "title": "Mise en live",
+    "desc": "Acceptez le contrat (avec annexe technique) avant d'activer les réservations en ligne.",
+    "contract_ok": "Contrat accepté",
+    "contract_pending": "Contrat en attente",
+    "admin_authorized": "Autorisé par admin pays (test)",
+    "online": "Réservations en ligne actives",
+    "offline": "Hors ligne",
+    "accept_btn": "Enregistrer l'acceptation du contrat",
+    "accepted_at": "Accepté le {{date}}",
+    "admin_bypass_hint": "Votre administrateur pays vous a autorisé la mise en live pendant la période de test, sans acceptation préalable du contrat.",
+    "reservations_label": "Réservations en ligne",
+    "reservations_hint": "Rendre votre compagnie visible aux voyageurs pour la réservation.",
+    "read_contract": "Lire le contrat et l'annexe",
+    "contract_required": "Acceptez le contrat ou demandez une autorisation admin pays.",
+    "contract_saved": "Contrat enregistré",
+    "enabled": "Mise en live activée",
+    "disabled": "Réservations en ligne désactivées",
+    "save_error": "Impossible d'enregistrer",
+    "load_error": "Impossible de charger le statut",
+    "after_create_hint": "Configurez votre compagnie puis acceptez le contrat dans « Mise en live »."
+  }
 }

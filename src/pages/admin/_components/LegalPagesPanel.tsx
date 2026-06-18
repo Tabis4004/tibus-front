@@ -10,12 +10,46 @@ import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
+  COMPANY_OWNER_CONTRACT_PATH,
   getCguPageSupabase,
+  getCompanyOwnerContractPageSupabase,
   upsertCguPageSupabase,
+  upsertCompanyOwnerContractPageSupabase,
   type LegalPage,
 } from "@/lib/supabase/legal-pages.ts";
 
-export default function LegalPagesPanel() {
+type LegalPageEditorProps = {
+  slug: "cgu" | "company-owner-contract";
+  titleKey: string;
+  titleDefault: string;
+  descKey: string;
+  descDefault: string;
+  previewPath: string;
+  savedMessage: string;
+};
+
+async function loadLegalEditorPage(slug: LegalPageEditorProps["slug"]): Promise<LegalPage> {
+  if (slug === "cgu") return getCguPageSupabase();
+  return getCompanyOwnerContractPageSupabase();
+}
+
+async function saveLegalEditorPage(
+  slug: LegalPageEditorProps["slug"],
+  page: Omit<LegalPage, "slug">,
+): Promise<LegalPage> {
+  if (slug === "cgu") return upsertCguPageSupabase(page);
+  return upsertCompanyOwnerContractPageSupabase(page);
+}
+
+function LegalPageEditor({
+  slug,
+  titleKey,
+  titleDefault,
+  descKey,
+  descDefault,
+  previewPath,
+  savedMessage,
+}: LegalPageEditorProps) {
   const { t } = useTranslation("admin");
   const { lng } = useParams<{ lng: string }>();
   const [page, setPage] = useState<LegalPage | null>(null);
@@ -24,9 +58,9 @@ export default function LegalPagesPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const load = () => {
+  useEffect(() => {
     setLoading(true);
-    void getCguPageSupabase()
+    void loadLegalEditorPage(slug)
       .then((data) => {
         setPage(data);
         setTitle(data.title);
@@ -36,20 +70,16 @@ export default function LegalPagesPanel() {
         toast.error(err instanceof Error ? err.message : t("legal_pages.load_error"));
       })
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  }, [slug, t]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const saved = await upsertCguPageSupabase({ title: title.trim(), content });
+      const saved = await saveLegalEditorPage(slug, { title: title.trim(), content });
       setPage(saved);
       setTitle(saved.title);
       setContent(saved.content);
-      toast.success(t("legal_pages.saved", { defaultValue: "CGU enregistrées" }));
+      toast.success(savedMessage);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("legal_pages.save_error"));
     } finally {
@@ -73,31 +103,24 @@ export default function LegalPagesPanel() {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <FileTextIcon className="w-4 h-4" />
-          {t("legal_pages.cgu_title", { defaultValue: "Conditions Générales d'Utilisation (CGU)" })}
+          {t(titleKey, { defaultValue: titleDefault })}
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
-          {t("legal_pages.cgu_desc", {
-            defaultValue: "Contenu affiché sur la page publique /cgu et lié depuis l'inscription et la connexion.",
-          })}
+          {t(descKey, { defaultValue: descDefault })}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="cgu-title">{t("legal_pages.page_title", { defaultValue: "Titre" })}</Label>
-          <Input
-            id="cgu-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <Label>{t("legal_pages.page_title", { defaultValue: "Titre" })}</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="cgu-content">{t("legal_pages.page_content", { defaultValue: "Contenu" })}</Label>
+          <Label>{t("legal_pages.page_content", { defaultValue: "Contenu" })}</Label>
           <Textarea
-            id="cgu-content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            rows={18}
+            rows={16}
             className="font-mono text-sm"
           />
         </div>
@@ -109,9 +132,14 @@ export default function LegalPagesPanel() {
               : t("legal_pages.save", { defaultValue: "Enregistrer" })}
           </Button>
           <Button asChild variant="outline">
-            <Link to={`/${lng ?? "fr"}/cgu`} target="_blank" rel="noopener noreferrer" className="gap-2">
+            <Link
+              to={`/${lng ?? "fr"}${previewPath}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="gap-2"
+            >
               <ExternalLinkIcon className="w-4 h-4" />
-              {t("legal_pages.preview", { defaultValue: "Voir la page /cgu" })}
+              {t("legal_pages.preview", { defaultValue: "Voir la page" })} {previewPath}
             </Link>
           </Button>
         </div>
@@ -126,5 +154,47 @@ export default function LegalPagesPanel() {
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+export default function LegalPagesPanel() {
+  const { t } = useTranslation("admin");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">
+          {t("legal_pages.panel_title", { defaultValue: "Pages juridiques" })}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {t("legal_pages.panel_desc", {
+            defaultValue:
+              "Modifiez les textes affichés publiquement. Lien admin : /admin?tab=legal",
+          })}
+        </p>
+      </div>
+
+      <LegalPageEditor
+        slug="cgu"
+        titleKey="legal_pages.cgu_title"
+        titleDefault="Conditions Générales d'Utilisation (CGU)"
+        descKey="legal_pages.cgu_desc"
+        descDefault="Contenu affiché sur /cgu et lié depuis l'inscription et la connexion."
+        previewPath="/cgu"
+        savedMessage={t("legal_pages.cgu_saved", { defaultValue: "CGU enregistrées" })}
+      />
+
+      <LegalPageEditor
+        slug="company-owner-contract"
+        titleKey="legal_pages.company_owner_title"
+        titleDefault="Contrat propriétaire de compagnie"
+        descKey="legal_pages.company_owner_desc"
+        descDefault="Contrat obligatoire avant la mise en live. L'annexe technique reprend la section 2 de l'offre commerciale (/admin/commercial-offer)."
+        previewPath={`/${COMPANY_OWNER_CONTRACT_PATH}`}
+        savedMessage={t("legal_pages.company_owner_saved", {
+          defaultValue: "Contrat propriétaire enregistré",
+        })}
+      />
+    </div>
   );
 }

@@ -304,7 +304,7 @@ export default function SupabaseAdminPanel() {
     { id: "roles", label: t("tabs.roles"), icon: KeyIcon },
     { id: "contact", label: t("tabs.contact", { defaultValue: "Contact" }), icon: MessageCircleIcon },
     { id: "loyalty", label: t("tabs.loyalty", { defaultValue: "Fidélité" }), icon: GiftIcon },
-    { id: "legal", label: t("tabs.legal", { defaultValue: "CGU" }), icon: FileTextIcon },
+    { id: "legal", label: t("tabs.legal", { defaultValue: "Juridique" }), icon: FileTextIcon },
     { id: "scaling_metrics", label: t("tabs.scaling_metrics"), icon: ActivityIcon },
     { id: "investor_plan", label: t("tabs.investor_plan"), icon: TrendingUpIcon },
     { id: "landing", label: t("tabs.landing", { defaultValue: "Landing Page" }), icon: PencilIcon },

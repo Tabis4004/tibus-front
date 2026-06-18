@@ -10,7 +10,8 @@
     "geography": "Pays & Villes",
     "roles": "Rôles & Permissions",
     "scaling_metrics": "Métriques scaling",
-    "investor_plan": "Plan investisseur"
+    "investor_plan": "Plan investisseur",
+    "legal": "Juridique"
   },
   "total_users": "Total utilisateurs",
   "owners": "Propriétaires",
@@ -486,5 +487,44 @@
     "period": "Période",
     "companies_title": "Mes compagnies recrutées",
     "no_companies": "Aucune compagnie ne vous est attribuée comme recruteur."
+  },
+  "legal_pages": {
+    "panel_title": "Pages juridiques",
+    "panel_desc": "Modifiez les textes affichés publiquement (CGU et contrat propriétaire).",
+    "load_error": "Impossible de charger la page juridique",
+    "save_error": "Impossible d'enregistrer",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "preview": "Voir la page",
+    "page_title": "Titre",
+    "page_content": "Contenu",
+    "last_saved": "Dernière sauvegarde : {{date}}",
+    "cgu_title": "Conditions Générales d'Utilisation (CGU)",
+    "cgu_desc": "Contenu affiché sur /cgu et lié depuis l'inscription et la connexion.",
+    "cgu_saved": "CGU enregistrées",
+    "company_owner_title": "Contrat propriétaire de compagnie",
+    "company_owner_desc": "Contrat obligatoire avant la mise en live. L'annexe reprend la section 2 de l'offre commerciale.",
+    "company_owner_saved": "Contrat propriétaire enregistré"
+  },
+  "company_live": {
+    "title": "Contrat & mise en live",
+    "desc": "Autoriser une compagnie en période de test ou activer la compagnie après acceptation du contrat.",
+    "load_error": "Impossible de charger le statut contrat",
+    "save_error": "Impossible d'enregistrer",
+    "contract_ok": "Contrat accepté",
+    "contract_pending": "Contrat non accepté",
+    "test_auth_badge": "Autorisation test",
+    "live": "Compagnie active",
+    "not_live": "Compagnie inactive",
+    "accepted_at": "Contrat accepté le {{date}}",
+    "authorize_test": "Autoriser mise en live (période test)",
+    "authorize_test_hint": "Permet au propriétaire d'activer les réservations sans acceptation préalable du contrat.",
+    "activate_company": "Compagnie active (visible voyageurs)",
+    "activate_company_hint": "Active la compagnie sur la plateforme. Nécessite contrat accepté ou autorisation test.",
+    "view_contract": "Voir le contrat + annexe",
+    "authorized_on": "Autorisation test activée",
+    "authorized_off": "Autorisation test retirée",
+    "activated": "Compagnie activée",
+    "deactivated": "Compagnie désactivée"
   }
 }

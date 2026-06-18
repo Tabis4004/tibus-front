@@ -13,6 +13,7 @@ export type OwnerCompany = {
 export type OwnerCompanyDetails = OwnerCompany & {
   voyageColisMsg: string | null;
   arretReservation: boolean;
+  countryId: string | null;
 };
 
 export type OwnerKPIs = {
@@ -372,6 +373,7 @@ export async function getOwnerCompanyDetailsSupabase(
     currency: (country?.currency as string | null) ?? "XOF",
     voyageColisMsg: (data.voyageColisMsg as string | null) ?? null,
     arretReservation: Boolean(data.arretReservation),
+    countryId: (data.countryId as string | null) ?? null,
   };
 }
 

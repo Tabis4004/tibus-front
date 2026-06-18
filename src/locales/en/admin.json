@@ -10,7 +10,8 @@
     "geography": "Countries & Cities",
     "roles": "Roles & Permissions",
     "scaling_metrics": "Scaling metrics",
-    "investor_plan": "Investor plan"
+    "investor_plan": "Investor plan",
+    "legal": "Legal"
   },
   "total_users": "Total Users",
   "owners": "Owners",
@@ -486,5 +487,44 @@
     "period": "Period",
     "companies_title": "My recruited companies",
     "no_companies": "No company is assigned to you as recruiter."
+  },
+  "legal_pages": {
+    "panel_title": "Legal pages",
+    "panel_desc": "Edit public legal texts (Terms of Use and company owner contract).",
+    "load_error": "Unable to load legal page",
+    "save_error": "Unable to save",
+    "save": "Save",
+    "saving": "Saving…",
+    "preview": "View page",
+    "page_title": "Title",
+    "page_content": "Content",
+    "last_saved": "Last saved: {{date}}",
+    "cgu_title": "Terms of Use",
+    "cgu_desc": "Content shown on /cgu and linked from sign-in and sign-up.",
+    "cgu_saved": "Terms saved",
+    "company_owner_title": "Company owner contract",
+    "company_owner_desc": "Required before go-live. Appendix uses commercial offer section 2.",
+    "company_owner_saved": "Company owner contract saved"
+  },
+  "company_live": {
+    "title": "Contract & go live",
+    "desc": "Authorize a company during test or activate after contract acceptance.",
+    "load_error": "Unable to load contract status",
+    "save_error": "Unable to save",
+    "contract_ok": "Contract accepted",
+    "contract_pending": "Contract not accepted",
+    "test_auth_badge": "Test authorization",
+    "live": "Company active",
+    "not_live": "Company inactive",
+    "accepted_at": "Contract accepted on {{date}}",
+    "authorize_test": "Authorize go-live (test period)",
+    "authorize_test_hint": "Allows the owner to enable bookings without prior contract acceptance.",
+    "activate_company": "Active company (visible to travelers)",
+    "activate_company_hint": "Activates the company on the platform. Requires contract or test authorization.",
+    "view_contract": "View contract + appendix",
+    "authorized_on": "Test authorization enabled",
+    "authorized_off": "Test authorization removed",
+    "activated": "Company activated",
+    "deactivated": "Company deactivated"
   }
 }

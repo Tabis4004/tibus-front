@@ -8,6 +8,8 @@ import "./i18n";
 import { useServiceWorker } from "@/hooks/use-service-worker.ts";
 import { useTibusWebViewBootstrap } from "@/hooks/use-tibus-webview.ts";
 import AuthCallback from "./pages/auth/Callback.tsx";
+import CguPage from "./pages/legal/CguPage.tsx";
+import CompanyOwnerContractPage from "./pages/legal/CompanyOwnerContractPage.tsx";
 import Index from "./pages/Index.tsx";
 import NosGaresPage from "./pages/landing/NosGaresPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -154,6 +156,8 @@ function AppShell() {
                 </Route>
                 <Route path="seller" element={<SellerDashboard />} />
                 <Route path="contact" element={<ContactPage />} />
+                <Route path="cgu" element={<CguPage />} />
+                <Route path="contrat-proprietaire-compagnie" element={<CompanyOwnerContractPage />} />
                 <Route path="guide" element={<GuidePageRoute />} />
                 <Route path="manual/compagnie" element={<CompanyManual />} />
                 <Route path="manual/admin-pays" element={<CountryAdminManual />} />

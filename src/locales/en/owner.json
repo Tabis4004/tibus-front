@@ -502,5 +502,41 @@
   "income_statement.financial_result": "Financial result",
   "income_statement.net_result": "Net result",
   "income_statement.load_error": "Could not load income statement",
-  "feature_modules.disabled": "This module is not enabled for your company."
+  "feature_modules.disabled": "This module is not enabled for your company.",
+  "company_owner_contract": {
+    "title": "Company owner contract",
+    "accept_prefix": "I accept the",
+    "link": "company owner contract",
+    "annex_short": " (including the technical offer appendix)",
+    "required": "Please accept the company owner contract.",
+    "back": "Back",
+    "updated_at": "Last updated: {{date}}",
+    "annex_title": "Appendix — Technical offer",
+    "annex_desc": "Section 2 — Technical architecture (included in subscription), aligned with the country commercial offer.",
+    "modules_title": "Functional modules",
+    "requires_module": "requires module {{code}}",
+    "annex_plain": "Full text version of the appendix"
+  },
+  "company_go_live": {
+    "title": "Go live",
+    "desc": "Accept the contract (with technical appendix) before enabling online bookings.",
+    "contract_ok": "Contract accepted",
+    "contract_pending": "Contract pending",
+    "admin_authorized": "Authorized by country admin (test)",
+    "online": "Online bookings enabled",
+    "offline": "Offline",
+    "accept_btn": "Save contract acceptance",
+    "accepted_at": "Accepted on {{date}}",
+    "admin_bypass_hint": "Your country administrator authorized go-live during the test period without prior contract acceptance.",
+    "reservations_label": "Online bookings",
+    "reservations_hint": "Make your company available to travelers for booking.",
+    "read_contract": "Read contract and appendix",
+    "contract_required": "Accept the contract or request country admin authorization.",
+    "contract_saved": "Contract saved",
+    "enabled": "Go live enabled",
+    "disabled": "Online bookings disabled",
+    "save_error": "Unable to save",
+    "load_error": "Unable to load status",
+    "after_create_hint": "Configure your company then accept the contract under Go live."
+  }
 }
