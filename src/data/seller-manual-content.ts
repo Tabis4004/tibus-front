@@ -15,7 +15,7 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
       "Depuis l'accueil, ouvrez « Vente guichet » ou « Tableau vendeur » (lien /fr/seller).",
       "L'onglet Guichet sert aux ventes du jour ; l'onglet Ventes compagnie (vendeur compagnie uniquement) liste l'historique des billets.",
       "Le bouton Scanner mène au contrôle d'embarquement (/fr/verify/scan).",
-      "Ce document est visible uniquement pour les rôles vendeur et vendeur indépendant.",
+      "Ce document est accessible publiquement sur /fr/manual/vendeur (formation guichet et agents indépendants).",
     ],
     figure: {
       src: "/manuel/captures/seller-real-dashboard.png",

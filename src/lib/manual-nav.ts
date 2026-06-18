@@ -1,7 +1,4 @@
-import {
-  hasSellerManualAccess,
-  isSellerOnlyManualProfile,
-} from "@/lib/seller-manual-access.ts";
+import { isSellerOnlyManualProfile } from "@/lib/seller-manual-access.ts";
 
 export type ManualNavItem = {
   toSuffix: string;
@@ -29,7 +26,7 @@ export function getManualNavItems(input: {
     });
   }
 
-  if (isAuthenticated && hasSellerManualAccess(roles)) {
+  if (!items.some((item) => item.toSuffix === "/manual/vendeur")) {
     items.push({
       toSuffix: "/manual/vendeur",
       labelKey: "manual.seller_nav_title",
