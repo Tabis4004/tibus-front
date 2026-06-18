@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeftIcon, FileTextIcon } from "lucide-react";
+import { ArrowLeftIcon, ExternalLinkIcon, FileTextIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -14,14 +14,12 @@ import {
   TableRow,
 } from "@/components/ui/table.tsx";
 import {
+  COMMERCIAL_OFFER_ADMIN_URL,
   COMPANY_OWNER_CONTRACT_SLUG,
   getLegalPageSupabase,
   type LegalPage,
 } from "@/lib/supabase/legal-pages.ts";
-import {
-  formatTechnicalAnnexText,
-  type CommercialOfferTechnicalAnnex,
-} from "@/lib/commercial-offer-annex.ts";
+import { type CommercialOfferTechnicalAnnex } from "@/lib/commercial-offer-annex.ts";
 import { resolveTechnicalAnnexForCountry } from "@/lib/supabase/company-owner-contract.ts";
 
 export default function CompanyOwnerContractPage() {
@@ -63,8 +61,6 @@ export default function CompanyOwnerContractPage() {
       cancelled = true;
     };
   }, [countryId, locale]);
-
-  const annexText = annex ? formatTechnicalAnnexText(annex) : "";
 
   return (
     <div className="min-h-svh bg-background">
@@ -117,82 +113,85 @@ export default function CompanyOwnerContractPage() {
                   {page?.content ?? ""}
                 </article>
 
-                {annex ? (
-                  <section className="space-y-4 border-t pt-6">
-                    <div>
-                      <h2 className="text-lg font-semibold">
-                        {t("company_owner_contract.annex_title", {
-                          defaultValue: "Annexe — Offre technique",
-                        })}
-                      </h2>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t("company_owner_contract.annex_desc", {
-                          defaultValue:
-                            "Contenu aligné sur l'offre commerciale (section 2 — Architecture technique), personnalisable par pays dans Admin → Offre commerciale.",
-                        })}
-                      </p>
-                    </div>
+                <section className="space-y-4 border-t pt-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">
+                      {t("company_owner_contract.annex_title", {
+                        defaultValue: "Annexe — Offre technique",
+                      })}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {t("company_owner_contract.annex_link_intro", {
+                        defaultValue:
+                          "2. Architecture technique (incluse dans l'abonnement) — offre commerciale Tibus :",
+                      })}
+                    </p>
+                  </div>
 
-                    <h3 className="text-base font-semibold text-primary">{annex.heading}</h3>
+                  <Button asChild variant="outline" className="gap-2">
+                    <a href={COMMERCIAL_OFFER_ADMIN_URL} target="_blank" rel="noopener noreferrer">
+                      <ExternalLinkIcon className="w-4 h-4" />
+                      {COMMERCIAL_OFFER_ADMIN_URL}
+                    </a>
+                  </Button>
 
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          {annex.architectureTable.headers.map((header) => (
-                            <TableHead key={header}>{header}</TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {annex.architectureTable.rows.map((row, index) => (
-                          <TableRow key={`${row[0]}-${index}`}>
-                            {row.map((cell, cellIndex) => (
-                              <TableCell key={`${index}-${cellIndex}`} className="align-top text-sm">
-                                {cell}
-                              </TableCell>
+                  {annex ? (
+                    <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                      <h3 className="text-base font-semibold text-primary">{annex.heading}</h3>
+
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {annex.architectureTable.headers.map((header) => (
+                              <TableHead key={header}>{header}</TableHead>
                             ))}
                           </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {annex.architectureTable.rows.map((row, index) => (
+                            <TableRow key={`${row[0]}-${index}`}>
+                              {row.map((cell, cellIndex) => (
+                                <TableCell
+                                  key={`${index}-${cellIndex}`}
+                                  className="align-top text-sm"
+                                >
+                                  {cell}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold">
+                          {t("company_owner_contract.modules_title", {
+                            defaultValue: "Modules fonctionnels",
+                          })}
+                        </h4>
+                        {annex.modules.map((module) => (
+                          <div key={module.code} className="rounded-lg border bg-background p-3 text-sm">
+                            <p className="font-medium">
+                              Module {module.code} — {module.title}
+                              {module.requires ? (
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}
+                                  (
+                                  {t("company_owner_contract.requires_module", {
+                                    defaultValue: "requiert module {{code}}",
+                                    code: module.requires,
+                                  })}
+                                  )
+                                </span>
+                              ) : null}
+                            </p>
+                            <p className="text-muted-foreground mt-1">{module.description}</p>
+                          </div>
                         ))}
-                      </TableBody>
-                    </Table>
-
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-semibold">
-                        {t("company_owner_contract.modules_title", {
-                          defaultValue: "Modules fonctionnels",
-                        })}
-                      </h4>
-                      {annex.modules.map((module) => (
-                        <div key={module.code} className="rounded-lg border p-3 text-sm">
-                          <p className="font-medium">
-                            Module {module.code} — {module.title}
-                            {module.requires ? (
-                              <span className="text-muted-foreground font-normal">
-                                {" "}
-                                ({t("company_owner_contract.requires_module", {
-                                  defaultValue: "requiert module {{code}}",
-                                  code: module.requires,
-                                })})
-                              </span>
-                            ) : null}
-                          </p>
-                          <p className="text-muted-foreground mt-1">{module.description}</p>
-                        </div>
-                      ))}
+                      </div>
                     </div>
-
-                    <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer">
-                        {t("company_owner_contract.annex_plain", {
-                          defaultValue: "Version texte intégrale de l'annexe",
-                        })}
-                      </summary>
-                      <pre className="mt-2 whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-xs">
-                        {annexText}
-                      </pre>
-                    </details>
-                  </section>
-                ) : null}
+                  ) : null}
+                </section>
               </>
             )}
           </CardContent>

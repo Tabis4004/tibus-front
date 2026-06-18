@@ -515,7 +515,8 @@
     "annex_desc": "Section 2 — Architecture technique (incluse dans l'abonnement), alignée sur l'offre commerciale du pays.",
     "modules_title": "Modules fonctionnels",
     "requires_module": "requiert module {{code}}",
-    "annex_plain": "Version texte intégrale de l'annexe"
+    "annex_plain": "Version texte intégrale de l'annexe",
+    "annex_link_intro": "2. Architecture technique (incluse dans l'abonnement) — offre commerciale Tibus :"
   },
   "company_go_live": {
     "title": "Mise en live",

@@ -1,4 +1,8 @@
 import { supabase } from "@/lib/supabase";
+import {
+  COMMERCIAL_OFFER_ADMIN_URL,
+  COMPANY_OWNER_CONTRACT_FULL_TEXT,
+} from "@/lib/company-owner-contract-content.ts";
 
 export type LegalPage = {
   slug: string;
@@ -37,40 +41,8 @@ Ces conditions peuvent être mises à jour par l'administrateur de la plateforme
 
 export const DEFAULT_COMPANY_OWNER_CONTRACT_PAGE: LegalPage = {
   slug: COMPANY_OWNER_CONTRACT_SLUG,
-  title: "Contrat propriétaire de compagnie",
-  content: `CONTRAT DE SOUSCRIPTION — PROPRIÉTAIRE DE COMPAGNIE
-
-TIBUS TECHNOLOGY
-
-Le Prestataire développe et exploite un Logiciel mis en ligne.
-
-Ce logiciel est destiné à être utilisé par des utilisateurs itinérants ou sédentaires et est dénommé ci-après « le Logiciel ».
-
-La plateforme Tibus est accessible à distance selon le mode SaaS, et rend dans ce cadre des prestations de service, notamment d'hébergement et de gestion des données des clients des utilisateurs de ce logiciel.
-
-1. Objet
-Le présent contrat régit les conditions dans lesquelles l'Utilisateur, en sa qualité de propriétaire d'une compagnie de transport, accède au Logiciel et crée une entreprise sur la plateforme Tibus.
-
-2. Engagements du propriétaire
-L'Utilisateur s'engage à fournir des informations exactes concernant sa compagnie, à respecter la réglementation applicable au transport de voyageurs et à préserver la confidentialité de ses identifiants d'accès.
-
-3. Prestations SaaS
-Le Prestataire assure l'hébergement, la maintenance et la disponibilité du Logiciel dans les limites des présentes conditions et du plan d'abonnement souscrit.
-
-4. Données
-Les données relatives à la compagnie, aux voyageurs et aux ventes sont traitées conformément à la politique de confidentialité de Tibus.
-
-5. Rémunération
-L'utilisation du Logiciel peut être soumise à un abonnement et à des commissions sur les ventes, selon les barèmes en vigueur au moment de la souscription.
-
-6. Responsabilité
-Le Prestataire agit en tant que fournisseur de solution technique. Le propriétaire de compagnie demeure responsable de l'exécution du service de transport et des obligations légales liées à son activité.
-
-7. Résiliation
-En cas de manquement grave aux présentes conditions ou de non-paiement, le Prestataire pourra suspendre l'accès au Logiciel après notification.
-
-8. Modification
-Le contenu de ce contrat peut être mis à jour par l'administrateur de la plateforme. La version publiée sur Tibus fait foi. La création ou le maintien d'une compagnie vaut acceptation de la version en vigueur.`,
+  title: "Contrat de souscription — Propriétaire de compagnie",
+  content: COMPANY_OWNER_CONTRACT_FULL_TEXT,
 };
 
 function defaultLegalPage(slug: string): LegalPage {
@@ -128,3 +100,5 @@ export async function upsertCompanyOwnerContractPageSupabase(
 }
 
 export const COMPANY_OWNER_CONTRACT_PATH = "contrat-proprietaire-compagnie";
+
+export { COMMERCIAL_OFFER_ADMIN_URL };

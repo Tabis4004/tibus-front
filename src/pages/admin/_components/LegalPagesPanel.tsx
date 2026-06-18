@@ -10,7 +10,9 @@ import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
+  COMMERCIAL_OFFER_ADMIN_URL,
   COMPANY_OWNER_CONTRACT_PATH,
+  COMPANY_OWNER_CONTRACT_SLUG,
   getCguPageSupabase,
   getCompanyOwnerContractPageSupabase,
   upsertCguPageSupabase,
@@ -195,6 +197,20 @@ export default function LegalPagesPanel() {
           defaultValue: "Contrat propriétaire enregistré",
         })}
       />
+
+      <p className="text-sm text-muted-foreground">
+        {t("legal_pages.commercial_offer_annex_hint", {
+          defaultValue: "Annexe technique (section 2) :",
+        })}{" "}
+        <a
+          href={COMMERCIAL_OFFER_ADMIN_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2"
+        >
+          {COMMERCIAL_OFFER_ADMIN_URL}
+        </a>
+      </p>
     </div>
   );
 }
