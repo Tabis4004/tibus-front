@@ -15,7 +15,7 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
       "Depuis l'accueil, ouvrez « Vente guichet » ou « Tableau vendeur » (lien /fr/seller).",
       "L'onglet Guichet sert aux ventes du jour ; l'onglet Ventes compagnie (vendeur compagnie uniquement) liste l'historique des billets.",
       "Le bouton Scanner mène au contrôle d'embarquement (/fr/verify/scan).",
-      "Ce document est accessible publiquement sur /fr/manual/vendeur (formation guichet et agents indépendants).",
+      "Ce document est visible uniquement pour les rôles vendeur et vendeur indépendant.",
     ],
     figure: {
       src: "/manuel/captures/seller-real-dashboard.png",
@@ -39,7 +39,6 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
     bullets: [
       "Un reversement en attente de validation comptable bloque les nouvelles ventes cash.",
       "Le mode affiché en haut du tableau de bord est « Guichet » (et non « Tiers »).",
-      "Mode hors ligne : voir section 4 — point crucial (caisse ouverte + départs chargés une fois en ligne).",
     ],
     subsections: [
       {
@@ -93,6 +92,17 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
         ],
       },
       {
+        title: "Prérequis pour le mode offline (point crucial)",
+        body: "Le guichet Tibus peut fonctionner hors ligne. Pour que les départs restent disponibles sans connexion internet, le vendeur doit une fois en ligne :",
+        numbered: [
+          "Ouvrir sa caisse sur la gare.",
+          "Laisser charger les départs (mis en cache automatiquement).",
+        ],
+        bullets: [
+          "Ensuite, hors ligne, les départs de cette gare réapparaissent depuis le cache local.",
+        ],
+      },
+      {
         title: "Pendant le service",
         body: "Le solde et le journal des mouvements (ventes, annulations) se rafraîchissent automatiquement.",
       },
@@ -103,15 +113,6 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
           "Le statut passe en « en attente » : les ventes cash sont suspendues jusqu'à validation.",
           "Le comptable valide depuis la console owner → Caisse compagnie.",
           "Après validation, vous pouvez rouvrir une nouvelle session le lendemain.",
-        ],
-      },
-      {
-        title: "Mode hors ligne — point crucial",
-        body: "Prérequis pour le mode offline : le vendeur doit une fois en ligne :",
-        numbered: [
-          "Ouvrir sa caisse sur la gare.",
-          "Laisser charger les départs (mis en cache automatiquement).",
-          "Ensuite, hors ligne, les départs de cette gare réapparaissent depuis le cache local.",
         ],
       },
     ],

@@ -1,8 +1,11 @@
-import { Link, useParams } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeftIcon, BookOpenIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { useAppUser } from "@/hooks/use-app-user.ts";
+import { hasSellerManualAccess } from "@/lib/seller-manual-access.ts";
 import {
   SELLER_MANUAL_SECTIONS,
   SELLER_MANUAL_SUBTITLE,
@@ -12,23 +15,44 @@ import { ManualSectionBlock } from "./_components/manual-blocks.tsx";
 
 export default function SellerManualPage() {
   const { lng } = useParams<{ lng: string }>();
+  const navigate = useNavigate();
   const { t } = useTranslation("common");
+  const appUser = useAppUser();
   const locale = lng ?? "fr";
   const home = `/${locale}`;
+  const sellerHome = `/${locale}/seller`;
+
+  const canAccess = appUser.isReady && hasSellerManualAccess(appUser.roles);
+
+  useEffect(() => {
+    if (appUser.isReady && !appUser.isLoading && !canAccess) {
+      navigate(home, { replace: true });
+    }
+  }, [appUser.isReady, appUser.isLoading, canAccess, home, navigate]);
+
+  if (!appUser.isReady || appUser.isLoading) {
+    return (
+      <div className="min-h-svh bg-background flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!canAccess) return null;
 
   return (
     <div className="min-h-svh bg-background">
       <div className="max-w-4xl mx-auto px-4 py-6 pb-24 space-y-8">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
-            <Link to={home}>
+            <Link to={sellerHome}>
               <ArrowLeftIcon className="h-4 w-4" />
             </Link>
           </Button>
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                {t("manual.public_badge", { defaultValue: "Documentation publique" })}
+                {t("manual.seller_badge", { defaultValue: "Vendeur & agent indépendant" })}
               </Badge>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#1A5296]">
