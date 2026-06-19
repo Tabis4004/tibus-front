@@ -461,3 +461,24 @@ curl -s -X POST "https://VOTRE_SUBDOMAIN.api.infobip.com/sms/3/messages" \
 ```
 
 Réponse OK : `messages[0].messageId` + statut `PENDING_ACCEPTED`.
+
+## Mise en production — nettoyage données de test
+
+Script manuel (ne pas `db push`) : **`scripts/prod-cleanup-test-data.sql`**
+
+1. `./scripts/supabase-project-check.sh` — confirmer le projet **Tibus 1.0** (`kqudaqtydimjclwaihqr`).
+2. Backup Supabase (Dashboard → Database → Backups).
+3. SQL Editor : exécuter la section **AUDIT** du script ; noter les compagnies (ex. *Tibus Démo Transport*, *Tabis Express BF*, noms *Test* / *Démo*).
+4. Ajuster le filtre `companies_to_purge` (noms ou UUID explicites).
+5. Exécuter **CLEANUP** avec `ROLLBACK` (dry-run), puis `COMMIT` si les volumes sont corrects.
+
+**À conserver :** `Countries`, `Cities` (~2180 villes), `Role`, plans d'abonnement, pages légales, comptes `super_admin` / `admin_pays` réels.
+
+**À purger :** compagnies de test, `ReservationBus` / `Payment`, caisses (`caisses_gares`, `mouvements_caisse_gare`), colis, bus, gares, voyages, `UserRoles` liés à ces compagnies.
+
+**Checklist front / secrets après nettoyage :**
+
+- Vercel : `VITE_ADMIN_SANDBOX=false` (pas de faux super_admin UI).
+- FedaPay : `sk_live_…` + `https://api.fedapay.com` (Edge Functions secrets).
+- Auth Supabase : Site URL + redirects → `https://tibus.app`.
+- Changer le mot de passe du compte démo `tabiscompany@gmail.com` ou le retirer des rôles compagnie de test.
