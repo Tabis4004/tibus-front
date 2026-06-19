@@ -72,6 +72,18 @@ export function consoleTileStyle(index: number): ConsoleTileStyle {
   return CONSOLE_TILE_PALETTES[((index % CONSOLE_TILE_PALETTES.length) + CONSOLE_TILE_PALETTES.length) % CONSOLE_TILE_PALETTES.length]!;
 }
 
+/** Applique la couleur choisie par l'utilisateur si présente. */
+export function resolveConsoleTileStyle(
+  defaultIndex: number,
+  overrides?: Record<string, number>,
+  blockId?: string,
+): ConsoleTileStyle {
+  if (blockId && overrides && overrides[blockId] != null) {
+    return consoleTileStyle(overrides[blockId]);
+  }
+  return consoleTileStyle(defaultIndex);
+}
+
 export function consoleTileClass(index: number, ...parts: (keyof ConsoleTileStyle)[]): string {
   const style = consoleTileStyle(index);
   return cn(...parts.map((part) => style[part]));

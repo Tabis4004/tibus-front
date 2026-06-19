@@ -77,7 +77,10 @@ export async function listGaresMapPointsSupabase(
 ): Promise<GareMapPoint[]> {
   let query = supabase
     .from("Gares")
-    .select("id, name, googleMapsLink, latitude, longitude, Companies(name, Countries(name))")
+    .select(
+      "id, name, googleMapsLink, latitude, longitude, Companies!inner(name, isActive, Countries(name))",
+    )
+    .eq("Companies.isActive", true)
     .not("googleMapsLink", "is", null)
     .order("name");
 

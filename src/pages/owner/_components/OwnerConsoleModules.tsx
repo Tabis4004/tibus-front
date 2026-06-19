@@ -15,14 +15,16 @@ import {
   canAccessGuaranteeFund,
   filterOwnerConsoleModules,
   groupOwnerConsoleModules,
-  isOwnerNavPathEnabled,
   type OwnerConsoleModule,
 } from "@/lib/owner-console-modules.tsx";
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import type { OwnerCompany } from "@/lib/supabase/owner-company";
 import GuaranteeFundOverviewCard from "./GuaranteeFundOverviewCard.tsx";
+import ConsoleBlocksShell from "@/components/console/ConsoleBlocksShell.tsx";
+import { useConsoleBlocksCustomize } from "@/components/console/ConsoleBlocksCustomizeContext.tsx";
+import ConsoleTilePalettePicker from "@/components/console/ConsoleTilePalettePicker.tsx";
 import { cn } from "@/lib/utils.ts";
-import { consoleTileStyle } from "@/lib/console-grid-tiles.ts";
+import { resolveConsoleTileStyle } from "@/lib/console-grid-tiles.ts";
 
 type Props = {
   company: OwnerCompany;
@@ -40,34 +42,62 @@ function ModuleBlock({
   tileIndex: number;
 }) {
   const Icon = module.icon;
-  const style = consoleTileStyle(tileIndex);
+  const customize = useConsoleBlocksCustomize();
+  const blockId = `owner-${module.id}`;
+  const style = customize
+    ? customize.styleFor(blockId, tileIndex)
+    : resolveConsoleTileStyle(tileIndex);
+  const showPicker = Boolean(customize?.customizeMode);
 
-  return (
-    <Link to={`/${lng}${module.toSuffix}`} className="block h-full" data-tour={module.tourTarget}>
-      <div
-        className={cn(
-          "h-full min-h-[132px] rounded-2xl border p-4 flex flex-col items-center justify-center text-center gap-2.5",
-          "hover:shadow-md transition-all group",
-          style.tile,
-          style.border,
-        )}
-      >
-        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", style.iconWrap)}>
-          <Icon className={cn("w-6 h-6", style.icon)} />
-        </div>
-        <div className="min-w-0 w-full">
-          <h3 className={cn("font-semibold text-sm leading-snug", style.title)}>
-            {t(module.titleKey, { defaultValue: module.titleDefault })}
-          </h3>
-          <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
-            {t(module.descKey, { defaultValue: module.descDefault })}
-          </p>
-        </div>
+  const inner = (
+    <div
+      className={cn(
+        "h-full min-h-[132px] rounded-2xl border p-4 flex flex-col items-center justify-center text-center gap-2.5",
+        !showPicker && "hover:shadow-md transition-all group",
+        style.tile,
+        style.border,
+      )}
+    >
+      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", style.iconWrap)}>
+        <Icon className={cn("w-6 h-6", style.icon)} />
+      </div>
+      <div className="min-w-0 w-full">
+        <h3 className={cn("font-semibold text-sm leading-snug", style.title)}>
+          {t(module.titleKey, { defaultValue: module.titleDefault })}
+        </h3>
+        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
+          {t(module.descKey, { defaultValue: module.descDefault })}
+        </p>
+      </div>
+      {!showPicker ? (
         <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground group-hover:text-foreground">
           Ouvrir
           <ArrowRightIcon className="w-3 h-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </div>
+      ) : null}
+      {showPicker && customize ? (
+        <ConsoleTilePalettePicker
+          blockId={blockId}
+          selectedIndex={customize.paletteIndexFor(blockId, tileIndex)}
+          defaultIndex={tileIndex}
+          onSelect={(index) => customize.setBlockColor(blockId, index)}
+          onReset={() => customize.resetBlockColor(blockId)}
+        />
+      ) : null}
+    </div>
+  );
+
+  if (showPicker) {
+    return (
+      <div className="block h-full" data-tour={module.tourTarget}>
+        {inner}
       </div>
+    );
+  }
+
+  return (
+    <Link to={`/${lng}${module.toSuffix}`} className="block h-full" data-tour={module.tourTarget}>
+      {inner}
     </Link>
   );
 }
@@ -185,23 +215,25 @@ export default function OwnerConsoleModules({ company }: Props) {
   const showGuaranteeFund = canAccessGuaranteeFund(appUser.roles, appUser.isSuperAdmin);
 
   return (
-    <div className="space-y-6">
-      {sections.map((section) => (
-        <div key={section.sectionKey} className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
-            {t(section.sectionKey, { defaultValue: section.sectionDefault })}
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {section.items.map((module, index) =>
-              module.id === "guarantee" && showGuaranteeFund ? (
-                <GuaranteeFundOverviewCard key={module.id} companyId={company.id} />
-              ) : (
-                <ModuleBlock key={module.id} module={module} lng={lng ?? "fr"} t={t} tileIndex={index} />
-              ),
-            )}
+    <ConsoleBlocksShell userId={appUser.profile?.id ?? null} surface="owner" className="mb-2">
+      <div className="space-y-6">
+        {sections.map((section) => (
+          <div key={section.sectionKey} className="space-y-2">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
+              {t(section.sectionKey, { defaultValue: section.sectionDefault })}
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {section.items.map((module, index) =>
+                module.id === "guarantee" && showGuaranteeFund ? (
+                  <GuaranteeFundOverviewCard key={module.id} companyId={company.id} />
+                ) : (
+                  <ModuleBlock key={module.id} module={module} lng={lng ?? "fr"} t={t} tileIndex={index} />
+                ),
+              )}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </ConsoleBlocksShell>
   );
 }

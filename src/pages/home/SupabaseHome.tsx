@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import ExploreFeaturesButton from "@/components/onboarding/ExploreFeaturesButton.tsx";
 import { HomeManualBlocks } from "./_components/HomeManualBlocks.tsx";
 import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock.tsx";
+import ConsoleBlocksShell from "@/components/console/ConsoleBlocksShell.tsx";
 import { canViewNetworkGaresMap } from "@/lib/gares-map-audience.ts";
 import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
 
@@ -87,7 +88,9 @@ export default function SupabaseHome() {
           </motion.div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+        <ConsoleBlocksShell userId={appUser.profile?.id ?? null} surface="home" className="mb-3">
+        <div className="space-y-6">
           {(showTicketScanner ||
             !appUser.shouldHideMerchantAgentCta ||
             showOwnerDashboard ||
@@ -238,6 +241,8 @@ export default function SupabaseHome() {
               icon={MessageCircleIcon}
             />
           </HomeBlockSection>
+        </div>
+        </ConsoleBlocksShell>
         </div>
       </main>
       <BottomNav />

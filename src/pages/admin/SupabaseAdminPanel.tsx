@@ -75,6 +75,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
+import ConsoleBlocksShell from "@/components/console/ConsoleBlocksShell.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import {
@@ -365,32 +366,38 @@ export default function SupabaseAdminPanel() {
       </div>
 
       {appUser.isSuperAdmin ? (
+        <ConsoleBlocksShell userId={appUser.profile?.id ?? null} surface="admin" className="mb-1">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <ConsoleGridTile
+            blockId="admin-stat-users"
             tileIndex={0}
             icon={UsersIcon}
             label={t("total_users")}
             value={stats.users.toLocaleString()}
           />
           <ConsoleGridTile
+            blockId="admin-stat-companies"
             tileIndex={1}
             icon={BuildingIcon}
             label={t("total_companies")}
             value={stats.companies.toLocaleString()}
           />
           <ConsoleGridTile
+            blockId="admin-stat-subs"
             tileIndex={2}
             icon={CreditCardIcon}
             label={t("active_subs")}
             value={stats.activeSubscriptions.toLocaleString()}
           />
           <ConsoleGridTile
+            blockId="admin-stat-cities"
             tileIndex={3}
             icon={GlobeIcon}
             label={t("geo.cities", { defaultValue: "Villes" })}
             value={stats.cities.toLocaleString()}
           />
         </div>
+        </ConsoleBlocksShell>
       ) : null}
 
       <div className="rounded-xl bg-muted p-1">

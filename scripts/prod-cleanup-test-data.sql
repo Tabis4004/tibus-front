@@ -115,7 +115,7 @@ DELETE FROM "PromoCodes" pc WHERE pc."companyId" IN (SELECT id FROM companies_to
 DELETE FROM "Subscriptions" s WHERE s."companyId" IN (SELECT id FROM companies_to_purge);
 
 DELETE FROM public."CounterSaleIdempotency" i
-WHERE i."companyId" IN (SELECT id FROM companies_to_purge);
+WHERE i.reservation_id IN (SELECT id FROM reservations_to_purge);
 
 DELETE FROM public.colis_natures_selectionnees cns
 WHERE cns.colis_id IN (
@@ -158,7 +158,9 @@ WHERE p.id IN (SELECT id FROM payments_to_purge)
 DELETE FROM "Bus" b WHERE b."companyId" IN (SELECT id FROM companies_to_purge);
 DELETE FROM "Gares" g WHERE g.id IN (SELECT id FROM gares_to_purge);
 
-DELETE FROM "UserRoles" ur WHERE ur."companyId" IN (SELECT id FROM companies_to_purge);
+-- Comptes Users conservés — supprimer UserRoles liés aux compagnies purgées
+DELETE FROM "UserRoles" ur
+WHERE ur."companyId" IN (SELECT id FROM companies_to_purge);
 
 DELETE FROM "CompanyExpense" e WHERE e."companyId" IN (SELECT id FROM companies_to_purge);
 DELETE FROM "CompanyExpenseCategory" ec WHERE ec."companyId" IN (SELECT id FROM companies_to_purge);

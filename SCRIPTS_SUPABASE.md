@@ -464,21 +464,52 @@ Réponse OK : `messages[0].messageId` + statut `PENDING_ACCEPTED`.
 
 ## Mise en production — nettoyage données de test
 
-Script manuel (ne pas `db push`) : **`scripts/prod-cleanup-test-data.sql`**
+Scripts manuels (ne pas `db push`) :
 
-1. `./scripts/supabase-project-check.sh` — confirmer le projet **Tibus 1.0** (`kqudaqtydimjclwaihqr`).
-2. Backup Supabase (Dashboard → Database → Backups).
-3. SQL Editor : exécuter la section **AUDIT** du script ; noter les compagnies (ex. *Tibus Démo Transport*, *Tabis Express BF*, noms *Test* / *Démo*).
-4. Ajuster le filtre `companies_to_purge` (noms ou UUID explicites).
-5. Exécuter **CLEANUP** avec `ROLLBACK` (dry-run), puis `COMMIT` si les volumes sont corrects.
+| Fichier | Rôle |
+|---------|------|
+| `scripts/prod-cleanup-test-data.sql` | Audit + modèle commenté |
+| `scripts/prod-cleanup-execute.sql` | **Prêt à exécuter** — purge **toutes** les compagnies + ventes (utilisateurs conservés) |
+| `scripts/run-prod-cleanup.sh` | Lance via `psql` si `SUPABASE_DB_PASSWORD` est défini |
 
-**À conserver :** `Countries`, `Cities` (~2180 villes), `Role`, plans d'abonnement, pages légales, comptes `super_admin` / `admin_pays` réels.
+### Compagnies sur prod (audit 19/06/2026)
 
-**À purger :** compagnies de test, `ReservationBus` / `Payment`, caisses (`caisses_gares`, `mouvements_caisse_gare`), colis, bus, gares, voyages, `UserRoles` liés à ces compagnies.
+**Toutes supprimées** par `prod-cleanup-execute.sql` (8 au total), dont :
 
-**Checklist front / secrets après nettoyage :**
+| Nom | UUID |
+|-----|------|
+| EDF | `347e11f2-039b-4617-b76b-e29dfef1c5b7` |
+| severin travel | `2df2d454-f0fb-4a61-a414-4a37732889ae` |
+| Tibus Démo Transport | `5b181dca-ec1d-4990-9346-dbb99f458727` |
+| Tabis Express / BF, Test compagnie et frère, Tibus, Tibus ETVT | voir audit |
 
-- Vercel : `VITE_ADMIN_SANDBOX=false` (pas de faux super_admin UI).
-- FedaPay : `sk_live_…` + `https://api.fedapay.com` (Edge Functions secrets).
-- Auth Supabase : Site URL + redirects → `https://tibus.app`.
-- Changer le mot de passe du compte démo `tabiscompany@gmail.com` ou le retirer des rôles compagnie de test.
+Suppression en cascade : billets (`ReservationBus`), paiements, caisses, colis, bus, gares, voyages. **Comptes `Users` / `auth.users` conservés** — les lignes `UserRoles` liées aux compagnies purgées sont supprimées (rôles owner/vendeur exigent un `companyId` non null).
+
+### Exécution
+
+**Option A — SQL Editor** (recommandé)  
+1. Backup Dashboard → Database → Backups  
+2. Coller le contenu de `scripts/prod-cleanup-execute.sql`  
+3. Exécuter  
+
+**Option B — Terminal**
+```bash
+export SUPABASE_DB_PASSWORD='…'   # Dashboard → Database password
+./scripts/run-prod-cleanup.sh dry-run   # simulation (ROLLBACK)
+./scripts/run-prod-cleanup.sh           # purge réelle
+```
+
+Après exécution : table `Companies` vide ; les comptes utilisateurs restent connectables (rôles pays / voyageur inchangés).
+
+## Compagnie démo + owners (post-purge)
+
+Script manuel : **`scripts/prod-seed-demo-company.sql`**
+
+1. Crée **Tibus Démo Transport** (ou réutilise si déjà présente).
+2. Active tous les modules (`CompanyFeatureModules`) et `liveAuthorizedByAdmin` pour les tests internes.
+3. **`isActive = false`** et **`arretReservation = false`** → gares et voyages **invisibles** au public (recherche voyageur, carte réseau, filtres compagnies).
+4. Attribue le rôle **owner** sur cette compagnie à **chaque ligne** de `Users` (idempotent).
+
+Pour publier plus tard : owner accepte le contrat + active la mise en ligne, ou admin pays passe `isActive` à `true`.
+
+SQL Editor : Ctrl+A sur le fichier → Run. Vérifier que `owner_count = users_total` dans le résultat.
