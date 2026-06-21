@@ -7,7 +7,7 @@ const OWNER_ROLES = [
   "chauffeur",
   "comptable_compagnie",
   "controleur",
-  "gestionnaire_gare",
+  "gerant_gare",
 ] as const;
 
 type ProvisionBody = {
@@ -355,7 +355,7 @@ Deno.serve(async (req) => {
     }
 
     const requiredCompanyRoles = roles.filter((r) =>
-      ["vendeur", "chauffeur", "comptable_compagnie", "controleur", "gestionnaire_gare", "owner"].includes(r)
+      ["vendeur", "chauffeur", "comptable_compagnie", "controleur", "gerant_gare", "owner"].includes(r)
     );
     const missingRequired = requiredCompanyRoles.filter((r) => !assignedRoles.includes(r));
     if (missingRequired.length > 0) {

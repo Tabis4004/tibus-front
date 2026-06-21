@@ -54,8 +54,9 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   const role = resolveDashboardRole(roles);
 
   if (role === "owner") return `/${locale}/owner`;
-  if (role === "gerant_gare" || role === "gestionnaire_gare") return `/${locale}/owner/gare-dashboard`;
-  if (role === "comptable_gare") return `/${locale}/owner/gare-dashboard`;
+  if (role === "gerant_gare" || role === "gestionnaire_gare" || role === "comptable_gare") {
+    return `/${locale}/owner/gare-dashboard`;
+  }
   if (role === "controleur_gare") return `/${locale}/verify/scan`;
   if (role === "super_admin" || role === "admin_pays") return `/${locale}/admin`;
   if (role === "demarcheur") return `/${locale}/admin/demarcheur`;

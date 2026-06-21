@@ -20,6 +20,7 @@ import {
 
 const SELLER_ROLE_NAMES = [
   "vendeur",
+  "vendeur_gare",
   "chauffeur",
   "vendeur_independant",
   "vendeur_reseau",

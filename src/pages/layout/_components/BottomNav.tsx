@@ -1,12 +1,13 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { NavLink, useParams } from "react-router-dom";
-import { HomeIcon, TicketIcon, LayoutDashboardIcon, ShieldIcon, TrendingUpIcon } from "lucide-react";
+import { HomeIcon, TicketIcon, LayoutDashboardIcon, ShieldIcon, TrendingUpIcon, ScanLineIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { useTranslation } from "react-i18next";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { resolveUserHomePath } from "@/lib/auth/role-routing.ts";
+import { hasGareDashboardAccess } from "@/lib/owner-team-roles.ts";
 
 export default function BottomNav() {
   const { t } = useTranslation("common");
@@ -50,6 +51,18 @@ export default function BottomNav() {
     { to: `/${locale}/admin`, icon: ShieldIcon, label: t("nav.admin") },
   ];
 
+  const gareLinks = [
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/owner/gare-dashboard`, icon: LayoutDashboardIcon, label: t("nav.dashboard") },
+  ];
+
+  const controleurGareLinks = [
+    { to: homePath, icon: HomeIcon, label: t("nav.home") },
+    { to: `/${locale}/verify/scan`, icon: ScanLineIcon, label: t("nav.scan", { defaultValue: "Contrôle" }) },
+  ];
+
+  const hasGareNav = isSupabaseAuth() && hasGareDashboardAccess(appUser.roles);
+
   const links =
     dashboardRole === "owner"
       ? ownerLinks
@@ -59,6 +72,10 @@ export default function BottomNav() {
           dashboardRole === "admin_pays" ||
           dashboardRole === "superadmin"
         ? adminLinks
+        : dashboardRole === "controleur_gare"
+          ? controleurGareLinks
+        : hasGareNav
+          ? gareLinks
         : hasSellerNav
           ? sellerLinks
           : travelerLinks;

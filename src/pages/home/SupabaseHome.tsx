@@ -26,6 +26,7 @@ import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock
 import ConsoleBlocksShell from "@/components/console/ConsoleBlocksShell.tsx";
 import { canViewNetworkGaresMap } from "@/lib/gares-map-audience.ts";
 import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
+import { hasGareDashboardAccess } from "@/lib/owner-team-roles.ts";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -42,11 +43,12 @@ export default function SupabaseHome() {
     "Tibus";
 
   const showOwnerDashboard = appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
+  const showGareDashboard = hasGareDashboardAccess(appUser.roles);
   const showPlatformAdmin = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
   const showDemarcheurDashboard = isDemarcheurRole(appUser.roles);
   const showSellerDashboard = appUser.hasSellerRole || appUser.hasMerchantAgentApplication;
   const showThirdPartyBooking = appUser.hasThirdPartySellerRole || appUser.hasMerchantAgentApplication;
-  const showTicketScanner = ["owner", "controleur", "vendeur", "chauffeur", "super_admin"].some((role) =>
+  const showTicketScanner = ["owner", "controleur", "controleur_gare", "vendeur", "vendeur_gare", "chauffeur", "super_admin"].some((role) =>
     appUser.roles.includes(role),
   );
   const showGaresMap = canViewNetworkGaresMap(appUser.roles, true);
@@ -94,6 +96,7 @@ export default function SupabaseHome() {
           {(showTicketScanner ||
             !appUser.shouldHideMerchantAgentCta ||
             showOwnerDashboard ||
+            showGareDashboard ||
             showSellerDashboard ||
             showThirdPartyBooking ||
             showPlatformAdmin ||
@@ -129,6 +132,18 @@ export default function SupabaseHome() {
                   description={t("owner_dashboard_desc", { defaultValue: "Manage your company" })}
                   icon={LayoutDashboardIcon}
                   tour="home-owner-dashboard"
+                />
+              )}
+
+              {showGareDashboard && (
+                <HomeActionBlock
+                  to={`/${locale}/owner/gare-dashboard`}
+                  title={t("home.gare_dashboard", { defaultValue: "Ma gare" })}
+                  description={t("home.gare_dashboard_desc", {
+                    defaultValue: "Équipe de gare, commissions guichet et reversements",
+                  })}
+                  icon={MapPinIcon}
+                  tour="home-gare-dashboard"
                 />
               )}
 

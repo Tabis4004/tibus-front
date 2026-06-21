@@ -22,15 +22,17 @@ type GareSummary = {
   id: string;
   name: string;
   city: string | null;
+  companyId: string | null;
 };
 
 export default function GareDashboardPage() {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const locale = lng ?? "fr";
-  const { companyId } = useOwnerCompany();
+  const { companyId: ownerCompanyId } = useOwnerCompany();
   const appUser = useAppUser();
   const [gare, setGare] = useState<GareSummary | null | undefined>(undefined);
+  const companyId = ownerCompanyId ?? gare?.companyId ?? null;
 
   const canManageTeam = appUser.roles.some((role) => isGareManagerRole(role));
   const canValidateCash = appUser.roles.some((role) => isGareCashValidatorRole(role));
@@ -50,7 +52,7 @@ export default function GareDashboardPage() {
 
         const { data, error } = await supabase
           .from("Gares")
-          .select("id, name, Cities(name)")
+          .select("id, name, companyId, Cities(name)")
           .eq("id", gareId)
           .maybeSingle();
 
@@ -67,6 +69,7 @@ export default function GareDashboardPage() {
           id: data.id as string,
           name: data.name as string,
           city: cityName ?? null,
+          companyId: (data.companyId as string | null) ?? null,
         });
       } catch (err) {
         if (!cancelled) {

@@ -34,7 +34,7 @@ export const GUARANTEE_FUND_ACCESS_ROLES = [
   "super_admin",
 ] as const;
 
-/** Rôles avec accès console compagnie (/owner) au-delà du seul owner. */
+/** Accès console compagnie (/owner) au-delà du seul owner. */
 export const COMPANY_CONSOLE_ROLE_NAMES = [
   "owner",
   "comptable_compagnie",
@@ -45,7 +45,10 @@ export const COMPANY_CONSOLE_ROLE_NAMES = [
   "comptable_gare",
 ] as const;
 
-export const GARE_MANAGER_CONSOLE_ROLE_NAMES = ["gerant_gare", "gestionnaire_gare"] as const;
+export const GARE_MANAGER_CONSOLE_ROLE_NAMES = [
+  "gerant_gare",
+  "gestionnaire_gare",
+] as const;
 
 /** Roles with access to the counter / vendor card (`/seller`). */
 export const VENDOR_CONSOLE_ROLE_NAMES = [
@@ -338,7 +341,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Scanner QR et validation des billets.",
     toSuffix: "/verify/scan",
     icon: ScanLineIcon,
-    roles: ["owner", "controleur", "vendeur", "chauffeur", "vendeur_reseau", "vendeur_master", "super_admin"],
+    roles: ["owner", "controleur", "controleur_gare", "vendeur", "vendeur_gare", "chauffeur", "vendeur_reseau", "vendeur_master", "super_admin"],
     tourTarget: "owner-scan",
   },
   {

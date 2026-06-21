@@ -35,8 +35,9 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAppUser } from "@/hooks/use-app-user.ts";
+import { hasGareConsoleAccess, isGareStaffOnlyConsoleUser } from "@/lib/owner-team-roles.ts";
 import type { CompanyFeatureModules } from "@/lib/company-feature-modules.ts";
-import { canAccessGuaranteeFund, isOwnerNavPathEnabled } from "@/lib/owner-console-modules.tsx";
+import { canAccessGuaranteeFund, filterOwnerConsoleModules, isOwnerNavPathEnabled } from "@/lib/owner-console-modules.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getMyCompanySupabase, type OwnerCompany } from "@/lib/supabase/owner-company";
 import { OwnerCompanyProvider, useOwnerCompany } from "@/hooks/use-owner-company.tsx";
@@ -99,6 +100,7 @@ const SUPABASE_NAV_SECTIONS: NavSection[] = [
       { toSuffix: "/owner/sales", labelKey: "sidebar.sales", icon: ReceiptTextIcon },
       { toSuffix: "/owner/guarantee-fund", labelKey: "sidebar.guarantee_fund", icon: LandmarkIcon },
       { toSuffix: "/owner/cash-register", labelKey: "sidebar.cash_register", icon: WalletIcon },
+      { toSuffix: "/owner/gare-dashboard", labelKey: "sidebar.gare_dashboard", icon: MapPinIcon },
       { toSuffix: "/owner/gare-manager-commissions", labelKey: "sidebar.gare_manager_commissions", icon: HandCoinsIcon },
       { toSuffix: "/owner/colis", labelKey: "sidebar.colis", icon: PackageIcon },
       { toSuffix: "/verify/scan", labelKey: "sidebar.scanner", icon: ScanLineIcon },
@@ -269,6 +271,15 @@ function OwnerSidebarNav({
     roles && isSuperAdmin !== undefined
       ? canAccessGuaranteeFund(roles, isSuperAdmin)
       : true;
+  const gareStaffOnly = roles ? isGareStaffOnlyConsoleUser(roles) : false;
+  const allowedNavSuffixes =
+    roles && isSuperAdmin !== undefined
+      ? new Set(
+          filterOwnerConsoleModules(roles, isSuperAdmin, featureModules ?? null).map(
+            (module) => module.toSuffix,
+          ),
+        )
+      : null;
 
   return (
     <nav className="flex-1 px-3 space-y-5 overflow-y-auto">
@@ -278,6 +289,9 @@ function OwnerSidebarNav({
           if (item.toSuffix === "/owner/cash-register") return canSeeGuaranteeFund;
           if (item.toSuffix === "/manual/compagnie") {
             return Boolean(isSuperAdmin || roles?.includes("owner"));
+          }
+          if (gareStaffOnly && allowedNavSuffixes && !allowedNavSuffixes.has(item.toSuffix)) {
+            return false;
           }
           if (!isOwnerNavPathEnabled(item.toSuffix, featureModules)) return false;
           return true;
@@ -432,10 +446,7 @@ function SupabaseOwnerLayout() {
     appUser.roles.includes("super_admin") ||
     appUser.roles.includes("comptable_compagnie") ||
     appUser.roles.includes("controleur") ||
-    appUser.roles.includes("gerant_gare") ||
-    appUser.roles.includes("gestionnaire_gare") ||
-    appUser.roles.includes("controleur_gare") ||
-    appUser.roles.includes("comptable_gare");
+    hasGareConsoleAccess(appUser.roles);
 
   useEffect(() => {
     if (!appUser.isLoading && appUser.isReady && !canAccess) {

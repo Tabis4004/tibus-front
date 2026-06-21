@@ -17,13 +17,32 @@ export const GARE_TEAM_ASSIGNABLE_ROLES = [
 
 export type GareTeamAssignableRole = (typeof GARE_TEAM_ASSIGNABLE_ROLES)[number];
 
-/** Gérant opérationnel (équipe, commissions, départs). gestionnaire_gare = alias legacy (% revenus gare). */
-export const GARE_MANAGER_ROLE_NAMES = ["gerant_gare", "gestionnaire_gare"] as const;
+/** Gérant opérationnel (équipe, commissions, départs). */
+export const GARE_MANAGER_ROLE_NAME = "gerant_gare" as const;
+
+/** Alias legacy encore présents en base avant migration 147. */
+export const GARE_MANAGER_LEGACY_ROLE_NAMES = ["gestionnaire_gare"] as const;
+
+export const GARE_MANAGER_ROLE_NAMES = [
+  GARE_MANAGER_ROLE_NAME,
+  ...GARE_MANAGER_LEGACY_ROLE_NAMES,
+] as const;
+
+export const GARE_DASHBOARD_ROLE_NAMES = [
+  GARE_MANAGER_ROLE_NAME,
+  ...GARE_MANAGER_LEGACY_ROLE_NAMES,
+  "comptable_gare",
+] as const;
+
+export const GARE_CONSOLE_ACCESS_ROLE_NAMES = [
+  ...GARE_DASHBOARD_ROLE_NAMES,
+  "controleur_gare",
+] as const;
 
 export const GARE_CASH_VALIDATOR_ROLE_NAMES = [
   "comptable_gare",
-  "gerant_gare",
-  "gestionnaire_gare",
+  GARE_MANAGER_ROLE_NAME,
+  ...GARE_MANAGER_LEGACY_ROLE_NAMES,
 ] as const;
 
 export function isGareCashValidatorRole(role: string): boolean {
@@ -40,4 +59,23 @@ export function isOwnerAssignableTeamRole(role: string): role is OwnerAssignable
 
 export function isGareTeamAssignableRole(role: string): role is GareTeamAssignableRole {
   return (GARE_TEAM_ASSIGNABLE_ROLES as readonly string[]).includes(role);
+}
+
+export function hasGareDashboardAccess(roles: readonly string[]): boolean {
+  return roles.some((role) =>
+    (GARE_DASHBOARD_ROLE_NAMES as readonly string[]).includes(role),
+  );
+}
+
+export function hasGareConsoleAccess(roles: readonly string[]): boolean {
+  return roles.some((role) =>
+    (GARE_CONSOLE_ACCESS_ROLE_NAMES as readonly string[]).includes(role),
+  );
+}
+
+export function isGareStaffOnlyConsoleUser(roles: readonly string[]): boolean {
+  if (!hasGareConsoleAccess(roles)) return false;
+  return !roles.some((role) =>
+    ["owner", "super_admin", "comptable_compagnie", "controleur"].includes(role),
+  );
 }

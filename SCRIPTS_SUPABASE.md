@@ -520,6 +520,14 @@ Fichier : **`supabase/migrations/146_gare_gerant_assignment_cash_roles.sql`** �
 - `can_validate_station_reversal` / `validate_station_cash_reversal` : `comptable_gare` et `gerant_gare` peuvent valider les reversements de leur gare.
 - Front : gérant retiré de l'écran Équipe ; assignation via Gares ; dashboard « Ma gare » pour comptable et gérant.
 
+## Lot 147 — Fusion gestionnaire_gare → gerant_gare
+
+Fichier : **`supabase/migrations/147_merge_gestionnaire_into_gerant_gare.sql`** — statut : **à déployer**
+
+- Migration des `UserRoles` `gestionnaire_gare` vers `gerant_gare` (+ backfill `gareId` depuis `Gares.gestionnaireUserId` / compagnie, purge orphelins).
+- Suppression du rôle legacy `gestionnaire_gare` ; fonctions RPC/RLS unifiées sur `gerant_gare`.
+- Front : accès dashboards gare (accueil, nav, seller `vendeur_gare`), équipe gérant via `GareTeamPanel`.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

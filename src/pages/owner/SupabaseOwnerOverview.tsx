@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   BuildingIcon,
@@ -27,10 +27,12 @@ import OwnerConsoleModules, {
   OwnerProfileCard,
 } from "./_components/OwnerConsoleModules.tsx";
 import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
+import { hasGareDashboardAccess, isGareStaffOnlyConsoleUser } from "@/lib/owner-team-roles.ts";
 
 export default function SupabaseOwnerOverview() {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
+  const navigate = useNavigate();
   const { appUserId } = useSupabaseAuth();
   const appUser = useAppUser();
   const { companyId, isReady, isLoading: companyLoading } = useOwnerCompany();
@@ -44,6 +46,14 @@ export default function SupabaseOwnerOverview() {
     appUser.profile?.firstName ??
     appUser.profile?.email?.split("@")[0] ??
     t("console.default_user", { defaultValue: "Utilisateur Tibus" });
+
+  useEffect(() => {
+    if (!appUser.isReady) return;
+    if (!isGareStaffOnlyConsoleUser(appUser.roles)) return;
+    if (hasGareDashboardAccess(appUser.roles)) {
+      navigate(`/${lng ?? "fr"}/owner/gare-dashboard`, { replace: true });
+    }
+  }, [appUser.isReady, appUser.roles, lng, navigate]);
 
   useEffect(() => {
     if (!appUserId || !isReady) return;

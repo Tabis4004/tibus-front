@@ -312,6 +312,7 @@
   "sidebar.guarantee_fund": "Guarantee fund",
   "sidebar.cash_register": "Station cash",
   "sidebar.gare_manager_commissions": "Station manager commissions",
+  "sidebar.gare_dashboard": "My station",
   "gare_commissions_page.title": "Station manager commissions",
   "gare_commissions_page.desc": "Track station managers' shares: counter commission is already collected in cash; only reservation commissions are payable by the company.",
   "gare_commissions_page.configure_stations": "Configure stations",
