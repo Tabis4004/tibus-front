@@ -34,10 +34,24 @@ export const GUARANTEE_FUND_ACCESS_ROLES = [
   "super_admin",
 ] as const;
 
+/** Rôles avec accès console compagnie (/owner) au-delà du seul owner. */
+export const COMPANY_CONSOLE_ROLE_NAMES = [
+  "owner",
+  "comptable_compagnie",
+  "controleur",
+  "gerant_gare",
+  "gestionnaire_gare",
+  "controleur_gare",
+  "comptable_gare",
+] as const;
+
+export const GARE_MANAGER_CONSOLE_ROLE_NAMES = ["gerant_gare", "gestionnaire_gare"] as const;
+
 /** Roles with access to the counter / vendor card (`/seller`). */
 export const VENDOR_CONSOLE_ROLE_NAMES = [
   "owner",
   "vendeur",
+  "vendeur_gare",
   "chauffeur",
   "vendeur_reseau",
   "vendeur_master",
@@ -149,6 +163,19 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     tourTarget: "owner-cash-register",
   },
   {
+    id: "counter-commissions",
+    sectionKey: "console.section_finance",
+    sectionDefault: "Finance & garantie",
+    titleKey: "console.counter_commissions_title",
+    titleDefault: "Commissions guichet",
+    descKey: "console.counter_commissions_desc",
+    descDefault: "Tranches fixe ou % pour vendeurs au guichet.",
+    toSuffix: "/owner/counter-commissions",
+    icon: PercentIcon,
+    roles: ["owner", "comptable_compagnie", "super_admin"],
+    tourTarget: "owner-counter-commissions",
+  },
+  {
     id: "gare-manager-commissions",
     sectionKey: "console.section_finance",
     sectionDefault: "Finance & garantie",
@@ -222,6 +249,20 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/stations",
     icon: MapPinIcon,
     tourTarget: "owner-stations",
+    roles: ["owner", "super_admin"],
+  },
+  {
+    id: "gare-dashboard",
+    sectionKey: "console.section_operations",
+    sectionDefault: "Exploitation",
+    titleKey: "console.gare_dashboard_title",
+    titleDefault: "Ma gare",
+    descKey: "console.gare_dashboard_desc",
+    descDefault: "Équipe de gare, commissions guichet et accès voyages.",
+    toSuffix: "/owner/gare-dashboard",
+    icon: MapPinIcon,
+    roles: [...GARE_MANAGER_CONSOLE_ROLE_NAMES],
+    tourTarget: "owner-gare-dashboard",
   },
   {
     id: "routes",
@@ -234,6 +275,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/routes",
     icon: RouteIcon,
     tourTarget: "owner-routes",
+    roles: ["owner", "comptable_compagnie", "controleur", ...GARE_MANAGER_CONSOLE_ROLE_NAMES, "controleur_gare", "comptable_gare", "super_admin"],
   },
   {
     id: "team",
@@ -259,6 +301,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/trips",
     icon: CalendarIcon,
     tourTarget: "owner-trips",
+    roles: ["owner", "comptable_compagnie", "controleur", ...GARE_MANAGER_CONSOLE_ROLE_NAMES, "controleur_gare", "comptable_gare", "super_admin"],
   },
   {
     id: "partner-api",
@@ -372,6 +415,7 @@ export function filterOwnerConsoleModules(
     } else if (
       !roles.includes("owner") &&
       !roles.includes("comptable_compagnie") &&
+      !roles.includes("controleur") &&
       !isSuperAdmin
     ) {
       return false;

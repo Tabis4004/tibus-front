@@ -501,6 +501,16 @@ export SUPABASE_DB_PASSWORD='…'   # Dashboard → Database password
 
 Après exécution : table `Companies` vide ; les comptes utilisateurs restent connectables (rôles pays / voyageur inchangés).
 
+## Lot 145 — Rôles gare, itinéraires programmation, commissions guichet
+
+Fichier : **`supabase/migrations/145_gare_roles_itinerary_counter_commission.sql`** — statut : **déployé**
+
+- `UserRoles.gareId` + validation trigger (rôles gare : `gareId` obligatoire).
+- Rôles : `gerant_gare`, `vendeur_gare`, `controleur_gare`, `comptable_gare` (+ alias `gestionnaire_gare`).
+- `ProgrammationTrajets.isSchedulingActive` — masqué à la programmation des départs si `false` ; reste dans les filtres reporting historique.
+- Table `GareCounterCommissionTiers` + RPC `compute_counter_seller_commission`, CRUD tranches, équipe gare (`list/assign/remove_gare_team_*`), `set_trajet_scheduling_active`, `can_manage_gare`, `resolve_user_managed_gare_id`.
+- `current_owner_company_id()` étendu aux rôles staff/gare pour les RPC owner.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

@@ -15,8 +15,13 @@ const DASHBOARD_ROLE_PRIORITY = [
   "master",
   "vendeur_master",
   "comptable_compagnie",
+  "comptable_gare",
   "controleur",
+  "controleur_gare",
+  "gerant_gare",
+  "gestionnaire_gare",
   "chauffeur",
+  "vendeur_gare",
   "vendeur_reseau",
   "vendeur",
   "vendeur_independant",
@@ -49,10 +54,12 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   const role = resolveDashboardRole(roles);
 
   if (role === "owner") return `/${locale}/owner`;
+  if (role === "gerant_gare" || role === "gestionnaire_gare") return `/${locale}/owner/gare-dashboard`;
   if (role === "super_admin" || role === "admin_pays") return `/${locale}/admin`;
   if (role === "demarcheur") return `/${locale}/admin/demarcheur`;
   if (
     role === "vendeur" ||
+    role === "vendeur_gare" ||
     role === "vendeur_independant" ||
     role === "vendeur_reseau" ||
     role === "vendeur_master" ||
@@ -60,8 +67,8 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   ) {
     return `/${locale}/seller`;
   }
-  if (role === "comptable_compagnie" || role === "controleur") {
-    return `/${locale}/company/sales`;
+  if (role === "comptable_compagnie" || role === "controleur" || role === "comptable_gare" || role === "controleur_gare") {
+    return `/${locale}/owner/trips`;
   }
   return `/${locale}`;
 }

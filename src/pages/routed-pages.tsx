@@ -70,6 +70,8 @@ import GuaranteeFundPage from "./owner/GuaranteeFundPage.tsx";
 import CompanySalesPage from "./owner/CompanySalesPage.tsx";
 import CashRegisterPage from "./owner/CashRegisterPage.tsx";
 import GareManagerCommissionsPage from "./owner/GareManagerCommissionsPage.tsx";
+import GareDashboardPage from "./owner/GareDashboardPage.tsx";
+import CounterCommissionsPage from "./owner/CounterCommissionsPage.tsx";
 import ColisSettingsPage from "./owner/ColisSettingsPage.tsx";
 import LoyaltyPage from "./owner/LoyaltyPage.tsx";
 import CancellationPolicyPage from "./owner/CancellationPolicyPage.tsx";
@@ -304,6 +306,14 @@ export function OwnerCashRegister() {
 
 export function OwnerGareManagerCommissions() {
   return supabaseOnlyPage("Commissions gestionnaires gare", GareManagerCommissionsPage);
+}
+
+export function OwnerGareDashboard() {
+  return supabaseOnlyPage("Ma gare", GareDashboardPage);
+}
+
+export function OwnerCounterCommissions() {
+  return supabaseOnlyPage("Commissions guichet", CounterCommissionsPage);
 }
 
 export function OwnerColisSettings() {

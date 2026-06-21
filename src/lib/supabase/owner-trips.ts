@@ -15,6 +15,7 @@ export type OwnerRouteOption = {
   price: number;
   currency: string;
   kilometrage: number | null;
+  isSchedulingActive: boolean;
 };
 
 export type OwnerStationOption = {
@@ -133,6 +134,7 @@ async function companyTrajetIds(companyId: string): Promise<string[]> {
 export async function listOwnerRoutesSupabase(
   appUserId: string,
   companyId?: string | null,
+  options?: { schedulingOnly?: boolean },
 ): Promise<OwnerRouteOption[]> {
   const resolvedCompanyId = await resolveOwnerCompanyId(appUserId, companyId);
   if (!resolvedCompanyId) return [];
@@ -140,10 +142,16 @@ export async function listOwnerRoutesSupabase(
   const trajetIds = await companyTrajetIds(resolvedCompanyId);
   if (!trajetIds.length) return [];
 
-  const { data: trajets, error: trajetsError } = await supabase
+  let trajetsQuery = supabase
     .from("ProgrammationTrajets")
-    .select("id, depart, final")
+    .select("id, depart, final, isSchedulingActive")
     .in("id", trajetIds);
+
+  if (options?.schedulingOnly) {
+    trajetsQuery = trajetsQuery.eq("isSchedulingActive", true);
+  }
+
+  const { data: trajets, error: trajetsError } = await trajetsQuery;
 
   if (trajetsError) throw trajetsError;
 
@@ -219,10 +227,22 @@ export async function listOwnerRoutesSupabase(
       price: arret.price as number,
       currency,
       kilometrage: (arret.kilometrage as number | null) ?? null,
+      isSchedulingActive: trajet.isSchedulingActive !== false,
     });
   }
 
   return routes.sort((a, b) => a.originCity.localeCompare(b.originCity));
+}
+
+export async function setTrajetSchedulingActiveSupabase(
+  trajetId: string,
+  active: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_trajet_scheduling_active", {
+    p_trajet_id: trajetId,
+    p_active: active,
+  });
+  if (error) throw error;
 }
 
 export async function listOwnerRouteStationsSupabase(

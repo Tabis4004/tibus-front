@@ -81,6 +81,7 @@ const ROLE_I18N_KEYS: Record<OwnerTeamRoleName, string> = {
   controleur: "sellers.role_controleur",
   comptable_compagnie: "sellers.role_comptable",
   gestionnaire_gare: "sellers.role_gestionnaire_gare",
+  gerant_gare: "sellers.role_gerant_gare",
 };
 
 function RoleSelect({

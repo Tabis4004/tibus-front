@@ -430,7 +430,12 @@ function SupabaseOwnerLayout() {
   const canAccess =
     appUser.roles.includes("owner") ||
     appUser.roles.includes("super_admin") ||
-    appUser.roles.includes("comptable_compagnie");
+    appUser.roles.includes("comptable_compagnie") ||
+    appUser.roles.includes("controleur") ||
+    appUser.roles.includes("gerant_gare") ||
+    appUser.roles.includes("gestionnaire_gare") ||
+    appUser.roles.includes("controleur_gare") ||
+    appUser.roles.includes("comptable_gare");
 
   useEffect(() => {
     if (!appUser.isLoading && appUser.isReady && !canAccess) {

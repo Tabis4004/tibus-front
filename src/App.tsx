@@ -43,6 +43,8 @@ import {
   OwnerCancellationPolicy,
   OwnerCashRegister,
   OwnerGareManagerCommissions,
+  OwnerGareDashboard,
+  OwnerCounterCommissions,
   OwnerColisSettings,
   OwnerExpenses,
   OwnerGuaranteeFund,
@@ -133,6 +135,8 @@ function AppShell() {
                   <Route path="guarantee-fund" element={<OwnerGuaranteeFund />} />
                   <Route path="cash-register" element={<OwnerCashRegister />} />
                   <Route path="gare-manager-commissions" element={<OwnerGareManagerCommissions />} />
+                  <Route path="gare-dashboard" element={<OwnerGareDashboard />} />
+                  <Route path="counter-commissions" element={<OwnerCounterCommissions />} />
                   <Route path="expenses" element={<OwnerExpenses />} />
                   <Route path="income-statement" element={<OwnerIncomeStatement />} />
                   <Route path="colis" element={<OwnerColisSettings />} />

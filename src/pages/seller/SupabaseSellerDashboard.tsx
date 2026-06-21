@@ -957,6 +957,7 @@ export default function SupabaseSellerDashboard() {
   const canCancelTickets =
     profile.company &&
     (profile.roleNames.includes("vendeur") ||
+      profile.roleNames.includes("vendeur_gare") ||
       profile.roleNames.includes("chauffeur") ||
       profile.roleNames.includes("owner"));
 

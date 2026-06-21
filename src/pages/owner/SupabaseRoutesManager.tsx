@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ import {
   listOwnerRoutesSupabase,
   listOwnerRouteStationsSupabase,
   createOwnerRouteSupabase,
+  setTrajetSchedulingActiveSupabase,
   type OwnerRouteOption,
   type OwnerStationOption,
 } from "@/lib/supabase/owner-trips";
@@ -191,6 +193,7 @@ export default function SupabaseRoutesManager() {
   const [routes, setRoutes] = useState<OwnerRouteOption[] | undefined>(undefined);
   const [stations, setStations] = useState<OwnerStationOption[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!appUserId || !companyId) return;
@@ -217,6 +220,23 @@ export default function SupabaseRoutesManager() {
     window.addEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(OWNER_COMPANY_REFRESH_EVENT, onRefresh);
   }, [loadData]);
+
+  const handleSchedulingToggle = async (route: OwnerRouteOption, active: boolean) => {
+    setTogglingId(route.id);
+    try {
+      await setTrajetSchedulingActiveSupabase(route.id, active);
+      toast.success(active ? t("routes.activated") : t("routes.deactivated"));
+      setRoutes((prev) =>
+        (prev ?? []).map((item) =>
+          item.id === route.id ? { ...item, isSchedulingActive: active } : item,
+        ),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("routes.update_error"));
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -258,10 +278,23 @@ export default function SupabaseRoutesManager() {
           {routes.map((route) => (
             <Card key={route.id}>
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-1.5 font-semibold text-sm flex-wrap">
-                  <span>{route.originName}</span>
-                  <ArrowRightIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <span>{route.destName}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-1.5 font-semibold text-sm flex-wrap min-w-0">
+                    <span>{route.originName}</span>
+                    <ArrowRightIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span>{route.destName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Label htmlFor={`scheduling-${route.id}`} className="text-[11px] text-muted-foreground">
+                      {route.isSchedulingActive ? t("routes.scheduling_on") : t("routes.scheduling_off")}
+                    </Label>
+                    <Switch
+                      id={`scheduling-${route.id}`}
+                      checked={route.isSchedulingActive}
+                      disabled={togglingId === route.id}
+                      onCheckedChange={(checked) => void handleSchedulingToggle(route, checked)}
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>

@@ -330,7 +330,7 @@ export default function SupabaseTripsManager() {
     try {
       const [departures, routeList, busList] = await Promise.all([
         listOwnerDeparturesSupabase(appUserId, companyId),
-        listOwnerRoutesSupabase(appUserId, companyId),
+        listOwnerRoutesSupabase(appUserId, companyId, { schedulingOnly: true }),
         listOwnerBusesSupabase(appUserId, companyId),
       ]);
       setTrips(departures);

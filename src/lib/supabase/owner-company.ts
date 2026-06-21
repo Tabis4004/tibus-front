@@ -37,6 +37,11 @@ export const COMPANY_STAFF_ROLE_NAMES = [
   "controleur",
   "vendeur",
   "chauffeur",
+  "gerant_gare",
+  "gestionnaire_gare",
+  "controleur_gare",
+  "comptable_gare",
+  "vendeur_gare",
 ] as const;
 
 export type CompanyStaffRole = (typeof COMPANY_STAFF_ROLE_NAMES)[number];
@@ -134,9 +139,20 @@ async function listOwnedCompaniesOnlySupabase(
 
   if (error) throw error;
 
+  const consoleRoles = new Set<string>([
+    "owner",
+    "comptable_compagnie",
+    "controleur",
+    "gerant_gare",
+    "gestionnaire_gare",
+    "controleur_gare",
+    "comptable_gare",
+  ]);
+
   const companies = new Map<string, OwnerCompanyOption>();
   for (const row of data ?? []) {
-    if (roleNameFromJoin(row.Role as { name: string } | { name: string }[]) !== "owner") {
+    const roleName = roleNameFromJoin(row.Role as { name: string } | { name: string }[]);
+    if (!roleName || !consoleRoles.has(roleName)) {
       continue;
     }
     const companyId = row.companyId as string | null;

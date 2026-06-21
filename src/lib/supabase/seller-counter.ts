@@ -87,6 +87,7 @@ export async function getSellerProfileSupabase(
     return [
       "super_admin",
       "vendeur",
+      "vendeur_gare",
       "chauffeur",
       "vendeur_independant",
       "vendeur_reseau",
@@ -103,7 +104,7 @@ export async function getSellerProfileSupabase(
 
   const companySellerRow = sellerRoles.find((row) => {
     const name = roleNameFromJoin(row.Role as { name: string } | { name: string }[] | null);
-    return Boolean(row.companyId) && (name === "vendeur" || name === "chauffeur" || name === "owner");
+    return Boolean(row.companyId) && (name === "vendeur" || name === "vendeur_gare" || name === "chauffeur" || name === "owner");
   });
 
   const companyId = (companySellerRow?.companyId ?? sellerRoles.find((row) => row.companyId)?.companyId) as

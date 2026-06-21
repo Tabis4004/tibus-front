@@ -11,6 +11,10 @@ export const ESTABLISHED_PRO_ROLES = [
   "controleur",
   "comptable_compagnie",
   "gestionnaire_gare",
+  "gerant_gare",
+  "vendeur_gare",
+  "controleur_gare",
+  "comptable_gare",
 ] as const;
 
 type ProfileLike =
