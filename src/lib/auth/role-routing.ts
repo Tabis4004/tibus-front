@@ -55,6 +55,8 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
 
   if (role === "owner") return `/${locale}/owner`;
   if (role === "gerant_gare" || role === "gestionnaire_gare") return `/${locale}/owner/gare-dashboard`;
+  if (role === "comptable_gare") return `/${locale}/owner/gare-dashboard`;
+  if (role === "controleur_gare") return `/${locale}/verify/scan`;
   if (role === "super_admin" || role === "admin_pays") return `/${locale}/admin`;
   if (role === "demarcheur") return `/${locale}/admin/demarcheur`;
   if (
@@ -67,7 +69,7 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   ) {
     return `/${locale}/seller`;
   }
-  if (role === "comptable_compagnie" || role === "controleur" || role === "comptable_gare" || role === "controleur_gare") {
+  if (role === "comptable_compagnie" || role === "controleur") {
     return `/${locale}/owner/trips`;
   }
   return `/${locale}`;

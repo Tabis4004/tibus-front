@@ -1,5 +1,6 @@
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
+import { isGareCashValidatorRole } from "@/lib/owner-team-roles.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import StationCashOverviewPanel from "./_components/StationCashOverviewPanel.tsx";
 import StationCashReversalsPanel from "@/pages/company/_components/StationCashReversalsPanel.tsx";
@@ -8,7 +9,10 @@ export default function CashRegisterPage() {
   const appUser = useAppUser();
   const { selectedCompany, isLoading, isReady } = useOwnerCompany();
 
-  const canValidate = appUser.roles.includes("owner");
+  const canValidate =
+    appUser.roles.includes("owner")
+    || appUser.roles.includes("comptable_compagnie")
+    || appUser.roles.some((role) => isGareCashValidatorRole(role));
 
   if (!isReady || isLoading || appUser.isLoading) {
     return (

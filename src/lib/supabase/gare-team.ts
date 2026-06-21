@@ -57,8 +57,30 @@ export async function removeGareTeamRoleSupabase(input: {
 export async function resolveManagedGareIdSupabase(): Promise<string | null> {
   const { data, error } = await supabase.rpc("resolve_user_managed_gare_id");
   if (error) {
-    if (/resolve_user_managed_gare_id|could not find|PGRST202/i.test(error.message)) return null;
+    if (/resolve_user_managed_gare_id|could not find|PGRST202/i.test(error.message)) {
+      return resolveUserGareIdSupabase();
+    }
+    throw error;
+  }
+  return data ? String(data) : resolveUserGareIdSupabase();
+}
+
+export async function resolveUserGareIdSupabase(): Promise<string | null> {
+  const { data, error } = await supabase.rpc("resolve_user_gare_id");
+  if (error) {
+    if (/resolve_user_gare_id|could not find|PGRST202/i.test(error.message)) return null;
     throw error;
   }
   return data ? String(data) : null;
+}
+
+export async function assignGareGerantSupabase(
+  gareId: string,
+  userId: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc("assign_gare_gerant", {
+    p_gare_id: gareId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
 }

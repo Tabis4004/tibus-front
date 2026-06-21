@@ -80,8 +80,6 @@ const ROLE_I18N_KEYS: Record<OwnerTeamRoleName, string> = {
   chauffeur: "sellers.role_chauffeur",
   controleur: "sellers.role_controleur",
   comptable_compagnie: "sellers.role_comptable",
-  gestionnaire_gare: "sellers.role_gestionnaire_gare",
-  gerant_gare: "sellers.role_gerant_gare",
 };
 
 function RoleSelect({
@@ -385,6 +383,13 @@ export default function SupabaseSellersManager() {
         <Alert variant="destructive">
           <AlertCircleIcon className="h-4 w-4" />
           <AlertDescription>{listError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {canManageTeam ? (
+        <Alert>
+          <AlertCircleIcon className="h-4 w-4" />
+          <AlertDescription>{t("sellers.gerant_via_stations_hint")}</AlertDescription>
         </Alert>
       ) : null}
 

@@ -8,11 +8,15 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import { useAppUser } from "@/hooks/use-app-user.ts";
-import { isGareManagerRole } from "@/lib/owner-team-roles.ts";
-import { resolveManagedGareIdSupabase } from "@/lib/supabase/gare-team.ts";
+import {
+  isGareCashValidatorRole,
+  isGareManagerRole,
+} from "@/lib/owner-team-roles.ts";
+import { resolveUserGareIdSupabase } from "@/lib/supabase/gare-team.ts";
 import { supabase } from "@/lib/supabase";
 import GareTeamPanel from "./_components/GareTeamPanel.tsx";
 import CounterCommissionTiersPanel from "./_components/CounterCommissionTiersPanel.tsx";
+import StationCashReversalsPanel from "@/pages/company/_components/StationCashReversalsPanel.tsx";
 
 type GareSummary = {
   id: string;
@@ -29,13 +33,15 @@ export default function GareDashboardPage() {
   const [gare, setGare] = useState<GareSummary | null | undefined>(undefined);
 
   const canManageTeam = appUser.roles.some((role) => isGareManagerRole(role));
+  const canValidateCash = appUser.roles.some((role) => isGareCashValidatorRole(role));
+  const isComptableGare = appUser.roles.includes("comptable_gare");
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
       try {
-        const gareId = await resolveManagedGareIdSupabase();
+        const gareId = await resolveUserGareIdSupabase();
         if (cancelled) return;
         if (!gareId) {
           setGare(null);
@@ -104,22 +110,35 @@ export default function GareDashboardPage() {
           {gare.name}
           {gare.city ? ` · ${gare.city}` : ""}
         </p>
+        {isComptableGare ? (
+          <p className="text-xs text-muted-foreground mt-1">{t("gare.comptable_hint")}</p>
+        ) : null}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Button asChild variant="outline" className="h-auto py-4 justify-start">
-          <Link to={`/${locale}/owner/trips`}>
-            <CalendarIcon className="w-4 h-4 mr-2 shrink-0" />
-            {t("gare.link_trips")}
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="h-auto py-4 justify-start">
-          <Link to={`/${locale}/owner/routes`}>
-            <RouteIcon className="w-4 h-4 mr-2 shrink-0" />
-            {t("gare.link_routes")}
-          </Link>
-        </Button>
-      </div>
+      {canManageTeam ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button asChild variant="outline" className="h-auto py-4 justify-start">
+            <Link to={`/${locale}/owner/trips`}>
+              <CalendarIcon className="w-4 h-4 mr-2 shrink-0" />
+              {t("gare.link_trips")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="h-auto py-4 justify-start">
+            <Link to={`/${locale}/owner/routes`}>
+              <RouteIcon className="w-4 h-4 mr-2 shrink-0" />
+              {t("gare.link_routes")}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
+
+      {canValidateCash ? (
+        <StationCashReversalsPanel
+          companyId={companyId}
+          gareId={gare.id}
+          canValidate={canValidateCash}
+        />
+      ) : null}
 
       {canManageTeam ? <GareTeamPanel gareId={gare.id} /> : null}
       {canManageTeam ? (

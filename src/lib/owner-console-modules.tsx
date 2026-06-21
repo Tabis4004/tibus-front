@@ -159,7 +159,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Caisses ouvertes, mouvements et reversements.",
     toSuffix: "/owner/cash-register",
     icon: WalletIcon,
-    roles: ["owner", "comptable_compagnie", "super_admin"],
+    roles: ["owner", "comptable_compagnie", "super_admin", "comptable_gare", ...GARE_MANAGER_CONSOLE_ROLE_NAMES],
     tourTarget: "owner-cash-register",
   },
   {
@@ -261,7 +261,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     descDefault: "Équipe de gare, commissions guichet et accès voyages.",
     toSuffix: "/owner/gare-dashboard",
     icon: MapPinIcon,
-    roles: [...GARE_MANAGER_CONSOLE_ROLE_NAMES],
+    roles: [...GARE_MANAGER_CONSOLE_ROLE_NAMES, "comptable_gare"],
     tourTarget: "owner-gare-dashboard",
   },
   {

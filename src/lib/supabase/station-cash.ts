@@ -58,6 +58,7 @@ export type StationCashReversal = {
   amount: number;
   status: ReversalStatus;
   caisseId: string;
+  gareId: string | null;
   gareName: string;
   cashierName: string | null;
   caisseBalance: number;
@@ -258,6 +259,7 @@ export async function listCompanyStationCashReversalsSupabase(
     amount: num(row.montant_reverse),
     status: String(row.statut_validation) as ReversalStatus,
     caisseId: String(row.caisse_id),
+    gareId: row.gare_id ? String(row.gare_id) : null,
     gareName: String(row.gare_name ?? ""),
     cashierName: row.gestionnaire_name ? String(row.gestionnaire_name) : null,
     caisseBalance: num(row.solde_caisse),

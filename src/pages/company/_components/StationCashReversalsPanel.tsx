@@ -33,9 +33,11 @@ function fmtDate(iso: string) {
 
 export default function StationCashReversalsPanel({
   companyId,
+  gareId,
   canValidate = false,
 }: {
   companyId: string;
+  gareId?: string | null;
   canValidate?: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState<"all" | ReversalStatus>("en_attente");
@@ -52,7 +54,11 @@ export default function StationCashReversalsPanel({
           companyId,
           statusFilter === "all" ? null : statusFilter,
         );
-        setRows(data);
+        setRows(
+          gareId
+            ? data.filter((row) => row.gareId === gareId)
+            : data,
+        );
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Chargement impossible");
         setRows([]);
@@ -60,7 +66,7 @@ export default function StationCashReversalsPanel({
         setRefreshing(false);
       }
     },
-    [companyId, statusFilter],
+    [companyId, statusFilter, gareId],
   );
 
   useEffect(() => {

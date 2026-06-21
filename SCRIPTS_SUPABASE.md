@@ -511,6 +511,15 @@ Fichier : **`supabase/migrations/145_gare_roles_itinerary_counter_commission.sql
 - Table `GareCounterCommissionTiers` + RPC `compute_counter_seller_commission`, CRUD tranches, équipe gare (`list/assign/remove_gare_team_*`), `set_trajet_scheduling_active`, `can_manage_gare`, `resolve_user_managed_gare_id`.
 - `current_owner_company_id()` étendu aux rôles staff/gare pour les RPC owner.
 
+## Lot 146 — Gérant de gare obligatoire, reversements comptable/gérant gare
+
+Fichier : **`supabase/migrations/146_gare_gerant_assignment_cash_roles.sql`** — statut : **à déployer**
+
+- RPC `assign_gare_gerant(gare_id, user_id)` : owner désigne le gérant avec `UserRoles.gareId` + `Gares.gestionnaireUserId`.
+- RPC `resolve_user_gare_id` : résolution gare pour tous rôles gare-scoped.
+- `can_validate_station_reversal` / `validate_station_cash_reversal` : `comptable_gare` et `gerant_gare` peuvent valider les reversements de leur gare.
+- Front : gérant retiré de l'écran Équipe ; assignation via Gares ; dashboard « Ma gare » pour comptable et gérant.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

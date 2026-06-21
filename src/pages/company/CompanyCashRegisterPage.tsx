@@ -7,6 +7,7 @@ import {
   resolveCompanyStaffCompanyId,
   COMPANY_STAFF_ROLE_NAMES,
 } from "@/lib/supabase/owner-company";
+import { isGareCashValidatorRole } from "@/lib/owner-team-roles.ts";
 import StationCashReversalsPanel from "@/pages/company/_components/StationCashReversalsPanel.tsx";
 
 const CASH_REGISTER_ROLES = [...COMPANY_STAFF_ROLE_NAMES, "owner"] as const;
@@ -20,7 +21,9 @@ export default function CompanyCashRegisterPage() {
 
   const hasAccess = CASH_REGISTER_ROLES.some((role) => appUser.roles.includes(role));
   const canValidate =
-    appUser.roles.includes("owner") || appUser.roles.includes("comptable_compagnie");
+    appUser.roles.includes("owner")
+    || appUser.roles.includes("comptable_compagnie")
+    || appUser.roles.some((role) => isGareCashValidatorRole(role));
 
   useEffect(() => {
     if (!appUser.isReady || appUser.isLoading) return;

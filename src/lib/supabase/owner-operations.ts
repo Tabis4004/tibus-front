@@ -296,12 +296,19 @@ export async function updateOwnerStationSupabase(input: {
     const { setGareManagerRevenueShareSupabase } = await import(
       "@/lib/supabase/gare-manager-revenue.ts"
     );
+    const { assignGareGerantSupabase } = await import("@/lib/supabase/gare-team.ts");
     await setGareManagerRevenueShareSupabase({
       gareId: input.stationId,
       sharePct: input.gestionnaireSharePct ?? 0,
       sharePctReservation: input.gestionnaireSharePctReservation ?? input.gestionnaireSharePct ?? 0,
       gestionnaireUserId: input.gestionnaireUserId ?? null,
     });
+    try {
+      await assignGareGerantSupabase(input.stationId, input.gestionnaireUserId ?? null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/assign_gare_gerant|could not find|PGRST202/i.test(message)) throw err;
+    }
   }
 }
 

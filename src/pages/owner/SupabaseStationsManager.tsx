@@ -230,6 +230,7 @@ function StationDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">{t("stations.manager_hint")}</p>
               </div>
               <div className="space-y-1.5">
                 <Label>{t("stations.share_pct_counter")}</Label>
