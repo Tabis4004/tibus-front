@@ -79,3 +79,25 @@ export function isGareStaffOnlyConsoleUser(roles: readonly string[]): boolean {
     ["owner", "super_admin", "comptable_compagnie", "controleur"].includes(role),
   );
 }
+
+export function canOpenStationCashRegister(roles: readonly string[]): boolean {
+  return roles.some((role) =>
+    ["vendeur", "vendeur_gare", "chauffeur"].includes(role),
+  );
+}
+
+export function hasGareManagerDashboardAccess(roles: readonly string[]): boolean {
+  return roles.some((role) => isGareManagerRole(role));
+}
+
+export function hasGareComptableDashboardAccess(roles: readonly string[]): boolean {
+  return roles.includes("comptable_gare");
+}
+
+export function hasGareControleurScanAccess(roles: readonly string[]): boolean {
+  return roles.includes("controleur_gare");
+}
+
+export function hasCompanyControleurScanAccess(roles: readonly string[]): boolean {
+  return roles.includes("controleur");
+}

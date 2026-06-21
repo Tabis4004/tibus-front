@@ -72,6 +72,7 @@ import CompanyLoyaltyUserLookup, {
   type SelectedLoyaltyUser,
 } from "@/components/CompanyLoyaltyUserLookup.tsx";
 import { hasSellerManualAccess } from "@/lib/seller-manual-access.ts";
+import { canOpenStationCashRegister } from "@/lib/owner-team-roles.ts";
 import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
 import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -1050,10 +1051,7 @@ export default function SupabaseSellerDashboard() {
       {profile.canSellDirect && profile.company ? (
         <StationCashPanel
           companyId={profile.company.id}
-          canOpen={
-            profile.roleNames.includes("vendeur") ||
-            profile.roleNames.includes("chauffeur")
-          }
+          canOpen={canOpenStationCashRegister(profile.roleNames)}
         />
       ) : null}
 

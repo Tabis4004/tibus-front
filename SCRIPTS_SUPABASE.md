@@ -528,6 +528,15 @@ Fichier : **`supabase/migrations/147_merge_gestionnaire_into_gerant_gare.sql`** 
 - Suppression du rôle legacy `gestionnaire_gare` ; fonctions RPC/RLS unifiées sur `gerant_gare`.
 - Front : accès dashboards gare (accueil, nav, seller `vendeur_gare`), équipe gérant via `GareTeamPanel`.
 
+## Lot 148 — Caisse guichet vendeur_gare et gares assignées
+
+Fichier : **`supabase/migrations/148_vendeur_gare_station_cash_gares.sql`** — statut : **à déployer**
+
+- `resolve_seller_company_id` / `can_operate_station_cash` : incluent `vendeur_gare`.
+- RPC `list_company_station_gares` : vendeur_gare ne voit que sa/ses gare(s) ; vendeur/chauffeur compagnie voient toutes les gares.
+- `open_station_cash_register` : contrôle gare assignée pour vendeur_gare.
+- Front : ouverture caisse pour `vendeur_gare` ; blocs accueil séparés gérant / comptable / contrôleur / guichet.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

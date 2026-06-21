@@ -13,6 +13,7 @@ import {
   BookOpenIcon,
   MapPinIcon,
   TrendingUpIcon,
+  WalletIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { motion } from "motion/react";
@@ -26,7 +27,12 @@ import { HomeActionBlock, HomeBlockSection } from "./_components/HomeActionBlock
 import ConsoleBlocksShell from "@/components/console/ConsoleBlocksShell.tsx";
 import { canViewNetworkGaresMap } from "@/lib/gares-map-audience.ts";
 import { canAccessPlatformAdminPanel, isDemarcheurRole } from "@/lib/auth/company-access.ts";
-import { hasGareDashboardAccess } from "@/lib/owner-team-roles.ts";
+import {
+  hasGareComptableDashboardAccess,
+  hasGareControleurScanAccess,
+  hasGareManagerDashboardAccess,
+  hasCompanyControleurScanAccess,
+} from "@/lib/owner-team-roles.ts";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -43,14 +49,22 @@ export default function SupabaseHome() {
     "Tibus";
 
   const showOwnerDashboard = appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
-  const showGareDashboard = hasGareDashboardAccess(appUser.roles);
+  const showGareManagerDashboard = hasGareManagerDashboardAccess(appUser.roles);
+  const showGareComptableDashboard = hasGareComptableDashboardAccess(appUser.roles);
   const showPlatformAdmin = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
   const showDemarcheurDashboard = isDemarcheurRole(appUser.roles);
   const showSellerDashboard = appUser.hasSellerRole || appUser.hasMerchantAgentApplication;
   const showThirdPartyBooking = appUser.hasThirdPartySellerRole || appUser.hasMerchantAgentApplication;
-  const showTicketScanner = ["owner", "controleur", "controleur_gare", "vendeur", "vendeur_gare", "chauffeur", "super_admin"].some((role) =>
-    appUser.roles.includes(role),
-  );
+  const showCompanyControleurScan = hasCompanyControleurScanAccess(appUser.roles);
+  const showGareControleurScan = hasGareControleurScanAccess(appUser.roles);
+  const showOwnerScan =
+    appUser.roles.includes("owner") ||
+    appUser.roles.includes("vendeur") ||
+    appUser.roles.includes("vendeur_gare") ||
+    appUser.roles.includes("chauffeur") ||
+    appUser.roles.includes("super_admin");
+  const showTicketScanner =
+    showCompanyControleurScan || showGareControleurScan || showOwnerScan;
   const showGaresMap = canViewNetworkGaresMap(appUser.roles, true);
 
   if (appUser.isLoading) {
@@ -96,14 +110,40 @@ export default function SupabaseHome() {
           {(showTicketScanner ||
             !appUser.shouldHideMerchantAgentCta ||
             showOwnerDashboard ||
-            showGareDashboard ||
+            showGareManagerDashboard ||
+            showGareComptableDashboard ||
             showSellerDashboard ||
             showThirdPartyBooking ||
             showPlatformAdmin ||
             showDemarcheurDashboard ||
             appUser.isSuperAdmin) && (
             <HomeBlockSection title={t("home.section_pro", { defaultValue: "Espace pro" })}>
-              {showTicketScanner && (
+              {showCompanyControleurScan && (
+                <HomeActionBlock
+                  to={`/${locale}/verify/scan`}
+                  title={t("home.scan_company", { defaultValue: "Contrôle embarquement (compagnie)" })}
+                  description={t("home.scan_company_desc", {
+                    defaultValue: "Scanner les billets en tant que contrôleur compagnie",
+                  })}
+                  icon={ScanLineIcon}
+                />
+              )}
+
+              {showGareControleurScan && (
+                <HomeActionBlock
+                  to={`/${locale}/verify/scan`}
+                  title={t("home.scan_gare", { defaultValue: "Contrôle embarquement (gare)" })}
+                  description={t("home.scan_gare_desc", {
+                    defaultValue: "Scanner les billets rattachés à votre gare",
+                  })}
+                  icon={ScanLineIcon}
+                />
+              )}
+
+              {showOwnerScan &&
+              !showCompanyControleurScan &&
+              !showGareControleurScan &&
+              showTicketScanner && (
                 <HomeActionBlock
                   to={`/${locale}/verify/scan`}
                   title={t("home.scan_tickets", { defaultValue: "Scanner les billets" })}
@@ -135,15 +175,27 @@ export default function SupabaseHome() {
                 />
               )}
 
-              {showGareDashboard && (
+              {showGareManagerDashboard && (
                 <HomeActionBlock
                   to={`/${locale}/owner/gare-dashboard`}
-                  title={t("home.gare_dashboard", { defaultValue: "Ma gare" })}
-                  description={t("home.gare_dashboard_desc", {
-                    defaultValue: "Équipe de gare, commissions guichet et reversements",
+                  title={t("home.gare_manager_dashboard", { defaultValue: "Ma gare (gérant)" })}
+                  description={t("home.gare_manager_dashboard_desc", {
+                    defaultValue: "Équipe, commissions guichet et programmation des départs",
                   })}
                   icon={MapPinIcon}
-                  tour="home-gare-dashboard"
+                  tour="home-gare-manager-dashboard"
+                />
+              )}
+
+              {showGareComptableDashboard && (
+                <HomeActionBlock
+                  to={`/${locale}/owner/gare-dashboard`}
+                  title={t("home.gare_comptable_dashboard", { defaultValue: "Comptabilité gare" })}
+                  description={t("home.gare_comptable_dashboard_desc", {
+                    defaultValue: "Valider les reversements caisse de votre gare",
+                  })}
+                  icon={WalletIcon}
+                  tour="home-gare-comptable-dashboard"
                 />
               )}
 

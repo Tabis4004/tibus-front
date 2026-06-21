@@ -311,8 +311,8 @@ export default function StationCashPanel({
           </div>
           ) : (
             <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">
-              L&apos;ouverture de caisse est réservée aux vendeurs. Les comptables valident les reversements
-              depuis le menu Caisse compagnie.
+              L&apos;ouverture de caisse est réservée aux vendeurs guichet (vendeur ou vendeur gare).
+              Les comptables valident les reversements depuis le menu Caisse compagnie ou Ma gare.
             </p>
           )
         ) : (
