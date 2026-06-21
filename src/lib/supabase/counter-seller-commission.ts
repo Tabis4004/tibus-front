@@ -37,7 +37,7 @@ export async function listCounterCommissionTiersSupabase(
     p_gare_id: gareId ?? null,
   });
   if (error) throw error;
-  return (data ?? []).map((row) => mapTier(row as Record<string, unknown>));
+  return (data ?? []).map((row: any) => mapTier(row as Record<string, unknown>));
 }
 
 export async function upsertCounterCommissionTierSupabase(input: {
