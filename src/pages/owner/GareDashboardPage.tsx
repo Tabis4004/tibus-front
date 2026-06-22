@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { CalendarIcon, RouteIcon, MapPinIcon } from "lucide-react";
+import { CalendarIcon, RouteIcon, MapPinIcon, ScanLineIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -12,11 +12,14 @@ import {
   isGareCashValidatorRole,
   isGareManagerRole,
 } from "@/lib/owner-team-roles.ts";
+import { roleDashboardPath } from "@/lib/gare-role-routing.ts";
 import { resolveUserGareIdSupabase } from "@/lib/supabase/gare-team.ts";
 import { supabase } from "@/lib/supabase";
 import GareTeamPanel from "./_components/GareTeamPanel.tsx";
 import CounterCommissionTiersPanel from "./_components/CounterCommissionTiersPanel.tsx";
 import StationCashReversalsPanel from "@/pages/company/_components/StationCashReversalsPanel.tsx";
+
+export type GareDashboardVariant = "gerant" | "comptable" | "controleur";
 
 type GareSummary = {
   id: string;
@@ -25,7 +28,18 @@ type GareSummary = {
   companyId: string | null;
 };
 
-export default function GareDashboardPage() {
+function canAccessVariant(
+  variant: GareDashboardVariant,
+  roles: readonly string[],
+): boolean {
+  if (roles.includes("owner") || roles.includes("super_admin")) return true;
+  if (variant === "gerant") return roles.some((role) => isGareManagerRole(role));
+  if (variant === "comptable") return roles.some((role) => isGareCashValidatorRole(role));
+  if (variant === "controleur") return roles.includes("controleur_gare");
+  return false;
+}
+
+export default function GareDashboardPage({ variant }: { variant: GareDashboardVariant }) {
   const { t } = useTranslation("owner");
   const { lng } = useParams<{ lng: string }>();
   const locale = lng ?? "fr";
@@ -36,7 +50,7 @@ export default function GareDashboardPage() {
 
   const canManageTeam = appUser.roles.some((role) => isGareManagerRole(role));
   const canValidateCash = appUser.roles.some((role) => isGareCashValidatorRole(role));
-  const isComptableGare = appUser.roles.includes("comptable_gare");
+  const allowed = canAccessVariant(variant, appUser.roles);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +98,19 @@ export default function GareDashboardPage() {
     };
   }, [t]);
 
+  if (!appUser.isReady) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-28 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return <Navigate to={`/${locale}`} replace />;
+  }
+
   if (gare === undefined) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -104,21 +131,51 @@ export default function GareDashboardPage() {
     );
   }
 
+  const titleKey =
+    variant === "comptable"
+      ? "gare.comptable_dashboard_title"
+      : variant === "controleur"
+        ? "gare.controleur_dashboard_title"
+        : "gare.gerant_dashboard_title";
+
+  const titleDefault =
+    variant === "comptable"
+      ? "Comptabilité gare"
+      : variant === "controleur"
+        ? "Contrôle gare"
+        : "Ma gare (gérant)";
+
+  const descKey =
+    variant === "comptable"
+      ? "gare.comptable_dashboard_desc"
+      : variant === "controleur"
+        ? "gare.controleur_dashboard_desc"
+        : "gare.gerant_dashboard_desc";
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">{t("gare.dashboard_title")}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {t(titleKey, { defaultValue: titleDefault })}
+        </h1>
         <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1.5">
           <MapPinIcon className="w-3.5 h-3.5" />
           {gare.name}
           {gare.city ? ` · ${gare.city}` : ""}
         </p>
-        {isComptableGare ? (
-          <p className="text-xs text-muted-foreground mt-1">{t("gare.comptable_hint")}</p>
-        ) : null}
+        <p className="text-xs text-muted-foreground mt-1">
+          {t(descKey, {
+            defaultValue:
+              variant === "comptable"
+                ? "Validez les reversements caisse de cette gare."
+                : variant === "controleur"
+                  ? "Contrôlez l'embarquement pour votre gare."
+                  : "Équipe, commissions guichet et programmation des départs.",
+          })}
+        </p>
       </div>
 
-      {canManageTeam ? (
+      {variant === "gerant" && canManageTeam ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Button asChild variant="outline" className="h-auto py-4 justify-start">
             <Link to={`/${locale}/owner/trips`}>
@@ -135,7 +192,16 @@ export default function GareDashboardPage() {
         </div>
       ) : null}
 
-      {canValidateCash ? (
+      {variant === "controleur" ? (
+        <Button asChild className="h-auto py-4 justify-start w-full sm:w-auto">
+          <Link to={`/${locale}/verify/scan`}>
+            <ScanLineIcon className="w-4 h-4 mr-2 shrink-0" />
+            {t("gare.controleur_link_scan", { defaultValue: "Ouvrir le scanner QR" })}
+          </Link>
+        </Button>
+      ) : null}
+
+      {variant === "comptable" && canValidateCash ? (
         <StationCashReversalsPanel
           companyId={companyId}
           gareId={gare.id}
@@ -143,9 +209,28 @@ export default function GareDashboardPage() {
         />
       ) : null}
 
-      {canManageTeam ? <GareTeamPanel gareId={gare.id} /> : null}
-      {canManageTeam ? (
+      {variant === "gerant" && canValidateCash ? (
+        <StationCashReversalsPanel
+          companyId={companyId}
+          gareId={gare.id}
+          canValidate={canValidateCash}
+        />
+      ) : null}
+
+      {variant === "gerant" && canManageTeam ? <GareTeamPanel gareId={gare.id} /> : null}
+      {variant === "gerant" && canManageTeam ? (
         <CounterCommissionTiersPanel companyId={companyId} gareId={gare.id} />
+      ) : null}
+
+      {variant === "comptable" && appUser.roles.includes("gerant_gare") ? (
+        <p className="text-xs text-muted-foreground">
+          {t("gare.also_gerant_link", {
+            defaultValue: "Vous êtes aussi gérant :",
+          })}{" "}
+          <Link to={roleDashboardPath(locale, "gerant_gare")} className="underline">
+            {t("gare.gerant_dashboard_title", { defaultValue: "Ma gare (gérant)" })}
+          </Link>
+        </p>
       ) : null}
     </div>
   );

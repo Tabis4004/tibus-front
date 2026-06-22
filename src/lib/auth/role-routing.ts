@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { roleDashboardPath } from "@/lib/gare-role-routing.ts";
 
 function normalizeRoleForUi(role: string): string {
   if (role === "super_admin") return "superadmin";
@@ -54,10 +55,11 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   const role = resolveDashboardRole(roles);
 
   if (role === "owner") return `/${locale}/owner`;
-  if (role === "gerant_gare" || role === "gestionnaire_gare" || role === "comptable_gare") {
-    return `/${locale}/owner/gare-dashboard`;
+  if (role === "gerant_gare" || role === "gestionnaire_gare") {
+    return roleDashboardPath(locale, "gerant_gare");
   }
-  if (role === "controleur_gare") return `/${locale}/verify/scan`;
+  if (role === "comptable_gare") return roleDashboardPath(locale, "comptable_gare");
+  if (role === "controleur_gare") return roleDashboardPath(locale, "controleur_gare");
   if (role === "super_admin" || role === "admin_pays") return `/${locale}/admin`;
   if (role === "demarcheur") return `/${locale}/admin/demarcheur`;
   if (
@@ -70,9 +72,8 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   ) {
     return `/${locale}/seller`;
   }
-  if (role === "comptable_compagnie" || role === "controleur") {
-    return `/${locale}/owner/trips`;
-  }
+  if (role === "comptable_compagnie") return `/${locale}/owner/trips`;
+  if (role === "controleur") return roleDashboardPath(locale, "controleur");
   return `/${locale}`;
 }
 

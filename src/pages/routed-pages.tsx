@@ -71,6 +71,8 @@ import CompanySalesPage from "./owner/CompanySalesPage.tsx";
 import CashRegisterPage from "./owner/CashRegisterPage.tsx";
 import GareManagerCommissionsPage from "./owner/GareManagerCommissionsPage.tsx";
 import GareDashboardPage from "./owner/GareDashboardPage.tsx";
+import GareDashboardRedirectPage from "./owner/GareDashboardRedirectPage.tsx";
+import CompanyControleurDashboardPage from "./owner/CompanyControleurDashboardPage.tsx";
 import CounterCommissionsPage from "./owner/CounterCommissionsPage.tsx";
 import ColisSettingsPage from "./owner/ColisSettingsPage.tsx";
 import LoyaltyPage from "./owner/LoyaltyPage.tsx";
@@ -309,7 +311,23 @@ export function OwnerGareManagerCommissions() {
 }
 
 export function OwnerGareDashboard() {
-  return supabaseOnlyPage("Ma gare", GareDashboardPage);
+  return supabaseOnlyPage("Ma gare", GareDashboardRedirectPage);
+}
+
+export function OwnerGareGerantDashboard() {
+  return supabaseOnlyPage("Ma gare (gérant)", () => <GareDashboardPage variant="gerant" />);
+}
+
+export function OwnerGareComptableDashboard() {
+  return supabaseOnlyPage("Comptabilité gare", () => <GareDashboardPage variant="comptable" />);
+}
+
+export function OwnerGareControleurDashboard() {
+  return supabaseOnlyPage("Contrôle gare", () => <GareDashboardPage variant="controleur" />);
+}
+
+export function OwnerCompanyControleurDashboard() {
+  return supabaseOnlyPage("Contrôle compagnie", CompanyControleurDashboardPage);
 }
 
 export function OwnerCounterCommissions() {

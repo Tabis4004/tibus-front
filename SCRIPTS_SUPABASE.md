@@ -537,6 +537,14 @@ Fichier : **`supabase/migrations/148_vendeur_gare_station_cash_gares.sql`** — 
 - `open_station_cash_register` : contrôle gare assignée pour vendeur_gare.
 - Front : ouverture caisse pour `vendeur_gare` ; blocs accueil séparés gérant / comptable / contrôleur / guichet.
 
+## Lot 149 — Vente guichet vendeur_gare
+
+Fichier : **`supabase/migrations/149_vendeur_gare_counter_sale.sql`** — statut : **à déployer**
+
+- RPC `can_seller_counter_sale` : owner, vendeur, chauffeur compagnie **ou** `vendeur_gare` rattaché à une gare.
+- `seller_counter_sale` : remplace le contrôle legacy « vendeurs de la compagnie » (bloquait `vendeur_gare` malgré caisse ouverte).
+- Front : `getSellerProfileSupabase` résout la compagnie via `gareId` si besoin.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

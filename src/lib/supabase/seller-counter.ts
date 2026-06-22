@@ -75,7 +75,7 @@ export async function getSellerProfileSupabase(
 
   const { data: roles, error: rolesError } = await supabase
     .from("UserRoles")
-    .select("companyId, Role(name)")
+    .select("companyId, gareId, Role(name)")
     .eq("userId", appUserId);
 
   if (rolesError) throw rolesError;
@@ -107,9 +107,24 @@ export async function getSellerProfileSupabase(
     return Boolean(row.companyId) && (name === "vendeur" || name === "vendeur_gare" || name === "chauffeur" || name === "owner");
   });
 
-  const companyId = (companySellerRow?.companyId ?? sellerRoles.find((row) => row.companyId)?.companyId) as
+  const gareSellerRow = sellerRoles.find((row) => {
+    const name = roleNameFromJoin(row.Role as { name: string } | { name: string }[] | null);
+    return name === "vendeur_gare" && Boolean(row.gareId);
+  });
+
+  let companyId = (companySellerRow?.companyId ?? sellerRoles.find((row) => row.companyId)?.companyId) as
     | string
     | undefined;
+
+  if (!companyId && gareSellerRow?.gareId) {
+    const { data: gareRow, error: gareError } = await supabase
+      .from("Gares")
+      .select("companyId")
+      .eq("id", gareSellerRow.gareId as string)
+      .maybeSingle();
+    if (gareError) throw gareError;
+    companyId = (gareRow?.companyId as string | undefined) ?? undefined;
+  }
 
   let company: SellerCompany | null = null;
   if (companyId) {
@@ -128,7 +143,7 @@ export async function getSellerProfileSupabase(
     }
   }
 
-  const canSellDirect = Boolean(companySellerRow);
+  const canSellDirect = Boolean(companySellerRow || gareSellerRow);
   const canReserveWithGateway = roleNames.some((name) =>
     ["vendeur_independant", "vendeur_reseau", "vendeur_master"].includes(name),
   );

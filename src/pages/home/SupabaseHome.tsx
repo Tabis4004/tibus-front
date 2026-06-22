@@ -33,6 +33,7 @@ import {
   hasGareManagerDashboardAccess,
   hasCompanyControleurScanAccess,
 } from "@/lib/owner-team-roles.ts";
+import { roleDashboardPath } from "@/lib/gare-role-routing.ts";
 
 export default function SupabaseHome() {
   const { lng } = useParams<{ lng: string }>();
@@ -120,10 +121,10 @@ export default function SupabaseHome() {
             <HomeBlockSection title={t("home.section_pro", { defaultValue: "Espace pro" })}>
               {showCompanyControleurScan && (
                 <HomeActionBlock
-                  to={`/${locale}/verify/scan`}
+                  to={roleDashboardPath(locale, "controleur")}
                   title={t("home.scan_company", { defaultValue: "Contrôle embarquement (compagnie)" })}
                   description={t("home.scan_company_desc", {
-                    defaultValue: "Scanner les billets en tant que contrôleur compagnie",
+                    defaultValue: "Tableau de bord contrôleur compagnie — scan et départs",
                   })}
                   icon={ScanLineIcon}
                 />
@@ -131,10 +132,10 @@ export default function SupabaseHome() {
 
               {showGareControleurScan && (
                 <HomeActionBlock
-                  to={`/${locale}/verify/scan`}
+                  to={roleDashboardPath(locale, "controleur_gare")}
                   title={t("home.scan_gare", { defaultValue: "Contrôle embarquement (gare)" })}
                   description={t("home.scan_gare_desc", {
-                    defaultValue: "Scanner les billets rattachés à votre gare",
+                    defaultValue: "Tableau de bord contrôleur de votre gare",
                   })}
                   icon={ScanLineIcon}
                 />
@@ -177,7 +178,7 @@ export default function SupabaseHome() {
 
               {showGareManagerDashboard && (
                 <HomeActionBlock
-                  to={`/${locale}/owner/gare-dashboard`}
+                  to={roleDashboardPath(locale, "gerant_gare")}
                   title={t("home.gare_manager_dashboard", { defaultValue: "Ma gare (gérant)" })}
                   description={t("home.gare_manager_dashboard_desc", {
                     defaultValue: "Équipe, commissions guichet et programmation des départs",
@@ -189,7 +190,7 @@ export default function SupabaseHome() {
 
               {showGareComptableDashboard && (
                 <HomeActionBlock
-                  to={`/${locale}/owner/gare-dashboard`}
+                  to={roleDashboardPath(locale, "comptable_gare")}
                   title={t("home.gare_comptable_dashboard", { defaultValue: "Comptabilité gare" })}
                   description={t("home.gare_comptable_dashboard_desc", {
                     defaultValue: "Valider les reversements caisse de votre gare",
@@ -201,7 +202,7 @@ export default function SupabaseHome() {
 
               {showSellerDashboard && (
                 <HomeActionBlock
-                  to={`/${locale}/seller`}
+                  to={roleDashboardPath(locale, "vendeur_gare")}
                   title={
                     showThirdPartyBooking
                       ? ts("seller_dashboard", { defaultValue: "Seller Dashboard" })

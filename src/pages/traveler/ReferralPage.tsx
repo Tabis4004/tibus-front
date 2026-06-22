@@ -1,34 +1,64 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { CopyIcon, GiftIcon, Share2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { useSupabaseAuth } from "@/components/providers/supabase-auth";
+import { useAppUser } from "@/hooks/use-app-user.ts";
 import {
   getMyReferralProfileSupabase,
   recordReferralShareSupabase,
   type ReferralProfile,
 } from "@/lib/supabase/platform-loyalty.ts";
+import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 export default function ReferralPage() {
   const { t } = useTranslation("traveler");
   const { lng } = useParams<{ lng: string }>();
+  const locale = lng ?? "fr";
+  const { session, isLoading, isBootstrapping } = useSupabaseAuth();
+  const appUser = useAppUser();
   const [profile, setProfile] = useState<ReferralProfile | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
+    if (isLoading || isBootstrapping || !appUser.isReady) return;
+
+    if (!session) {
+      setProfile({ authenticated: false });
+      setLoadError(null);
+      return;
+    }
+
+    setProfile(null);
+    setLoadError(null);
+
     void getMyReferralProfileSupabase()
-      .then(setProfile)
-      .catch(() => setProfile({ authenticated: false }));
-  }, []);
+      .then((next) => {
+        setProfile(next);
+        if (!next.authenticated) {
+          setLoadError(
+            t("referral.profile_unavailable", {
+              defaultValue: "Profil parrainage indisponible pour ce compte.",
+            }),
+          );
+        }
+      })
+      .catch((err) => {
+        setLoadError(supabaseErrorMessage(err, "Chargement parrainage impossible"));
+        setProfile({ authenticated: false });
+      });
+  }, [session, isLoading, isBootstrapping, appUser.isReady, t]);
 
   const referralLink = useMemo(() => {
     if (!profile?.referralCode) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return `${origin}/${lng ?? "fr"}?ref=${profile.referralCode}`;
-  }, [lng, profile?.referralCode]);
+    return `${origin}/${locale}?ref=${profile.referralCode}`;
+  }, [locale, profile?.referralCode]);
 
   const copyLink = async () => {
     if (!referralLink) return;
@@ -73,15 +103,27 @@ export default function ReferralPage() {
     }
   };
 
-  if (!profile) {
+  if (isLoading || isBootstrapping || !appUser.isReady || !profile) {
     return <Skeleton className="h-64 w-full max-w-lg mx-auto" />;
   }
 
-  if (!profile.authenticated) {
+  if (!session || !profile.authenticated) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-16">
-        {t("referral.login_required", { defaultValue: "Connectez-vous pour accéder au parrainage." })}
-      </p>
+      <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-3">
+        <p className="text-sm text-muted-foreground">
+          {loadError ??
+            t("referral.login_required", {
+              defaultValue: "Connectez-vous pour accéder au parrainage.",
+            })}
+        </p>
+        {!session ? (
+          <Button asChild className="cursor-pointer">
+            <Link to={`/${locale}/auth/login`}>
+              {t("referral.login_cta", { defaultValue: "Se connecter" })}
+            </Link>
+          </Button>
+        ) : null}
+      </div>
     );
   }
 
@@ -96,6 +138,14 @@ export default function ReferralPage() {
           })}
         </p>
       </div>
+
+      {!profile.platformActive ? (
+        <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+          {t("referral.program_inactive", {
+            defaultValue: "Le programme fidélité plateforme est actuellement désactivé.",
+          })}
+        </p>
+      ) : null}
 
       <Card>
         <CardHeader className="pb-2">

@@ -44,6 +44,10 @@ import {
   OwnerCashRegister,
   OwnerGareManagerCommissions,
   OwnerGareDashboard,
+  OwnerGareGerantDashboard,
+  OwnerGareComptableDashboard,
+  OwnerGareControleurDashboard,
+  OwnerCompanyControleurDashboard,
   OwnerCounterCommissions,
   OwnerColisSettings,
   OwnerExpenses,
@@ -136,6 +140,10 @@ function AppShell() {
                   <Route path="cash-register" element={<OwnerCashRegister />} />
                   <Route path="gare-manager-commissions" element={<OwnerGareManagerCommissions />} />
                   <Route path="gare-dashboard" element={<OwnerGareDashboard />} />
+                  <Route path="gare/gerant" element={<OwnerGareGerantDashboard />} />
+                  <Route path="gare/comptable" element={<OwnerGareComptableDashboard />} />
+                  <Route path="gare/controleur" element={<OwnerGareControleurDashboard />} />
+                  <Route path="controleur" element={<OwnerCompanyControleurDashboard />} />
                   <Route path="counter-commissions" element={<OwnerCounterCommissions />} />
                   <Route path="expenses" element={<OwnerExpenses />} />
                   <Route path="income-statement" element={<OwnerIncomeStatement />} />

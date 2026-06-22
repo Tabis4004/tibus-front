@@ -8,6 +8,7 @@ import { ThemeProvider } from "./theme.tsx";
 import { Toaster } from "../ui/sonner.tsx";
 import { TooltipProvider } from "../ui/tooltip.tsx";
 import { OfflineSyncProvider } from "@/hooks/use-offline-sync.tsx";
+import ReferralBootstrap from "@/components/referral/ReferralBootstrap.tsx";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -31,6 +32,7 @@ export function DefaultProviders({ children }: { children: React.ReactNode }) {
     return (
       <SupabaseAuthProvider>
         <AppUserProvider>
+          <ReferralBootstrap />
           <AppShell>{children}</AppShell>
         </AppUserProvider>
       </SupabaseAuthProvider>

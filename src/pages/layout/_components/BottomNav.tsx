@@ -7,7 +7,12 @@ import { useTranslation } from "react-i18next";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAppUser } from "@/hooks/use-app-user.ts";
 import { resolveUserHomePath } from "@/lib/auth/role-routing.ts";
-import { hasGareDashboardAccess } from "@/lib/owner-team-roles.ts";
+import { resolveGareBottomNavDashboardPath } from "@/lib/gare-role-routing.ts";
+import {
+  hasGareComptableDashboardAccess,
+  hasGareControleurScanAccess,
+  hasGareManagerDashboardAccess,
+} from "@/lib/owner-team-roles.ts";
 
 export default function BottomNav() {
   const { t } = useTranslation("common");
@@ -53,15 +58,27 @@ export default function BottomNav() {
 
   const gareLinks = [
     { to: homePath, icon: HomeIcon, label: t("nav.home") },
-    { to: `/${locale}/owner/gare-dashboard`, icon: LayoutDashboardIcon, label: t("nav.dashboard") },
+    {
+      to: resolveGareBottomNavDashboardPath(locale, appUser.roles),
+      icon: LayoutDashboardIcon,
+      label: t("nav.dashboard"),
+    },
   ];
 
   const controleurGareLinks = [
     { to: homePath, icon: HomeIcon, label: t("nav.home") },
-    { to: `/${locale}/verify/scan`, icon: ScanLineIcon, label: t("nav.scan", { defaultValue: "Contrôle" }) },
+    {
+      to: resolveGareBottomNavDashboardPath(locale, appUser.roles),
+      icon: ScanLineIcon,
+      label: t("nav.scan", { defaultValue: "Contrôle" }),
+    },
   ];
 
-  const hasGareNav = isSupabaseAuth() && hasGareDashboardAccess(appUser.roles);
+  const hasGareNav =
+    isSupabaseAuth() &&
+    (hasGareManagerDashboardAccess(appUser.roles) ||
+      hasGareComptableDashboardAccess(appUser.roles) ||
+      hasGareControleurScanAccess(appUser.roles));
 
   const links =
     dashboardRole === "owner"

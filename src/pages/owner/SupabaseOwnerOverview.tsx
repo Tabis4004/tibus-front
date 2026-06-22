@@ -27,7 +27,8 @@ import OwnerConsoleModules, {
   OwnerProfileCard,
 } from "./_components/OwnerConsoleModules.tsx";
 import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
-import { hasGareDashboardAccess, isGareStaffOnlyConsoleUser } from "@/lib/owner-team-roles.ts";
+import { resolvePrimaryGareStaffDashboardPath } from "@/lib/gare-role-routing.ts";
+import { isGareStaffOnlyConsoleUser } from "@/lib/owner-team-roles.ts";
 
 export default function SupabaseOwnerOverview() {
   const { t } = useTranslation("owner");
@@ -50,9 +51,7 @@ export default function SupabaseOwnerOverview() {
   useEffect(() => {
     if (!appUser.isReady) return;
     if (!isGareStaffOnlyConsoleUser(appUser.roles)) return;
-    if (hasGareDashboardAccess(appUser.roles)) {
-      navigate(`/${lng ?? "fr"}/owner/gare-dashboard`, { replace: true });
-    }
+    navigate(resolvePrimaryGareStaffDashboardPath(lng ?? "fr", appUser.roles), { replace: true });
   }, [appUser.isReady, appUser.roles, lng, navigate]);
 
   useEffect(() => {
