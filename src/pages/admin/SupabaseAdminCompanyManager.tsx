@@ -292,7 +292,6 @@ export default function SupabaseAdminCompanyManager() {
 
       <PayAtStationPanel
         companyId={company.id}
-        companyName={company.name}
         readOnly={!canManageModules}
         showMsgEditor={isSuperAdmin}
       />
