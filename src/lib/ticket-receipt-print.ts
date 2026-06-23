@@ -56,6 +56,9 @@ export type TicketReceiptInput = {
   companyInfo?: SellerCompanyReceiptInfo;
   boardingMessage?: string;
   lng?: string;
+  /** Option "Payer en gare" */
+  isStationBooking?: boolean;
+  stationDueAmount?: number; // M — montant billet à régler en gare
 };
 
 export type ThermalPaperWidth = "80mm" | "56mm";
@@ -187,6 +190,24 @@ export function buildTicketReceiptLines(
     { text: `Date: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, size: "small" },
   );
 
+  // ─── Mention "Payer en gare" (imprimante thermique) ───
+  if (input.isStationBooking) {
+    lines.push(
+      { text: sep },
+      { text: "*** RECU DE RESERVATION ***", align: "center", bold: true },
+      { text: "Ceci est un recu de reservation.", align: "center", size: "small" },
+      { text: "Le montant du a la compagnie est", align: "center", size: "small" },
+      { text: "a regler en gare de depart.", align: "center", size: "small" },
+    );
+    if (input.stationDueAmount && input.stationDueAmount > 0) {
+      lines.push({
+        text: `Montant gare: ${input.trip.currency} ${input.stationDueAmount.toLocaleString()}`,
+        align: "center",
+        bold: true,
+      });
+    }
+  }
+
   const boarding = input.boardingMessage ?? companyInfo?.boardingMessage;
   if (boarding) {
     lines.push({ text: sep }, { text: `! ${boarding}`, size: "small" });
@@ -283,6 +304,8 @@ export function buildTicketReceiptPdfData(input: TicketReceiptInput): ReceiptDat
     totalPrice: input.totalPrice,
     issuedAt: fmt(new Date().toISOString(), "dd/MM/yyyy HH:mm"),
     verifyUrl: buildVerifyUrl(input),
+    isStationBooking: input.isStationBooking,
+    stationDueAmount: input.stationDueAmount,
   };
 }
 

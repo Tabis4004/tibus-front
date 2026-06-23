@@ -46,6 +46,9 @@ export type ReceiptData = {
   /** Meta */
   issuedAt: string;
   verifyUrl: string;
+  /** Option "Payer en gare" */
+  isStationBooking?: boolean;
+  stationDueAmount?: number;  // M — montant billet à régler en gare
 };
 
 const PRIMARY_COLOR: [number, number, number] = [75, 0, 130]; // Deep purple
@@ -272,6 +275,43 @@ export async function generateReceiptPDF(data: ReceiptData, format: ReceiptForma
   doc.text(`${data.currency} ${data.totalPrice.toLocaleString()}`, pageWidth - margin - 4, y + (isA5 ? 5.5 : 7), { align: "right" });
 
   y += isA5 ? 12 : 16;
+
+  // ─── Mention "Payer en gare" (si activée) ───
+  if (data.isStationBooking) {
+    const AMBER: [number, number, number] = [180, 100, 0];
+    const AMBER_BG: [number, number, number] = [255, 248, 220];
+    doc.setFillColor(...AMBER_BG);
+    doc.roundedRect(margin, y, contentWidth, isA5 ? 18 : 22, 1, 1, "F");
+    doc.setDrawColor(...AMBER);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, y, contentWidth, isA5 ? 18 : 22, 1, 1, "S");
+
+    // Titre
+    doc.setTextColor(...AMBER);
+    doc.setFontSize(isA5 ? 7.5 : 9);
+    doc.setFont("helvetica", "bold");
+    doc.text("⚠  REÇU DE RÉSERVATION", margin + 3, y + (isA5 ? 5 : 6));
+
+    // Ligne 1
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(isA5 ? 6.5 : 8);
+    doc.text(
+      "Ceci est un reçu de réservation à payer dans la gare du départ.",
+      margin + 3,
+      y + (isA5 ? 10 : 12),
+    );
+
+    // Ligne 2 — montant M si disponible
+    if (data.stationDueAmount && data.stationDueAmount > 0) {
+      doc.text(
+        `Montant dû à la compagnie : ${data.currency} ${data.stationDueAmount.toLocaleString()}`,
+        margin + 3,
+        y + (isA5 ? 14.5 : 18),
+      );
+    }
+
+    y += isA5 ? 22 : 28;
+  }
 
   // ─── Boarding message ───
   if (data.boardingMessage) {
