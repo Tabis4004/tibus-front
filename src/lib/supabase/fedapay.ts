@@ -31,6 +31,12 @@ export type InitializeFedaPayParams = {
   paymentCountryId?: string;
   successUrl: string;
   errorUrl: string;
+  /** Option "Payer en gare" */
+  isStationBooking?: boolean;
+  stationDueAmount?: number;
+  stationReceiptTitle?: string;
+  stationReceiptLine1?: string;
+  stationReceiptLine2?: string;
 };
 
 export type InitializeFedaPayResult = {

@@ -5,6 +5,7 @@ import {
   ArrowRightIcon,
   CreditCardIcon,
   Loader2Icon,
+  MapPinIcon,
   ShieldCheckIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,6 +43,14 @@ import {
   getTravelerPaymentNoticeSupabase,
   type TravelerPaymentNotice,
 } from "@/lib/supabase/traveler-payment-notice.ts";
+import {
+  getPayAtStationConfigSupabase,
+  calculateStationBookingFeeSupabase,
+  getPayAtStationReceiptMsgSupabase,
+  DEFAULT_STATION_RECEIPT_MSG,
+  type StationBookingFee,
+  type PayAtStationReceiptMsg,
+} from "@/lib/supabase/pay-at-station.ts";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
 
 function fmt(iso: string, pattern: string) {
@@ -71,6 +80,12 @@ function PaymentSetupInner() {
     DEFAULT_TRAVELER_PAYMENT_NOTICE,
   );
   const [paying, setPaying] = useState(false);
+
+  // ── Pay-at-station state ──
+  const [isStationMode, setIsStationMode]           = useState(false);
+  const [stationFee, setStationFee]                 = useState<StationBookingFee | null>(null);
+  const [stationFeeLoading, setStationFeeLoading]   = useState(false);
+  const [receiptMsg, setReceiptMsg]                 = useState<PayAtStationReceiptMsg>(DEFAULT_STATION_RECEIPT_MSG);
 
   const isGeniusPayCheckout = activeGateway === "geniuspay";
 
@@ -134,6 +149,22 @@ function PaymentSetupInner() {
       .catch(() => setActiveGateway("geniuspay"));
   }, []);
 
+  // ── Vérifier si la compagnie a activé "Payer en gare" ──
+  useEffect(() => {
+    if (!trip?.companyId) return;
+    void getPayAtStationConfigSupabase(trip.companyId)
+      .then((cfg) => setIsStationMode(cfg.payAtStation))
+      .catch(() => setIsStationMode(false));
+  }, [trip?.companyId]);
+
+  // ── Charger le message du reçu si mode station ──
+  useEffect(() => {
+    if (!isStationMode) return;
+    void getPayAtStationReceiptMsgSupabase()
+      .then(setReceiptMsg)
+      .catch(() => setReceiptMsg(DEFAULT_STATION_RECEIPT_MSG));
+  }, [isStationMode]);
+
   const nominalAmount = useMemo(() => {
     if (!trip) return 0;
     return Math.max(
@@ -145,61 +176,90 @@ function PaymentSetupInner() {
     );
   }, [draft, trip]);
 
+  // ── Calcul du montant selon le mode ──
   useEffect(() => {
-    if (!trip?.companyId) {
+    if (!trip?.companyId || !paymentCountryId || checkoutNetwork === "unknown") {
       setPaymentBreakdown(null);
-      setPaymentPreviewError(null);
-      return;
-    }
-
-    if (!paymentCountryId) {
-      setPaymentBreakdown(null);
-      setPaymentPreviewError(null);
-      return;
-    }
-
-    if (checkoutNetwork === "unknown") {
-      setPaymentBreakdown(null);
+      setStationFee(null);
       setPaymentPreviewError(null);
       return;
     }
 
     let cancelled = false;
     setPaymentPreviewLoading(true);
+    setStationFeeLoading(true);
     setPaymentPreviewError(null);
 
-    calculateTravelerPaymentSupabase({
-      nominalAmount,
-      companyId: trip.companyId,
-      countryId: paymentCountryId,
-      gateway: activeGateway,
-      method: "mobile_money",
-      network: checkoutNetwork,
-    })
-      .then((breakdown) => {
-        if (!cancelled) setPaymentBreakdown(breakdown);
+    if (isStationMode) {
+      // Mode gare : calculer uniquement les frais (X+Y+Z+F)
+      calculateStationBookingFeeSupabase({
+        nominalAmount,
+        companyId: trip.companyId,
+        countryId: paymentCountryId,
+        gateway:   activeGateway,
+        method:    "mobile_money",
+        network:   checkoutNetwork,
       })
-      .catch((err) => {
-        if (!cancelled) {
-          setPaymentBreakdown(null);
-          setPaymentPreviewError(
-            err instanceof Error ? err.message : "Calcul du montant impossible",
-          );
-        }
+        .then((fee) => {
+          if (!cancelled) {
+            setStationFee(fee);
+            setPaymentBreakdown(null);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setStationFee(null);
+            setPaymentPreviewError(
+              err instanceof Error ? err.message : "Calcul des frais impossible",
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setPaymentPreviewLoading(false);
+            setStationFeeLoading(false);
+          }
+        });
+    } else {
+      // Mode normal : paiement complet
+      calculateTravelerPaymentSupabase({
+        nominalAmount,
+        companyId:  trip.companyId,
+        countryId:  paymentCountryId,
+        gateway:    activeGateway,
+        method:     "mobile_money",
+        network:    checkoutNetwork,
       })
-      .finally(() => {
-        if (!cancelled) setPaymentPreviewLoading(false);
-      });
+        .then((breakdown) => {
+          if (!cancelled) {
+            setPaymentBreakdown(breakdown);
+            setStationFee(null);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setPaymentBreakdown(null);
+            setPaymentPreviewError(
+              err instanceof Error ? err.message : "Calcul du montant impossible",
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setPaymentPreviewLoading(false);
+            setStationFeeLoading(false);
+          }
+        });
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [
     trip?.companyId,
     nominalAmount,
     paymentCountryId,
     checkoutNetwork,
     activeGateway,
+    isStationMode,
   ]);
 
   const persistDraft = () => {
@@ -256,24 +316,30 @@ function PaymentSetupInner() {
       persistDraft();
 
       const baseUrl = window.location.origin;
-      const successUrl = `${baseUrl}/${lng}/payment/verify?reservationId=${reservationId}&gateway=${activeGateway}`;
-      const errorUrl = `${baseUrl}/${lng}/payment/verify?status=failed&reservationId=${reservationId}&gateway=${activeGateway}`;
+      const successUrl = `${baseUrl}/${lng}/payment/verify?reservationId=${reservationId}&gateway=${activeGateway}&stationBooking=${isStationMode}`;
+      const errorUrl   = `${baseUrl}/${lng}/payment/verify?status=failed&reservationId=${reservationId}&gateway=${activeGateway}`;
 
       const { checkoutUrl } = await initializePaymentSupabase({
         reservationId,
-        passengerName: draft.passengerName.trim(),
-        passengerPhone: phone,
-        seatNumber: draft.selectedSeat ?? undefined,
-        promoId: draft.promoId,
-        discountAmount: draft.discountAmount,
-        loyaltyPointsRedeemed: draft.loyaltyPointsRedeemed,
-        loyaltyDiscountAmount: draft.loyaltyDiscountAmount,
-        platformLoyaltyPointsRedeemed: draft.platformLoyaltyPointsRedeemed,
-        platformLoyaltyDiscountAmount: draft.platformLoyaltyDiscountAmount,
+        passengerName:                   draft.passengerName.trim(),
+        passengerPhone:                  phone,
+        seatNumber:                      draft.selectedSeat ?? undefined,
+        promoId:                         draft.promoId,
+        discountAmount:                  draft.discountAmount,
+        loyaltyPointsRedeemed:           draft.loyaltyPointsRedeemed,
+        loyaltyDiscountAmount:           draft.loyaltyDiscountAmount,
+        platformLoyaltyPointsRedeemed:   draft.platformLoyaltyPointsRedeemed,
+        platformLoyaltyDiscountAmount:   draft.platformLoyaltyDiscountAmount,
         paymentCountryId,
-        paymentNetwork: checkoutNetwork,
+        paymentNetwork:                  checkoutNetwork,
         successUrl,
         errorUrl,
+        // Champs pay-at-station transmis pour que la confirmation génère le bon ticket
+        isStationBooking:                isStationMode || undefined,
+        stationDueAmount:                isStationMode ? nominalAmount : undefined,
+        stationReceiptTitle:             isStationMode ? receiptMsg.title : undefined,
+        stationReceiptLine1:             isStationMode ? receiptMsg.line1 : undefined,
+        stationReceiptLine2:             isStationMode ? receiptMsg.line2 : undefined,
       });
 
       window.location.href = checkoutUrl;
@@ -282,6 +348,11 @@ function PaymentSetupInner() {
       setPaying(false);
     }
   };
+
+  // ── Montant affiché selon le mode ──
+  const displayAmount = isStationMode
+    ? (stationFee?.totalOnlineAmount ?? 0)
+    : (paymentBreakdown?.totalAmount ?? nominalAmount);
 
   if (!reservationId) {
     return (
@@ -335,13 +406,36 @@ function PaymentSetupInner() {
         </p>
       </div>
 
-      <div className="rounded-xl border p-4 space-y-3 bg-muted/20">
-        <div className="flex items-start gap-2">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <p className="text-sm leading-snug">{paymentNotice.infoLine}</p>
+      {/* Bandeau "Payer en gare" */}
+      {isStationMode && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold text-sm">
+            <MapPinIcon className="w-4 h-4 shrink-0" />
+            Réservation — paiement en gare
+          </div>
+          <p className="text-sm text-amber-700 dark:text-amber-400 leading-snug">
+            {receiptMsg.line1}
+          </p>
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+            {receiptMsg.line2}{" "}
+            <strong>{trip.currency} {nominalAmount.toLocaleString()}</strong> — réglé en gare.
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-500">
+            Vous payez maintenant uniquement les frais de service et de traitement.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">{paymentNotice.paragraph1}</p>
-      </div>
+      )}
+
+      {/* Notice paiement normal */}
+      {!isStationMode && (
+        <div className="rounded-xl border p-4 space-y-3 bg-muted/20">
+          <div className="flex items-start gap-2">
+            <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <p className="text-sm leading-snug">{paymentNotice.infoLine}</p>
+          </div>
+          <p className="text-sm text-muted-foreground">{paymentNotice.paragraph1}</p>
+        </div>
+      )}
 
       <div className="rounded-xl border p-4 space-y-4">
         <div className="space-y-1 text-sm">
@@ -443,9 +537,11 @@ function PaymentSetupInner() {
             {checkoutNetwork !== "unknown"
               ? paymentNetworkLabel(checkoutNetwork, lng ?? "fr")
               : "à choisir"}
-            {paymentBreakdown
-              ? ` · total ${paymentBreakdown.totalAmount.toLocaleString()} ${trip.currency}`
-              : ""}
+            {isStationMode && stationFee
+              ? ` · frais ${stationFee.totalOnlineAmount.toLocaleString()} ${trip.currency}`
+              : paymentBreakdown
+                ? ` · total ${paymentBreakdown.totalAmount.toLocaleString()} ${trip.currency}`
+                : ""}
             . Vous finalisez sur la page GeniusPay (geniuspay.ci).
           </p>
         ) : null}
@@ -457,17 +553,23 @@ function PaymentSetupInner() {
           </p>
         ) : null}
 
+        {/* Récapitulatif montant */}
         <div className="rounded-lg border bg-background p-3 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium text-muted-foreground">
-              Total à payer
+              {isStationMode ? "Frais à payer maintenant" : "Total à payer"}
             </p>
             <p className="text-2xl font-black text-primary">
-              {paymentPreviewLoading
+              {paymentPreviewLoading || stationFeeLoading
                 ? "..."
-                : `${trip.currency} ${(paymentBreakdown?.totalAmount ?? nominalAmount).toLocaleString()}`}
+                : `${trip.currency} ${displayAmount.toLocaleString()}`}
             </p>
-            {paymentBreakdown ? (
+            {isStationMode && stationFee ? (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Frais plateforme + gateway uniquement · Billet{" "}
+                {trip.currency} {nominalAmount.toLocaleString()} réglé en gare
+              </p>
+            ) : paymentBreakdown ? (
               <p className="text-[11px] text-muted-foreground mt-1">
                 Billet {nominalAmount.toLocaleString()} {trip.currency}
                 {paymentBreakdown.platformMarginPercent > 0
@@ -512,6 +614,7 @@ function PaymentSetupInner() {
           disabled={
             paying ||
             paymentPreviewLoading ||
+            stationFeeLoading ||
             !paymentCountryId ||
             checkoutNetwork === "unknown" ||
             Boolean(phoneCountryMismatch)
@@ -524,7 +627,7 @@ function PaymentSetupInner() {
             </>
           ) : (
             <>
-              Payer maintenant
+              {isStationMode ? "Payer les frais et réserver" : "Payer maintenant"}
               <ArrowRightIcon className="w-4 h-4" />
             </>
           )}

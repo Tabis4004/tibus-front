@@ -545,6 +545,13 @@ Fichier : **`supabase/migrations/149_vendeur_gare_counter_sale.sql`** — statut
 - `seller_counter_sale` : remplace le contrôle legacy « vendeurs de la compagnie » (bloquait `vendeur_gare` malgré caisse ouverte).
 - Front : `getSellerProfileSupabase` résout la compagnie via `gareId` si besoin.
 
+## Lot 150 — Parrainage : fix SELECT FOR UPDATE
+
+Fichier : **`supabase/migrations/150_fix_referral_profile_volatile.sql`** — statut : **à déployer**
+
+- `get_my_referral_profile` : `STABLE` → `VOLATILE` (génère le code parrain via `ensure_user_referral_code`).
+- Corrige l’erreur prod « cannot execute SELECT FOR UPDATE in a read-only transaction » sur `/traveler/referral`.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**
