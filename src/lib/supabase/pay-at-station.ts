@@ -11,14 +11,18 @@ import { supabase } from "@/lib/supabase";
 import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import type { PaymentGateway, PaymentMethod, PaymentNetwork } from "@/config/commission.ts";
 
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+
 export type PayAtStationConfig = {
   payAtStation: boolean;
 };
 
 export type StationBookingFee = {
-  nominalAmount: number;
-  totalOnlineAmount: number;
-  stationDueAmount: number;
+  nominalAmount: number;      // M — prix billet, à payer en gare
+  totalOnlineAmount: number;  // X + Y + Z + F — payé en ligne maintenant
+  stationDueAmount: number;   // Alias de M, pour affichage ticket
   isStationBooking: true;
 };
 
@@ -29,11 +33,15 @@ export type PayAtStationReceiptMsg = {
   updatedAt?: string | null;
 };
 
-export DEFAULT_STATION_RECEIPT_MSG: PayAtStationReceiptMsg = {
+export const DEFAULT_STATION_RECEIPT_MSG: PayAtStationReceiptMsg = {
   title: "REÇU DE RÉSERVATION",
   line1: "Ceci est un reçu de réservation à payer dans la gare du départ.",
   line2: "Montant dû à la compagnie :",
 };
+
+// ─────────────────────────────────────────────
+// Normalisation
+// ─────────────────────────────────────────────
 
 function normalizeConfig(raw: unknown): PayAtStationConfig {
   const r = (raw ?? {}) as Record<string, unknown>;
@@ -59,12 +67,16 @@ function normalizeReceiptMsg(raw: unknown): PayAtStationReceiptMsg {
   if (!raw || typeof raw !== "object") return DEFAULT_STATION_RECEIPT_MSG;
   const r = raw as Record<string, unknown>;
   return {
-    t  String(r.title     ?? DEFAULT_STATION_RECEIPT_MSG.title),
+    title:     String(r.title     ?? DEFAULT_STATION_RECEIPT_MSG.title),
     line1:     String(r.line1     ?? DEFAULT_STATION_RECEIPT_MSG.line1),
     line2:     String(r.line2     ?? DEFAULT_STATION_RECEIPT_MSG.line2),
     updatedAt: r.updatedAt ? String(r.updatedAt) : null,
   };
 }
+
+// ─────────────────────────────────────────────
+// Lecture config compagnie
+// ─────────────────────────────────────────────
 
 export async function getPayAtStationConfigSupabase(
   companyId: string,
@@ -75,6 +87,10 @@ export async function getPayAtStationConfigSupabase(
   if (error) throw error;
   return normalizeConfig(data);
 }
+
+// ─────────────────────────────────────────────
+// Calcul des frais en ligne (X+Y+Z+F sans M)
+// ─────────────────────────────────────────────
 
 export async function calculateStationBookingFeeSupabase(input: {
   nominalAmount: number;
@@ -98,6 +114,10 @@ export async function calculateStationBookingFeeSupabase(input: {
   return normalizeStationFee(data);
 }
 
+// ─────────────────────────────────────────────
+// Activation / désactivation (admin plateforme)
+// ─────────────────────────────────────────────
+
 export async function setPayAtStationConfigSupabase(
   companyId: string,
   enabled: boolean,
@@ -118,7 +138,12 @@ export async function setPayAtStationConfigSupabase(
   }).catch(() => undefined);
 }
 
-export async function getPayAtStationReceiptMsgSupabase(): Promise<PayAtStatieceiptMsg> {
+// ─────────────────────────────────────────────
+// Message du reçu — éditable par le superadmin
+// Stocké dans PlatformSettings key = "pay_at_station_receipt_msg"
+// ─────────────────────────────────────────────
+
+export async function getPayAtStationReceiptMsgSupabase(): Promise<PayAtStationReceiptMsg> {
   const { data, error } = await supabase
     .from("PlatformSettings")
     .select("value, updatedAt")
@@ -136,10 +161,7 @@ export async function upsertPayAtStationReceiptMsgSupabase(
   const { error } = await supabase
     .from("PlatformSettings")
     .upsert(
-      {
-        key: "pay_at_station_receipt_msg",
-        value: JSON.stringify({ title: msg.title, line1: msg.line1, line2: msg.line2 }),
-      },
+      { key: "pay_at_station_receipt_msg", value: JSON.stringify({ title: msg.title, line1: msg.line1, line2: msg.line2 }) },
       { onConflict: "key" },
     );
   if (error) throw error;
@@ -149,5 +171,5 @@ export async function upsertPayAtStationReceiptMsgSupabase(
     action:    "update",
     summary:   `Message reçu "Payer en gare" mis à jour`,
     metadata:  { msg },
-  }).catch(() =>ndefined);
+  }).catch(() => undefined);
 }
