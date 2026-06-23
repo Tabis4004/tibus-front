@@ -161,7 +161,7 @@ export async function upsertPayAtStationReceiptMsgSupabase(
   const { error } = await supabase
     .from("PlatformSettings")
     .upsert(
-      { key: "pay_at_station_receipt_msg", value: JSON.stringify({ title: msg.title, line1: msg.line1, line2: msg.line2 }) },
+      { key: "pay_at_station_receipt_msg", value: JSON.stringify({ title: msg.title, line1: msg.line1, line2: msg.line2 }), updatedAt: new Date().toISOString() },
       { onConflict: "key" },
     );
   if (error) throw error;
