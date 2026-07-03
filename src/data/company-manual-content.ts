@@ -654,5 +654,7 @@ export const COMPANY_MANUAL_SECTIONS: ManualSection[] = [
 ];
 
 export function canAccessCompanyManual(roles: string[], isSuperAdmin: boolean): boolean {
-  return isSuperAdmin || roles.includes("owner");
+  // admin_pays inclus : la nav (getManualNavItems) lui montre ce manuel comme
+  // référence pour former/accompagner les owners de son pays.
+  return isSuperAdmin || roles.includes("owner") || roles.includes("admin_pays");
 }
