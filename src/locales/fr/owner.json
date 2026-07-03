@@ -93,6 +93,7 @@
   "stations.add_location_title": "Ajouter un emplacement",
   "stations.city": "Ville",
   "stations.country": "Pays",
+  "stations.country_placeholder": "Choisir un pays",
   "stations.location_added": "Emplacement ajouté !",
   "stations.location_error": "Impossible d'ajouter l'emplacement.",
   "stations.station": "Gare",

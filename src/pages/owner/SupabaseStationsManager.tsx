@@ -44,7 +44,12 @@ import {
 } from "@/components/ui/empty.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
-import { listCitiesSupabase } from "@/lib/supabase/geography.ts";
+import {
+  listCitiesSupabase,
+  listCompanyAvailableCountriesSupabase,
+  getCityCountryIdSupabase,
+  type CountryRow,
+} from "@/lib/supabase/geography.ts";
 import {
   listOwnerStationsSupabase,
   listOwnerTeamSupabase,
@@ -91,6 +96,11 @@ function StationDialog({
   const [saving, setSaving] = useState(false);
   const [team, setTeam] = useState<SupabaseOwnerTeamMember[]>([]);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [countries, setCountries] = useState<CountryRow[]>([]);
+  // Pays sélectionné dans le formulaire — pas forcément celui de la compagnie
+  // si un pays d'opération transfrontalier a été autorisé (voir manuel owner,
+  // section "Payer en gare" / admin_grant_company_operating_country).
+  const [selectedCountryId, setSelectedCountryId] = useState<string | null>(countryId);
 
   const {
     register,
@@ -110,15 +120,32 @@ function StationDialog({
     },
   });
 
+  // Liste des pays où cette compagnie peut créer des gares (pays d'origine +
+  // pays autorisés). S'il n'y en a qu'un, le sélecteur pays reste masqué.
   useEffect(() => {
-    if (!countryId) {
+    void listCompanyAvailableCountriesSupabase(companyId)
+      .then(setCountries)
+      .catch(() => setCountries([]));
+  }, [companyId]);
+
+  // En édition, pré-sélectionner le pays réel de la gare (utile si elle a
+  // été créée dans un pays différent du pays d'origine de la compagnie).
+  useEffect(() => {
+    if (!station?.cityId) return;
+    void getCityCountryIdSupabase(station.cityId)
+      .then((id) => { if (id) setSelectedCountryId(id); })
+      .catch(() => undefined);
+  }, [station?.cityId]);
+
+  useEffect(() => {
+    if (!selectedCountryId) {
       setCities([]);
       return;
     }
-    void listCitiesSupabase(countryId)
+    void listCitiesSupabase(selectedCountryId)
       .then((rows) => setCities(rows.map((row) => ({ id: row._id, name: row.name }))))
       .catch(() => setCities([]));
-  }, [countryId]);
+  }, [selectedCountryId]);
 
   useEffect(() => {
     if (!station) return;
@@ -179,6 +206,31 @@ function StationDialog({
               <p className="text-xs text-destructive">{errors.name.message}</p>
             )}
           </div>
+          {countries.length > 1 && (
+            <div className="space-y-1.5">
+              <Label>{t("stations.country")}</Label>
+              <Select
+                value={selectedCountryId ?? ""}
+                onValueChange={(value) => {
+                  setSelectedCountryId(value);
+                  // Le pays a changé : la ville sélectionnée ne correspond
+                  // probablement plus à la nouvelle liste de villes.
+                  setValue("cityId", "", { shouldValidate: false });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("stations.country_placeholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {countries.map((country) => (
+                    <SelectItem key={country._id} value={country._id}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>{t("stations.city")}</Label>
             <Select

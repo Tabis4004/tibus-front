@@ -93,6 +93,7 @@
   "stations.add_location_title": "Add Location",
   "stations.city": "City",
   "stations.country": "Country",
+  "stations.country_placeholder": "Choose a country",
   "stations.location_added": "Location added!",
   "stations.location_error": "Failed to add location.",
   "stations.station": "Station",
