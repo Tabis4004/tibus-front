@@ -66,6 +66,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import CityCombobox from "./_components/CityCombobox.tsx";
 
 const stationSchema = z.object({
   name: z.string().min(2, "Station name required"),
@@ -233,21 +234,23 @@ function StationDialog({
           )}
           <div className="space-y-1.5">
             <Label>{t("stations.city")}</Label>
-            <Select
+            <CityCombobox
+              cities={cities}
               value={selectedCityId}
-              onValueChange={(value) => setValue("cityId", value, { shouldValidate: true })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("stations.city_placeholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {cities.map((city) => (
-                  <SelectItem key={city.id} value={city.id}>
-                    {city.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(cityId) => setValue("cityId", cityId, { shouldValidate: true })}
+              companyId={companyId}
+              countryId={selectedCountryId}
+              countryName={
+                countries.find((country) => country._id === selectedCountryId)?.name ?? null
+              }
+              onCityCreated={(city) =>
+                setCities((current) =>
+                  current.some((c) => c.id === city.id)
+                    ? current
+                    : [...current, city].sort((a, b) => a.name.localeCompare(b.name, "fr")),
+                )
+              }
+            />
             {errors.cityId && (
               <p className="text-xs text-destructive">{t("stations.city_required")}</p>
             )}

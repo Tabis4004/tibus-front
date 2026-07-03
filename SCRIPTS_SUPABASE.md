@@ -552,6 +552,15 @@ Fichier : **`supabase/migrations/150_fix_referral_profile_volatile.sql`** — st
 - `get_my_referral_profile` : `STABLE` → `VOLATILE` (génère le code parrain via `ensure_user_referral_code`).
 - Corrige l’erreur prod « cannot execute SELECT FOR UPDATE in a read-only transaction » sur `/traveler/referral`.
 
+## Lot 157 — Autocomplete ville + création (formulaire gare)
+
+Fichier : **`supabase/migrations/157_find_or_create_city_for_gare_form.sql`** — statut : **✅ déployé (via MCP)**
+
+- Extension `unaccent` installée (schéma `extensions`).
+- RPC `find_or_create_city(companyId, countryId, name)` : déduplication insensible casse/accents, création partagée entre compagnies du pays.
+- Gardé par `manage_stations` (ou super_admin) + pays d'origine ou pays d'opération autorisé (`CompanyOperatingCountries`, lot 155).
+- Front : combobox autocomplete ville (`CityCombobox.tsx`) avec vérification externe OpenStreetMap avant création.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

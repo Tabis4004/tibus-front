@@ -40,6 +40,7 @@ import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 import CompanyFeatureModulesPanel from "./_components/CompanyFeatureModulesPanel.tsx";
 import PayAtStationPanel from "./_components/PayAtStationPanel.tsx";
 import CompanyLiveAuthorizationPanel from "./_components/CompanyLiveAuthorizationPanel.tsx";
+import CompanyOperatingCountriesPanel from "./_components/CompanyOperatingCountriesPanel.tsx";
 import StakeholderPayoutDashboardPanel from "./_components/StakeholderPayoutDashboardPanel.tsx";
 
 type CompanyOverview = {
@@ -298,6 +299,14 @@ export default function SupabaseAdminCompanyManager() {
 
       {(isSuperAdmin || isAdminPays) && companyId ? (
         <CompanyLiveAuthorizationPanel companyId={companyId} countryId={company.countryId} />
+      ) : null}
+
+      {isSuperAdmin ? (
+        <CompanyOperatingCountriesPanel
+          companyId={company.id}
+          homeCountryId={company.countryId}
+          homeCountryName={company.countryName}
+        />
       ) : null}
 
       {(isSuperAdmin ||
