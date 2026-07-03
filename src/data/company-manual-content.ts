@@ -536,6 +536,16 @@ export const COMPANY_MANUAL_SECTIONS: ManualSection[] = [
           "Hold 15 min : POST …/v1/bookings avec mode hold → POST …/confirm pour émettre le billet.",
         ],
       },
+      {
+        title: "Payer en gare — activation",
+        body: "Option qui change ce que le voyageur règle en ligne : au lieu du prix billet complet, il ne paie que les frais plateforme et gateway (X+Y+Z+F). Le prix du billet (M) reste dû en espèces à la gare de départ, et un « reçu de réservation » est émis à la place d'un billet acquitté.",
+        bullets: [
+          "Accès : page /fr/admin/company/{votre companyId} — pas encore reliée par un lien dans le menu Owner, s'y rendre directement par l'URL (l'ID de la compagnie est visible dans Mon entreprise).",
+          "Vous ne pouvez activer/désactiver cette option que pour votre propre compagnie — pas pour les autres compagnies de la plateforme.",
+          "Le texte affiché sur le reçu (titre, mention, préfixe du montant dû) est fixé par le super administrateur Tibus et s'applique à toutes les compagnies ; vous ne pouvez pas le modifier.",
+          "Une fois activée, informez votre équipe guichet : les voyageurs qui arrivent avec un reçu de réservation doivent régler M en espèces avant l'embarquement (voir le manuel vendeur, section « Payer en gare »).",
+        ],
+      },
     ],
   },
   {

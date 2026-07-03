@@ -176,8 +176,44 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
     ],
   },
   {
+    id: "pay-at-station",
+    title: "6. Reçu « Payer en gare » — encaissement à l'arrivée",
+    intro:
+      "Certaines compagnies activent l'option « Payer en gare » : le voyageur ne paie en ligne que les frais (plateforme + gateway), pas le prix du billet. Il se présente à la gare de départ avec un reçu de réservation, pas un billet acquitté. Il n'y a pas d'écran dédié pour ça dans l'application — reconnaissance visuelle et encaissement manuel avant l'embarquement.",
+    subsections: [
+      {
+        title: "Reconnaître un reçu de réservation",
+        body: "Il ressemble à un reçu normal mais porte un encart orange bien visible, différent du billet standard.",
+        bullets: [
+          "Titre « ⚠ REÇU DE RÉSERVATION » dans un encadré orange/jaune.",
+          "Mention « Ceci est un reçu de réservation à payer dans la gare du départ ».",
+          "Ligne « Montant dû à la compagnie : [devise] [montant] » — c'est le montant M à encaisser.",
+          "Le texte exact peut varier : il est personnalisable par la plateforme, mais l'encart orange et le montant dû restent toujours présents.",
+        ],
+        figure: {
+          src: "/manuel/captures/seller-real-receipt.png",
+          caption: "Repère visuel : encart orange « reçu de réservation » avec montant dû",
+        },
+      },
+      {
+        title: "Procédure à l'arrivée du voyageur",
+        body: "Avant de scanner et embarquer le passager :",
+        numbered: [
+          "Vérifiez la référence TB-… du reçu et l'identité du passager.",
+          "Encaissez en espèces exactement le montant affiché sur « Montant dû à la compagnie ».",
+          "Notez l'encaissement selon la procédure de votre compagnie (aucune validation automatique dans l'app pour cette étape).",
+          "Poursuivez ensuite avec le scan normal du billet (voir section 5 — Scanner un billet).",
+        ],
+        bullets: [
+          "En cas de doute sur le montant ou de reçu qui ne semble pas correspondre à un vrai départ, contactez votre owner ou responsable avant d'embarquer le passager.",
+          "Cette étape d'encaissement est manuelle : le scan à l'embarquement ne vérifie pas que le montant a été payé, faites-le systématiquement avant de « Marquer à bord ».",
+        ],
+      },
+    ],
+  },
+  {
     id: "sales-ledger",
-    title: "6. Journal des ventes — filtres et réimpression",
+    title: "7. Journal des ventes — filtres et réimpression",
     intro:
       "Onglet « Ventes compagnie » du tableau vendeur (vendeur compagnie). Liste tous les billets vendus ou réservés pour votre compagnie.",
     subsections: [

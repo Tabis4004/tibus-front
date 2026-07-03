@@ -128,6 +128,15 @@ export const COUNTRY_ADMIN_MANUAL_SECTIONS: ManualSection[] = [
         title: "Compagnie absente de la liste garantie",
         body: "Seules les compagnies actives du pays chargé apparaissent. Vérifiez le pays de la compagnie en base.",
       },
+      {
+        title: "Interrupteur « Payer en gare » grisé",
+        body: "Sur la fiche compagnie (/fr/admin/company/:companyId), l'option « Payer en gare » vous est affichée en lecture seule : vous voyez si elle est active et son message de reçu, mais vous ne pouvez ni l'activer ni la désactiver.",
+        bullets: [
+          "Seuls le propriétaire de la compagnie (pour sa propre compagnie) et le super administrateur peuvent basculer l'interrupteur.",
+          "Le message affiché sur le reçu de réservation est modifiable par le super administrateur uniquement (il s'applique à toutes les compagnies).",
+          "Pour toute demande d'activation, orientez la compagnie vers son propriétaire ou remontez la demande au super administrateur.",
+        ],
+      },
     ],
   },
   {
