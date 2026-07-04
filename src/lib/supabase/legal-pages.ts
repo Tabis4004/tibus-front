@@ -39,6 +39,16 @@ Tibus agit en tant qu'intermédiaire technique. La compagnie de transport reste 
 Ces conditions peuvent être mises à jour par l'administrateur de la plateforme. La version publiée sur cette page fait foi.`,
 };
 
+export const PRIVACY_POLICY_SLUG = "politique-confidentialite";
+
+export const DEFAULT_PRIVACY_POLICY_PAGE: LegalPage = {
+  slug: PRIVACY_POLICY_SLUG,
+  title: "Politique de Confidentialité",
+  content: `Tibus met en relation voyageurs, compagnies de transport et vendeurs pour la recherche, la réservation et la vente de titres de transport.
+
+Pour toute question relative à vos données personnelles : tabistibus@gmail.com — WhatsApp : +225 01 72 96 00 00`,
+};
+
 export const DEFAULT_COMPANY_OWNER_CONTRACT_PAGE: LegalPage = {
   slug: COMPANY_OWNER_CONTRACT_SLUG,
   title: "Contrat de souscription — Propriétaire de compagnie",
@@ -47,6 +57,7 @@ export const DEFAULT_COMPANY_OWNER_CONTRACT_PAGE: LegalPage = {
 
 function defaultLegalPage(slug: string): LegalPage {
   if (slug === "cgu") return DEFAULT_CGU_PAGE;
+  if (slug === PRIVACY_POLICY_SLUG) return DEFAULT_PRIVACY_POLICY_PAGE;
   if (slug === COMPANY_OWNER_CONTRACT_SLUG) return DEFAULT_COMPANY_OWNER_CONTRACT_PAGE;
   return { slug, title: slug, content: "" };
 }
@@ -100,5 +111,17 @@ export async function upsertCompanyOwnerContractPageSupabase(
 }
 
 export const COMPANY_OWNER_CONTRACT_PATH = "contrat-proprietaire-compagnie";
+
+export const PRIVACY_POLICY_PATH = "politique-confidentialite";
+
+export async function getPrivacyPolicyPageSupabase(): Promise<LegalPage> {
+  return getLegalPageSupabase(PRIVACY_POLICY_SLUG);
+}
+
+export async function upsertPrivacyPolicyPageSupabase(
+  page: Omit<LegalPage, "slug">,
+): Promise<LegalPage> {
+  return upsertLegalPageSupabase({ slug: PRIVACY_POLICY_SLUG, ...page });
+}
 
 export { COMMERCIAL_OFFER_ADMIN_URL };
