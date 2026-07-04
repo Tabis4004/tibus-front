@@ -39,6 +39,7 @@ import {
   deleteCommissionSettingSupabase,
   resolveCompanyPlatformCommission,
   upsertCommissionSettingSupabase,
+  type CommissionAmountType,
   type CommissionSetting,
 } from "@/lib/supabase/accounting.ts";
 import {
@@ -99,7 +100,12 @@ function resolveCompanyCommissionDisplay(
   settings: CommissionSetting[],
 ) {
   const resolved = resolveCompanyPlatformCommission(company, settings);
-  return { rate: resolved.rate, paidBy: resolved.paidBy };
+  return {
+    rate: resolved.rate,
+    paidBy: resolved.paidBy,
+    amountType: resolved.amountType,
+    fixedAmount: resolved.fixedAmount,
+  };
 }
 
 type TabId = AdminTabId;
@@ -557,7 +563,10 @@ export default function SupabaseAdminPanel() {
                         {company.isActive ? tc("status.active") : tc("status.inactive")}
                       </Badge>
                       <Badge variant="secondary">
-                        {commission.rate}% ·{" "}
+                        {commission.amountType === "fixed"
+                          ? `${commission.fixedAmount} ${company.currency ?? "XOF"}`
+                          : `${commission.rate}%`}
+                        {" · "}
                         {commission.paidBy === "traveler"
                           ? t("commissions.paid_by_traveler_short", { defaultValue: "voyageur" })
                           : t("commissions.paid_by_company_short", { defaultValue: "compagnie" })}
@@ -999,11 +1008,26 @@ function CommissionSettingsManager({
   const { t: tc } = useTranslation("common");
   const countrySettings = settings.filter((setting) => setting.scope === "country");
   const companySettings = settings.filter((setting) => setting.scope === "company");
-  const [drafts, setDrafts] = useState<Record<string, { rate: string; paidBy: "company" | "traveler" }>>({});
+  const [drafts, setDrafts] = useState<
+    Record<
+      string,
+      {
+        rate: string;
+        paidBy: "company" | "traveler";
+        amountType: CommissionAmountType;
+        fixedAmount: string;
+      }
+    >
+  >({});
   const [companyId, setCompanyId] = useState<string>("__none");
   const [companyRate, setCompanyRate] = useState("0");
   const [companyPaidBy, setCompanyPaidBy] = useState<"company" | "traveler">("company");
+  const [companyAmountType, setCompanyAmountType] = useState<CommissionAmountType>("percentage");
+  const [companyFixedAmount, setCompanyFixedAmount] = useState("0");
   const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const currencyForSetting = (setting: CommissionSetting) =>
+    companies.find((company) => company.id === setting.companyId)?.currency ?? "XOF";
 
   const settingKey = (setting: CommissionSetting) =>
     `${setting.scope}:${setting.companyId ?? setting.countryId}`;
@@ -1012,11 +1036,18 @@ function CommissionSettingsManager({
     drafts[settingKey(setting)] ?? {
       rate: String(setting.rate),
       paidBy: setting.paidBy,
+      amountType: setting.amountType,
+      fixedAmount: String(setting.fixedAmount),
     };
 
   const setDraft = (
     setting: CommissionSetting,
-    patch: Partial<{ rate: string; paidBy: "company" | "traveler" }>,
+    patch: Partial<{
+      rate: string;
+      paidBy: "company" | "traveler";
+      amountType: CommissionAmountType;
+      fixedAmount: string;
+    }>,
   ) => {
     const key = settingKey(setting);
     setDrafts((current) => ({
@@ -1031,11 +1062,24 @@ function CommissionSettingsManager({
   const handleSave = async (setting: CommissionSetting) => {
     const key = settingKey(setting);
     const draft = draftFor(setting);
-    const rate = Number(draft.rate);
+    // Le scope "country" reste toujours en pourcentage (fonctionnalité abandonnée
+    // pour le montant fixe au niveau pays, sur décision explicite).
+    const amountType: CommissionAmountType = setting.scope === "country" ? "percentage" : draft.amountType;
 
-    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
-      toast.error(t("commissions.invalid_rate", { defaultValue: "Le taux doit etre entre 0 et 100." }));
-      return;
+    let rate = 0;
+    let fixedAmount = 0;
+    if (amountType === "fixed") {
+      fixedAmount = Number(draft.fixedAmount);
+      if (!Number.isFinite(fixedAmount) || fixedAmount < 0) {
+        toast.error(t("commissions.invalid_fixed_amount", { defaultValue: "Le montant fixe doit etre positif." }));
+        return;
+      }
+    } else {
+      rate = Number(draft.rate);
+      if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+        toast.error(t("commissions.invalid_rate", { defaultValue: "Le taux doit etre entre 0 et 100." }));
+        return;
+      }
     }
 
     setSavingKey(key);
@@ -1046,16 +1090,19 @@ function CommissionSettingsManager({
         companyId: setting.scope === "company" ? setting.companyId : null,
         rate,
         paidBy: draft.paidBy,
+        amountType,
+        fixedAmount,
       });
       toast.success(t("commissions.updated"));
+      const summaryValue = amountType === "fixed" ? `${fixedAmount} ${currencyForSetting(setting)}` : `${rate}%`;
       void recordPlatformAuditSupabase({
         moduleKey:
           setting.scope === "country"
             ? "admin.commissions.country_rates"
             : "admin.commissions.company_overrides",
         action: "update",
-        summary: `Commission ${setting.countryName ?? setting.companyName ?? ""} → ${rate}% (${draft.paidBy})`,
-        metadata: { scope: setting.scope, rate, paidBy: draft.paidBy },
+        summary: `Commission ${setting.countryName ?? setting.companyName ?? ""} → ${summaryValue} (${draft.paidBy})`,
+        metadata: { scope: setting.scope, rate, paidBy: draft.paidBy, amountType, fixedAmount },
       });
       setDrafts((current) => {
         const next = { ...current };
@@ -1097,11 +1144,21 @@ function CommissionSettingsManager({
 
   const handleAddCompanyOverride = async () => {
     if (companyId === "__none") return;
-    const rate = Number(companyRate);
 
-    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
-      toast.error(t("commissions.invalid_rate", { defaultValue: "Le taux doit etre entre 0 et 100." }));
-      return;
+    let rate = 0;
+    let fixedAmount = 0;
+    if (companyAmountType === "fixed") {
+      fixedAmount = Number(companyFixedAmount);
+      if (!Number.isFinite(fixedAmount) || fixedAmount < 0) {
+        toast.error(t("commissions.invalid_fixed_amount", { defaultValue: "Le montant fixe doit etre positif." }));
+        return;
+      }
+    } else {
+      rate = Number(companyRate);
+      if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+        toast.error(t("commissions.invalid_rate", { defaultValue: "Le taux doit etre entre 0 et 100." }));
+        return;
+      }
     }
 
     setSavingKey("company:new");
@@ -1112,18 +1169,23 @@ function CommissionSettingsManager({
         companyId,
         rate,
         paidBy: companyPaidBy,
+        amountType: companyAmountType,
+        fixedAmount,
       });
       toast.success(t("commissions.updated"));
       const company = companies.find((row) => row.id === companyId);
+      const summaryValue = companyAmountType === "fixed" ? `${fixedAmount} ${company?.currency ?? "XOF"}` : `${rate}%`;
       void recordPlatformAuditSupabase({
         moduleKey: "admin.commissions.company_overrides",
         action: "create",
-        summary: `Exception compagnie ${company?.name ?? companyId} → ${rate}% (${companyPaidBy})`,
-        metadata: { companyId, rate, paidBy: companyPaidBy },
+        summary: `Exception compagnie ${company?.name ?? companyId} → ${summaryValue} (${companyPaidBy})`,
+        metadata: { companyId, rate, paidBy: companyPaidBy, amountType: companyAmountType, fixedAmount },
       });
       setCompanyId("__none");
       setCompanyRate("0");
       setCompanyPaidBy("company");
+      setCompanyAmountType("percentage");
+      setCompanyFixedAmount("0");
       onChanged();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("commissions.update_error"));
@@ -1235,7 +1297,7 @@ function CommissionSettingsManager({
             })}
           </p>
 
-          <div className="grid gap-3 rounded-lg border bg-muted/50 p-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
+          <div className="grid gap-3 rounded-lg border bg-muted/50 p-3 md:grid-cols-[1fr_110px_140px_160px_auto] md:items-end">
             <div className="space-y-1">
               <Label>{t("commissions.company")}</Label>
               <Select value={companyId} onValueChange={setCompanyId}>
@@ -1253,16 +1315,48 @@ function CommissionSettingsManager({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>{t("commissions.rate")}</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={companyRate}
-                onChange={(event) => setCompanyRate(event.target.value)}
-              />
+              <Label>{t("commissions.amount_type", { defaultValue: "Type" })}</Label>
+              <Select
+                value={companyAmountType}
+                onValueChange={(value) => setCompanyAmountType(value === "fixed" ? "fixed" : "percentage")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">{t("commissions.type_percentage", { defaultValue: "Pourcentage" })}</SelectItem>
+                  <SelectItem value="fixed">{t("commissions.type_fixed", { defaultValue: "Montant fixe" })}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {companyAmountType === "fixed" ? (
+              <div className="space-y-1">
+                <Label>
+                  {t("commissions.fixed_amount", { defaultValue: "Montant fixe" })}
+                  {" "}
+                  ({companies.find((c) => c.id === companyId)?.currency ?? "XOF"})
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={companyFixedAmount}
+                  onChange={(event) => setCompanyFixedAmount(event.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label>{t("commissions.rate")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={companyRate}
+                  onChange={(event) => setCompanyRate(event.target.value)}
+                />
+              </div>
+            )}
             <div className="space-y-1">
               <Label>{t("commissions.paid_by")}</Label>
               <Select
@@ -1299,19 +1393,43 @@ function CommissionSettingsManager({
                 const draft = draftFor(setting);
                 const key = settingKey(setting);
                 return (
-                  <div key={key} className="grid gap-3 p-3 md:grid-cols-[1fr_120px_160px_auto] md:items-end">
+                  <div key={key} className="grid gap-3 p-3 md:grid-cols-[1fr_110px_140px_160px_auto] md:items-end">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{setting.companyName}</p>
                       <p className="text-xs text-muted-foreground">{setting.countryName}</p>
                     </div>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      value={draft.rate}
-                      onChange={(event) => setDraft(setting, { rate: event.target.value })}
-                    />
+                    <Select
+                      value={draft.amountType}
+                      onValueChange={(value) => setDraft(setting, { amountType: value === "fixed" ? "fixed" : "percentage" })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percentage">{t("commissions.type_percentage", { defaultValue: "Pourcentage" })}</SelectItem>
+                        <SelectItem value="fixed">{t("commissions.type_fixed", { defaultValue: "Montant fixe" })}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {draft.amountType === "fixed" ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={draft.fixedAmount}
+                        onChange={(event) => setDraft(setting, { fixedAmount: event.target.value })}
+                        aria-label={t("commissions.fixed_amount", { defaultValue: "Montant fixe" })}
+                      />
+                    ) : (
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={draft.rate}
+                        onChange={(event) => setDraft(setting, { rate: event.target.value })}
+                        aria-label={t("commissions.rate")}
+                      />
+                    )}
                     <Select
                       value={draft.paidBy}
                       onValueChange={(value) => setDraft(setting, { paidBy: value === "traveler" ? "traveler" : "company" })}

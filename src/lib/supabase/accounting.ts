@@ -96,11 +96,14 @@ export type PlatformCommissionSummary = {
 };
 
 export type CommissionSettingScope = "country" | "company";
+export type CommissionAmountType = "percentage" | "fixed";
 
 export type ResolvedPlatformCommission = {
   rate: number;
   paidBy: "company" | "traveler";
   source: "company_setting" | "company_profile" | "default";
+  amountType: CommissionAmountType;
+  fixedAmount: number;
 };
 
 /**
@@ -122,6 +125,8 @@ export function resolveCompanyPlatformCommission(
       rate: companySetting.rate,
       paidBy: companySetting.paidBy,
       source: "company_setting",
+      amountType: companySetting.amountType,
+      fixedAmount: companySetting.fixedAmount,
     };
   }
   if (company.commissionRate != null && Number.isFinite(company.commissionRate)) {
@@ -129,12 +134,16 @@ export function resolveCompanyPlatformCommission(
       rate: company.commissionRate,
       paidBy: "traveler",
       source: "company_profile",
+      amountType: "percentage",
+      fixedAmount: 0,
     };
   }
   return {
     rate: 5,
     paidBy: "traveler",
     source: "default",
+    amountType: "percentage",
+    fixedAmount: 0,
   };
 }
 
@@ -148,6 +157,8 @@ export type CommissionSetting = {
   rate: number;
   paidBy: "company" | "traveler";
   isActive: boolean;
+  amountType: CommissionAmountType;
+  fixedAmount: number;
   source: string;
   updatedAt: string | null;
   updatedByName: string | null;
@@ -183,6 +194,8 @@ type CommissionSettingRpcRow = {
   rate: unknown;
   paid_by: unknown;
   is_active: unknown;
+  amount_type: unknown;
+  fixed_amount: unknown;
   source: unknown;
   updated_at: unknown;
   updated_by_name: unknown;
@@ -267,6 +280,8 @@ function normalizeCommissionSetting(row: CommissionSettingRpcRow): CommissionSet
     rate: numberValue(row.rate),
     paidBy: paidBy === "traveler" ? "traveler" : "company",
     isActive: Boolean(row.is_active),
+    amountType: String(row.amount_type) === "fixed" ? "fixed" : "percentage",
+    fixedAmount: numberValue(row.fixed_amount),
     source: String(row.source ?? "unset"),
     updatedAt: row.updated_at ? String(row.updated_at) : null,
     updatedByName: row.updated_by_name ? String(row.updated_by_name) : null,
@@ -364,6 +379,8 @@ export async function upsertCommissionSettingSupabase(params: {
   rate: number;
   paidBy: "company" | "traveler";
   isActive?: boolean;
+  amountType?: CommissionAmountType;
+  fixedAmount?: number;
 }): Promise<CommissionSetting | null> {
   const { data, error } = await supabase.rpc("upsert_commission_setting", {
     p_scope: params.scope,
@@ -372,6 +389,8 @@ export async function upsertCommissionSettingSupabase(params: {
     p_rate: params.rate,
     p_paid_by: params.paidBy,
     p_is_active: params.isActive ?? true,
+    p_amount_type: params.amountType ?? "percentage",
+    p_fixed_amount: params.fixedAmount ?? 0,
   });
 
   if (error) throw error;
