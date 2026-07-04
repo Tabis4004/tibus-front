@@ -149,7 +149,9 @@ export function adminTabDataKeys(tab: AdminTabId, isSuperAdmin: boolean): AdminD
     case "guarantee_fund":
       return ["companies"];
     case "geography":
-      return ["countries", "cities"];
+      // Le CRUD Pays & Villes (GeographyManagerPanel) charge ses propres
+      // données avec recherche côté serveur (Cities > 1000 lignes).
+      return [];
     case "roles":
       return ["roles"];
     case "contact":

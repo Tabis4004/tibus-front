@@ -10,7 +10,6 @@ import {
   KeyIcon,
   LayoutDashboardIcon,
   LandmarkIcon,
-  MapPinIcon,
   MessageCircleIcon,
   PercentIcon,
   PencilIcon,
@@ -54,6 +53,7 @@ import {
 import {
   ContactSettingsPanel,
   GatewayFeeSettingsPanel,
+  GeographyManagerPanel,
   GuaranteeFundManager,
   InvestorPlanPanel,
   LegalPagesPanel,
@@ -833,50 +833,12 @@ export default function SupabaseAdminPanel() {
       )}
 
       {tab === "geography" && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <GlobeIcon className="w-4 h-4" />
-                {t("geo.countries")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <LoadingRows /> : errors.countries ? <p className="text-sm text-destructive">{errors.countries}</p> : (
-                <SimpleList
-                  emptyIcon={GlobeIcon}
-                  emptyTitle={t("geo.no_countries")}
-                  items={data.countries.map((country) => ({
-                    id: country.id,
-                    title: country.name,
-                    meta: country.currency ?? "",
-                  }))}
-                />
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPinIcon className="w-4 h-4" />
-                {t("geo.add_cities")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <LoadingRows /> : errors.cities ? <p className="text-sm text-destructive">{errors.cities}</p> : (
-                <SimpleList
-                  emptyIcon={MapPinIcon}
-                  emptyTitle={t("geo.no_cities", { defaultValue: "Aucune ville." })}
-                  items={data.cities.map((city) => ({
-                    id: city.id,
-                    title: city.name,
-                    meta: city.countryName ?? "",
-                  }))}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <AdminTabSuspense>
+          <GeographyManagerPanel
+            canManage={appUser.isSuperAdmin || isAdminPays}
+            onDataChanged={reloadCurrentTab}
+          />
+        </AdminTabSuspense>
       )}
 
       {tab === "geography" && <AdminTabAuditHub tab="geography" />}
@@ -1396,30 +1358,6 @@ function EmptyState({
       <Icon className="mx-auto mb-2 h-6 w-6 opacity-50" />
       <p className="font-medium text-foreground">{title}</p>
       {description && <p className="mt-1">{description}</p>}
-    </div>
-  );
-}
-
-function SimpleList({
-  emptyIcon,
-  emptyTitle,
-  items,
-}: {
-  emptyIcon: LucideIcon;
-  emptyTitle: string;
-  items: { id: string; title: string; meta: string }[];
-}) {
-  if (items.length === 0) {
-    return <EmptyState icon={emptyIcon} title={emptyTitle} description="" />;
-  }
-  return (
-    <div className="divide-y">
-      {items.map((item) => (
-        <div key={item.id} className="py-3">
-          <p className="font-medium">{item.title}</p>
-          {item.meta && <p className="text-xs text-muted-foreground">{item.meta}</p>}
-        </div>
-      ))}
     </div>
   );
 }

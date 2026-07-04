@@ -19,6 +19,9 @@ export const TravelerBookingNoticePanel = lazy(
   () => import("./_components/TravelerBookingNoticePanel.tsx"),
 );
 export const GuaranteeFundManager = lazy(() => import("./_components/GuaranteeFundManager.tsx"));
+export const GeographyManagerPanel = lazy(
+  () => import("./_components/GeographyManagerPanel.tsx"),
+);
 export const ContactSettingsPanel = lazy(() => import("./_components/ContactSettingsPanel.tsx"));
 export const PlatformLoyaltySettingsPanel = lazy(
   () => import("./_components/PlatformLoyaltySettingsPanel.tsx"),
