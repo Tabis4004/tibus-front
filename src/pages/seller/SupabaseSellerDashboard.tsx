@@ -866,9 +866,10 @@ export default function SupabaseSellerDashboard() {
   // Visiteur non connecté : sans session, profil/trajets/caisse ne se
   // chargent jamais (effet coupé par `if (!appUserId) return`), ce qui
   // laissait la page bloquée sur les squelettes (écran "blanc" WebView).
-  // On redirige vers la connexion dès que l'auth a fini de s'initialiser.
+  // On renvoie vers la landing page publique (infos + bouton Se connecter)
+  // dès que l'auth a fini de s'initialiser.
   if (!authLoading && !authBootstrapping && !appUserId) {
-    return <Navigate to={`/${lng ?? "fr"}/auth/login`} replace />;
+    return <Navigate to={`/${lng ?? "fr"}`} replace />;
   }
 
   if (appUser.isLoading || profile === undefined || trips === undefined || cashSession === undefined || featureModulesLoading) {
