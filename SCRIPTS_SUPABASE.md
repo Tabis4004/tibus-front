@@ -561,6 +561,16 @@ Fichier : **`supabase/migrations/157_find_or_create_city_for_gare_form.sql`** �
 - Gardé par `manage_stations` (ou super_admin) + pays d'origine ou pays d'opération autorisé (`CompanyOperatingCountries`, lot 155).
 - Front : combobox autocomplete ville (`CityCombobox.tsx`) avec vérification externe OpenStreetMap avant création.
 
+## Lot 159 — Admin pays limité à SON pays (écritures)
+
+Fichier : **`supabase/migrations/159_admin_pays_country_scoped_writes.sql`** — statut : **✅ déployé (via MCP)**
+
+- `Companies` INSERT : admin_pays limité à son pays (avant : `has_global_droit`, tous pays).
+- `Countries` : INSERT/DELETE super_admin seulement ; UPDATE limité au pays de l'admin.
+- `Cities` : écriture limitée aux villes du pays de l'admin.
+- Lecture publique inchangée (voyageurs : tous pays, villes, compagnies actives, voyages).
+- Déjà scoped avant ce lot : UPDATE Companies, activation/live/arrêt résa, modules, commissions, fonds de garantie.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**
