@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import {
   ArrowLeftIcon,
@@ -700,7 +700,11 @@ function SaleForm({
 export default function SupabaseSellerDashboard() {
   const { t } = useTranslation("seller");
   const { lng } = useParams<{ lng: string }>();
-  const { appUserId } = useSupabaseAuth();
+  const {
+    appUserId,
+    isLoading: authLoading,
+    isBootstrapping: authBootstrapping,
+  } = useSupabaseAuth();
   const appUser = useAppUser();
   const [profile, setProfile] = useState<SellerProfileSupabase | null | undefined>(undefined);
   const [trips, setTrips] = useState<SellerCounterTrip[] | undefined>(undefined);
@@ -858,6 +862,14 @@ export default function SupabaseSellerDashboard() {
     return () => window.removeEventListener("tibus:station-cash-refresh", onCashRefresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUserId, profile]);
+
+  // Visiteur non connecté : sans session, profil/trajets/caisse ne se
+  // chargent jamais (effet coupé par `if (!appUserId) return`), ce qui
+  // laissait la page bloquée sur les squelettes (écran "blanc" WebView).
+  // On redirige vers la connexion dès que l'auth a fini de s'initialiser.
+  if (!authLoading && !authBootstrapping && !appUserId) {
+    return <Navigate to={`/${lng ?? "fr"}/auth/login`} replace />;
+  }
 
   if (appUser.isLoading || profile === undefined || trips === undefined || cashSession === undefined || featureModulesLoading) {
     return (
