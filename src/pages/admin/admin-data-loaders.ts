@@ -278,7 +278,17 @@ async function loadUsers(hasDbSuperAdmin: boolean): Promise<Pick<AdminDataSlice,
 async function loadCompanies(scope?: {
   countryId?: string | null;
   recruitedByUserId?: string | null;
+  enforce?: "country" | "recruiter" | null;
 }): Promise<Pick<AdminDataSlice, "companies">> {
+  // Fail-closed : un admin pays sans pays (ou un démarcheur sans profil)
+  // ne doit voir AUCUNE compagnie, plutôt que toutes.
+  if (scope?.enforce === "country" && !scope.countryId) {
+    return { companies: [] };
+  }
+  if (scope?.enforce === "recruiter" && !scope.recruitedByUserId) {
+    return { companies: [] };
+  }
+
   let query = supabase
     .from("Companies")
     .select("id, name, countryId, isActive, commissionRate, managerName, recruitedByUserId, Countries(name, currency)")
@@ -459,6 +469,7 @@ type LoaderContext = {
   hasDbSuperAdmin: boolean;
   countryId?: string | null;
   recruitedByUserId?: string | null;
+  enforce?: "country" | "recruiter" | null;
 };
 
 const LOADER_BY_KEY: Record<
@@ -471,6 +482,7 @@ const LOADER_BY_KEY: Record<
     loadCompanies({
       countryId: context.countryId,
       recruitedByUserId: context.recruitedByUserId,
+      enforce: context.enforce,
     }),
   countries: () => loadCountries(),
   cities: () => loadCities(),
@@ -486,7 +498,11 @@ export async function loadAdminTabData(
   tab: AdminTabId,
   isSuperAdmin: boolean,
   hasDbSuperAdmin: boolean,
-  scope?: { countryId?: string | null; recruitedByUserId?: string | null },
+  scope?: {
+    countryId?: string | null;
+    recruitedByUserId?: string | null;
+    enforce?: "country" | "recruiter" | null;
+  },
 ): Promise<{ data: Partial<AdminDataSlice>; errors: Partial<Record<AdminDataKey, string>> }> {
   const keys = [...new Set(adminTabDataKeys(tab, isSuperAdmin))];
   const data: Partial<AdminDataSlice> = {};
@@ -495,6 +511,7 @@ export async function loadAdminTabData(
     hasDbSuperAdmin,
     countryId: scope?.countryId,
     recruitedByUserId: scope?.recruitedByUserId,
+    enforce: scope?.enforce,
   };
 
   await Promise.all(

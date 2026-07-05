@@ -123,12 +123,12 @@ export default function SupabaseAdminCompanyManager() {
       }).length;
 
       if (!cancelled) {
+        // Fail-closed : un admin pays ne voit que les compagnies de SON pays.
+        // Profil sans pays ou compagnie sans pays => accès refusé.
         if (
           !isSuperAdmin &&
           isAdminPays &&
-          profile?.countryId &&
-          countryId &&
-          profile.countryId !== countryId
+          (!profile?.countryId || !countryId || profile.countryId !== countryId)
         ) {
           setCompany(null);
           return;

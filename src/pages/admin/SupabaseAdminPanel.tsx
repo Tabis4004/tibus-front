@@ -183,18 +183,33 @@ export default function SupabaseAdminPanel() {
 
   const adminDataScope = useMemo(() => {
     if (appUser.isSuperAdmin) {
-      return { countryId: null as string | null, recruitedByUserId: null as string | null };
+      return {
+        countryId: null as string | null,
+        recruitedByUserId: null as string | null,
+        enforce: null as "country" | "recruiter" | null,
+      };
+    }
+    // Fail-closed : admin_pays limité à SON pays (aucune compagnie si le
+    // profil n'a pas de pays), démarcheur limité à SES recrutements.
+    if (isAdminPays) {
+      return {
+        countryId: adminCountryId,
+        recruitedByUserId: null as string | null,
+        enforce: "country" as const,
+      };
     }
     if (isDemarcheur) {
       return {
         countryId: null as string | null,
         recruitedByUserId: appUser.profile?.id ?? null,
+        enforce: "recruiter" as const,
       };
     }
-    if (isAdminPays) {
-      return { countryId: adminCountryId, recruitedByUserId: null as string | null };
-    }
-    return { countryId: null as string | null, recruitedByUserId: null as string | null };
+    return {
+      countryId: null as string | null,
+      recruitedByUserId: null as string | null,
+      enforce: null as "country" | "recruiter" | null,
+    };
   }, [adminCountryId, appUser.isSuperAdmin, appUser.profile?.id, isAdminPays, isDemarcheur]);
 
   useEffect(() => {
