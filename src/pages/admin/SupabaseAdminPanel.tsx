@@ -179,7 +179,10 @@ export default function SupabaseAdminPanel() {
 
   const isAdminPays = isAdminPaysRole(appUser.roles);
   const isDemarcheur = isDemarcheurRole(appUser.roles);
-  const adminCountryId = appUser.profile?.countryId ?? null;
+  // Pays du rôle admin_pays (UserRoles.countryId) : c'est lui qui fait foi
+  // pour les droits en base, pas le pays du profil — un utilisateur peut être
+  // admin pays d'un autre pays que son pays d'origine.
+  const adminCountryId = appUser.adminPaysCountryIds[0] ?? null;
 
   const adminDataScope = useMemo(() => {
     if (appUser.isSuperAdmin) {

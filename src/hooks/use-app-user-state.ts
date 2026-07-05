@@ -90,6 +90,7 @@ export function useAppUserState() {
   const [profile, setProfile] = useState<AppUserProfile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [ownedCompanyIds, setOwnedCompanyIds] = useState<string[]>([]);
+  const [adminPaysCountryIds, setAdminPaysCountryIds] = useState<string[]>([]);
   const [merchantAgentApplicationStatus, setMerchantAgentApplicationStatus] = useState<
     string | null
   >(null);
@@ -116,6 +117,7 @@ export function useAppUserState() {
       setProfile(null);
       setRoles([]);
       setOwnedCompanyIds([]);
+      setAdminPaysCountryIds([]);
       setMerchantAgentApplicationStatus(null);
       setIsReady(!session);
       setIsLoading(false);
@@ -130,6 +132,7 @@ export function useAppUserState() {
       setProfile(null);
       setRoles([]);
       setOwnedCompanyIds([]);
+      setAdminPaysCountryIds([]);
       setMerchantAgentApplicationStatus(null);
     }
 
@@ -150,7 +153,7 @@ export function useAppUserState() {
 
       const { data: userRoles, error: urError } = await supabase
         .from("UserRoles")
-        .select("roleId, companyId, Role(name)")
+        .select("roleId, companyId, countryId, Role(name)")
         .eq("userId", appUserId);
 
       if (urError) throw urError;
@@ -201,6 +204,22 @@ export function useAppUserState() {
         ),
       );
 
+      // Pays du/des rôle(s) admin_pays : c'est CE pays qui fait foi pour les
+      // droits en base (has_country_role), pas celui du profil — un
+      // utilisateur peut être admin pays d'un autre pays que le sien.
+      const adminPaysCountryIds = Array.from(
+        new Set(
+          (userRoles ?? [])
+            .filter((row) => {
+              const name = roleNameFromJoin(
+                row.Role as { name: string } | { name: string }[] | null,
+              );
+              return name === "admin_pays" && Boolean(row.countryId);
+            })
+            .map((row) => row.countryId as string),
+        ),
+      );
+
       const { data: merchantAgentApplication } = await supabase
         .from("MerchantAgentApplications")
         .select("status")
@@ -229,6 +248,7 @@ export function useAppUserState() {
         setProfile(profileRow);
         setRoles(roleNames);
         setOwnedCompanyIds(ownedCompanyIds);
+        setAdminPaysCountryIds(adminPaysCountryIds);
         setMerchantAgentApplicationStatus(
           (merchantAgentApplication?.status as string | null | undefined) ?? null,
         );
@@ -241,6 +261,7 @@ export function useAppUserState() {
           setProfile(null);
           setRoles([]);
           setOwnedCompanyIds([]);
+          setAdminPaysCountryIds([]);
           setMerchantAgentApplicationStatus(null);
           setIsReady(true);
         }
@@ -288,6 +309,7 @@ export function useAppUserState() {
       profile,
       roles: effectiveRoles,
       ownedCompanyIds,
+      adminPaysCountryIds,
       hasSellerRole: hasAnyRole(effectiveRoles, SELLER_ROLE_NAMES),
       hasSellerAccess: hasAnyRole(effectiveRoles, SELLER_ACCESS_ROLE_NAMES),
       hasThirdPartySellerRole: hasAnyRole(effectiveRoles, THIRD_PARTY_SELLER_ROLE_NAMES),
@@ -310,6 +332,7 @@ export function useAppUserState() {
       refresh,
     }),
     [
+      adminPaysCountryIds,
       appUserId,
       effectiveRoles,
       error,

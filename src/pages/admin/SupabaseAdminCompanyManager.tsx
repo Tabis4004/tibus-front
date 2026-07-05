@@ -61,7 +61,7 @@ export default function SupabaseAdminCompanyManager() {
   const { lng, companyId } = useParams<{ lng: string; companyId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("common");
-  const { isSuperAdmin, isReady, profile, roles, ownedCompanyIds } = useAppUser();
+  const { isSuperAdmin, isReady, profile, roles, ownedCompanyIds, adminPaysCountryIds } = useAppUser();
   const isAdminPays = isAdminPaysRole(roles);
   const isDemarcheur = isDemarcheurRole(roles);
   const canManageModules =
@@ -123,12 +123,13 @@ export default function SupabaseAdminCompanyManager() {
       }).length;
 
       if (!cancelled) {
-        // Fail-closed : un admin pays ne voit que les compagnies de SON pays.
-        // Profil sans pays ou compagnie sans pays => accès refusé.
+        // Fail-closed : un admin pays ne voit que les compagnies du pays de
+        // son RÔLE admin_pays (UserRoles.countryId — le même critère que les
+        // droits en base), pas du pays de son profil.
         if (
           !isSuperAdmin &&
           isAdminPays &&
-          (!profile?.countryId || !countryId || profile.countryId !== countryId)
+          (!countryId || !adminPaysCountryIds.includes(countryId))
         ) {
           setCompany(null);
           return;
@@ -165,7 +166,7 @@ export default function SupabaseAdminCompanyManager() {
     return () => {
       cancelled = true;
     };
-  }, [companyId, isSuperAdmin, isAdminPays, isDemarcheur, profile?.countryId, profile?.id]);
+  }, [companyId, isSuperAdmin, isAdminPays, isDemarcheur, adminPaysCountryIds, profile?.id]);
 
   useEffect(() => {
     void listPlatformUsersForAdminSupabase(500)
@@ -310,7 +311,7 @@ export default function SupabaseAdminCompanyManager() {
       ) : null}
 
       {(isSuperAdmin ||
-        (isAdminPays && company.countryId === profile?.countryId) ||
+        (isAdminPays && !!company.countryId && adminPaysCountryIds.includes(company.countryId)) ||
         (isDemarcheur && company.recruitedByUserId === profile?.id)) ? (
         <Card>
           <CardContent className="pt-6">
