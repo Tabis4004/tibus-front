@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { RouteIcon, PlusIcon, ArrowRightIcon, TagIcon, TrashIcon } from "lucide-react";
+import { errorMessage } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -114,7 +115,7 @@ function RouteDialog({
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("routes.create_error"));
+      toast.error(errorMessage(err, t("routes.create_error")));
     } finally {
       setSaving(false);
     }
@@ -219,7 +220,7 @@ export default function SupabaseRoutesManager() {
       setRoutes(routeList);
       setStations(stationList);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("routes.create_error"));
+      toast.error(errorMessage(err, t("routes.create_error")));
       setRoutes([]);
     }
   }, [appUserId, companyId, t]);
@@ -245,7 +246,7 @@ export default function SupabaseRoutesManager() {
         ),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("routes.update_error"));
+      toast.error(errorMessage(err, t("routes.update_error")));
     } finally {
       setTogglingId(null);
     }
@@ -263,7 +264,7 @@ export default function SupabaseRoutesManager() {
       // Le serveur refuse si des réservations sont rattachées à l'itinéraire
       // (voir migration delete_owner_route) : on affiche son message précis
       // plutôt que le message générique.
-      toast.error(err instanceof Error ? err.message : t("routes.delete_error"));
+      toast.error(errorMessage(err, t("routes.delete_error")));
     } finally {
       setDeleting(false);
     }

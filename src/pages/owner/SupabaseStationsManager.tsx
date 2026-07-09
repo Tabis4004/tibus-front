@@ -42,6 +42,7 @@ import {
   EmptyDescription,
   EmptyContent,
 } from "@/components/ui/empty.tsx";
+import { errorMessage } from "@/lib/utils";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
@@ -185,7 +186,7 @@ function StationDialog({
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("stations.station_error"));
+      toast.error(errorMessage(err, t("stations.station_error")));
     } finally {
       setSaving(false);
     }
@@ -346,7 +347,7 @@ export default function SupabaseStationsManager() {
     try {
       setStations(await listOwnerStationsSupabase(appUserId, companyId));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("stations.station_error"));
+      toast.error(errorMessage(err, t("stations.station_error")));
       setStations([]);
     }
   }, [appUserId, companyId, t]);
@@ -379,7 +380,7 @@ export default function SupabaseStationsManager() {
       toast.success(t("stations.station_removed"));
       void loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("stations.delete_error"));
+      toast.error(errorMessage(err, t("stations.delete_error")));
     } finally {
       setDeleteTarget(null);
     }
