@@ -47,7 +47,7 @@ import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import {
   listCitiesSupabase,
-  listCompanyAvailableCountriesSupabase,
+  listCountriesSupabase,
   getCityCountryIdSupabase,
   type CountryRow,
 } from "@/lib/supabase/geography.ts";
@@ -122,13 +122,14 @@ function StationDialog({
     },
   });
 
-  // Liste des pays où cette compagnie peut créer des gares (pays d'origine +
-  // pays autorisés). S'il n'y en a qu'un, le sélecteur pays reste masqué.
+  // Une compagnie peut créer des gares dans n'importe quel pays disponible
+  // sur la plateforme (restriction pays levée, itinéraires transfrontaliers
+  // libres) — on liste donc tous les pays.
   useEffect(() => {
-    void listCompanyAvailableCountriesSupabase(companyId)
+    void listCountriesSupabase()
       .then(setCountries)
       .catch(() => setCountries([]));
-  }, [companyId]);
+  }, []);
 
   // En édition, pré-sélectionner le pays réel de la gare (utile si elle a
   // été créée dans un pays différent du pays d'origine de la compagnie).
@@ -208,7 +209,7 @@ function StationDialog({
               <p className="text-xs text-destructive">{errors.name.message}</p>
             )}
           </div>
-          {countries.length > 1 && (
+          {countries.length > 0 && (
             <div className="space-y-1.5">
               <Label>{t("stations.country")}</Label>
               <Select
