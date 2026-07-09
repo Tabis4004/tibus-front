@@ -303,6 +303,26 @@ function LandingPage() {
                   </Button>
                 </Link>
               </motion.div>
+
+              <motion.div
+                className="flex justify-center lg:justify-start pt-1"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                <a
+                  href="https://play.google.com/store/apps/details?id=app.onhercules.tibus"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block"
+                >
+                  <img
+                    src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+                    alt="Get it on Google Play"
+                    className="h-14 w-auto"
+                  />
+                </a>
+              </motion.div>
             </div>
 
             {/* Right: hero image */}
