@@ -27,6 +27,9 @@ export const PlatformLoyaltySettingsPanel = lazy(
   () => import("./_components/PlatformLoyaltySettingsPanel.tsx"),
 );
 export const LegalPagesPanel = lazy(() => import("./_components/LegalPagesPanel.tsx"));
+export const SupabaseLandingCmsTab = lazy(
+  () => import("./_components/SupabaseLandingCmsTab.tsx"),
+);
 export const PlatformScalingMetricsPanel = lazy(
   () => import("./_components/PlatformScalingMetricsPanel.tsx"),
 );

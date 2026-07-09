@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "convex/react";
@@ -30,6 +31,12 @@ import { AppBrand } from "@/components/brand/AppBrand.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { isSupabaseAuth } from "@/lib/auth/config";
 import { useAuth } from "@/hooks/use-auth.ts";
+import {
+  getAllLandingContentSupabase,
+  getLandingLiveStatsSupabase,
+  type LandingContentMap,
+  type LandingLiveStats,
+} from "@/lib/supabase/landing-content.ts";
 import SupabaseHome from "./home/SupabaseHome.tsx";
 import HomeDashboard from "./home/Dashboard.tsx";
 import LandingTravelSection from "./landing/LandingTravelSection.tsx";
@@ -41,14 +48,31 @@ function LandingPage() {
   const { lng } = useParams<{ lng: string }>();
   const { t } = useTranslation("common");
   const locale = lng ?? "en";
-  const cmsEnabled = !isSupabaseAuth();
+  const supabaseMode = isSupabaseAuth();
 
-  // CMS data (Convex — skipped in Supabase production to avoid Suspense hang)
-  const cmsData = useQuery(api.landingContent.getAll, cmsEnabled ? {} : "skip");
-  const liveStats = useQuery(
+  // CMS data — Convex en mode legacy, Supabase en prod (migration
+  // 161_landing_content_supabase, voir src/lib/supabase/landing-content.ts).
+  const convexCmsData = useQuery(api.landingContent.getAll, supabaseMode ? "skip" : {});
+  const convexLiveStats = useQuery(
     api.landingContent.getLiveStats,
-    cmsEnabled ? {} : "skip",
+    supabaseMode ? "skip" : {},
   );
+
+  const [supabaseCmsData, setSupabaseCmsData] = useState<LandingContentMap | undefined>(undefined);
+  const [supabaseLiveStats, setSupabaseLiveStats] = useState<LandingLiveStats | undefined>(undefined);
+
+  useEffect(() => {
+    if (!supabaseMode) return;
+    void getAllLandingContentSupabase()
+      .then(setSupabaseCmsData)
+      .catch(() => setSupabaseCmsData({}));
+    void getLandingLiveStatsSupabase()
+      .then(setSupabaseLiveStats)
+      .catch(() => setSupabaseLiveStats(undefined));
+  }, [supabaseMode]);
+
+  const cmsData = supabaseMode ? supabaseCmsData : convexCmsData;
+  const liveStats = supabaseMode ? supabaseLiveStats : convexLiveStats;
 
   // Parse CMS content with fallback defaults
   const heroContent = cmsData?.hero

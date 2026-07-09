@@ -64,6 +64,7 @@ import {
   StakeholderCommissionPanel,
   StakeholderPayoutDashboardPanel,
   SellerCommissionDashboardPanel,
+  SupabaseLandingCmsTab,
   SupabasePlansTab,
   SupabaseSubscriptionsTab,
   TpePosDiagnosticsPanel,
@@ -962,13 +963,9 @@ export default function SupabaseAdminPanel() {
 
       {tab === "landing" && (
         <>
-        <ComingSoon
-          icon={PencilIcon}
-          title={t("tabs.landing", { defaultValue: "Landing Page" })}
-          description={t("supabase_admin.landing_placeholder", {
-            defaultValue: "Le CMS Landing Page est encore branché sur Convex. Le panneau Supabase affiche ce statut au lieu d'un onglet vide.",
-          })}
-        />
+        <AdminTabSuspense>
+          <SupabaseLandingCmsTab />
+        </AdminTabSuspense>
         <AdminTabAuditHub tab="landing" />
         </>
       )}

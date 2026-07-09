@@ -1,12 +1,19 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
+import { errorMessage } from "@/lib/utils";
+import {
+  getAllLandingContentSupabase,
+  getLandingLiveStatsSupabase,
+  upsertLandingContentSupabase,
+  type LandingContentMap,
+  type LandingLiveStats,
+} from "@/lib/supabase/landing-content.ts";
+import { recordPlatformAuditSupabase } from "@/lib/supabase/platform-audit-log.ts";
 import {
   SECTION_META,
   StatBadge,
@@ -20,19 +27,49 @@ import {
   type SectionId,
 } from "./landing-cms-editors.tsx";
 
-// CMS "Landing Page" — variante Convex (legacy, VITE_AUTH_PROVIDER != supabase).
-// Voir SupabaseLandingCmsTab.tsx pour la variante en prod. Les éditeurs de
-// section sont partagés (landing-cms-editors.tsx) ; seule la source de
-// données change.
+// CMS "Landing Page" — variante Supabase (prod). Remplace le placeholder
+// "ComingSoon" affiché depuis la migration Convex -> Supabase (voir
+// migration 161_landing_content_supabase). Les éditeurs de section sont
+// partagés avec la variante Convex legacy (landing-cms-editors.tsx).
 
-export default function LandingCmsTab() {
+const SECTION_LABELS: Record<SectionId, string> = {
+  hero: "Hero",
+  stats: "Stats",
+  features_travelers: "Traveler features",
+  features_companies: "Company features",
+  testimonials: "Testimonials",
+  trust_signals: "Trust signals",
+  how_it_works: "How it works",
+  cta: "Call to action",
+};
+
+export default function SupabaseLandingCmsTab() {
   const { t } = useTranslation("admin");
-  const cmsData = useQuery(api.landingContent.getAll, {});
-  const liveStats = useQuery(api.landingContent.getLiveStats, {});
-  const updateSection = useMutation(api.landingContent.updateSection);
-
+  const [cmsData, setCmsData] = useState<LandingContentMap | undefined>(undefined);
+  const [liveStats, setLiveStats] = useState<LandingLiveStats | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>("hero");
   const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const [content, stats] = await Promise.all([
+        getAllLandingContentSupabase(),
+        getLandingLiveStatsSupabase(),
+      ]);
+      setCmsData(content);
+      setLiveStats(stats);
+    } catch (err) {
+      setLoadError(errorMessage(err, t("cms.load_error", { defaultValue: "Failed to load" })));
+      setCmsData({});
+      setLiveStats({ companies: 0, trips: 0, travelers: 0, cities: 0 });
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (cmsData === undefined || liveStats === undefined) {
     return (
@@ -44,13 +81,19 @@ export default function LandingCmsTab() {
     );
   }
 
-  const handleSave = async (section: string, content: string) => {
+  const handleSave = async (section: SectionId, content: string) => {
     setSaving(true);
     try {
-      await updateSection({ section, content });
+      await upsertLandingContentSupabase(section, content);
+      setCmsData((prev) => ({ ...(prev ?? {}), [section]: content }));
       toast.success(t("cms.saved", { defaultValue: "Section saved" }));
-    } catch {
-      toast.error(t("cms.save_error", { defaultValue: "Failed to save" }));
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.landing",
+        action: "update",
+        summary: `Section landing « ${SECTION_LABELS[section]} » mise à jour`,
+      });
+    } catch (err) {
+      toast.error(errorMessage(err, t("cms.save_error", { defaultValue: "Failed to save" })));
     } finally {
       setSaving(false);
     }
@@ -66,6 +109,9 @@ export default function LandingCmsTab() {
         <p className="text-xs text-muted-foreground">
           {t("cms.desc", { defaultValue: "Edit content displayed on the public landing page. Stats are auto-calculated from your data." })}
         </p>
+        {loadError && (
+          <p className="text-xs text-destructive">{loadError}</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Live Stats Preview */}
@@ -104,7 +150,7 @@ export default function LandingCmsTab() {
         {activeSection === "hero" && (
           <HeroEditor
             initial={cmsData.hero}
-            onSave={(c) => handleSave("hero", c)}
+            onSave={(c) => void handleSave("hero", c)}
             saving={saving}
           />
         )}
@@ -112,7 +158,7 @@ export default function LandingCmsTab() {
           <StatsEditor
             initial={cmsData.stats}
             liveStats={liveStats}
-            onSave={(c) => handleSave("stats", c)}
+            onSave={(c) => void handleSave("stats", c)}
             saving={saving}
           />
         )}
@@ -120,7 +166,7 @@ export default function LandingCmsTab() {
           <FeaturesEditor
             initial={cmsData.features_travelers}
             sectionLabel={t("cms.features_travelers", { defaultValue: "Traveler Features" })}
-            onSave={(c) => handleSave("features_travelers", c)}
+            onSave={(c) => void handleSave("features_travelers", c)}
             saving={saving}
           />
         )}
@@ -128,35 +174,35 @@ export default function LandingCmsTab() {
           <FeaturesEditor
             initial={cmsData.features_companies}
             sectionLabel={t("cms.features_companies", { defaultValue: "Company Features" })}
-            onSave={(c) => handleSave("features_companies", c)}
+            onSave={(c) => void handleSave("features_companies", c)}
             saving={saving}
           />
         )}
         {activeSection === "testimonials" && (
           <TestimonialsEditor
             initial={cmsData.testimonials}
-            onSave={(c) => handleSave("testimonials", c)}
+            onSave={(c) => void handleSave("testimonials", c)}
             saving={saving}
           />
         )}
         {activeSection === "trust_signals" && (
           <TrustSignalsEditor
             initial={cmsData.trust_signals}
-            onSave={(c) => handleSave("trust_signals", c)}
+            onSave={(c) => void handleSave("trust_signals", c)}
             saving={saving}
           />
         )}
         {activeSection === "how_it_works" && (
           <HowItWorksEditor
             initial={cmsData.how_it_works}
-            onSave={(c) => handleSave("how_it_works", c)}
+            onSave={(c) => void handleSave("how_it_works", c)}
             saving={saving}
           />
         )}
         {activeSection === "cta" && (
           <CtaEditor
             initial={cmsData.cta}
-            onSave={(c) => handleSave("cta", c)}
+            onSave={(c) => void handleSave("cta", c)}
             saving={saving}
           />
         )}
