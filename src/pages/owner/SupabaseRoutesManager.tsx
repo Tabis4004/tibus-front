@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { RouteIcon, PlusIcon, ArrowRightIcon, TagIcon } from "lucide-react";
+import { RouteIcon, PlusIcon, ArrowRightIcon, TagIcon, TrashIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -18,6 +18,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import {
   Select,
   SelectContent,
@@ -40,6 +50,7 @@ import {
   listOwnerRouteStationsSupabase,
   createOwnerRouteSupabase,
   setTrajetSchedulingActiveSupabase,
+  deleteOwnerRouteSupabase,
   type OwnerRouteOption,
   type OwnerStationOption,
 } from "@/lib/supabase/owner-trips";
@@ -194,6 +205,8 @@ export default function SupabaseRoutesManager() {
   const [stations, setStations] = useState<OwnerStationOption[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OwnerRouteOption | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!appUserId || !companyId) return;
@@ -235,6 +248,24 @@ export default function SupabaseRoutesManager() {
       toast.error(err instanceof Error ? err.message : t("routes.update_error"));
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteOwnerRouteSupabase(deleteTarget.id);
+      toast.success(t("routes.deleted"));
+      setRoutes((prev) => (prev ?? []).filter((item) => item.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      // Le serveur refuse si des réservations sont rattachées à l'itinéraire
+      // (voir migration delete_owner_route) : on affiche son message précis
+      // plutôt que le message générique.
+      toast.error(err instanceof Error ? err.message : t("routes.delete_error"));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -294,6 +325,14 @@ export default function SupabaseRoutesManager() {
                       disabled={togglingId === route.id}
                       onCheckedChange={(checked) => void handleSchedulingToggle(route, checked)}
                     />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteTarget(route)}
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
@@ -321,6 +360,27 @@ export default function SupabaseRoutesManager() {
           onSaved={() => void loadData()}
         />
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("routes.delete_confirm")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("routes.delete_desc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              {t("buttons.cancel", { ns: "common" })}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("buttons.delete", { ns: "common" })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

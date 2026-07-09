@@ -245,6 +245,17 @@ export async function setTrajetSchedulingActiveSupabase(
   if (error) throw error;
 }
 
+// Suppression définitive d'un itinéraire. Refusée côté DB (RPC
+// delete_owner_route) si des réservations y sont rattachées — dans ce cas
+// le message d'erreur du serveur explique qu'il faut désactiver la
+// programmation à la place (voir isSchedulingActive / setTrajetSchedulingActiveSupabase).
+export async function deleteOwnerRouteSupabase(trajetId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_owner_route", {
+    p_trajet_id: trajetId,
+  });
+  if (error) throw error;
+}
+
 export async function listOwnerRouteStationsSupabase(
   appUserId: string,
   companyId?: string | null,

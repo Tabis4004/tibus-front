@@ -190,7 +190,7 @@
   "routes.deleted": "Itinéraire supprimé.",
   "routes.delete_error": "Impossible de supprimer l'itinéraire.",
   "routes.delete_confirm": "Supprimer cet itinéraire ?",
-  "routes.delete_desc": "Cela supprimera définitivement l'itinéraire. Les voyages existants sur cet itinéraire resteront mais vous ne pourrez plus en créer de nouveaux.",
+  "routes.delete_desc": "Cela supprimera définitivement l'itinéraire (arrêts, horaires et bus assignés). Impossible si des réservations existent déjà dessus — désactivez plutôt la programmation dans ce cas.",
   "trips.title": "Voyages",
   "trips.desc": "Planifiez et gérez vos voyages",
   "trips.schedule": "Planifier un voyage",

@@ -187,7 +187,7 @@
   "routes.deleted": "Route deleted.",
   "routes.delete_error": "Failed to delete route.",
   "routes.delete_confirm": "Delete this route?",
-  "routes.delete_desc": "This will permanently delete the route. Existing trips on this route will remain but you won't be able to create new ones.",
+  "routes.delete_desc": "This will permanently delete the route (stops, schedules and assigned buses). Not possible if bookings already exist on it — disable scheduling instead in that case.",
   "trips.title": "Trips",
   "trips.desc": "Schedule and manage your trips",
   "trips.schedule": "Schedule Trip",
