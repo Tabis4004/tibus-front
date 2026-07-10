@@ -571,6 +571,17 @@ Fichier : **`supabase/migrations/159_admin_pays_country_scoped_writes.sql`** —
 - Lecture publique inchangée (voyageurs : tous pays, villes, compagnies actives, voyages).
 - Déjà scoped avant ce lot : UPDATE Companies, activation/live/arrêt résa, modules, commissions, fonds de garantie.
 
+## Lot 160 — Suppression d'itinéraire owner
+
+Fichier : **`supabase/migrations/160_delete_owner_route.sql`** — statut : **✅ déployé (via MCP)**
+
+- RPC `delete_owner_route` (owner ou super_admin) : supprime itinéraire + jours + arrêts + bus assignés.
+- Garde-fou : refus si des réservations sont rattachées (désactiver la programmation à la place).
+- `PromoCodes.trajetId` détaché (NULL) ; mappings partenaires en cascade.
+- Front : bouton corbeille + confirmation dans la page Itinéraires owner.
+- Data fix associé (one-off, exécuté) : gares RIMBO repointées vers les vraies villes
+  Abidjan (CI), Dakar (SN), Niamey (NE) ; doublons ABIDJAN/DAKAR/NIAMEY (Mali) supprimés.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**
