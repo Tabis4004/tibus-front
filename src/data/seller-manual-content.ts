@@ -252,4 +252,37 @@ export const SELLER_MANUAL_SECTIONS: ManualSection[] = [
       },
     ],
   },
+  {
+    id: "colis",
+    title: "8. Colis autonomes — envoi gare à gare sans billet",
+    intro:
+      "Réservé aux compagnies dont la plateforme a activé le module Colis (onglet Colis visible sur le tableau vendeur). Permet d'expédier un colis seul, sans billet voyageur : vous enregistrez l'envoi, encaissez le fret au guichet, imprimez le reçu, puis suivez le colis jusqu'à sa remise.",
+    subsections: [
+      {
+        title: "Enregistrer un envoi",
+        body: "Formulaire « Nouvel envoi gare à gare ». Votre caisse du jour doit être ouverte : l'encaissement du fret passe par la caisse guichet, comme une vente de billet.",
+        numbered: [
+          "Choisissez la gare de départ et la gare de destination.",
+          "Renseignez l'expéditeur et son téléphone, puis le destinataire et son téléphone (numéros utilisés pour les SMS de suivi).",
+          "Sélectionnez la nature du colis (liste définie par votre compagnie) et décrivez le contenu.",
+          "Indiquez le poids (kg), le nombre de pièces et le montant du fret.",
+          "Validez : le colis est enregistré, le montant est encaissé au guichet et le reçu s'affiche (impression POS ou partage).",
+        ],
+      },
+      {
+        title: "Suivi et statuts",
+        body: "Chaque colis avance dans l'ordre : Enregistré → Chargé (en soute) → Arrivé (à destination) → Livré (remis au destinataire). Le bouton d'avancement passe au statut suivant.",
+        bullets: [
+          "Selon la configuration de la compagnie, un SMS est envoyé automatiquement à l'expéditeur et/ou au destinataire à chaque changement de statut.",
+          "Filtrez la liste par statut pour retrouver les colis en attente de chargement ou de remise.",
+          "Le reçu peut être réaffiché et réimprimé à tout moment depuis la liste.",
+          "À la remise, vérifiez l'identité du destinataire avant de passer le colis en « Livré ».",
+        ],
+      },
+      {
+        title: "Bon à savoir",
+        body: "Le montant du fret est saisi librement selon la grille tarifaire de votre compagnie ; il alimente votre caisse journalière et la comptabilité colis de la compagnie. Ne confondez pas ce module avec le champ « colis » d'une vente de billet (bagage accompagné) : ici le colis voyage seul.",
+      },
+    ],
+  },
 ];

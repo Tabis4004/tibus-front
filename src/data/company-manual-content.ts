@@ -117,8 +117,16 @@ export const OWNER_MENU_FICHES: ManualSubsection[] = [
   },
   {
     title: "Colis autonomes",
-    body: "Module colis sans billet : enregistrement et suivi.",
-    figure: { src: "/manuel/captures/owner-real-colis.png", caption: "Colis autonomes" },
+    body: "Module d'envoi de colis gare à gare sans billet voyageur (module D, activé par la plateforme). Le vendeur enregistre l'envoi et encaisse le fret au guichet ; l'owner configure ici les natures de colis et les notifications SMS. Accès : sidebar Owner → Colis autonomes (/owner/colis).",
+    bullets: [
+      "Prérequis : module D « Colis » activé sur votre compagnie par la plateforme (fiche admin). Sinon la page affiche « module désactivé ».",
+      "Natures de colis : créez vos catégories (ex. Carton, Enveloppe, Sac…), activez/désactivez ou supprimez-les. Le vendeur choisit une nature à chaque envoi.",
+      "Notifications SMS à l'expéditeur/destinataire, activables statut par statut : Enregistrement au guichet · Chargement en soute · Arrivée à destination · Remise au destinataire.",
+      "L'option SMS est soumise à autorisation plateforme (module D + option SMS) : si elle n'est pas accordée, les interrupteurs restent verrouillés.",
+      "Le montant du fret est saisi librement par le vendeur au guichet et passe par sa caisse journalière.",
+      "Comptabilité : les ventes colis alimentent le produit 7012 du compte de résultat SYSCOHADA, distinct des billets (7011).",
+    ],
+    figure: { src: "/manuel/captures/owner-real-colis.png", caption: "Colis autonomes — natures et notifications SMS" },
   },
   {
     title: "Fond de garantie",
@@ -306,7 +314,7 @@ export const COMPANY_MANUAL_SECTIONS: ManualSection[] = [
       },
       {
         title: "Colis",
-        body: "Si activé : onglet Colis pour enregistrer des envois autonomes.",
+        body: "Si le module D est activé : onglet Colis pour enregistrer des envois autonomes gare à gare (expéditeur, destinataire, nature, poids, montant fret), encaisser au guichet et faire avancer le statut Enregistré → Chargé → Arrivé → Livré. Voir la section dédiée du manuel vendeur.",
       },
       {
         title: "Ventes compagnie",
