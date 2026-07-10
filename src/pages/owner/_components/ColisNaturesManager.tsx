@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PackageIcon, PlusIcon, SaveIcon, TrashIcon } from "lucide-react";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -41,7 +42,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       setSettings(nextSettings);
       setNatures(nextNatures);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("colis.load_error", { defaultValue: "Chargement impossible" }));
+      toast.error(errorMessage(err, t("colis.load_error", { defaultValue: "Chargement impossible" })));
       setSettings(null);
       setNatures([]);
     }
@@ -60,7 +61,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       toast.success(t("colis.nature_saved", { defaultValue: "Nature enregistrée" }));
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : tc("errors.generic"));
+      toast.error(errorMessage(err, tc("errors.generic")));
     } finally {
       setAdding(false);
     }
@@ -71,7 +72,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       await upsertColisNatureSupabase(companyId, nature.libelle, nature.id, !nature.isActive);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : tc("errors.generic"));
+      toast.error(errorMessage(err, tc("errors.generic")));
     }
   };
 
@@ -81,7 +82,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       toast.success(t("colis.nature_deleted", { defaultValue: "Nature supprimée" }));
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : tc("errors.generic"));
+      toast.error(errorMessage(err, tc("errors.generic")));
     }
   };
 
@@ -98,7 +99,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       setSettings(updated);
       toast.success(t("colis.sms_saved", { defaultValue: "Notifications SMS enregistrées" }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : tc("errors.generic"));
+      toast.error(errorMessage(err, tc("errors.generic")));
     } finally {
       setSavingSms(false);
     }
