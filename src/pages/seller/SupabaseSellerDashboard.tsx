@@ -722,14 +722,20 @@ export default function SupabaseSellerDashboard() {
     companyName,
   );
 
+  // Compagnie active choisie par le vendeur multi-compagnies (persistée).
+  const sellerCompanyPrefKey = appUserId ? `tibus.seller.activeCompanyId.${appUserId}` : null;
+
   const load = async () => {
     if (!appUserId) return;
     setProfile(undefined);
     setTrips(undefined);
     setCashSession(undefined);
     const offline = !isBrowserOnline();
+    const preferredCompanyId = sellerCompanyPrefKey
+      ? window.localStorage.getItem(sellerCompanyPrefKey)
+      : null;
     try {
-      const nextProfile = await getSellerProfileSupabase(appUserId);
+      const nextProfile = await getSellerProfileSupabase(appUserId, preferredCompanyId);
       setProfile(nextProfile);
       if (nextProfile) writeCachedSellerProfile(appUserId, nextProfile);
       if (!nextProfile) {
@@ -802,7 +808,10 @@ export default function SupabaseSellerDashboard() {
         const cachedTrips = await listCachedSellerTrips(appUserId, departureGareId);
         if (cachedTrips.length > 0) {
           const nextProfile =
-            (await getSellerProfileSupabase(appUserId).catch(() => null)) ??
+            (await getSellerProfileSupabase(
+              appUserId,
+              sellerCompanyPrefKey ? window.localStorage.getItem(sellerCompanyPrefKey) : null,
+            ).catch(() => null)) ??
             readCachedSellerProfile(appUserId);
           if (nextProfile) setProfile(nextProfile);
           setCashSession(cachedCash);
@@ -1032,11 +1041,42 @@ export default function SupabaseSellerDashboard() {
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <BusIcon className="w-5 h-5 text-primary" />
         </div>
-        <div className="min-w-0">
-          <p className="font-bold truncate">{profile.company?.name ?? "Agent marchand"}</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {profile.user.name || profile.user.email || "Vendeur"}
-          </p>
+        <div className="min-w-0 flex-1">
+          {(profile.companies ?? []).length > 1 ? (
+            <div className="space-y-0.5">
+              <Select
+                value={profile.company?.id ?? ""}
+                onValueChange={(companyId) => {
+                  if (sellerCompanyPrefKey) {
+                    window.localStorage.setItem(sellerCompanyPrefKey, companyId);
+                  }
+                  void load();
+                }}
+              >
+                <SelectTrigger className="h-8 w-full sm:w-72 font-bold bg-background/60">
+                  <SelectValue placeholder="Choisir la compagnie" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(profile.companies ?? []).map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground truncate">
+                {profile.user.name || profile.user.email || "Vendeur"} · vendeur dans{" "}
+                {(profile.companies ?? []).length} compagnies
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="font-bold truncate">{profile.company?.name ?? "Agent marchand"}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {profile.user.name || profile.user.email || "Vendeur"}
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -1069,7 +1109,7 @@ export default function SupabaseSellerDashboard() {
       ) : null}
 
       <div id="third-party-booking" data-tour="seller-departures" className="scroll-mt-20 space-y-2">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Departs disponibles</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Départs disponibles</h2>
         {profile.canSellDirect && cashSession && !cashSession.open ? (
           <p className="text-xs text-muted-foreground">
             Ouvrez votre caisse sur votre gare pour afficher les départs cash de cette gare.

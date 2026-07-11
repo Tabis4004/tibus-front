@@ -33,5 +33,7 @@
   "booking_reference": "Référence de réservation",
   "print": "Imprimer",
   "share": "Partager",
-  "scan_to_verify": "Scanner pour vérification"
+  "scan_to_verify": "Scanner pour vérification",
+  "seller_dashboard": "Tableau vendeur",
+  "counter_sale": "Vente guichet"
 }

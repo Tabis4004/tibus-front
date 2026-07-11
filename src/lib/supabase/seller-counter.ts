@@ -20,6 +20,8 @@ export type SellerProfileSupabase = {
     email: string | null;
   };
   company: SellerCompany | null;
+  /** Toutes les compagnies où l'utilisateur a un rôle de vente (multi-compagnies). */
+  companies: SellerCompany[];
   roleNames: string[];
   canSellDirect: boolean;
   canReserveWithGateway: boolean;
@@ -63,6 +65,7 @@ function roleNameFromJoin(
 
 export async function getSellerProfileSupabase(
   appUserId: string,
+  preferredCompanyId?: string | null,
 ): Promise<SellerProfileSupabase | null> {
   const { data: user, error: userError } = await supabase
     .from("Users")
@@ -112,36 +115,51 @@ export async function getSellerProfileSupabase(
     return name === "vendeur_gare" && Boolean(row.gareId);
   });
 
-  let companyId = (companySellerRow?.companyId ?? sellerRoles.find((row) => row.companyId)?.companyId) as
-    | string
-    | undefined;
+  // Toutes les compagnies où l'utilisateur peut vendre (un vendeur peut être
+  // rattaché à plusieurs compagnies) — rôles directs + rattachement via gare.
+  const companyIdSet = new Set<string>(
+    sellerRoles
+      .map((row) => row.companyId as string | null)
+      .filter((id): id is string => Boolean(id)),
+  );
 
-  if (!companyId && gareSellerRow?.gareId) {
+  if (gareSellerRow?.gareId && !gareSellerRow.companyId) {
     const { data: gareRow, error: gareError } = await supabase
       .from("Gares")
       .select("companyId")
       .eq("id", gareSellerRow.gareId as string)
       .maybeSingle();
     if (gareError) throw gareError;
-    companyId = (gareRow?.companyId as string | undefined) ?? undefined;
+    const gareCompanyId = gareRow?.companyId as string | undefined;
+    if (gareCompanyId) companyIdSet.add(gareCompanyId);
   }
 
-  let company: SellerCompany | null = null;
-  if (companyId) {
-    const { data: companyRow, error: companyError } = await supabase
+  let companies: SellerCompany[] = [];
+  if (companyIdSet.size) {
+    const { data: companyRows, error: companiesError } = await supabase
       .from("Companies")
       .select("id, name")
-      .eq("id", companyId)
-      .maybeSingle();
-
-    if (companyError) throw companyError;
-    if (companyRow) {
-      company = {
-        id: companyRow.id as string,
-        name: companyRow.name as string,
-      };
-    }
+      .in("id", [...companyIdSet])
+      .order("name");
+    if (companiesError) throw companiesError;
+    companies = (companyRows ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+    }));
   }
+
+  // Compagnie active : préférence explicite (sélecteur du dashboard) si elle
+  // fait partie des compagnies du vendeur, sinon comportement historique.
+  let companyId =
+    preferredCompanyId && companyIdSet.has(preferredCompanyId)
+      ? preferredCompanyId
+      : ((companySellerRow?.companyId ?? sellerRoles.find((row) => row.companyId)?.companyId) as
+          | string
+          | undefined) ?? [...companyIdSet][0];
+
+  const company: SellerCompany | null =
+    companies.find((row) => row.id === companyId) ?? null;
+  companyId = company?.id ?? companyId;
 
   const canSellDirect = Boolean(companySellerRow || gareSellerRow);
   const canReserveWithGateway = roleNames.some((name) =>
@@ -158,6 +176,7 @@ export async function getSellerProfileSupabase(
       email: user.email as string | null,
     },
     company,
+    companies,
     roleNames,
     canSellDirect,
     canReserveWithGateway,

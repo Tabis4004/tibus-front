@@ -33,5 +33,7 @@
   "booking_reference": "Booking reference",
   "print": "Print",
   "share": "Share",
-  "scan_to_verify": "Scan to verify"
+  "scan_to_verify": "Scan to verify",
+  "seller_dashboard": "Seller dashboard",
+  "counter_sale": "Counter sale"
 }
