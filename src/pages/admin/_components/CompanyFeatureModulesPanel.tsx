@@ -208,45 +208,48 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
                     aria-label={meta.title}
                   />
                 </div>
-                {id === "D" && enabled ? (
-                  <div className="ml-3 space-y-2 rounded-lg border border-dashed bg-muted/20 p-3">
-                    <div className="space-y-1 min-w-0">
-                      <Label className="text-sm font-medium">
-                        {t("feature_modules.colis_sms_steps", {
-                          defaultValue: "SMS colis inclus dans l'offre",
-                        })}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {t("feature_modules.colis_sms_steps_desc", {
-                          defaultValue:
-                            "Selon ce que la compagnie paie, choisissez les étapes que l'owner pourra activer. Les étapes non incluses restent verrouillées dans son espace.",
-                        })}
-                      </p>
-                    </div>
-                    {(
-                      [
-                        ["enregistre", "Enregistrement au guichet", modules.smsEnregistreAllowed],
-                        ["charge", "Chargement en soute", modules.smsChargeAllowed],
-                        ["arrive", "Arrivée à destination", modules.smsArriveAllowed],
-                        ["livre", "Remise au destinataire", modules.smsLivreAllowed],
-                      ] as const
-                    ).map(([step, label, allowed]) => (
-                      <div key={step} className="flex items-center justify-between gap-3">
-                        <span className="text-xs">{label}</span>
-                        <Switch
-                          checked={allowed}
-                          disabled={readOnly || saving}
-                          onCheckedChange={(checked) => void toggleSmsStep(step, checked)}
-                          aria-label={label}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             );
           })}
         </div>
+
+        {modules.moduleD ? (
+          <div className="space-y-2 rounded-lg border border-dashed bg-muted/20 p-3">
+            <div className="space-y-1 min-w-0">
+              <Label className="text-sm font-medium">
+                {t("feature_modules.colis_sms_steps", {
+                  defaultValue: "SMS colis inclus dans l'offre (module D)",
+                })}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t("feature_modules.colis_sms_steps_desc", {
+                  defaultValue:
+                    "Selon ce que la compagnie paie, choisissez les étapes que l'owner pourra activer. Les étapes non incluses restent verrouillées dans son espace.",
+                })}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              {(
+                [
+                  ["enregistre", "Enregistrement au guichet", modules.smsEnregistreAllowed],
+                  ["charge", "Chargement en soute", modules.smsChargeAllowed],
+                  ["arrive", "Arrivée à destination", modules.smsArriveAllowed],
+                  ["livre", "Remise au destinataire", modules.smsLivreAllowed],
+                ] as const
+              ).map(([step, label, allowed]) => (
+                <div key={step} className="flex items-center justify-between gap-3">
+                  <span className="text-xs">{label}</span>
+                  <Switch
+                    checked={allowed}
+                    disabled={readOnly || saving}
+                    onCheckedChange={(checked) => void toggleSmsStep(step, checked)}
+                    aria-label={label}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
