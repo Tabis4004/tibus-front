@@ -147,6 +147,11 @@ export default function ColisAutonomesPage({
   const [natures, setNatures] = useState<ColisNature[]>([]);
   const [rows, setRows] = useState<ColisAutonomeRow[]>([]);
   const [filterStatut, setFilterStatut] = useState<ColisStatut | "all">("all");
+  const [filterGareDepart, setFilterGareDepart] = useState<string>("all");
+  const [filterGareDest, setFilterGareDest] = useState<string>("all");
+  const [filterExpediteur, setFilterExpediteur] = useState("");
+  const [filterDestinataire, setFilterDestinataire] = useState("");
+  const [filterReference, setFilterReference] = useState("");
 
   const [gareDepartId, setGareDepartId] = useState("");
   const [gareDestinationId, setGareDestinationId] = useState("");
@@ -188,10 +193,44 @@ export default function ColisAutonomesPage({
     }
   }, [gareDepartId, gareDestinationId]);
 
+  // Listes de gares présentes dans les envois (pour les filtres de suivi).
+  const suiviGaresDepart = useMemo(
+    () => [...new Set(rows.map((r) => r.gareDepart).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr")),
+    [rows],
+  );
+  const suiviGaresDest = useMemo(
+    () => [...new Set(rows.map((r) => r.gareDestination).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr")),
+    [rows],
+  );
+
   const filteredRows = useMemo(() => {
-    if (filterStatut === "all") return rows;
-    return rows.filter((r) => r.statutColis === filterStatut);
-  }, [rows, filterStatut]);
+    const norm = (v: string) => v.trim().toLowerCase();
+    const expQ = norm(filterExpediteur);
+    const destQ = norm(filterDestinataire);
+    // Référence : accepte CL-XXXX, l'id complet ou un fragment.
+    const refQ = norm(filterReference).replace(/^cl-?/, "");
+    return rows.filter((r) => {
+      if (filterStatut !== "all" && r.statutColis !== filterStatut) return false;
+      if (filterGareDepart !== "all" && r.gareDepart !== filterGareDepart) return false;
+      if (filterGareDest !== "all" && r.gareDestination !== filterGareDest) return false;
+      if (
+        expQ &&
+        !norm(r.nomExpediteur).includes(expQ) &&
+        !norm(r.telephoneExpediteur).replace(/\s/g, "").includes(expQ.replace(/\s/g, ""))
+      ) {
+        return false;
+      }
+      if (
+        destQ &&
+        !norm(r.nomDestinataire).includes(destQ) &&
+        !norm(r.telephoneDestinataire).replace(/\s/g, "").includes(destQ.replace(/\s/g, ""))
+      ) {
+        return false;
+      }
+      if (refQ && !norm(r.id).includes(refQ)) return false;
+      return true;
+    });
+  }, [rows, filterStatut, filterGareDepart, filterGareDest, filterExpediteur, filterDestinataire, filterReference]);
 
   const resetExpeditionForm = () => {
     setNomExpediteur("");
@@ -607,15 +646,70 @@ export default function ColisAutonomesPage({
         </TabsContent>
 
         <TabsContent value="suivi" className="space-y-3 mt-4">
-          <Select value={filterStatut} onValueChange={(v) => setFilterStatut(v as ColisStatut | "all")}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              {(Object.keys(COLIS_STATUT_LABELS) as ColisStatut[]).map((s) => (
-                <SelectItem key={s} value={s}>{COLIS_STATUT_LABELS[s]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <Select value={filterStatut} onValueChange={(v) => setFilterStatut(v as ColisStatut | "all")}>
+              <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                {(Object.keys(COLIS_STATUT_LABELS) as ColisStatut[]).map((s) => (
+                  <SelectItem key={s} value={s}>{COLIS_STATUT_LABELS[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterGareDepart} onValueChange={setFilterGareDepart}>
+              <SelectTrigger><SelectValue placeholder="Gare de départ" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes gares de départ</SelectItem>
+                {suiviGaresDepart.map((gare) => (
+                  <SelectItem key={gare} value={gare}>{gare}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterGareDest} onValueChange={setFilterGareDest}>
+              <SelectTrigger><SelectValue placeholder="Gare d'arrivée" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes gares d'arrivée</SelectItem>
+                {suiviGaresDest.map((gare) => (
+                  <SelectItem key={gare} value={gare}>{gare}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              value={filterExpediteur}
+              onChange={(e) => setFilterExpediteur(e.target.value)}
+              placeholder={t("colis.filter_expediteur", { defaultValue: "Expéditeur (nom ou tél.)" })}
+            />
+            <Input
+              value={filterDestinataire}
+              onChange={(e) => setFilterDestinataire(e.target.value)}
+              placeholder={t("colis.filter_destinataire", { defaultValue: "Destinataire (nom ou tél.)" })}
+            />
+            <Input
+              value={filterReference}
+              onChange={(e) => setFilterReference(e.target.value)}
+              placeholder={t("colis.filter_reference", { defaultValue: "N° de colis (CL-… ou id)" })}
+            />
+          </div>
+          {(filterStatut !== "all" || filterGareDepart !== "all" || filterGareDest !== "all" || filterExpediteur || filterDestinataire || filterReference) ? (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{filteredRows.length} colis correspondant(s)</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs cursor-pointer"
+                onClick={() => {
+                  setFilterStatut("all");
+                  setFilterGareDepart("all");
+                  setFilterGareDest("all");
+                  setFilterExpediteur("");
+                  setFilterDestinataire("");
+                  setFilterReference("");
+                }}
+              >
+                {t("colis.filter_reset", { defaultValue: "Réinitialiser les filtres" })}
+              </Button>
+            </div>
+          ) : null}
 
           {filteredRows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Aucun colis</p>
