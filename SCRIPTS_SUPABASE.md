@@ -597,6 +597,22 @@ Fichier : **`supabase/migrations/163_admin_delete_company.sql`** — statut : **
 - Supprime TOUTES les données : billets, réservations, paiements, caisses, colis, gares, bus, itinéraires, abonnements, avis, rôles, dépenses — puis la compagnie (cascades pour le reste).
 - Front : switch actif/inactif par ligne + bouton corbeille avec alerte « action irréversible » dans l'onglet Entreprises.
 
+## Lot 165 — Caisse multi-compagnies
+
+Fichier : **`supabase/migrations/165_open_station_cash_company_param.sql`** — statut : **✅ déployé (via MCP)**
+
+- `open_station_cash_register` accepte `p_company_id` (compagnie active du dashboard vendeur), vérifié contre les rôles de vente.
+- Corrige « Gare invalide pour cette compagnie » pour les vendeurs multi-compagnies.
+
+## Lot 166 — Incidents voyage (voyageurs)
+
+Fichier : **`supabase/migrations/166_trip_incidents.sql`** — statut : **✅ déployé (via MCP)**
+
+- Table `TripIncidents` (RLS fermée, accès via RPC).
+- `report_trip_incident` : voyageur détenteur du billet ; notifie chaque owner (cloche Notifications).
+- `list_trip_incidents`, `list_trip_incident_counts`, `set_trip_incident_status` : owner/comptable/contrôleur.
+- Front : bouton « Signaler un incident » (Mes billets) + bouton « Incidents » avec compteur sur les cartes Voyages.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

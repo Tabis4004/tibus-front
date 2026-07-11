@@ -9,9 +9,34 @@ import {
   AlertCircleIcon,
   ArchiveIcon,
   XCircleIcon,
+  MegaphoneIcon,
 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
+import { errorMessage } from "@/lib/utils";
+import {
+  reportTripIncidentSupabase,
+  TRIP_INCIDENT_CATEGORIES,
+  TRIP_INCIDENT_CATEGORY_LABELS,
+} from "@/lib/supabase/trip-incidents.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { format, parseISO } from "date-fns";
@@ -37,11 +62,97 @@ const STATUS_CONFIG: Record<string, { icon: typeof CheckCircleIcon; color: strin
   collected: { icon: ArchiveIcon, color: "text-muted-foreground", bgColor: "bg-muted", variant: "outline" },
 };
 
+function IncidentDialog({
+  bookingId,
+  onClose,
+}: {
+  bookingId: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation("traveler");
+  const [category, setCategory] = useState<string>("retard");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const submit = async () => {
+    if (!message.trim()) {
+      toast.error(t("incident.message_required", { defaultValue: "Décrivez l'incident." }));
+      return;
+    }
+    setSending(true);
+    try {
+      await reportTripIncidentSupabase({ bookingId, category, message });
+      toast.success(
+        t("incident.sent", {
+          defaultValue: "Incident signalé. La compagnie a été notifiée, merci.",
+        }),
+      );
+      onClose();
+    } catch (err) {
+      toast.error(errorMessage(err, t("incident.error", { defaultValue: "Signalement impossible." })));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !sending && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>
+            {t("incident.title", { defaultValue: "Signaler un incident" })}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <div className="space-y-1.5">
+            <Label>{t("incident.category", { defaultValue: "Type d'incident" })}</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRIP_INCIDENT_CATEGORIES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {TRIP_INCIDENT_CATEGORY_LABELS[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("incident.message", { defaultValue: "Description" })}</Label>
+            <Textarea
+              rows={4}
+              maxLength={1000}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={t("incident.message_placeholder", {
+                defaultValue: "Décrivez ce qui s'est passé (lieu, heure, détails)…",
+              })}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
+            {t("buttons.cancel", { ns: "common" })}
+          </Button>
+          <Button type="button" onClick={() => void submit()} disabled={sending}>
+            {sending
+              ? t("incident.sending", { defaultValue: "Envoi…" })
+              : t("incident.submit", { defaultValue: "Envoyer le signalement" })}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SupabaseMyBookingsInner() {
   const { t } = useTranslation("traveler");
   const { lng } = useParams<{ lng: string }>();
   const { appUserId } = useSupabaseAuth();
   const { bookings } = useSupabaseMyBookings(appUserId);
+  const [incidentBookingId, setIncidentBookingId] = useState<string | null>(null);
 
   if (bookings === undefined) {
     return (
@@ -144,7 +255,19 @@ function SupabaseMyBookingsInner() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end pt-1 border-t">
+          <div className="flex items-center justify-between gap-2 pt-1 border-t">
+            {b.status !== "cancelled" ? (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 cursor-pointer"
+                onClick={() => setIncidentBookingId(b._id)}
+              >
+                <MegaphoneIcon className="w-3.5 h-3.5" />
+                {t("incident.report_btn", { defaultValue: "Signaler un incident" })}
+              </button>
+            ) : (
+              <span />
+            )}
             {canViewReceipt ? (
               <Link
                 to={`/${lng}/booking/${b._id}`}
@@ -186,6 +309,13 @@ function SupabaseMyBookingsInner() {
           </div>
         )}
       </div>
+
+      {incidentBookingId ? (
+        <IncidentDialog
+          bookingId={incidentBookingId}
+          onClose={() => setIncidentBookingId(null)}
+        />
+      ) : null}
 
     </>
   );

@@ -21,6 +21,12 @@ import {
 import { getTripManifestSupabase } from "@/lib/supabase/owner-reports";
 import { exportTripManifestPDF } from "@/lib/trip-manifest-export";
 import { errorMessage } from "@/lib/utils.ts";
+import TripIncidentsDialog from "./_components/TripIncidentsDialog.tsx";
+import {
+  listTripIncidentCountsSupabase,
+  type TripIncidentCount,
+} from "@/lib/supabase/trip-incidents.ts";
+import { MegaphoneIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -327,6 +333,22 @@ export default function SupabaseTripsManager() {
   const [editTrip, setEditTrip] = useState<OwnerDeparture | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [manifestBusyId, setManifestBusyId] = useState<string | null>(null);
+  const [incidentCounts, setIncidentCounts] = useState<Map<string, TripIncidentCount>>(new Map());
+  const [incidentTrip, setIncidentTrip] = useState<{ id: string; label: string } | null>(null);
+
+  const loadIncidentCounts = async () => {
+    if (!companyId) return;
+    try {
+      setIncidentCounts(await listTripIncidentCountsSupabase(companyId));
+    } catch {
+      setIncidentCounts(new Map());
+    }
+  };
+
+  useEffect(() => {
+    void loadIncidentCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
 
   const handleManifest = async (tripId: string) => {
     if (!appUserId) return;
@@ -559,6 +581,36 @@ export default function SupabaseTripsManager() {
                   </Button>
 
                   <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs cursor-pointer"
+                    onClick={() =>
+                      setIncidentTrip({
+                        id: trip.id,
+                        label:
+                          trip.origin && trip.destination
+                            ? `${trip.origin.city} → ${trip.destination.city} · ${format(parseISO(trip.departureTime), "dd/MM HH:mm")}`
+                            : format(parseISO(trip.departureTime), "dd/MM HH:mm"),
+                      })
+                    }
+                  >
+                    <MegaphoneIcon className="w-3 h-3 mr-1" />{" "}
+                    {t("trips.incidents_btn", { defaultValue: "Incidents" })}
+                    {(incidentCounts.get(trip.id)?.total ?? 0) > 0 ? (
+                      <span
+                        className={cn(
+                          "ml-1 rounded-full px-1.5 text-[10px] font-bold",
+                          (incidentCounts.get(trip.id)?.nouveaux ?? 0) > 0
+                            ? "bg-destructive text-destructive-foreground"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {incidentCounts.get(trip.id)?.total}
+                      </span>
+                    ) : null}
+                  </Button>
+
+                  <Button
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7 ml-auto cursor-pointer text-destructive hover:text-destructive"
@@ -573,6 +625,17 @@ export default function SupabaseTripsManager() {
           ))}
         </div>
       )}
+
+      {incidentTrip ? (
+        <TripIncidentsDialog
+          reservationId={incidentTrip.id}
+          tripLabel={incidentTrip.label}
+          onClose={() => {
+            setIncidentTrip(null);
+            void loadIncidentCounts();
+          }}
+        />
+      ) : null}
 
       {(showForm || editTrip) && appUserId && companyId && (
         <TripFormDialog
