@@ -622,6 +622,14 @@ Fichier : **`supabase/migrations/167_colis_sms_steps_allowed_per_company.sql`** 
 - Backfill : compagnies déjà autorisées ⇒ 4 étapes conservées.
 - Front : 4 interrupteurs par étape dans le panneau Modules (fiche compagnie admin) ; côté owner, étapes hors offre verrouillées avec mention « Non inclus dans votre offre ».
 
+## Lot 168 — Modules B/C/E activables avec A OU D
+
+Fichier : **`supabase/migrations/168_modules_bce_require_a_or_d.sql`** — statut : **✅ déployé (via MCP)**
+
+- `company_has_module` et `set_company_feature_modules` : B, C, E requièrent désormais A **ou** D (avant : A uniquement).
+- Front : gares, caisse, équipe, journal des ventes, guichet, profil compagnie et messages visibles si A **ou** D actif (briques partagées, pas de duplication pour le colis).
+- Une compagnie « colis seul » (D uniquement) garde ses gares, sa caisse et peut activer la comptabilité (C).
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

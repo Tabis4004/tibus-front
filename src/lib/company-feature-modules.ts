@@ -47,10 +47,24 @@ export function companyModuleEnabled(
   };
   const enabled = flags[module];
   if (!enabled) return false;
+  // B, C et E s'appuient sur les briques partagées (gares, caisse, journal) :
+  // disponibles avec la billetterie (A) OU les colis autonomes (D).
   if (module === "B" || module === "C" || module === "E") {
-    return modules.moduleA;
+    return modules.moduleA || modules.moduleD;
   }
   return true;
+}
+
+/**
+ * Une fonctionnalité peut être ouverte par PLUSIEURS modules (any-of) :
+ * ex. les gares et la caisse servent la billetterie (A) et les colis (D).
+ */
+export function companyFeatureEnabled(
+  modules: CompanyFeatureModules,
+  requirement: CompanyFeatureModuleId | readonly CompanyFeatureModuleId[],
+): boolean {
+  const list = Array.isArray(requirement) ? requirement : [requirement];
+  return list.some((module) => companyModuleEnabled(modules, module));
 }
 
 /** Colis autonomes : module commercial D (source admin) ou legacy `colis_autonome_enabled`. */

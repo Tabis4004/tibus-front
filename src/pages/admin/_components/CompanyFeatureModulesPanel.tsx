@@ -78,7 +78,8 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
   >, next: boolean) => {
     if (!modules || readOnly) return;
     const draft = { ...modules, [key]: next };
-    if (key === "moduleA" && !next) {
+    // B, C et E requièrent au moins un socle : billetterie (A) ou colis (D).
+    if ((key === "moduleA" || key === "moduleD") && !next && !(draft.moduleA || draft.moduleD)) {
       draft.moduleB = false;
       draft.moduleC = false;
       draft.moduleE = false;
@@ -86,10 +87,14 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
     if (key === "moduleD" && !next) {
       draft.moduleDColisSmsConfig = false;
     }
-    if ((key === "moduleB" || key === "moduleC" || key === "moduleE") && next && !draft.moduleA) {
+    if (
+      (key === "moduleB" || key === "moduleC" || key === "moduleE") &&
+      next &&
+      !(draft.moduleA || draft.moduleD)
+    ) {
       toast.error(
         t("feature_modules.requires_a", {
-          defaultValue: "Le module A (billetterie) doit être activé en premier.",
+          defaultValue: "Activez d'abord le module A (billetterie) ou D (colis).",
         }),
       );
       return;
@@ -177,7 +182,7 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
             const meta = COMMERCIAL_MODULE_LABELS[id];
             const key = flagKey(id);
             const enabled = Boolean(modules[key]);
-            const needsA = (id === "B" || id === "C" || id === "E") && !modules.moduleA;
+            const needsA = (id === "B" || id === "C" || id === "E") && !(modules.moduleA || modules.moduleD);
             const tile = consoleTileStyle(commercialModuleTileIndex(id));
 
             return (
@@ -196,7 +201,7 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
                     <Label className={cn("font-semibold text-sm block", tile.title)}>{meta.title}</Label>
                     {needsA ? (
                       <Badge variant="outline" className="text-[10px]">
-                        {t("feature_modules.requires_a_badge", { defaultValue: "Requiert A" })}
+                        {t("feature_modules.requires_a_badge", { defaultValue: "Requiert A ou D" })}
                       </Badge>
                     ) : null}
                     <p className="text-[11px] text-muted-foreground leading-snug">{meta.desc}</p>

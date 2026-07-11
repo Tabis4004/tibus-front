@@ -901,13 +901,13 @@ export default function SupabaseSellerDashboard() {
     );
   }
 
-  if (sellerCompanyId && !hasFeatureModule("A")) {
+  if (sellerCompanyId && !hasFeatureModule("A") && !hasFeatureModule("D")) {
     return (
       <div className="rounded-xl border p-8 text-center text-muted-foreground space-y-2">
         <TicketIcon className="w-10 h-10 mx-auto opacity-30" />
-        <p className="font-medium">Billetterie guichet désactivée</p>
+        <p className="font-medium">Espace guichet désactivé</p>
         <p className="text-sm">
-          Le module A (billetterie) n'est pas activé pour votre compagnie. Contactez l'administration Tibus.
+          Ni la billetterie (module A) ni les colis (module D) ne sont activés pour votre compagnie. Contactez l'administration Tibus.
         </p>
       </div>
     );

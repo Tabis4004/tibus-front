@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import {
   companyModuleEnabled,
+  companyFeatureEnabled,
   type CompanyFeatureModules,
 } from "@/lib/company-feature-modules.ts";
 import { OWNER_CONSOLE_MODULE_FEATURE, OWNER_NAV_SUFFIX_FEATURE } from "@/lib/company-feature-module-map.ts";
@@ -465,7 +466,7 @@ export function filterOwnerConsoleModules(
 
     if (featureModules) {
       const commercialModule = OWNER_CONSOLE_MODULE_FEATURE[module.id];
-      if (commercialModule && !companyModuleEnabled(featureModules, commercialModule)) {
+      if (commercialModule && !companyFeatureEnabled(featureModules, commercialModule)) {
         return false;
       }
     }
@@ -481,7 +482,7 @@ export function isOwnerNavPathEnabled(
   if (!featureModules) return true;
   const commercialModule = OWNER_NAV_SUFFIX_FEATURE[toSuffix];
   if (!commercialModule) return true;
-  return companyModuleEnabled(featureModules, commercialModule);
+  return companyFeatureEnabled(featureModules, commercialModule);
 }
 
 export function groupOwnerConsoleModules(
