@@ -14,6 +14,11 @@ export type CompanyColisSettings = {
   companyId: string;
   colisAutonomeEnabled: boolean;
   colisSmsConfigEnabled: boolean;
+  /** Étapes incluses dans l'offre de la compagnie (décidées par la plateforme). */
+  smsAllowedEnregistre: boolean;
+  smsAllowedCharge: boolean;
+  smsAllowedArrive: boolean;
+  smsAllowedLivre: boolean;
   smsOnEnregistre: boolean;
   smsOnCharge: boolean;
   smsOnArrive: boolean;
@@ -67,6 +72,10 @@ function mapSettings(data: Record<string, unknown>): CompanyColisSettings {
     companyId: String(data.companyId ?? ""),
     colisAutonomeEnabled: Boolean(data.colisAutonomeEnabled),
     colisSmsConfigEnabled: Boolean(data.colisSmsConfigEnabled),
+    smsAllowedEnregistre: Boolean(data.smsAllowedEnregistre ?? data.colisSmsConfigEnabled),
+    smsAllowedCharge: Boolean(data.smsAllowedCharge ?? data.colisSmsConfigEnabled),
+    smsAllowedArrive: Boolean(data.smsAllowedArrive ?? data.colisSmsConfigEnabled),
+    smsAllowedLivre: Boolean(data.smsAllowedLivre ?? data.colisSmsConfigEnabled),
     smsOnEnregistre: Boolean(data.smsOnEnregistre),
     smsOnCharge: Boolean(data.smsOnCharge),
     smsOnArrive: Boolean(data.smsOnArrive),

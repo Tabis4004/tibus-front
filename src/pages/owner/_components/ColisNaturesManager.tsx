@@ -200,19 +200,34 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
         </CardHeader>
         <CardContent className="space-y-3">
           {([
-            ["smsOnEnregistre", "colis.sms_enregistre", "Enregistrement au guichet"],
-            ["smsOnCharge", "colis.sms_charge", "Chargement en soute"],
-            ["smsOnArrive", "colis.sms_arrive", "Arrivée à destination"],
-            ["smsOnLivre", "colis.sms_livre", "Remise au destinataire"],
-          ] as const).map(([key, labelKey, fallback]) => (
-            <div key={key} className="flex items-center justify-between gap-3">
-              <Label>{t(labelKey, { defaultValue: fallback })}</Label>
-              <Switch
-                checked={settings[key]}
-                onCheckedChange={(v) => setSettings((prev) => (prev ? { ...prev, [key]: v } : prev))}
-              />
-            </div>
-          ))}
+            ["smsOnEnregistre", "smsAllowedEnregistre", "colis.sms_enregistre", "Enregistrement au guichet"],
+            ["smsOnCharge", "smsAllowedCharge", "colis.sms_charge", "Chargement en soute"],
+            ["smsOnArrive", "smsAllowedArrive", "colis.sms_arrive", "Arrivée à destination"],
+            ["smsOnLivre", "smsAllowedLivre", "colis.sms_livre", "Remise au destinataire"],
+          ] as const).map(([key, allowedKey, labelKey, fallback]) => {
+            const allowed = settings[allowedKey];
+            return (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label className={allowed ? undefined : "text-muted-foreground"}>
+                    {t(labelKey, { defaultValue: fallback })}
+                  </Label>
+                  {!allowed ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      {t("colis.sms_step_locked", {
+                        defaultValue: "Non inclus dans votre offre — contactez Tibus.",
+                      })}
+                    </p>
+                  ) : null}
+                </div>
+                <Switch
+                  checked={allowed && settings[key]}
+                  disabled={!allowed}
+                  onCheckedChange={(v) => setSettings((prev) => (prev ? { ...prev, [key]: v } : prev))}
+                />
+              </div>
+            );
+          })}
           <Button className="cursor-pointer gap-2" disabled={savingSms} onClick={() => void handleSaveSms()}>
             <SaveIcon className="w-4 h-4" />
             {savingSms ? "…" : tc("buttons.save")}

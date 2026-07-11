@@ -613,6 +613,15 @@ Fichier : **`supabase/migrations/166_trip_incidents.sql`** — statut : **✅ d�
 - `list_trip_incidents`, `list_trip_incident_counts`, `set_trip_incident_status` : owner/comptable/contrôleur.
 - Front : bouton « Signaler un incident » (Mes billets) + bouton « Incidents » avec compteur sur les cartes Voyages.
 
+## Lot 167 — SMS colis à l'étape (offre commerciale)
+
+Fichier : **`supabase/migrations/167_colis_sms_steps_allowed_per_company.sql`** — statut : **✅ déployé (via MCP)**
+
+- 4 colonnes `sms*Allowed` sur `CompanyFeatureModules` : étapes SMS incluses dans l'offre, choisies par le super admin / admin pays (RPC `set_company_colis_sms_steps_allowed`).
+- L'owner ne peut activer que les étapes autorisées (bornage dans `update_company_colis_sms_settings`, verrou d'envoi `colis_sms_enabled_for_statut`).
+- Backfill : compagnies déjà autorisées ⇒ 4 étapes conservées.
+- Front : 4 interrupteurs par étape dans le panneau Modules (fiche compagnie admin) ; côté owner, étapes hors offre verrouillées avec mention « Non inclus dans votre offre ».
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**

@@ -15,6 +15,7 @@ import type {
 import {
   getCompanyFeatureModulesSupabase,
   setCompanyFeatureModulesSupabase,
+  setCompanyColisSmsStepsAllowedSupabase,
 } from "@/lib/supabase/company-feature-modules.ts";
 import { cn } from "@/lib/utils.ts";
 import { commercialModuleTileIndex, consoleTileStyle } from "@/lib/console-grid-tiles.ts";
@@ -96,9 +97,34 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
     await persist(draft);
   };
 
-  const toggleColisSmsConfig = async (next: boolean) => {
+  // Étapes SMS colis incluses dans l'offre : le super admin choisit
+  // précisément ce que l'owner pourra activer (facturation à l'étape).
+  const toggleSmsStep = async (
+    step: "enregistre" | "charge" | "arrive" | "livre",
+    next: boolean,
+  ) => {
     if (!modules || readOnly || !modules.moduleD) return;
-    await persist({ ...modules, moduleDColisSmsConfig: next });
+    const steps = {
+      enregistre: modules.smsEnregistreAllowed,
+      charge: modules.smsChargeAllowed,
+      arrive: modules.smsArriveAllowed,
+      livre: modules.smsLivreAllowed,
+      [step]: next,
+    };
+    setSaving(true);
+    try {
+      const saved = await setCompanyColisSmsStepsAllowedSupabase(companyId, steps);
+      setModules(saved);
+      toast.success(
+        t("feature_modules.sms_steps_saved", {
+          defaultValue: "Étapes SMS colis mises à jour.",
+        }),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const flagKey = (
@@ -183,28 +209,38 @@ export default function CompanyFeatureModulesPanel({ companyId, readOnly = false
                   />
                 </div>
                 {id === "D" && enabled ? (
-                  <div className="ml-3 flex items-start justify-between gap-4 rounded-lg border border-dashed bg-muted/20 p-3">
+                  <div className="ml-3 space-y-2 rounded-lg border border-dashed bg-muted/20 p-3">
                     <div className="space-y-1 min-w-0">
                       <Label className="text-sm font-medium">
-                        {t("feature_modules.colis_sms_config", {
-                          defaultValue: "Configuration SMS par l'owner",
+                        {t("feature_modules.colis_sms_steps", {
+                          defaultValue: "SMS colis inclus dans l'offre",
                         })}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        {t("feature_modules.colis_sms_config_desc", {
+                        {t("feature_modules.colis_sms_steps_desc", {
                           defaultValue:
-                            "Si activé, l'owner peut choisir les étapes de notification SMS colis dans son espace.",
+                            "Selon ce que la compagnie paie, choisissez les étapes que l'owner pourra activer. Les étapes non incluses restent verrouillées dans son espace.",
                         })}
                       </p>
                     </div>
-                    <Switch
-                      checked={modules.moduleDColisSmsConfig}
-                      disabled={readOnly || saving}
-                      onCheckedChange={(checked) => void toggleColisSmsConfig(checked)}
-                      aria-label={t("feature_modules.colis_sms_config", {
-                        defaultValue: "Configuration SMS par l'owner",
-                      })}
-                    />
+                    {(
+                      [
+                        ["enregistre", "Enregistrement au guichet", modules.smsEnregistreAllowed],
+                        ["charge", "Chargement en soute", modules.smsChargeAllowed],
+                        ["arrive", "Arrivée à destination", modules.smsArriveAllowed],
+                        ["livre", "Remise au destinataire", modules.smsLivreAllowed],
+                      ] as const
+                    ).map(([step, label, allowed]) => (
+                      <div key={step} className="flex items-center justify-between gap-3">
+                        <span className="text-xs">{label}</span>
+                        <Switch
+                          checked={allowed}
+                          disabled={readOnly || saving}
+                          onCheckedChange={(checked) => void toggleSmsStep(step, checked)}
+                          aria-label={label}
+                        />
+                      </div>
+                    ))}
                   </div>
                 ) : null}
               </div>

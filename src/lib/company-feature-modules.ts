@@ -11,6 +11,11 @@ export type CompanyFeatureModules = {
   moduleF: boolean;
   /** Admin : l'owner peut configurer les SMS colis (module D). */
   moduleDColisSmsConfig: boolean;
+  /** Étapes SMS colis incluses dans l'offre (choisies par la plateforme). */
+  smsEnregistreAllowed: boolean;
+  smsChargeAllowed: boolean;
+  smsArriveAllowed: boolean;
+  smsLivreAllowed: boolean;
   updatedAt?: string;
 };
 
@@ -22,6 +27,10 @@ export const DEFAULT_COMPANY_FEATURE_MODULES: Omit<CompanyFeatureModules, "compa
   moduleE: true,
   moduleF: false,
   moduleDColisSmsConfig: false,
+  smsEnregistreAllowed: false,
+  smsChargeAllowed: false,
+  smsArriveAllowed: false,
+  smsLivreAllowed: false,
 };
 
 export function companyModuleEnabled(
@@ -76,6 +85,10 @@ export function normalizeCompanyFeatureModules(
     moduleE: row.moduleE === true,
     moduleF: row.moduleF === true,
     moduleDColisSmsConfig: row.moduleDColisSmsConfig === true,
+    smsEnregistreAllowed: row.smsEnregistreAllowed === true,
+    smsChargeAllowed: row.smsChargeAllowed === true,
+    smsArriveAllowed: row.smsArriveAllowed === true,
+    smsLivreAllowed: row.smsLivreAllowed === true,
     updatedAt: row.updatedAt ? String(row.updatedAt) : undefined,
   };
 }

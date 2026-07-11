@@ -15,6 +15,37 @@ export async function getCompanyFeatureModulesSupabase(
   return normalizeCompanyFeatureModules(companyId, data);
 }
 
+// Plateforme (super admin / admin pays) : étapes SMS colis incluses dans
+// l'offre de la compagnie. Synchronise le master moduleDColisSmsConfig et
+// coupe les toggles owner des étapes retirées.
+export async function setCompanyColisSmsStepsAllowedSupabase(
+  companyId: string,
+  steps: {
+    enregistre: boolean;
+    charge: boolean;
+    arrive: boolean;
+    livre: boolean;
+  },
+): Promise<CompanyFeatureModules> {
+  const { data, error } = await supabase.rpc("set_company_colis_sms_steps_allowed", {
+    p_company_id: companyId,
+    p_enregistre: steps.enregistre,
+    p_charge: steps.charge,
+    p_arrive: steps.arrive,
+    p_livre: steps.livre,
+  });
+  if (error) throw error;
+
+  void recordPlatformAuditSupabase({
+    moduleKey: "admin.companies",
+    action: "update",
+    summary: "Étapes SMS colis autorisées mises à jour",
+    metadata: { companyId, steps },
+  }).catch(() => undefined);
+
+  return normalizeCompanyFeatureModules(companyId, data);
+}
+
 export async function setCompanyFeatureModulesSupabase(
   companyId: string,
   modules: Pick<
