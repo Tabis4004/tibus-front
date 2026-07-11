@@ -6,7 +6,7 @@ import {
   sendInfobipSms,
 } from "../_shared/infobip-sms.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { createAdminClient, resolveAppUserId } from "../_shared/issue-ticket.ts";
+import { createAdminClient, resolveAppUserId } from "../_shared/admin-client.ts";
 
 type SmsBody = {
   colisId?: string;
@@ -89,6 +89,32 @@ Deno.serve(async (req) => {
     if (!allowed) {
       console.error("[colis-sms] forbidden", { appUserId, companyId: colis.company_id });
       return jsonResponse({ error: "Droits insuffisants" }, 403);
+    }
+
+    // Verrou par étape (migration 167) : l'étape doit être incluse dans
+    // l'offre de la compagnie ET activée par l'owner. Empêche tout envoi
+    // forgé contournant l'UI.
+    const { data: stepEnabled, error: gateError } = await admin.rpc(
+      "colis_sms_enabled_for_statut",
+      {
+        p_company_id: colis.company_id as string,
+        p_statut: String(body.statut ?? ""),
+      },
+    );
+
+    if (gateError) {
+      console.error("[colis-sms] gate check failed", gateError);
+      return jsonResponse({ error: "Vérification SMS impossible" }, 500);
+    }
+    if (!stepEnabled) {
+      console.warn("[colis-sms] step not allowed", {
+        companyId: colis.company_id,
+        statut: body.statut,
+      });
+      return jsonResponse(
+        { error: "Étape SMS non incluse dans l'offre de la compagnie ou désactivée" },
+        403,
+      );
     }
 
     const uniquePhones = [...new Set(phones)];
