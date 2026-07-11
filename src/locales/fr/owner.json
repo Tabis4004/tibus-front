@@ -194,6 +194,8 @@
   "trips.title": "Voyages",
   "trips.desc": "Planifiez et gérez vos voyages",
   "trips.schedule": "Planifier un voyage",
+  "trips.manifest_btn": "Manifeste",
+  "trips.manifest_error": "Manifeste indisponible pour ce voyage.",
   "trips.no_trips": "Aucun voyage {{filter}}",
   "trips.no_trips_all": "Planifiez votre premier voyage en utilisant un itinéraire et un bus que vous avez configurés.",
   "trips.no_trips_filter": "Aucun voyage avec le statut \"{{filter}}\" trouvé.",

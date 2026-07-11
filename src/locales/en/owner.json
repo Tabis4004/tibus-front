@@ -191,6 +191,8 @@
   "trips.title": "Trips",
   "trips.desc": "Schedule and manage your trips",
   "trips.schedule": "Schedule Trip",
+  "trips.manifest_btn": "Manifest",
+  "trips.manifest_error": "Manifest unavailable for this trip.",
   "trips.no_trips": "No {{filter}} trips",
   "trips.no_trips_all": "Schedule your first trip using a route and bus you've set up.",
   "trips.no_trips_filter": "No trips with status \"{{filter}}\" found.",

@@ -14,9 +14,13 @@ import {
   ArrowRightIcon,
   BusIcon,
   ClockIcon,
+  FileTextIcon,
   TagIcon,
   UsersIcon,
 } from "lucide-react";
+import { getTripManifestSupabase } from "@/lib/supabase/owner-reports";
+import { exportTripManifestPDF } from "@/lib/trip-manifest-export";
+import { errorMessage } from "@/lib/utils.ts";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -322,6 +326,22 @@ export default function SupabaseTripsManager() {
   const [showForm, setShowForm] = useState(false);
   const [editTrip, setEditTrip] = useState<OwnerDeparture | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [manifestBusyId, setManifestBusyId] = useState<string | null>(null);
+
+  const handleManifest = async (tripId: string) => {
+    if (!appUserId) return;
+    setManifestBusyId(tripId);
+    try {
+      const manifest = await getTripManifestSupabase(tripId, appUserId);
+      exportTripManifestPDF(manifest);
+    } catch (err) {
+      toast.error(
+        errorMessage(err, t("trips.manifest_error", { defaultValue: "Manifeste indisponible pour ce voyage." })),
+      );
+    } finally {
+      setManifestBusyId(null);
+    }
+  };
   const [filter, setFilter] = useState<FilterTab>("all");
 
   const loadData = useCallback(async () => {
@@ -525,6 +545,17 @@ export default function SupabaseTripsManager() {
                   >
                     <PencilIcon className="w-3 h-3 mr-1" />{" "}
                     {t("buttons.edit", { ns: "common" })}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs cursor-pointer"
+                    disabled={manifestBusyId === trip.id}
+                    onClick={() => void handleManifest(trip.id)}
+                  >
+                    <FileTextIcon className="w-3 h-3 mr-1" />{" "}
+                    {t("trips.manifest_btn", { defaultValue: "Manifeste" })}
                   </Button>
 
                   <Button
