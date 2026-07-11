@@ -86,6 +86,8 @@ export type TripManifestRow = {
   departureStation: string;
   parcelCount: number;
   reservationStatus: "Payé" | "Réservé";
+  /** Horodatage du scan d'embarquement (ReservationBus.boardedAt), null si non scanné. */
+  scannedAt: string | null;
 };
 
 export type TripManifest = {
@@ -121,6 +123,7 @@ type ReservationBusRow = {
   passengerName: string | null;
   parcelCount: number | null;
   ticketStatus?: string | null;
+  boardedAt?: string | null;
 };
 
 type PaymentRow = {
@@ -415,7 +418,7 @@ async function loadManifestBookingsForTrip(reservationId: string) {
   const { data: bookingRows, error: bookingError } = await supabase
     .from("ReservationBus")
     .select(
-      "id, reservationId, price, isReservation, createdAt, paymentId, createdBy, passengerName, parcelCount, ticketStatus",
+      "id, reservationId, price, isReservation, createdAt, paymentId, createdBy, passengerName, parcelCount, ticketStatus, boardedAt",
     )
     .eq("reservationId", reservationId)
     .eq("type", "voyage")
@@ -495,6 +498,7 @@ export async function getTripManifestSupabase(
         booking.isReservation,
         payment?.txID,
       ),
+      scannedAt: booking.boardedAt ?? null,
     };
   });
 
