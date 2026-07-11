@@ -88,6 +88,22 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
+import {
+  adminDeleteCompanySupabase,
+  setCompanyActiveAdminSupabase,
+} from "@/lib/supabase/company-owner-contract.ts";
+import { errorMessage } from "@/lib/utils.ts";
 import {
   Accordion,
 } from "@/components/ui/accordion.tsx";
@@ -175,6 +191,9 @@ export default function SupabaseAdminPanel() {
   const reloadCurrentTab = useCallback(() => {
     setTabRefreshNonce((nonce) => nonce + 1);
   }, []);
+  const [togglingCompanyId, setTogglingCompanyId] = useState<string | null>(null);
+  const [deleteCompanyTarget, setDeleteCompanyTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletingCompany, setDeletingCompany] = useState(false);
   const [commissionAccordionSections, setCommissionAccordionSections] = useState<string[]>([]);
   const canAccessAdminPanel = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
 
@@ -241,6 +260,50 @@ export default function SupabaseAdminPanel() {
   const selectTab = (id: TabId) => {
     setTab(id);
     setSearchParams({ tab: id }, { replace: true });
+  };
+
+  const handleToggleCompanyActive = async (
+    company: { id: string; name: string },
+    isActive: boolean,
+  ) => {
+    setTogglingCompanyId(company.id);
+    try {
+      await setCompanyActiveAdminSupabase(company.id, isActive);
+      toast.success(
+        isActive
+          ? t("companies.activated", { defaultValue: `${company.name} activée.` })
+          : t("companies.deactivated", { defaultValue: `${company.name} désactivée.` }),
+      );
+      setData((current) => ({
+        ...current,
+        companies: (current.companies ?? []).map((c) =>
+          c.id === company.id ? { ...c, isActive } : c,
+        ),
+      }));
+    } catch (err) {
+      toast.error(errorMessage(err, tc("errors.generic", { defaultValue: "Mise à jour impossible." })));
+    } finally {
+      setTogglingCompanyId(null);
+    }
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!deleteCompanyTarget) return;
+    setDeletingCompany(true);
+    try {
+      await adminDeleteCompanySupabase(deleteCompanyTarget.id, deleteCompanyTarget.name);
+      toast.success(
+        t("companies.deleted", {
+          defaultValue: `Compagnie « ${deleteCompanyTarget.name} » supprimée définitivement.`,
+        }),
+      );
+      setDeleteCompanyTarget(null);
+      reloadCurrentTab();
+    } catch (err) {
+      toast.error(errorMessage(err, tc("errors.generic", { defaultValue: "Suppression impossible." })));
+    } finally {
+      setDeletingCompany(false);
+    }
   };
 
   const handleManageCompanyAsOwner = async (companyId: string) => {
@@ -578,9 +641,39 @@ export default function SupabaseAdminPanel() {
                           {t("manage_resources")}
                         </Button>
                       ) : null}
-                      <Badge variant={company.isActive ? "default" : "secondary"}>
-                        {company.isActive ? tc("status.active") : tc("status.inactive")}
-                      </Badge>
+                      <div
+                        className="flex items-center gap-1.5"
+                        title={t("companies.toggle_active_hint", {
+                          defaultValue: "Activer / désactiver la compagnie (visibilité publique)",
+                        })}
+                      >
+                        <Switch
+                          checked={company.isActive}
+                          disabled={togglingCompanyId === company.id}
+                          onCheckedChange={(checked) =>
+                            void handleToggleCompanyActive(company, checked)
+                          }
+                        />
+                        <Badge variant={company.isActive ? "default" : "secondary"}>
+                          {company.isActive ? tc("status.active") : tc("status.inactive")}
+                        </Badge>
+                      </div>
+                      {appUser.isSuperAdmin ? (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          title={t("companies.delete_hint", {
+                            defaultValue: "Supprimer définitivement la compagnie",
+                          })}
+                          onClick={() =>
+                            setDeleteCompanyTarget({ id: company.id, name: company.name })
+                          }
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </Button>
+                      ) : null}
                       <Badge variant="secondary">
                         {commission.amountType === "fixed"
                           ? `${commission.fixedAmount} ${company.currency ?? "XOF"}`
@@ -969,6 +1062,43 @@ export default function SupabaseAdminPanel() {
         <AdminTabAuditHub tab="landing" />
         </>
       )}
+      <AlertDialog
+        open={!!deleteCompanyTarget}
+        onOpenChange={(open) => !open && !deletingCompany && setDeleteCompanyTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("companies.delete_confirm_title", {
+                defaultValue: `Supprimer définitivement « ${deleteCompanyTarget?.name ?? ""} » ?`,
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("companies.delete_confirm_desc", {
+                defaultValue:
+                  "⚠️ Action IRRÉVERSIBLE. Toutes les données de la compagnie seront effacées : gares, bus, itinéraires, réservations, billets, paiements, caisses, colis, abonnements, avis, rôles et paramètres. Aucune restauration ne sera possible.",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingCompany}>
+              {tc("buttons.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deletingCompany}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteCompany();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingCompany
+                ? tc("buttons.saving", { defaultValue: "Suppression…" })
+                : t("companies.delete_confirm_btn", { defaultValue: "Supprimer définitivement" })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </AdminAccessGate>
   );

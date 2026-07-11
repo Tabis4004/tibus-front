@@ -106,3 +106,17 @@ export async function setCompanyActiveAdminSupabase(
   });
   if (error) throw error;
 }
+
+// Suppression DÉFINITIVE d'une compagnie et de toutes ses données
+// (super admin uniquement). La RPC exige le nom exact de la compagnie en
+// confirmation. Action irréversible.
+export async function adminDeleteCompanySupabase(
+  companyId: string,
+  confirmName: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("admin_delete_company", {
+    p_company_id: companyId,
+    p_confirm_name: confirmName,
+  });
+  if (error) throw error;
+}

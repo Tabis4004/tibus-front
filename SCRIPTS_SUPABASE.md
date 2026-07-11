@@ -582,6 +582,21 @@ Fichier : **`supabase/migrations/160_delete_owner_route.sql`** — statut : **�
 - Data fix associé (one-off, exécuté) : gares RIMBO repointées vers les vraies villes
   Abidjan (CI), Dakar (SN), Niamey (NE) ; doublons ABIDJAN/DAKAR/NIAMEY (Mali) supprimés.
 
+## Lot 162 — Fix module colis (natures)
+
+Fichier : **`supabase/migrations/162_colis_module_enabled_from_feature_modules.sql`** — statut : **✅ déployé (via MCP)**
+
+- `company_colis_module_enabled` aligné sur `CompanyFeatureModules.moduleD` (source officielle) au lieu de la colonne legacy `colis_autonome_enabled`.
+- Corrige « impossible d'ajouter une nature de colis » quand l'UI affichait le module actif.
+
+## Lot 163 — Suppression définitive de compagnie (super admin)
+
+Fichier : **`supabase/migrations/163_admin_delete_company.sql`** — statut : **✅ déployé (via MCP)**
+
+- RPC `admin_delete_company(companyId, confirmName)` : super admin uniquement, exige le nom exact en confirmation.
+- Supprime TOUTES les données : billets, réservations, paiements, caisses, colis, gares, bus, itinéraires, abonnements, avis, rôles, dépenses — puis la compagnie (cascades pour le reste).
+- Front : switch actif/inactif par ligne + bouton corbeille avec alerte « action irréversible » dans l'onglet Entreprises.
+
 ## Compagnie démo + owners (post-purge)
 
 Script manuel : **`scripts/prod-seed-demo-company.sql`**
