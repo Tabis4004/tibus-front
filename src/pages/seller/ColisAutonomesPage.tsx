@@ -34,6 +34,7 @@ import {
   COLIS_NEXT_STATUT,
   COLIS_STATUT_LABELS,
   getColisAutonomeDetailSupabase,
+  getColisPrixMinSupabase,
   getCompanyColisSettingsSupabase,
   listColisAutonomesSupabase,
   listColisNaturesSupabase,
@@ -164,8 +165,10 @@ export default function ColisAutonomesPage({
   const [poidsKg, setPoidsKg] = useState("");
   const [nombrePieces, setNombrePieces] = useState("1");
   const [montantFret, setMontantFret] = useState("");
+  const [valeurMarchandise, setValeurMarchandise] = useState("");
   const [selectedNatureId, setSelectedNatureId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [prixMinSuggere, setPrixMinSuggere] = useState<number | null>(null);
   const [receiptDetail, setReceiptDetail] = useState<ColisAutonomeDetail | null>(null);
   const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(
     companyReceiptInfoProp ?? null,
@@ -241,7 +244,9 @@ export default function ColisAutonomesPage({
     setPoidsKg("");
     setNombrePieces("1");
     setMontantFret("");
+    setValeurMarchandise("");
     setSelectedNatureId("");
+    setPrixMinSuggere(null);
     if (cashGareId) setGareDepartId(cashGareId);
     else setGareDepartId("");
     setGareDestinationId("");
@@ -368,6 +373,27 @@ export default function ColisAutonomesPage({
     void load();
   }, [appUserId, companyIdProp, companyNameProp]);
 
+  // Prix minimum indicatif (règles owner : par nature ou override général) —
+  // purement informatif côté client, la validation finale est faite en base.
+  useEffect(() => {
+    if (!companyId || !selectedNatureId) {
+      setPrixMinSuggere(null);
+      return;
+    }
+    let cancelled = false;
+    const poids = poidsKg ? Number(poidsKg) : null;
+    getColisPrixMinSupabase(companyId, [selectedNatureId], poids)
+      .then((min) => {
+        if (!cancelled) setPrixMinSuggere(min > 0 ? min : null);
+      })
+      .catch(() => {
+        if (!cancelled) setPrixMinSuggere(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, selectedNatureId, poidsKg]);
+
   const handleRegister = async () => {
     if (!companyId) return;
     if (!gareDepartId || !gareDestinationId) {
@@ -402,6 +428,15 @@ export default function ColisAutonomesPage({
       toast.error(t("colis.nature_required", { defaultValue: "Sélectionnez une nature de colis" }));
       return;
     }
+    if (prixMinSuggere != null && (Number(montantFret) || 0) < prixMinSuggere) {
+      toast.error(
+        t("colis.montant_below_min", {
+          defaultValue: `Montant fret insuffisant — minimum requis ${prixMinSuggere.toLocaleString()} XOF`,
+          amount: prixMinSuggere.toLocaleString(),
+        }),
+      );
+      return;
+    }
     setSaving(true);
     try {
       const result = await registerColisAutonomeSupabase({
@@ -416,6 +451,7 @@ export default function ColisAutonomesPage({
         poidsKg: poidsKg ? Number(poidsKg) : undefined,
         nombrePieces: Number(nombrePieces) || 1,
         montantFret: Number(montantFret) || 0,
+        valeurMarchandise: valeurMarchandise ? Number(valeurMarchandise) : undefined,
         natureIds: [selectedNatureId],
       });
       const detail = await getColisAutonomeDetailSupabase(result.id);
@@ -633,9 +669,41 @@ export default function ColisAutonomesPage({
                   <Input type="number" min={1} value={nombrePieces} onChange={(e) => setNombrePieces(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{t("colis.montant", { defaultValue: "Montant fret (XOF)" })}</Label>
-                  <Input type="number" min={0} value={montantFret} onChange={(e) => setMontantFret(e.target.value)} />
+                  <Label>{t("colis.valeur_marchandise", { defaultValue: "Valeur marchandise (XOF)" })}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={valeurMarchandise}
+                    onChange={(e) => setValeurMarchandise(e.target.value)}
+                    placeholder={t("colis.valeur_marchandise_placeholder", { defaultValue: "Optionnel" })}
+                  />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>{t("colis.montant", { defaultValue: "Montant fret (XOF)" })}</Label>
+                <Input type="number" min={0} value={montantFret} onChange={(e) => setMontantFret(e.target.value)} />
+                {prixMinSuggere != null ? (
+                  <p
+                    className={cn(
+                      "text-xs",
+                      (Number(montantFret) || 0) < prixMinSuggere
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {t("colis.prix_min_hint", {
+                      defaultValue: `Prix minimum requis pour cette nature : ${prixMinSuggere.toLocaleString()} XOF`,
+                      amount: prixMinSuggere.toLocaleString(),
+                    })}
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  {t("colis.valeur_marchandise_hint", {
+                    defaultValue:
+                      "La valeur marchandise n'entre pas dans le calcul du prix — elle aide à fixer le montant du fret et figure sur le reçu.",
+                  })}
+                </p>
               </div>
 
               <Button className="w-full cursor-pointer" disabled={saving} onClick={() => void handleRegister()}>

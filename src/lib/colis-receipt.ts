@@ -59,6 +59,9 @@ export function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: st
     { text: detail.poidsKg ? `Poids: ${detail.poidsKg} kg` : "Poids: —" },
     { text: "" },
     { text: `Montant fret: ${detail.montantFret.toLocaleString()} ${currency}`, bold: true },
+    ...(detail.valeurMarchandise != null && detail.valeurMarchandise > 0
+      ? [{ text: `Valeur marchandise: ${detail.valeurMarchandise.toLocaleString()} ${currency}` }]
+      : []),
     { text: "" },
     { text: "Scannez le QR ou saisissez la reference CL- au retrait.", align: "center", size: "small" },
     { text: RECEIPT_POWERED_BY_LINE, align: "center", size: "small" },

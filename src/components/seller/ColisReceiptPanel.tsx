@@ -185,6 +185,14 @@ export default function ColisReceiptPanel({
               {currency} {detail.montantFret.toLocaleString()}
             </span>
           </div>
+          {detail.valeurMarchandise != null && detail.valeurMarchandise > 0 && (
+            <div className="flex justify-between gap-1">
+              <span className="text-gray-600">Valeur marchandise:</span>
+              <span className="text-right">
+                {currency} {detail.valeurMarchandise.toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
 
         <ReceiptPoweredByFooter companyLogoUrl={companyInfo?.logoUrl} />

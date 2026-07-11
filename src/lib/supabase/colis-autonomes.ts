@@ -8,6 +8,10 @@ export type ColisNature = {
   libelle: string;
   isActive: boolean;
   createdAt?: string;
+  /** Prix minimum fixe (XOF) pour cette nature ; prioritaire sur le taux si renseigné. */
+  prixMinFixe?: number | null;
+  /** Taux minimum (XOF / kg) pour cette nature, appliqué au poids du colis. */
+  prixMinTaux?: number | null;
 };
 
 export type CompanyColisSettings = {
@@ -23,6 +27,13 @@ export type CompanyColisSettings = {
   smsOnCharge: boolean;
   smsOnArrive: boolean;
   smsOnLivre: boolean;
+  /**
+   * Override général du prix minimum (fixe XOF), toutes natures confondues.
+   * S'applique à la place des règles par nature dès qu'il est non NULL.
+   */
+  colisPrixMinFixeGeneral?: number | null;
+  /** Override général du taux minimum (XOF / kg), toutes natures confondues. */
+  colisPrixMinTauxGeneral?: number | null;
 };
 
 export type ColisAutonomeRow = {
@@ -36,6 +47,8 @@ export type ColisAutonomeRow = {
   poidsKg?: number | null;
   nombrePieces: number;
   montantFret: number;
+  /** Valeur déclarée de la marchandise (XOF) — informative, n'entre pas dans le calcul du prix. */
+  valeurMarchandise?: number | null;
   createdAt: string;
   updatedAt: string;
   gareDepart: string;
@@ -80,6 +93,10 @@ function mapSettings(data: Record<string, unknown>): CompanyColisSettings {
     smsOnCharge: Boolean(data.smsOnCharge),
     smsOnArrive: Boolean(data.smsOnArrive),
     smsOnLivre: Boolean(data.smsOnLivre),
+    colisPrixMinFixeGeneral:
+      data.colisPrixMinFixeGeneral != null ? Number(data.colisPrixMinFixeGeneral) : null,
+    colisPrixMinTauxGeneral:
+      data.colisPrixMinTauxGeneral != null ? Number(data.colisPrixMinTauxGeneral) : null,
   };
 }
 
@@ -98,6 +115,7 @@ function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
     poidsKg: row.poidsKg != null ? Number(row.poidsKg) : null,
     nombrePieces: Number(row.nombrePieces ?? 1),
     montantFret: Number(row.montantFret ?? 0),
+    valeurMarchandise: row.valeurMarchandise != null ? Number(row.valeurMarchandise) : null,
     createdAt: String(row.createdAt ?? ""),
     updatedAt: String(row.updatedAt ?? ""),
     gareDepart: String(row.gareDepart ?? ""),
@@ -134,10 +152,44 @@ export async function updateCompanyColisSmsSettingsSupabase(
   return mapSettings((data ?? {}) as Record<string, unknown>);
 }
 
+/**
+ * Met à jour l'override général du prix minimum (fixe ou taux/kg) de la
+ * compagnie. Passer `null` pour désactiver l'override et retomber sur les
+ * règles par nature de colis.
+ */
+export async function updateCompanyColisPriceSettingsSupabase(
+  companyId: string,
+  input: { prixMinFixeGeneral: number | null; prixMinTauxGeneral: number | null },
+): Promise<CompanyColisSettings> {
+  const { data, error } = await supabase.rpc("update_company_colis_price_settings", {
+    p_company_id: companyId,
+    p_prix_min_fixe_general: input.prixMinFixeGeneral,
+    p_prix_min_taux_general: input.prixMinTauxGeneral,
+  });
+  if (error) throw error;
+  return mapSettings((data ?? {}) as Record<string, unknown>);
+}
+
+/** Calcule (côté serveur) le prix minimum requis pour un envoi donné — pour affichage indicatif avant enregistrement. */
+export async function getColisPrixMinSupabase(
+  companyId: string,
+  natureIds: string[],
+  poidsKg: number | null,
+): Promise<number> {
+  if (!natureIds.length) return 0;
+  const { data, error } = await supabase.rpc("get_colis_prix_min", {
+    p_company_id: companyId,
+    p_nature_ids: natureIds,
+    p_poids_kg: poidsKg ?? null,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
 export async function listColisNaturesSupabase(companyId: string): Promise<ColisNature[]> {
   const { data, error } = await supabase
     .from("colis_natures")
-    .select("id, libelle, is_active, created_at")
+    .select("id, libelle, is_active, created_at, prix_min_fixe, prix_min_taux")
     .eq("company_id", companyId)
     .order("libelle");
   if (error) throw error;
@@ -146,6 +198,8 @@ export async function listColisNaturesSupabase(companyId: string): Promise<Colis
     libelle: String(row.libelle),
     isActive: Boolean(row.is_active),
     createdAt: row.created_at ? String(row.created_at) : undefined,
+    prixMinFixe: row.prix_min_fixe != null ? Number(row.prix_min_fixe) : null,
+    prixMinTaux: row.prix_min_taux != null ? Number(row.prix_min_taux) : null,
   }));
 }
 
@@ -154,12 +208,16 @@ export async function upsertColisNatureSupabase(
   libelle: string,
   natureId?: string,
   isActive = true,
+  prixMinFixe?: number | null,
+  prixMinTaux?: number | null,
 ): Promise<ColisNature> {
   const { data, error } = await supabase.rpc("upsert_colis_nature", {
     p_company_id: companyId,
     p_libelle: libelle.trim(),
     p_nature_id: natureId ?? null,
     p_is_active: isActive,
+    p_prix_min_fixe: prixMinFixe ?? null,
+    p_prix_min_taux: prixMinTaux ?? null,
   });
   if (error) throw error;
   const row = (data ?? {}) as Record<string, unknown>;
@@ -167,6 +225,8 @@ export async function upsertColisNatureSupabase(
     id: String(row.id),
     libelle: String(row.libelle),
     isActive: Boolean(row.isActive),
+    prixMinFixe: row.prixMinFixe != null ? Number(row.prixMinFixe) : null,
+    prixMinTaux: row.prixMinTaux != null ? Number(row.prixMinTaux) : null,
   };
 }
 
@@ -187,6 +247,8 @@ export type RegisterColisInput = {
   poidsKg?: number;
   nombrePieces: number;
   montantFret: number;
+  /** Valeur déclarée de la marchandise (XOF) — informative, n'entre pas dans le calcul du prix. */
+  valeurMarchandise?: number;
   natureIds: string[];
 };
 
@@ -206,6 +268,7 @@ export async function registerColisAutonomeSupabase(
     p_nombre_pieces: input.nombrePieces,
     p_montant_fret: input.montantFret,
     p_nature_ids: input.natureIds,
+    p_valeur_marchandise: input.valeurMarchandise ?? null,
   });
   if (error) throwSupabaseError(error, "Enregistrement colis impossible");
   const row = (data ?? {}) as Record<string, unknown>;

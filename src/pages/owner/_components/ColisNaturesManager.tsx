@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PackageIcon, PlusIcon, SaveIcon, TrashIcon } from "lucide-react";
+import { CoinsIcon, PackageIcon, PlusIcon, SaveIcon, TrashIcon } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button.tsx";
@@ -13,6 +13,7 @@ import {
   deleteColisNatureSupabase,
   getCompanyColisSettingsSupabase,
   listColisNaturesSupabase,
+  updateCompanyColisPriceSettingsSupabase,
   updateCompanyColisSmsSettingsSupabase,
   upsertColisNatureSupabase,
   type ColisNature,
@@ -20,6 +21,17 @@ import {
 } from "@/lib/supabase/colis-autonomes.ts";
 import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
 import { useCompanyFeatureModules } from "@/hooks/use-company-feature-modules.ts";
+
+type NaturePriceDraft = { fixe: string; taux: string };
+
+function naturePriceDraftsFrom(natures: ColisNature[]): Record<string, NaturePriceDraft> {
+  return Object.fromEntries(
+    natures.map((n) => [
+      n.id,
+      { fixe: n.prixMinFixe != null ? String(n.prixMinFixe) : "", taux: n.prixMinTaux != null ? String(n.prixMinTaux) : "" },
+    ]),
+  );
+}
 
 export default function ColisNaturesManager({ companyId }: { companyId: string }) {
   const { t } = useTranslation("owner");
@@ -30,6 +42,11 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
   const [newLibelle, setNewLibelle] = useState("");
   const [savingSms, setSavingSms] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [naturePriceDrafts, setNaturePriceDrafts] = useState<Record<string, NaturePriceDraft>>({});
+  const [savingNaturePriceId, setSavingNaturePriceId] = useState<string | null>(null);
+  const [generalPrixMinFixe, setGeneralPrixMinFixe] = useState("");
+  const [generalPrixMinTaux, setGeneralPrixMinTaux] = useState("");
+  const [savingGeneralPrice, setSavingGeneralPrice] = useState(false);
 
   const load = async () => {
     setNatures(null);
@@ -41,6 +58,13 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       ]);
       setSettings(nextSettings);
       setNatures(nextNatures);
+      setNaturePriceDrafts(naturePriceDraftsFrom(nextNatures));
+      setGeneralPrixMinFixe(
+        nextSettings.colisPrixMinFixeGeneral != null ? String(nextSettings.colisPrixMinFixeGeneral) : "",
+      );
+      setGeneralPrixMinTaux(
+        nextSettings.colisPrixMinTauxGeneral != null ? String(nextSettings.colisPrixMinTauxGeneral) : "",
+      );
     } catch (err) {
       toast.error(errorMessage(err, t("colis.load_error", { defaultValue: "Chargement impossible" })));
       setSettings(null);
@@ -83,6 +107,48 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       await load();
     } catch (err) {
       toast.error(errorMessage(err, tc("errors.generic")));
+    }
+  };
+
+  const handleSaveNaturePrice = async (nature: ColisNature) => {
+    const draft = naturePriceDrafts[nature.id] ?? { fixe: "", taux: "" };
+    const fixe = draft.fixe.trim() ? Number(draft.fixe) : null;
+    const taux = draft.taux.trim() ? Number(draft.taux) : null;
+    if ((fixe != null && Number.isNaN(fixe)) || (taux != null && Number.isNaN(taux))) {
+      toast.error(t("colis.price_invalid", { defaultValue: "Montant invalide" }));
+      return;
+    }
+    setSavingNaturePriceId(nature.id);
+    try {
+      await upsertColisNatureSupabase(companyId, nature.libelle, nature.id, nature.isActive, fixe, taux);
+      toast.success(t("colis.nature_price_saved", { defaultValue: "Prix minimum enregistré" }));
+      await load();
+    } catch (err) {
+      toast.error(errorMessage(err, tc("errors.generic")));
+    } finally {
+      setSavingNaturePriceId(null);
+    }
+  };
+
+  const handleSaveGeneralPrice = async () => {
+    const fixe = generalPrixMinFixe.trim() ? Number(generalPrixMinFixe) : null;
+    const taux = generalPrixMinTaux.trim() ? Number(generalPrixMinTaux) : null;
+    if ((fixe != null && Number.isNaN(fixe)) || (taux != null && Number.isNaN(taux))) {
+      toast.error(t("colis.price_invalid", { defaultValue: "Montant invalide" }));
+      return;
+    }
+    setSavingGeneralPrice(true);
+    try {
+      const updated = await updateCompanyColisPriceSettingsSupabase(companyId, {
+        prixMinFixeGeneral: fixe,
+        prixMinTauxGeneral: taux,
+      });
+      setSettings(updated);
+      toast.success(t("colis.general_price_saved", { defaultValue: "Prix minimum général enregistré" }));
+    } catch (err) {
+      toast.error(errorMessage(err, tc("errors.generic")));
+    } finally {
+      setSavingGeneralPrice(false);
     }
   };
 
@@ -161,30 +227,137 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
             <p className="text-sm text-muted-foreground">{t("colis.no_natures", { defaultValue: "Aucune nature définie." })}</p>
           ) : (
             <div className="space-y-2">
-              {natures.map((nature) => (
-                <div key={nature.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <div>
-                    <p className="font-medium text-sm">{nature.libelle}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {nature.isActive ? tc("status.active", { defaultValue: "Actif" }) : tc("status.inactive", { defaultValue: "Inactif" })}
-                    </p>
+              {natures.map((nature) => {
+                const draft = naturePriceDrafts[nature.id] ?? { fixe: "", taux: "" };
+                const priceDirty =
+                  draft.fixe !== (nature.prixMinFixe != null ? String(nature.prixMinFixe) : "") ||
+                  draft.taux !== (nature.prixMinTaux != null ? String(nature.prixMinTaux) : "");
+                return (
+                  <div key={nature.id} className="rounded-lg border px-3 py-2 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-sm">{nature.libelle}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {nature.isActive ? tc("status.active", { defaultValue: "Actif" }) : tc("status.inactive", { defaultValue: "Inactif" })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={nature.isActive} onCheckedChange={() => void handleToggleNature(nature)} />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive cursor-pointer"
+                          onClick={() => void handleDeleteNature(nature.id)}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground font-normal">
+                          {t("colis.nature_prix_min_fixe", { defaultValue: "Prix min. fixe (XOF)" })}
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-8 text-xs"
+                          placeholder="—"
+                          value={draft.fixe}
+                          onChange={(e) =>
+                            setNaturePriceDrafts((prev) => ({
+                              ...prev,
+                              [nature.id]: { ...draft, fixe: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground font-normal">
+                          {t("colis.nature_prix_min_taux", { defaultValue: "Taux min. (XOF/kg)" })}
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-8 text-xs"
+                          placeholder="—"
+                          value={draft.taux}
+                          onChange={(e) =>
+                            setNaturePriceDrafts((prev) => ({
+                              ...prev,
+                              [nature.id]: { ...draft, taux: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    {priceDirty ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 text-xs cursor-pointer gap-1.5"
+                        disabled={savingNaturePriceId === nature.id}
+                        onClick={() => void handleSaveNaturePrice(nature)}
+                      >
+                        <SaveIcon className="w-3.5 h-3.5" />
+                        {savingNaturePriceId === nature.id
+                          ? "…"
+                          : t("colis.nature_price_save", { defaultValue: "Enregistrer le prix minimum" })}
+                      </Button>
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch checked={nature.isActive} onCheckedChange={() => void handleToggleNature(nature)} />
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="text-destructive cursor-pointer"
-                      onClick={() => void handleDeleteNature(nature.id)}
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CoinsIcon className="w-4 h-4" />
+            {t("colis.general_price_title", { defaultValue: "Prix minimum général (override)" })}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {t("colis.general_price_desc", {
+              defaultValue:
+                "Si renseigné (fixe ou taux), ce réglage remplace les prix minimums définis par nature pour tous les colis de la compagnie. Laissez vide pour utiliser les règles par nature.",
+            })}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>{t("colis.general_prix_min_fixe", { defaultValue: "Prix minimum fixe (XOF)" })}</Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder={t("colis.general_price_placeholder", { defaultValue: "Aucun override" })}
+                value={generalPrixMinFixe}
+                onChange={(e) => setGeneralPrixMinFixe(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("colis.general_prix_min_taux", { defaultValue: "Taux minimum (XOF/kg)" })}</Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder={t("colis.general_price_placeholder", { defaultValue: "Aucun override" })}
+                value={generalPrixMinTaux}
+                onChange={(e) => setGeneralPrixMinTaux(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            className="cursor-pointer gap-2"
+            disabled={savingGeneralPrice}
+            onClick={() => void handleSaveGeneralPrice()}
+          >
+            <SaveIcon className="w-4 h-4" />
+            {savingGeneralPrice ? "…" : tc("buttons.save")}
+          </Button>
         </CardContent>
       </Card>
 
