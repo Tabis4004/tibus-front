@@ -110,10 +110,12 @@ export async function openStationCashRegisterSupabase(input: {
   gareId: string;
   openingFloat: number;
 }): Promise<OpenStationCash> {
-  void input.companyId;
   const { data, error } = await supabase.rpc("open_station_cash_register", {
     p_gare_id: input.gareId,
     p_fond_roulement: Math.max(0, Math.round(input.openingFloat)),
+    // Compagnie active du dashboard vendeur : indispensable pour un vendeur
+    // multi-compagnies (sinon le serveur peut résoudre une autre compagnie).
+    p_company_id: input.companyId,
   });
   if (error) throw error;
   const row = (data ?? {}) as Record<string, unknown>;
