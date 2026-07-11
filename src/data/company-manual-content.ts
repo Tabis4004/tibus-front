@@ -77,11 +77,17 @@ export const OWNER_MENU_FICHES: ManualSubsection[] = [
     },
   },
   {
-    title: "Rapports Voyages",
-    body: "Occupation et performance de chaque départ programmé.",
+    title: "Rapports Voyages & Manifestes",
+    body: "Page Analyses → Rapport trajets, en deux onglets : « Voyages » (occupation et performance de chaque départ programmé) et « Colis autonomes » (manifeste des envois).",
+    bullets: [
+      "Onglet Voyages : chaque ligne de départ dispose de deux boutons Manifeste — PDF (liste nominative des passagers : billet, gare, colis/bagages, statut) et Excel/CSV.",
+      "Onglet Colis autonomes : manifeste des envois filtrable par statut (Enregistré · Chargé · Arrivé · Livré) et par gare de départ, avec totaux (nombre d'envois, total fret).",
+      "Bouton « Imprimer (PDF) » : manifeste colis paysage avec tous les détails — date, référence, gares, expéditeur et destinataire avec téléphones, natures, contenu, poids, pièces, montant, statut. Export Excel/CSV également.",
+      "Le filtre appliqué est rappelé dans l'en-tête du document imprimé.",
+    ],
     figure: {
       src: "/manuel/captures/owner-real-analytics-trips.png",
-      caption: "Rapports voyages",
+      caption: "Rapports voyages — onglets Voyages et Colis autonomes, boutons manifeste",
     },
   },
   {
@@ -125,6 +131,7 @@ export const OWNER_MENU_FICHES: ManualSubsection[] = [
       "L'option SMS est soumise à autorisation plateforme (module D + option SMS) : si elle n'est pas accordée, les interrupteurs restent verrouillés.",
       "Le montant du fret est saisi librement par le vendeur au guichet et passe par sa caisse journalière.",
       "Comptabilité : les ventes colis alimentent le produit 7012 du compte de résultat SYSCOHADA, distinct des billets (7011).",
+      "Manifeste colis : imprimable en PDF (ou export Excel/CSV) depuis Analyses → Rapport trajets → onglet Colis autonomes, filtrable par statut et gare de départ.",
     ],
     figure: { src: "/manuel/captures/owner-real-colis.png", caption: "Colis autonomes — natures et notifications SMS" },
   },
