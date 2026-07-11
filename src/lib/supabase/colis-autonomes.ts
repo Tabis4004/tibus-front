@@ -221,11 +221,12 @@ export async function registerColisAutonomeSupabase(
 export async function listColisAutonomesSupabase(
   companyId: string,
   statut?: ColisStatut | null,
+  limit = 100,
 ): Promise<ColisAutonomeRow[]> {
   const { data, error } = await supabase.rpc("list_colis_autonomes", {
     p_company_id: companyId,
     p_statut: statut ?? null,
-    p_limit: 100,
+    p_limit: limit,
   });
   if (error) throw error;
   const rows = Array.isArray(data) ? data : [];

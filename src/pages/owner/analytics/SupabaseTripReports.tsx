@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { BusIcon, FileSpreadsheetIcon, FileTextIcon, PackageIcon } from "lucide-react";
@@ -51,6 +52,13 @@ export default function SupabaseTripReports() {
   const [colisRows, setColisRows] = useState<ColisAutonomeRow[] | undefined>(undefined);
   const [colisStatutFilter, setColisStatutFilter] = useState<string>("all");
   const [colisGareFilter, setColisGareFilter] = useState<string>("all");
+  const [colisGareDestFilter, setColisGareDestFilter] = useState<string>("all");
+  const [colisDateFrom, setColisDateFrom] = useState<string>("");
+  const [colisDateTo, setColisDateTo] = useState<string>("");
+  // Ouverture directe de l'onglet colis via /owner/analytics/trips?tab=colis
+  // (lien depuis la page Colis autonomes).
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") === "colis" ? "colis" : "trips";
 
   const loadReport = useCallback(() => {
     if (!appUserId || !companyId) return;
@@ -68,7 +76,7 @@ export default function SupabaseTripReports() {
   const loadColis = useCallback(() => {
     if (!companyId) return;
     setColisRows(undefined);
-    void listColisAutonomesSupabase(companyId)
+    void listColisAutonomesSupabase(companyId, null, 500)
       .then(setColisRows)
       .catch((err) => {
         // Module colis désactivé ou droits insuffisants : liste vide, message discret.
@@ -107,6 +115,14 @@ export default function SupabaseTripReports() {
     return [...set].sort((a, b) => a.localeCompare(b, "fr"));
   }, [colisRows]);
 
+  const colisGaresDest = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of colisRows ?? []) {
+      if (row.gareDestination) set.add(row.gareDestination);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [colisRows]);
+
   const filteredColis = useMemo(() => {
     let rows = colisRows ?? [];
     if (colisStatutFilter !== "all") {
@@ -115,8 +131,17 @@ export default function SupabaseTripReports() {
     if (colisGareFilter !== "all") {
       rows = rows.filter((row) => row.gareDepart === colisGareFilter);
     }
+    if (colisGareDestFilter !== "all") {
+      rows = rows.filter((row) => row.gareDestination === colisGareDestFilter);
+    }
+    if (colisDateFrom) {
+      rows = rows.filter((row) => format(new Date(row.createdAt), "yyyy-MM-dd") >= colisDateFrom);
+    }
+    if (colisDateTo) {
+      rows = rows.filter((row) => format(new Date(row.createdAt), "yyyy-MM-dd") <= colisDateTo);
+    }
     return rows;
-  }, [colisRows, colisStatutFilter, colisGareFilter]);
+  }, [colisRows, colisStatutFilter, colisGareFilter, colisGareDestFilter, colisDateFrom, colisDateTo]);
 
   const totalFret = filteredColis.reduce((sum, row) => sum + row.montantFret, 0);
 
@@ -139,6 +164,10 @@ export default function SupabaseTripReports() {
       ? "Tous les statuts"
       : COLIS_STATUT_LABELS[colisStatutFilter as ColisStatut],
     colisGareFilter === "all" ? "toutes gares de départ" : `départ ${colisGareFilter}`,
+    colisGareDestFilter === "all" ? "toutes destinations" : `destination ${colisGareDestFilter}`,
+    colisDateFrom || colisDateTo
+      ? `du ${colisDateFrom ? format(new Date(colisDateFrom), "dd/MM/yyyy") : "…"} au ${colisDateTo ? format(new Date(colisDateTo), "dd/MM/yyyy") : "…"}`
+      : "toutes dates",
   ].join(" · ");
 
   const handleColisManifest = (kind: "pdf" | "csv") => {
@@ -167,7 +196,7 @@ export default function SupabaseTripReports() {
         </p>
       </div>
 
-      <Tabs defaultValue="trips">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="trips">
             <BusIcon className="w-4 h-4 mr-1.5" />
@@ -315,9 +344,9 @@ export default function SupabaseTripReports() {
 
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex flex-wrap gap-2 items-end">
                 <Select value={colisStatutFilter} onValueChange={setColisStatutFilter}>
-                  <SelectTrigger className="w-full sm:w-52">
+                  <SelectTrigger className="w-full sm:w-44">
                     <SelectValue placeholder="Statut" />
                   </SelectTrigger>
                   <SelectContent>
@@ -330,7 +359,7 @@ export default function SupabaseTripReports() {
                   </SelectContent>
                 </Select>
                 <Select value={colisGareFilter} onValueChange={setColisGareFilter}>
-                  <SelectTrigger className="w-full sm:w-52">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Gare de départ" />
                   </SelectTrigger>
                   <SelectContent>
@@ -342,7 +371,42 @@ export default function SupabaseTripReports() {
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex gap-2 sm:ml-auto">
+                <Select value={colisGareDestFilter} onValueChange={setColisGareDestFilter}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Gare d'arrivée" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes destinations</SelectItem>
+                    {colisGaresDest.map((gare) => (
+                      <SelectItem key={gare} value={gare}>
+                        {gare}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-muted-foreground" htmlFor="colis-date-from">
+                    Du
+                  </label>
+                  <input
+                    id="colis-date-from"
+                    type="date"
+                    value={colisDateFrom}
+                    onChange={(e) => setColisDateFrom(e.target.value)}
+                    className="h-9 rounded-md border bg-transparent px-2 text-xs"
+                  />
+                  <label className="text-xs text-muted-foreground" htmlFor="colis-date-to">
+                    au
+                  </label>
+                  <input
+                    id="colis-date-to"
+                    type="date"
+                    value={colisDateTo}
+                    onChange={(e) => setColisDateTo(e.target.value)}
+                    className="h-9 rounded-md border bg-transparent px-2 text-xs"
+                  />
+                </div>
+                <div className="flex gap-2 ml-auto">
                   <Button size="sm" variant="outline" onClick={() => handleColisManifest("pdf")}>
                     <FileTextIcon className="w-3.5 h-3.5 mr-1.5" />
                     {t("report.colis_manifest_pdf", { defaultValue: "Imprimer (PDF)" })}

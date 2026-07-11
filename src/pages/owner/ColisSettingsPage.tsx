@@ -1,8 +1,12 @@
+import { Link, useParams } from "react-router-dom";
+import { FileTextIcon } from "lucide-react";
 import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import ColisNaturesManager from "./_components/ColisNaturesManager.tsx";
 
 export default function ColisSettingsPage() {
+  const { lng } = useParams<{ lng: string }>();
   const { selectedCompany, isLoading, isReady } = useOwnerCompany();
 
   if (!isReady || isLoading) {
@@ -14,7 +18,15 @@ export default function ColisSettingsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
+      <div className="flex justify-end">
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/${lng ?? "fr"}/owner/analytics/trips?tab=colis`}>
+            <FileTextIcon className="w-3.5 h-3.5 mr-1.5" />
+            Manifeste colis (imprimer / exporter)
+          </Link>
+        </Button>
+      </div>
       <ColisNaturesManager key={selectedCompany.id} companyId={selectedCompany.id} />
     </div>
   );
