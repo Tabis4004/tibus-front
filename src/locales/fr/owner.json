@@ -349,6 +349,8 @@
   "gare.link_routes": "Itinéraires compagnie",
   "gare.team_title": "Équipe de gare",
   "gare.team_add_btn": "Ajouter à l'équipe",
+  "gare.team_identifier": "E-mail ou nom d'utilisateur",
+  "gare.team_identifier_placeholder": "email@exemple.com ou username",
   "gare.team_empty": "Aucun membre rattaché à cette gare.",
   "gare.team_assigned": "{{name}} a rejoint l'équipe de gare.",
   "gare.team_assign_error": "Impossible d'attribuer ce rôle.",

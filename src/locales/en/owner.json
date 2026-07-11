@@ -346,6 +346,8 @@
   "gare.link_routes": "Company routes",
   "gare.team_title": "Station team",
   "gare.team_add_btn": "Add to team",
+  "gare.team_identifier": "Email or username",
+  "gare.team_identifier_placeholder": "email@example.com or username",
   "gare.team_empty": "No members linked to this station.",
   "gare.team_assigned": "{{name}} joined the station team.",
   "gare.team_assign_error": "Unable to assign this role.",

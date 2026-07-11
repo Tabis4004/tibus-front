@@ -112,13 +112,17 @@ export default function GareTeamPanel({ gareId }: { gareId: string }) {
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
             <div className="space-y-1.5">
-              <Label htmlFor="gare-team-email">{t("sellers.email")}</Label>
+              <Label htmlFor="gare-team-email">
+                {t("gare.team_identifier", { defaultValue: "E-mail ou nom d'utilisateur" })}
+              </Label>
               <Input
                 id="gare-team-email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("sellers.search_email")}
+                placeholder={t("gare.team_identifier_placeholder", {
+                  defaultValue: "email@exemple.com ou username",
+                })}
               />
             </div>
             <div className="space-y-1.5">
