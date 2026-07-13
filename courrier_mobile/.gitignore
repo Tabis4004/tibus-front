@@ -1,0 +1,45 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+*.iml
+*.ipr
+*.iws
+
+# Secrets
+.env
+
+# Platform (générés par `flutter create .` si absents)
+# android/ : versionné exprès (driver imprimante P3/Wiseasy natif + libs
+# SDK — pas régénérable par `flutter create .`). Seuls le wrapper Gradle et
+# les artefacts de build/IDE, tous régénérables, sont exclus ci-dessous.
+# (git n'autorise pas de désexclure un sous-dossier d'un dossier ignoré en
+# bloc — d'où la liste explicite plutôt qu'un `android/` + `!android/app/`.)
+android/.gradle/
+android/local.properties
+android/gradlew
+android/gradlew.bat
+android/gradle/
+android/*.iml
+android/.DS_Store
+android/app/build/
+android/app/.cxx/
+android/app/.DS_Store
+android/app/src/.DS_Store
+android/app/src/main/.DS_Store
+ios/
+web/
+macos/
+linux/
+windows/
+
+# IDE
+.idea/
+.vscode/
+
+# Fichiers de secours ponctuels (édition manuelle)
+*.bak

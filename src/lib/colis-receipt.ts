@@ -62,6 +62,9 @@ export function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: st
     ...(detail.valeurMarchandise != null && detail.valeurMarchandise > 0
       ? [{ text: `Valeur marchandise: ${detail.valeurMarchandise.toLocaleString()} ${currency}` }]
       : []),
+    ...(detail.pourcentagePercu != null && detail.pourcentagePercu > 0
+      ? [{ text: `Pourcentage percu: ${detail.pourcentagePercu}%` }]
+      : []),
     { text: "" },
     { text: "Scannez le QR ou saisissez la reference CL- au retrait.", align: "center", size: "small" },
     { text: RECEIPT_POWERED_BY_LINE, align: "center", size: "small" },
@@ -135,6 +138,38 @@ export function printColisReceipt(
     console.error("Colis print error:", error);
     toast.error("Impression impossible");
   }
+}
+
+/** Construit un lien wa.me pré-rempli pour un numéro et un message donnés. */
+export function buildColisWhatsAppLink(phone: string, message: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+export function openColisWhatsApp(phone: string, message: string): void {
+  if (!phone.trim()) {
+    toast.error("Numéro de téléphone manquant");
+    return;
+  }
+  window.open(buildColisWhatsAppLink(phone, message), "_blank", "noopener,noreferrer");
+}
+
+/** Message WhatsApp de suivi — même contenu informatif que le SMS, pour envoi manuel à chaque étape. */
+export function buildColisTrackingWhatsAppMessage(input: {
+  colisId: string;
+  statut: ColisAutonomeDetail["statutColis"];
+  companyName: string;
+  gareDepart: string;
+  gareDestination: string;
+  recipientLabel: "Expéditeur" | "Destinataire";
+}): string {
+  const ref = colisPublicReference(input.colisId);
+  return [
+    `${input.companyName} — Suivi colis ${ref}`,
+    `Statut : ${COLIS_STATUT_LABELS[input.statut]}`,
+    `Trajet : ${input.gareDepart} → ${input.gareDestination}`,
+    `Bonjour, votre colis (réf. ${ref}) est maintenant "${COLIS_STATUT_LABELS[input.statut]}".`,
+  ].join("\n");
 }
 
 export function isColisPosPrinterAvailable(): boolean {

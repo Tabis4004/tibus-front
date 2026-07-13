@@ -46,6 +46,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
   const [savingNaturePriceId, setSavingNaturePriceId] = useState<string | null>(null);
   const [generalPrixMinFixe, setGeneralPrixMinFixe] = useState("");
   const [generalPrixMinTaux, setGeneralPrixMinTaux] = useState("");
+  const [generalPourcentagePercu, setGeneralPourcentagePercu] = useState("");
   const [savingGeneralPrice, setSavingGeneralPrice] = useState(false);
 
   const load = async () => {
@@ -64,6 +65,11 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       );
       setGeneralPrixMinTaux(
         nextSettings.colisPrixMinTauxGeneral != null ? String(nextSettings.colisPrixMinTauxGeneral) : "",
+      );
+      setGeneralPourcentagePercu(
+        nextSettings.colisPourcentagePercuGeneral != null
+          ? String(nextSettings.colisPourcentagePercuGeneral)
+          : "",
       );
     } catch (err) {
       toast.error(errorMessage(err, t("colis.load_error", { defaultValue: "Chargement impossible" })));
@@ -133,7 +139,12 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
   const handleSaveGeneralPrice = async () => {
     const fixe = generalPrixMinFixe.trim() ? Number(generalPrixMinFixe) : null;
     const taux = generalPrixMinTaux.trim() ? Number(generalPrixMinTaux) : null;
-    if ((fixe != null && Number.isNaN(fixe)) || (taux != null && Number.isNaN(taux))) {
+    const pourcentage = generalPourcentagePercu.trim() ? Number(generalPourcentagePercu) : null;
+    if (
+      (fixe != null && Number.isNaN(fixe)) ||
+      (taux != null && Number.isNaN(taux)) ||
+      (pourcentage != null && (Number.isNaN(pourcentage) || pourcentage < 0 || pourcentage > 100))
+    ) {
       toast.error(t("colis.price_invalid", { defaultValue: "Montant invalide" }));
       return;
     }
@@ -142,6 +153,7 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
       const updated = await updateCompanyColisPriceSettingsSupabase(companyId, {
         prixMinFixeGeneral: fixe,
         prixMinTauxGeneral: taux,
+        pourcentagePercuGeneral: pourcentage,
       });
       setSettings(updated);
       toast.success(t("colis.general_price_saved", { defaultValue: "Prix minimum général enregistré" }));
@@ -349,6 +361,24 @@ export default function ColisNaturesManager({ companyId }: { companyId: string }
                 onChange={(e) => setGeneralPrixMinTaux(e.target.value)}
               />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("colis.pourcentage_percu_general", { defaultValue: "Pourcentage perçu par défaut (%)" })}</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step="0.1"
+              placeholder={t("colis.pourcentage_percu_placeholder", { defaultValue: "Aucun défaut" })}
+              value={generalPourcentagePercu}
+              onChange={(e) => setGeneralPourcentagePercu(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("colis.pourcentage_percu_desc", {
+                defaultValue:
+                  "Pré-remplit le pourcentage proposé au guichet quand l'agent choisit de calculer le montant fret automatiquement à partir de la valeur marchandise. Le minimum ci-dessus reste appliqué.",
+              })}
+            </p>
           </div>
           <Button
             className="cursor-pointer gap-2"

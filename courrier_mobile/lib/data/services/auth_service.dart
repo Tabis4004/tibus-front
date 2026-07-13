@@ -1,0 +1,184 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_service.dart';
+import '../models/app_role.dart';
+
+/// Résultat d'une inscription — miroir de SignUpResult côté web
+/// (src/components/providers/supabase-auth.tsx).
+class SignUpOutcome {
+  final User? user;
+  final Session? session;
+  final String? appUserId;
+  final bool requiresConfirmation;
+
+  const SignUpOutcome({
+    required this.user,
+    required this.session,
+    required this.appUserId,
+    required this.requiresConfirmation,
+  });
+}
+
+/// Authentification + résolution des rôles — s'appuie sur les tables
+/// Users / UserRoles / Role existantes, inchangées. La logique
+/// d'inscription (signUpWithPassword + ensureUserProfile) est reprise
+/// à l'identique de src/lib/auth/ensure-profile.ts et
+/// src/components/providers/supabase-auth.tsx côté web, pour que les
+/// comptes créés depuis Courrier soient strictement compatibles avec
+/// Tibus (même table Users, même rôle "traveler").
+class AuthService {
+  final SupabaseClient _client = SupabaseService.client;
+
+  Session? get currentSession => _client.auth.currentSession;
+  bool get isLoggedIn => currentSession != null;
+  Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
+
+  /// Lève une [AuthException] avec un message exploitable en cas
+  /// d'identifiants invalides — ne jamais avaler l'erreur ici, l'appelant
+  /// (écran de connexion) décide comment l'afficher.
+  Future<AuthResponse> signInWithPassword({
+    required String identifier, // email ou téléphone selon config Tibus
+    required String password,
+  }) {
+    return _client.auth.signInWithPassword(email: identifier, password: password);
+  }
+
+  Future<void> signOut() => _client.auth.signOut();
+
+  Future<void> requestPasswordReset(String email) {
+    return _client.auth.resetPasswordForEmail(email.trim());
+  }
+
+  /// Inscription "client" (expéditeur/destinataire qui veut suivre ses
+  /// colis + notifications). Crée le compte Supabase Auth, puis — si une
+  /// session est immédiatement disponible (pas de confirmation email
+  /// requise) — la ligne Users correspondante avec le rôle "traveler".
+  Future<SignUpOutcome> signUpWithPassword({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+  }) async {
+    final response = await _client.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'full_name': fullName.trim(),
+        'phone': phone.trim(),
+      },
+    );
+
+    String? appUserId;
+    if (response.user != null && response.session != null) {
+      appUserId = await _ensureUserProfile(response.user!, fallbackPhone: phone);
+    }
+
+    return SignUpOutcome(
+      user: response.user,
+      session: response.session,
+      appUserId: appUserId,
+      requiresConfirmation: response.session == null,
+    );
+  }
+
+  /// Miroir de ensureUserProfile (web) : crée la ligne Users + rôle
+  /// "traveler" si elle n'existe pas encore pour cet utilisateur Auth.
+  /// Idempotent — peut être rappelée sans risque (ex: à chaque connexion).
+  Future<String> _ensureUserProfile(User authUser, {String? fallbackPhone}) async {
+    final existing = await _client
+        .from('Users')
+        .select('id')
+        .eq('auth_user_id', authUser.id)
+        .maybeSingle();
+    if (existing != null) return existing['id'] as String;
+
+    final countries = await _client.from('Countries').select('id').limit(1);
+    if ((countries as List).isEmpty) {
+      throw Exception(
+        "Aucun pays en base. Impossible de créer le profil (voir table Countries).",
+      );
+    }
+
+    final meta = authUser.userMetadata ?? {};
+    final fullName = (meta['full_name'] as String?) ?? (meta['name'] as String?) ?? '';
+    final parts = fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final firstName = parts.isNotEmpty ? parts.first : 'Utilisateur';
+    final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : 'Tibus';
+
+    final email = authUser.email ?? '';
+    final base = email.split('@').first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    final username = '${base.isEmpty ? 'user' : base}_${authUser.id.substring(0, 6)}'.toLowerCase();
+
+    final phone = ((meta['phone'] as String?) ?? authUser.phone ?? fallbackPhone ?? '').trim();
+    final profileCompleted = phone.replaceAll(RegExp(r'\D'), '').length >= 9 &&
+        !(firstName == 'Utilisateur' && lastName == 'Tibus');
+
+    final profile = await _client
+        .from('Users')
+        .insert({
+          'auth_user_id': authUser.id,
+          'firstName': firstName,
+          'lastName': lastName,
+          'username': username,
+          'email': email.isEmpty ? null : email,
+          'phone': phone.isEmpty ? null : phone,
+          'countryId': countries.first['id'],
+          'profileCompleted': profileCompleted,
+        })
+        .select('id')
+        .single();
+
+    final travelerRole = await _client.from('Role').select('id').eq('name', 'traveler').single();
+
+    await _client.from('UserRoles').insert({
+      'userId': profile['id'],
+      'roleId': travelerRole['id'],
+      'companyId': null,
+      'countryId': null,
+    });
+
+    return profile['id'] as String;
+  }
+
+  /// Rôles de l'utilisateur courant, toutes compagnies confondues.
+  /// Reprend UserRoles -> Role -> Companies (jointure applicative simple,
+  /// à remplacer par une RPC dédiée `list_my_roles` si le volume le justifie).
+  ///
+  /// Important : UserRoles.userId référence Users.id (le profil applicatif),
+  /// PAS l'id Supabase Auth (currentSession.user.id) — voir _ensureUserProfile
+  /// et son miroir web src/lib/auth/ensure-profile.ts, qui insèrent
+  /// `userId: profile.id` (Users.id). Il faut donc résoudre Users.id via
+  /// auth_user_id avant d'interroger UserRoles (comme le fait le web dans
+  /// use-app-user-state.ts), sous peine de ne jamais trouver de rôle pour
+  /// des comptes créés côté web (Tibus) ou plus anciens.
+  Future<List<AppRole>> fetchMyRoles() async {
+    final authUserId = currentSession?.user.id;
+    if (authUserId == null) return [];
+
+    final appUser = await _client
+        .from('Users')
+        .select('id')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+    final appUserId = appUser?['id'] as String?;
+    if (appUserId == null) return [];
+
+    final rows = await _client
+        .from('UserRoles')
+        .select('roleId, companyId, Role(name, scope, level, droits), Companies(name)')
+        .eq('userId', appUserId);
+
+    return (rows as List).map((row) {
+      final role = row['Role'] as Map<String, dynamic>? ?? {};
+      final company = row['Companies'] as Map<String, dynamic>? ?? {};
+      return AppRole.fromMap({
+        'roleId': row['roleId'],
+        'companyId': row['companyId'],
+        'roleName': role['name'],
+        'scope': role['scope'],
+        'level': role['level'],
+        'droits': role['droits'],
+        'companyName': company['name'],
+      });
+    }).toList();
+  }
+}

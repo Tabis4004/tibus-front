@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeftIcon,
+  MessageCircleIcon,
   PackageIcon,
   PrinterIcon,
   TruckIcon,
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -46,7 +48,9 @@ import {
   type ColisNature,
   type ColisSmsPayload,
   type ColisStatut,
+  type CompanyColisSettings,
 } from "@/lib/supabase/colis-autonomes.ts";
+import { buildColisTrackingWhatsAppMessage, openColisWhatsApp } from "@/lib/colis-receipt.ts";
 import { isColisAutonomeModuleActive } from "@/lib/company-feature-modules.ts";
 import { getCompanyFeatureModulesSupabase } from "@/lib/supabase/company-feature-modules.ts";
 import { cn } from "@/lib/utils.ts";
@@ -166,6 +170,8 @@ export default function ColisAutonomesPage({
   const [nombrePieces, setNombrePieces] = useState("1");
   const [montantFret, setMontantFret] = useState("");
   const [valeurMarchandise, setValeurMarchandise] = useState("");
+  const [montantMode, setMontantMode] = useState<"manuel" | "auto">("manuel");
+  const [pourcentagePercu, setPourcentagePercu] = useState("");
   const [selectedNatureId, setSelectedNatureId] = useState("");
   const [saving, setSaving] = useState(false);
   const [prixMinSuggere, setPrixMinSuggere] = useState<number | null>(null);
@@ -173,6 +179,7 @@ export default function ColisAutonomesPage({
   const [companyReceiptInfo, setCompanyReceiptInfo] = useState<SellerCompanyReceiptInfo | null>(
     companyReceiptInfoProp ?? null,
   );
+  const [companySettings, setCompanySettings] = useState<CompanyColisSettings | null>(null);
 
   const activeNatures = useMemo(
     () => natures.filter((n) => n.isActive),
@@ -309,6 +316,14 @@ export default function ColisAutonomesPage({
         receiptInfoPromise,
       ]);
       setCompanyReceiptInfo(receiptInfo);
+      setCompanySettings(settings);
+      setPourcentagePercu((prev) =>
+        prev
+          ? prev
+          : settings.colisPourcentagePercuGeneral != null
+            ? String(settings.colisPourcentagePercuGeneral)
+            : prev,
+      );
       const moduleActive = isColisAutonomeModuleActive(settings, featureModules);
       setModuleEnabled(moduleActive);
       if (!moduleActive) return;
@@ -394,6 +409,22 @@ export default function ColisAutonomesPage({
     };
   }, [companyId, selectedNatureId, poidsKg]);
 
+  // Calcul automatique du montant fret = pourcentage perçu × valeur marchandise,
+  // remonté au minimum requis (prixMinSuggere) le cas échéant. Le mode "manuel"
+  // laisse l'agent saisir librement le montant fret.
+  useEffect(() => {
+    if (montantMode !== "auto") return;
+    const valeur = Number(valeurMarchandise) || 0;
+    const pct = Number(pourcentagePercu) || 0;
+    if (valeur <= 0 || pct <= 0) {
+      setMontantFret("");
+      return;
+    }
+    const calcule = Math.round((valeur * pct) / 100);
+    const applique = prixMinSuggere != null ? Math.max(calcule, Math.round(prixMinSuggere)) : calcule;
+    setMontantFret(String(applique));
+  }, [montantMode, valeurMarchandise, pourcentagePercu, prixMinSuggere]);
+
   const handleRegister = async () => {
     if (!companyId) return;
     if (!gareDepartId || !gareDestinationId) {
@@ -428,6 +459,23 @@ export default function ColisAutonomesPage({
       toast.error(t("colis.nature_required", { defaultValue: "Sélectionnez une nature de colis" }));
       return;
     }
+    if (!valeurMarchandise.trim() || (Number(valeurMarchandise) || 0) <= 0) {
+      toast.error(
+        t("colis.valeur_marchandise_required", {
+          defaultValue:
+            "Valeur marchandise obligatoire — elle sert de base au remboursement en cas de perte.",
+        }),
+      );
+      return;
+    }
+    if (montantMode === "auto" && (!pourcentagePercu.trim() || (Number(pourcentagePercu) || 0) <= 0)) {
+      toast.error(
+        t("colis.pourcentage_percu_required", {
+          defaultValue: "Renseignez le pourcentage perçu pour le calcul automatique",
+        }),
+      );
+      return;
+    }
     if (prixMinSuggere != null && (Number(montantFret) || 0) < prixMinSuggere) {
       toast.error(
         t("colis.montant_below_min", {
@@ -451,7 +499,8 @@ export default function ColisAutonomesPage({
         poidsKg: poidsKg ? Number(poidsKg) : undefined,
         nombrePieces: Number(nombrePieces) || 1,
         montantFret: Number(montantFret) || 0,
-        valeurMarchandise: valeurMarchandise ? Number(valeurMarchandise) : undefined,
+        valeurMarchandise: Number(valeurMarchandise),
+        pourcentagePercu: montantMode === "auto" ? Number(pourcentagePercu) || undefined : undefined,
         natureIds: [selectedNatureId],
       });
       const detail = await getColisAutonomeDetailSupabase(result.id);
@@ -479,6 +528,19 @@ export default function ColisAutonomesPage({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Reçu indisponible");
     }
+  };
+
+  const handleColisWhatsApp = (row: ColisAutonomeRow, recipient: "expediteur" | "destinataire") => {
+    const phone = recipient === "expediteur" ? row.telephoneExpediteur : row.telephoneDestinataire;
+    const message = buildColisTrackingWhatsAppMessage({
+      colisId: row.id,
+      statut: row.statutColis,
+      companyName,
+      gareDepart: row.gareDepart,
+      gareDestination: row.gareDestination,
+      recipientLabel: recipient === "expediteur" ? "Expéditeur" : "Destinataire",
+    });
+    openColisWhatsApp(phone, message);
   };
 
   const handleAdvanceStatus = async (row: ColisAutonomeRow) => {
@@ -669,41 +731,85 @@ export default function ColisAutonomesPage({
                   <Input type="number" min={1} value={nombrePieces} onChange={(e) => setNombrePieces(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{t("colis.valeur_marchandise", { defaultValue: "Valeur marchandise (XOF)" })}</Label>
+                  <Label>
+                    {t("colis.valeur_marchandise", { defaultValue: "Valeur marchandise (XOF)" })}
+                    <span className="text-destructive"> *</span>
+                  </Label>
                   <Input
                     type="number"
                     min={0}
                     value={valeurMarchandise}
                     onChange={(e) => setValeurMarchandise(e.target.value)}
-                    placeholder={t("colis.valeur_marchandise_placeholder", { defaultValue: "Optionnel" })}
+                    placeholder={t("colis.valeur_marchandise_placeholder", { defaultValue: "Obligatoire" })}
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label>{t("colis.montant", { defaultValue: "Montant fret (XOF)" })}</Label>
-                <Input type="number" min={0} value={montantFret} onChange={(e) => setMontantFret(e.target.value)} />
-                {prixMinSuggere != null ? (
-                  <p
-                    className={cn(
-                      "text-xs",
-                      (Number(montantFret) || 0) < prixMinSuggere
-                        ? "text-destructive"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {t("colis.prix_min_hint", {
-                      defaultValue: `Prix minimum requis pour cette nature : ${prixMinSuggere.toLocaleString()} XOF`,
-                      amount: prixMinSuggere.toLocaleString(),
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Label className="mb-0.5 block">
+                      {t("colis.montant_mode_auto", { defaultValue: "Calcul automatique du montant fret" })}
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {t("colis.montant_mode_auto_desc", {
+                        defaultValue: "Montant fret = pourcentage perçu × valeur marchandise.",
+                      })}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={montantMode === "auto"}
+                    onCheckedChange={(checked) => setMontantMode(checked ? "auto" : "manuel")}
+                  />
+                </div>
+
+                {montantMode === "auto" ? (
+                  <div className="space-y-1.5">
+                    <Label>{t("colis.pourcentage_percu", { defaultValue: "Pourcentage perçu (%)" })}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.1"
+                      value={pourcentagePercu}
+                      onChange={(e) => setPourcentagePercu(e.target.value)}
+                      placeholder={t("colis.pourcentage_percu_placeholder", { defaultValue: "Ex: 10" })}
+                    />
+                  </div>
+                ) : null}
+
+                <div className="space-y-1.5">
+                  <Label>{t("colis.montant", { defaultValue: "Montant fret (XOF)" })}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={montantFret}
+                    onChange={(e) => setMontantFret(e.target.value)}
+                    disabled={montantMode === "auto"}
+                    className={montantMode === "auto" ? "bg-muted" : undefined}
+                  />
+                  {prixMinSuggere != null ? (
+                    <p
+                      className={cn(
+                        "text-xs",
+                        (Number(montantFret) || 0) < prixMinSuggere
+                          ? "text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {t("colis.prix_min_hint", {
+                        defaultValue: `Prix minimum requis pour cette nature : ${prixMinSuggere.toLocaleString()} XOF`,
+                        amount: prixMinSuggere.toLocaleString(),
+                      })}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    {t("colis.valeur_marchandise_hint", {
+                      defaultValue:
+                        "La valeur marchandise sert de base au remboursement en cas de perte et figure sur le reçu — elle pilote aussi le montant fret en mode automatique.",
                     })}
                   </p>
-                ) : null}
-                <p className="text-xs text-muted-foreground">
-                  {t("colis.valeur_marchandise_hint", {
-                    defaultValue:
-                      "La valeur marchandise n'entre pas dans le calcul du prix — elle aide à fixer le montant du fret et figure sur le reçu.",
-                  })}
-                </p>
+                </div>
               </div>
 
               <Button className="w-full cursor-pointer" disabled={saving} onClick={() => void handleRegister()}>
@@ -805,6 +911,22 @@ export default function ColisAutonomesPage({
                       ) : null}
                       <Button size="sm" variant="outline" className="cursor-pointer gap-1" onClick={() => void handleShowReceipt(row.id)}>
                         <PrinterIcon className="w-3.5 h-3.5" /> Reçu
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer gap-1 border-[#25D366]/50 text-[#128C7E] hover:bg-[#25D366]/10"
+                        onClick={() => handleColisWhatsApp(row, "expediteur")}
+                      >
+                        <MessageCircleIcon className="w-3.5 h-3.5" /> Exp.
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer gap-1 border-[#25D366]/50 text-[#128C7E] hover:bg-[#25D366]/10"
+                        onClick={() => handleColisWhatsApp(row, "destinataire")}
+                      >
+                        <MessageCircleIcon className="w-3.5 h-3.5" /> Dest.
                       </Button>
                     </div>
                   </CardContent>

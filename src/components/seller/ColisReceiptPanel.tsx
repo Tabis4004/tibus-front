@@ -3,14 +3,17 @@ import { format, parseISO } from "date-fns";
 import QRCode from "qrcode";
 import {
   CheckCircleIcon,
+  MessageCircleIcon,
   PlusIcon,
   PrinterIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import {
+  buildColisTrackingWhatsAppMessage,
   colisPublicReference,
   colisQrPayload,
   isColisPosPrinterAvailable,
+  openColisWhatsApp,
   printColisReceipt,
   printColisReceiptBrowser,
 } from "@/lib/colis-receipt.ts";
@@ -83,6 +86,22 @@ export default function ColisReceiptPanel({
       printColisReceiptBrowser(paperWidth);
     },
     [currency, detail],
+  );
+
+  const handleWhatsAppShare = useCallback(
+    (recipient: "expediteur" | "destinataire") => {
+      const phone = recipient === "expediteur" ? detail.telephoneExpediteur : detail.telephoneDestinataire;
+      const message = buildColisTrackingWhatsAppMessage({
+        colisId: detail.id,
+        statut: detail.statutColis,
+        companyName,
+        gareDepart: detail.gareDepart,
+        gareDestination: detail.gareDestination,
+        recipientLabel: recipient === "expediteur" ? "Expéditeur" : "Destinataire",
+      });
+      openColisWhatsApp(phone, message);
+    },
+    [companyName, detail],
   );
 
   return (
@@ -193,6 +212,12 @@ export default function ColisReceiptPanel({
               </span>
             </div>
           )}
+          {detail.pourcentagePercu != null && detail.pourcentagePercu > 0 && (
+            <div className="flex justify-between gap-1">
+              <span className="text-gray-600">Pourcentage perçu:</span>
+              <span className="text-right">{detail.pourcentagePercu}%</span>
+            </div>
+          )}
         </div>
 
         <ReceiptPoweredByFooter companyLogoUrl={companyInfo?.logoUrl} />
@@ -231,6 +256,31 @@ export default function ColisReceiptPanel({
               56mm
             </Button>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-3 space-y-2 print-hide">
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1.5">
+          <MessageCircleIcon className="w-3.5 h-3.5" />
+          Notifier par WhatsApp
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 cursor-pointer text-xs bg-[#25D366] hover:bg-[#1ebe57] text-white"
+            onClick={() => handleWhatsAppShare("expediteur")}
+          >
+            Expéditeur
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 cursor-pointer text-xs bg-[#25D366] hover:bg-[#1ebe57] text-white"
+            onClick={() => handleWhatsAppShare("destinataire")}
+          >
+            Destinataire
+          </Button>
         </div>
       </div>
 

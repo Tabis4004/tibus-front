@@ -34,6 +34,12 @@ export type CompanyColisSettings = {
   colisPrixMinFixeGeneral?: number | null;
   /** Override général du taux minimum (XOF / kg), toutes natures confondues. */
   colisPrixMinTauxGeneral?: number | null;
+  /**
+   * Pourcentage perçu par défaut (0-100), pré-rempli dans le formulaire
+   * d'envoi quand l'agent choisit le calcul automatique du montant fret à
+   * partir de la valeur marchandise déclarée.
+   */
+  colisPourcentagePercuGeneral?: number | null;
 };
 
 export type ColisAutonomeRow = {
@@ -47,8 +53,10 @@ export type ColisAutonomeRow = {
   poidsKg?: number | null;
   nombrePieces: number;
   montantFret: number;
-  /** Valeur déclarée de la marchandise (XOF) — informative, n'entre pas dans le calcul du prix. */
+  /** Valeur déclarée de la marchandise (XOF) — sert de base au remboursement en cas de perte. */
   valeurMarchandise?: number | null;
+  /** Pourcentage de la valeur marchandise utilisé pour calculer montantFret, si mode automatique. */
+  pourcentagePercu?: number | null;
   createdAt: string;
   updatedAt: string;
   gareDepart: string;
@@ -97,6 +105,8 @@ function mapSettings(data: Record<string, unknown>): CompanyColisSettings {
       data.colisPrixMinFixeGeneral != null ? Number(data.colisPrixMinFixeGeneral) : null,
     colisPrixMinTauxGeneral:
       data.colisPrixMinTauxGeneral != null ? Number(data.colisPrixMinTauxGeneral) : null,
+    colisPourcentagePercuGeneral:
+      data.colisPourcentagePercuGeneral != null ? Number(data.colisPourcentagePercuGeneral) : null,
   };
 }
 
@@ -116,6 +126,7 @@ function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
     nombrePieces: Number(row.nombrePieces ?? 1),
     montantFret: Number(row.montantFret ?? 0),
     valeurMarchandise: row.valeurMarchandise != null ? Number(row.valeurMarchandise) : null,
+    pourcentagePercu: row.pourcentagePercu != null ? Number(row.pourcentagePercu) : null,
     createdAt: String(row.createdAt ?? ""),
     updatedAt: String(row.updatedAt ?? ""),
     gareDepart: String(row.gareDepart ?? ""),
@@ -159,12 +170,17 @@ export async function updateCompanyColisSmsSettingsSupabase(
  */
 export async function updateCompanyColisPriceSettingsSupabase(
   companyId: string,
-  input: { prixMinFixeGeneral: number | null; prixMinTauxGeneral: number | null },
+  input: {
+    prixMinFixeGeneral: number | null;
+    prixMinTauxGeneral: number | null;
+    pourcentagePercuGeneral?: number | null;
+  },
 ): Promise<CompanyColisSettings> {
   const { data, error } = await supabase.rpc("update_company_colis_price_settings", {
     p_company_id: companyId,
     p_prix_min_fixe_general: input.prixMinFixeGeneral,
     p_prix_min_taux_general: input.prixMinTauxGeneral,
+    p_pourcentage_percu_general: input.pourcentagePercuGeneral ?? null,
   });
   if (error) throw error;
   return mapSettings((data ?? {}) as Record<string, unknown>);
@@ -247,8 +263,10 @@ export type RegisterColisInput = {
   poidsKg?: number;
   nombrePieces: number;
   montantFret: number;
-  /** Valeur déclarée de la marchandise (XOF) — informative, n'entre pas dans le calcul du prix. */
-  valeurMarchandise?: number;
+  /** Valeur déclarée de la marchandise (XOF) — obligatoire, sert de base au remboursement en cas de perte. */
+  valeurMarchandise: number;
+  /** Pourcentage de la valeur marchandise utilisé pour calculer montantFret, si mode automatique. */
+  pourcentagePercu?: number;
   natureIds: string[];
 };
 
@@ -268,7 +286,8 @@ export async function registerColisAutonomeSupabase(
     p_nombre_pieces: input.nombrePieces,
     p_montant_fret: input.montantFret,
     p_nature_ids: input.natureIds,
-    p_valeur_marchandise: input.valeurMarchandise ?? null,
+    p_valeur_marchandise: input.valeurMarchandise,
+    p_pourcentage_percu: input.pourcentagePercu ?? null,
   });
   if (error) throwSupabaseError(error, "Enregistrement colis impossible");
   const row = (data ?? {}) as Record<string, unknown>;

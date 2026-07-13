@@ -89,6 +89,7 @@ export function useAppUserState() {
   } = useSupabaseAuth();
   const [profile, setProfile] = useState<AppUserProfile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
+  const [droits, setDroits] = useState<string[]>([]);
   const [ownedCompanyIds, setOwnedCompanyIds] = useState<string[]>([]);
   const [adminPaysCountryIds, setAdminPaysCountryIds] = useState<string[]>([]);
   const [merchantAgentApplicationStatus, setMerchantAgentApplicationStatus] = useState<
@@ -116,6 +117,7 @@ export function useAppUserState() {
       previousAppUserIdRef.current = null;
       setProfile(null);
       setRoles([]);
+      setDroits([]);
       setOwnedCompanyIds([]);
       setAdminPaysCountryIds([]);
       setMerchantAgentApplicationStatus(null);
@@ -131,6 +133,7 @@ export function useAppUserState() {
       setIsReady(false);
       setProfile(null);
       setRoles([]);
+      setDroits([]);
       setOwnedCompanyIds([]);
       setAdminPaysCountryIds([]);
       setMerchantAgentApplicationStatus(null);
