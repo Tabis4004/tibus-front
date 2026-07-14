@@ -55,6 +55,8 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
   String? _error;
   bool _loading = false;
   bool _advancing = false;
+  List<BusOption> _buses = const [];
+  String? _selectedBusId;
 
   @override
   void dispose() {
@@ -84,7 +86,18 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
         _detail = detail;
         _colis = Colis.fromMap(detail);
         _manualCtrl.text = colisPublicReference(colisId);
+        _selectedBusId = null;
       });
+      final companyId = detail['companyId'] as String?;
+      final action = _actionFor(_colis!.statut);
+      if (companyId != null && action?.next == ColisStatut.charge) {
+        try {
+          final buses = await service.listBuses(companyId);
+          if (mounted) setState(() => _buses = buses);
+        } catch (_) {
+          // Sélection bus best-effort — l'avancement reste possible sans bus.
+        }
+      }
     } catch (_) {
       if (mounted) setState(() => _error = 'Colis introuvable pour ce code.');
     } finally {
@@ -104,7 +117,7 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
       if (action.next == ColisStatut.livre) {
         await service.deliverColis(colisPublicReference(colis.id));
       } else {
-        await service.updateStatut(colis.id, action.next);
+        await service.updateStatut(colis.id, action.next, busId: _selectedBusId);
       }
       unawaited(service.notifyColisStatusChange(
         colisId: colis.id,
@@ -137,6 +150,8 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
       _detail = null;
       _error = null;
       _manualCtrl.clear();
+      _buses = const [];
+      _selectedBusId = null;
     });
   }
 
@@ -243,11 +258,27 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
                 const SizedBox(height: 8),
                 Text('${colis.montantFret.toStringAsFixed(0)} FCFA',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark)),
+                if (colis.busPlateNumber != null) ...[
+                  const SizedBox(height: 4),
+                  Text('Bus : ${colis.busPlateNumber}', style: const TextStyle(color: AppColors.textSecondary)),
+                ],
               ],
             ),
           ),
         ),
         const SizedBox(height: 20),
+        if (action?.next == ColisStatut.charge && _buses.isNotEmpty) ...[
+          DropdownButtonFormField<String?>(
+            value: _selectedBusId,
+            decoration: const InputDecoration(labelText: 'Bus du convoi (optionnel)'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('Aucun / à définir plus tard')),
+              ..._buses.map((b) => DropdownMenuItem(value: b.id, child: Text(b.label))),
+            ],
+            onChanged: (v) => setState(() => _selectedBusId = v),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (action != null)
           ElevatedButton(
             onPressed: _advancing ? null : _advance,

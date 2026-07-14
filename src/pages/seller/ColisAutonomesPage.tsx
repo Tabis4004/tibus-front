@@ -40,11 +40,13 @@ import {
   getCompanyColisSettingsSupabase,
   listColisAutonomesSupabase,
   listColisNaturesSupabase,
+  listCompanyBusesSupabase,
   registerColisAutonomeSupabase,
   sendColisSmsSupabase,
   updateColisStatutSupabase,
   type ColisAutonomeDetail,
   type ColisAutonomeRow,
+  type ColisBusOption,
   type ColisNature,
   type ColisSmsPayload,
   type ColisStatut,
@@ -157,6 +159,10 @@ export default function ColisAutonomesPage({
   const [filterExpediteur, setFilterExpediteur] = useState("");
   const [filterDestinataire, setFilterDestinataire] = useState("");
   const [filterReference, setFilterReference] = useState("");
+  const [filterBus, setFilterBus] = useState<string>("all");
+  const [buses, setBuses] = useState<ColisBusOption[]>([]);
+  // Bus sélectionné (par colis) juste avant de confirmer "Charger en soute".
+  const [busSelections, setBusSelections] = useState<Record<string, string>>({});
 
   const [gareDepartId, setGareDepartId] = useState("");
   const [gareDestinationId, setGareDestinationId] = useState("");
@@ -212,6 +218,10 @@ export default function ColisAutonomesPage({
     () => [...new Set(rows.map((r) => r.gareDestination).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr")),
     [rows],
   );
+  const suiviBuses = useMemo(
+    () => [...new Set(rows.map((r) => r.busPlateNumber).filter((v): v is string => Boolean(v)))].sort((a, b) => a.localeCompare(b, "fr")),
+    [rows],
+  );
 
   const filteredRows = useMemo(() => {
     const norm = (v: string) => v.trim().toLowerCase();
@@ -223,6 +233,7 @@ export default function ColisAutonomesPage({
       if (filterStatut !== "all" && r.statutColis !== filterStatut) return false;
       if (filterGareDepart !== "all" && r.gareDepart !== filterGareDepart) return false;
       if (filterGareDest !== "all" && r.gareDestination !== filterGareDest) return false;
+      if (filterBus !== "all" && r.busPlateNumber !== filterBus) return false;
       if (
         expQ &&
         !norm(r.nomExpediteur).includes(expQ) &&
@@ -240,7 +251,7 @@ export default function ColisAutonomesPage({
       if (refQ && !norm(r.id).includes(refQ)) return false;
       return true;
     });
-  }, [rows, filterStatut, filterGareDepart, filterGareDest, filterExpediteur, filterDestinataire, filterReference]);
+  }, [rows, filterStatut, filterGareDepart, filterGareDest, filterBus, filterExpediteur, filterDestinataire, filterReference]);
 
   const resetExpeditionForm = () => {
     setNomExpediteur("");
@@ -328,16 +339,18 @@ export default function ColisAutonomesPage({
       setModuleEnabled(moduleActive);
       if (!moduleActive) return;
 
-      const [garesResult, naturesResult, listResult, openCashResult] = await Promise.allSettled([
+      const [garesResult, naturesResult, listResult, openCashResult, busesResult] = await Promise.allSettled([
         listCompanyStationGaresSupabase(cid),
         listColisNaturesSupabase(cid),
         listColisAutonomesSupabase(cid),
         getOpenStationCashSupabase(),
+        listCompanyBusesSupabase(cid),
       ]);
 
       const nextGares = garesResult.status === "fulfilled" ? garesResult.value : [];
       const nextNatures = naturesResult.status === "fulfilled" ? naturesResult.value : [];
       const nextRows = listResult.status === "fulfilled" ? listResult.value : [];
+      const nextBuses = busesResult.status === "fulfilled" ? busesResult.value : [];
 
       const loadErrors: string[] = [];
       if (garesResult.status === "rejected") {
@@ -353,6 +366,7 @@ export default function ColisAutonomesPage({
       setGares(nextGares);
       setNatures(nextNatures.filter((n) => n.isActive));
       setRows(nextRows);
+      setBuses(nextBuses);
 
       const openCash =
         openCashResult.status === "fulfilled" ? openCashResult.value : null;
@@ -547,9 +561,15 @@ export default function ColisAutonomesPage({
     const next = COLIS_NEXT_STATUT[row.statutColis];
     if (!next || next === "livre") return;
     try {
-      const result = await updateColisStatutSupabase(row.id, next);
+      const busId = next === "charge" ? busSelections[row.id] || null : null;
+      const result = await updateColisStatutSupabase(row.id, next, busId);
       await maybeSendColisSms(result.id, result.statutColis, result.sms);
       toast.success(`${COLIS_STATUT_LABELS[result.statutColis]}`);
+      setBusSelections((prev) => {
+        const updated = { ...prev };
+        delete updated[row.id];
+        return updated;
+      });
       await load();
     } catch (err) {
       toast.error(supabaseErrorMessage(err, t("errors.generic", { ns: "common" })));
@@ -848,6 +868,15 @@ export default function ColisAutonomesPage({
                 ))}
               </SelectContent>
             </Select>
+            <Select value={filterBus} onValueChange={setFilterBus}>
+              <SelectTrigger><SelectValue placeholder="Bus du convoi" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les bus</SelectItem>
+                {suiviBuses.map((plate) => (
+                  <SelectItem key={plate} value={plate}>{plate}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               value={filterExpediteur}
               onChange={(e) => setFilterExpediteur(e.target.value)}
@@ -864,7 +893,7 @@ export default function ColisAutonomesPage({
               placeholder={t("colis.filter_reference", { defaultValue: "N° de colis (CL-… ou id)" })}
             />
           </div>
-          {(filterStatut !== "all" || filterGareDepart !== "all" || filterGareDest !== "all" || filterExpediteur || filterDestinataire || filterReference) ? (
+          {(filterStatut !== "all" || filterGareDepart !== "all" || filterGareDest !== "all" || filterBus !== "all" || filterExpediteur || filterDestinataire || filterReference) ? (
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{filteredRows.length} colis correspondant(s)</span>
               <Button
@@ -875,6 +904,7 @@ export default function ColisAutonomesPage({
                   setFilterStatut("all");
                   setFilterGareDepart("all");
                   setFilterGareDest("all");
+                  setFilterBus("all");
                   setFilterExpediteur("");
                   setFilterDestinataire("");
                   setFilterReference("");
@@ -902,6 +932,30 @@ export default function ColisAutonomesPage({
                       <Badge variant="secondary">{COLIS_STATUT_LABELS[row.statutColis]}</Badge>
                     </div>
                     <p className="text-xs">{row.natures.join(", ")} · {row.montantFret.toLocaleString()} XOF</p>
+                    {row.busPlateNumber ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t("colis.bus_assigned", { defaultValue: "Bus" })} : {row.busPlateNumber}
+                      </p>
+                    ) : null}
+                    {next === "charge" && buses.length > 0 ? (
+                      <select
+                        className="h-8 w-full max-w-[220px] rounded-md border bg-transparent px-2 text-xs"
+                        value={busSelections[row.id] ?? ""}
+                        onChange={(e) =>
+                          setBusSelections((prev) => ({ ...prev, [row.id]: e.target.value }))
+                        }
+                      >
+                        <option value="">
+                          {t("colis.bus_placeholder", { defaultValue: "Bus du convoi (optionnel)" })}
+                        </option>
+                        {buses.map((bus) => (
+                          <option key={bus.id} value={bus.id}>
+                            {bus.plateNumber}
+                            {bus.model ? ` — ${bus.model}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
                     <div className="flex gap-2 flex-wrap">
                       {next && next !== "livre" ? (
                         <Button size="sm" variant="secondary" className="cursor-pointer gap-1" onClick={() => void handleAdvanceStatus(row)}>

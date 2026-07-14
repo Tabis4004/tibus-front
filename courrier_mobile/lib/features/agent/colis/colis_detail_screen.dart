@@ -38,6 +38,8 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
   Map<String, dynamic>? _detail;
   bool _loading = true;
   bool _updating = false;
+  List<BusOption> _buses = const [];
+  String? _selectedBusId;
 
   @override
   void initState() {
@@ -47,11 +49,23 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final detail = await ref.read(colisServiceProvider).getColisDetail(widget.colisId);
+    final service = ref.read(colisServiceProvider);
+    final detail = await service.getColisDetail(widget.colisId);
     if (mounted) setState(() {
       _detail = detail;
       _loading = false;
+      _selectedBusId = null;
     });
+    final companyId = detail?['companyId'] as String?;
+    final statut = detail != null ? ColisStatutX.fromDb(detail['statutColis'] as String? ?? 'enregistre') : null;
+    if (companyId != null && statut?.next == ColisStatut.charge) {
+      try {
+        final buses = await service.listBuses(companyId);
+        if (mounted) setState(() => _buses = buses);
+      } catch (_) {
+        // Sélection bus best-effort — l'avancement reste possible sans bus.
+      }
+    }
   }
 
   Future<void> _printReceipt(Colis colis) async {
@@ -89,7 +103,8 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
     setState(() => _updating = true);
     try {
       final service = ref.read(colisServiceProvider);
-      await service.updateStatut(widget.colisId, next);
+      final busId = next == ColisStatut.charge ? _selectedBusId : null;
+      await service.updateStatut(widget.colisId, next, busId: busId);
       // SMS déjà géré par la RPC update_colis_autonome_statut côté base
       // (voir colis-sms-notify). On ajoute ici le push app, en plus,
       // best-effort — voir notifyColisStatusChange.
@@ -178,11 +193,33 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
                       ],
                     ),
                   ],
+                  if (colis.busPlateNumber != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Bus', style: TextStyle(color: AppColors.textSecondary)),
+                        Text(colis.busPlateNumber!),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
           const SizedBox(height: 24),
+          if (colis.statut.next == ColisStatut.charge && _buses.isNotEmpty) ...[
+            DropdownButtonFormField<String?>(
+              value: _selectedBusId,
+              decoration: const InputDecoration(labelText: 'Bus du convoi (optionnel)'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Aucun / à définir plus tard')),
+                ..._buses.map((b) => DropdownMenuItem(value: b.id, child: Text(b.label))),
+              ],
+              onChanged: (v) => setState(() => _selectedBusId = v),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (colis.statut.next != null)
             ElevatedButton(
               onPressed: _updating ? null : () => _advanceStatut(colis.statut),

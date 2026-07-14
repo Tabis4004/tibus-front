@@ -53,6 +53,7 @@ export default function SupabaseTripReports() {
   const [colisStatutFilter, setColisStatutFilter] = useState<string>("all");
   const [colisGareFilter, setColisGareFilter] = useState<string>("all");
   const [colisGareDestFilter, setColisGareDestFilter] = useState<string>("all");
+  const [colisBusFilter, setColisBusFilter] = useState<string>("all");
   const [colisDateFrom, setColisDateFrom] = useState<string>("");
   const [colisDateTo, setColisDateTo] = useState<string>("");
   // Ouverture directe de l'onglet colis via /owner/analytics/trips?tab=colis
@@ -123,6 +124,14 @@ export default function SupabaseTripReports() {
     return [...set].sort((a, b) => a.localeCompare(b, "fr"));
   }, [colisRows]);
 
+  const colisBuses = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of colisRows ?? []) {
+      if (row.busPlateNumber) set.add(row.busPlateNumber);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [colisRows]);
+
   const filteredColis = useMemo(() => {
     let rows = colisRows ?? [];
     if (colisStatutFilter !== "all") {
@@ -134,6 +143,9 @@ export default function SupabaseTripReports() {
     if (colisGareDestFilter !== "all") {
       rows = rows.filter((row) => row.gareDestination === colisGareDestFilter);
     }
+    if (colisBusFilter !== "all") {
+      rows = rows.filter((row) => row.busPlateNumber === colisBusFilter);
+    }
     if (colisDateFrom) {
       rows = rows.filter((row) => format(new Date(row.createdAt), "yyyy-MM-dd") >= colisDateFrom);
     }
@@ -141,7 +153,7 @@ export default function SupabaseTripReports() {
       rows = rows.filter((row) => format(new Date(row.createdAt), "yyyy-MM-dd") <= colisDateTo);
     }
     return rows;
-  }, [colisRows, colisStatutFilter, colisGareFilter, colisGareDestFilter, colisDateFrom, colisDateTo]);
+  }, [colisRows, colisStatutFilter, colisGareFilter, colisGareDestFilter, colisBusFilter, colisDateFrom, colisDateTo]);
 
   const totalFret = filteredColis.reduce((sum, row) => sum + row.montantFret, 0);
 
@@ -165,6 +177,7 @@ export default function SupabaseTripReports() {
       : COLIS_STATUT_LABELS[colisStatutFilter as ColisStatut],
     colisGareFilter === "all" ? "toutes gares de départ" : `départ ${colisGareFilter}`,
     colisGareDestFilter === "all" ? "toutes destinations" : `destination ${colisGareDestFilter}`,
+    colisBusFilter === "all" ? "tous les bus" : `bus ${colisBusFilter}`,
     colisDateFrom || colisDateTo
       ? `du ${colisDateFrom ? format(new Date(colisDateFrom), "dd/MM/yyyy") : "…"} au ${colisDateTo ? format(new Date(colisDateTo), "dd/MM/yyyy") : "…"}`
       : "toutes dates",
@@ -384,6 +397,19 @@ export default function SupabaseTripReports() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={colisBusFilter} onValueChange={setColisBusFilter}>
+                  <SelectTrigger className="w-full sm:w-44">
+                    <SelectValue placeholder="Bus du convoi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les bus</SelectItem>
+                    {colisBuses.map((plate) => (
+                      <SelectItem key={plate} value={plate}>
+                        {plate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs text-muted-foreground" htmlFor="colis-date-from">
                     Du
@@ -445,6 +471,7 @@ export default function SupabaseTripReports() {
                         <th className="pb-2 px-2">Expéditeur</th>
                         <th className="pb-2 px-2">Destinataire</th>
                         <th className="pb-2 px-2">Nature</th>
+                        <th className="pb-2 px-2">Bus</th>
                         <th className="pb-2 px-2">Poids</th>
                         <th className="pb-2 px-2">Pièces</th>
                         <th className="pb-2 px-2">Montant</th>
@@ -469,6 +496,7 @@ export default function SupabaseTripReports() {
                             <span className="block text-muted-foreground">{row.telephoneDestinataire}</span>
                           </td>
                           <td className="py-2 px-2">{row.natures.join(", ")}</td>
+                          <td className="py-2 px-2">{row.busPlateNumber ?? "—"}</td>
                           <td className="py-2 px-2">{row.poidsKg ?? "—"}</td>
                           <td className="py-2 px-2">{row.nombrePieces}</td>
                           <td className="py-2 px-2 font-medium">{row.montantFret.toLocaleString()}</td>

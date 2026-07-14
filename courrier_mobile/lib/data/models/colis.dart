@@ -58,6 +58,11 @@ class Colis {
   /// Pourcentage de la valeur marchandise utilisé pour calculer montantFret
   /// quand l'agent choisit le mode de calcul automatique.
   final double? pourcentagePercu;
+  /// Bus qui effectue le convoi — assignable à l'enregistrement ou au
+  /// chargement (voir migration colis_bus_convoi, même logique que le web).
+  final String? busId;
+  /// Immatriculation du bus (affichage), voir busId.
+  final String? busPlateNumber;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String gareDepart;
@@ -77,6 +82,8 @@ class Colis {
     required this.montantFret,
     this.valeurMarchandise,
     this.pourcentagePercu,
+    this.busId,
+    this.busPlateNumber,
     required this.createdAt,
     required this.updatedAt,
     required this.gareDepart,
@@ -98,6 +105,8 @@ class Colis {
       montantFret: (map['montantFret'] as num?)?.toDouble() ?? 0,
       valeurMarchandise: (map['valeurMarchandise'] as num?)?.toDouble(),
       pourcentagePercu: (map['pourcentagePercu'] as num?)?.toDouble(),
+      busId: map['busId'] as String?,
+      busPlateNumber: map['busPlateNumber'] as String?,
       createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? DateTime.now(),
       gareDepart: map['gareDepart'] as String? ?? '',
@@ -105,6 +114,25 @@ class Colis {
       natures: (map['natures'] as List?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
+}
+
+/// Bus actif de la compagnie, pour le sélecteur "bus du convoi" — reflète
+/// la table Bus (même select direct que le web, voir listCompanyBusesSupabase
+/// dans colis-autonomes.ts) : lecture publique pour les compagnies actives.
+class BusOption {
+  final String id;
+  final String plateNumber;
+  final String model;
+
+  const BusOption({required this.id, required this.plateNumber, this.model = ''});
+
+  factory BusOption.fromMap(Map<String, dynamic> map) => BusOption(
+        id: map['id'] as String? ?? '',
+        plateNumber: map['registrationNumber'] as String? ?? '',
+        model: map['model'] as String? ?? '',
+      );
+
+  String get label => model.isNotEmpty ? '$plateNumber — $model' : plateNumber;
 }
 
 /// Gare d'une compagnie, pour les sélecteurs départ/destination — reflète
@@ -258,6 +286,8 @@ class RegisterColisInput {
   /// Obligatoire — voir Colis.valeurMarchandise.
   final double valeurMarchandise;
   final double? pourcentagePercu;
+  /// Bus qui effectue le convoi, si déjà connu à l'enregistrement (optionnel).
+  final String? busId;
   final List<String> natureIds;
 
   const RegisterColisInput({
@@ -269,6 +299,7 @@ class RegisterColisInput {
     required this.nomDestinataire,
     required this.telephoneDestinataire,
     this.descriptionContenu,
+    this.busId,
     this.poidsKg,
     required this.nombrePieces,
     required this.montantFret,

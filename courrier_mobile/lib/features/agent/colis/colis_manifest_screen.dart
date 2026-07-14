@@ -30,6 +30,7 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
   ColisStatut? _statutFilter;
   String? _gareDepartFilter;
   String? _gareDestFilter;
+  String? _busFilter;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -65,6 +66,9 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
     if (_gareDestFilter != null) {
       rows = rows.where((c) => c.gareDestination == _gareDestFilter).toList();
     }
+    if (_busFilter != null) {
+      rows = rows.where((c) => c.busPlateNumber == _busFilter).toList();
+    }
     if (_dateFrom != null) {
       final from = DateTime(_dateFrom!.year, _dateFrom!.month, _dateFrom!.day);
       rows = rows.where((c) => !c.createdAt.isBefore(from)).toList();
@@ -80,12 +84,18 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
       (_all ?? const <Colis>[]).map((c) => c.gareDepart).where((g) => g.isNotEmpty).toSet();
   Set<String> get _gareDests =>
       (_all ?? const <Colis>[]).map((c) => c.gareDestination).where((g) => g.isNotEmpty).toSet();
+  Set<String> get _busPlates => (_all ?? const <Colis>[])
+      .map((c) => c.busPlateNumber)
+      .whereType<String>()
+      .where((g) => g.isNotEmpty)
+      .toSet();
 
   String get _filterLabel {
     final parts = <String>[
       _statutFilter == null ? 'tous statuts' : _statutFilter!.label,
       _gareDepartFilter == null ? 'toutes gares de départ' : 'départ $_gareDepartFilter',
       _gareDestFilter == null ? 'toutes destinations' : 'destination $_gareDestFilter',
+      _busFilter == null ? 'tous les bus' : 'bus $_busFilter',
     ];
     if (_dateFrom != null || _dateTo != null) {
       final from = _dateFrom != null ? DateFormat('dd/MM/yyyy').format(_dateFrom!) : '…';
@@ -218,6 +228,15 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
                         items: [
                           const PopupMenuItem(value: null, child: Text('Toutes destinations')),
                           ..._gareDests.map((g) => PopupMenuItem(value: g, child: Text(g))),
+                        ],
+                      ),
+                      _FilterChipDropdown<String?>(
+                        label: _busFilter ?? 'Tous les bus',
+                        icon: Icons.directions_bus_outlined,
+                        onSelected: (v) => setState(() => _busFilter = v),
+                        items: [
+                          const PopupMenuItem(value: null, child: Text('Tous les bus')),
+                          ..._busPlates.map((b) => PopupMenuItem(value: b, child: Text(b))),
                         ],
                       ),
                     ],

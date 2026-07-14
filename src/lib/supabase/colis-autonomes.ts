@@ -57,6 +57,10 @@ export type ColisAutonomeRow = {
   valeurMarchandise?: number | null;
   /** Pourcentage de la valeur marchandise utilisé pour calculer montantFret, si mode automatique. */
   pourcentagePercu?: number | null;
+  /** Bus qui effectue le convoi — assignable à l'enregistrement ou au chargement. */
+  busId?: string | null;
+  /** Immatriculation du bus (affichage), voir busId. */
+  busPlateNumber?: string | null;
   createdAt: string;
   updatedAt: string;
   gareDepart: string;
@@ -127,6 +131,8 @@ function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
     montantFret: Number(row.montantFret ?? 0),
     valeurMarchandise: row.valeurMarchandise != null ? Number(row.valeurMarchandise) : null,
     pourcentagePercu: row.pourcentagePercu != null ? Number(row.pourcentagePercu) : null,
+    busId: row.busId ? String(row.busId) : null,
+    busPlateNumber: row.busPlateNumber ? String(row.busPlateNumber) : null,
     createdAt: String(row.createdAt ?? ""),
     updatedAt: String(row.updatedAt ?? ""),
     gareDepart: String(row.gareDepart ?? ""),
@@ -202,6 +208,28 @@ export async function getColisPrixMinSupabase(
   return Number(data ?? 0);
 }
 
+export type ColisBusOption = {
+  id: string;
+  plateNumber: string;
+  model: string;
+};
+
+/** Bus actifs de la compagnie, pour le sélecteur "bus du convoi" (chargement colis). */
+export async function listCompanyBusesSupabase(companyId: string): Promise<ColisBusOption[]> {
+  const { data, error } = await supabase
+    .from("Bus")
+    .select("id, model, registrationNumber")
+    .eq("companyId", companyId)
+    .eq("isActive", true)
+    .order("registrationNumber");
+  if (error) throw error;
+  return (data ?? []).map((b) => ({
+    id: String(b.id),
+    plateNumber: String(b.registrationNumber ?? ""),
+    model: b.model ? String(b.model) : "",
+  }));
+}
+
 export async function listColisNaturesSupabase(companyId: string): Promise<ColisNature[]> {
   const { data, error } = await supabase
     .from("colis_natures")
@@ -267,6 +295,8 @@ export type RegisterColisInput = {
   valeurMarchandise: number;
   /** Pourcentage de la valeur marchandise utilisé pour calculer montantFret, si mode automatique. */
   pourcentagePercu?: number;
+  /** Bus qui effectue le convoi, si déjà connu à l'enregistrement (optionnel). */
+  busId?: string | null;
   natureIds: string[];
 };
 
@@ -288,6 +318,7 @@ export async function registerColisAutonomeSupabase(
     p_nature_ids: input.natureIds,
     p_valeur_marchandise: input.valeurMarchandise,
     p_pourcentage_percu: input.pourcentagePercu ?? null,
+    p_bus_id: input.busId ?? null,
   });
   if (error) throwSupabaseError(error, "Enregistrement colis impossible");
   const row = (data ?? {}) as Record<string, unknown>;
@@ -353,10 +384,12 @@ export async function getColisAutonomeDetailSupabase(
 export async function updateColisStatutSupabase(
   colisId: string,
   statut: ColisStatut,
+  busId?: string | null,
 ): Promise<{ id: string; statutColis: ColisStatut; sms: ColisSmsPayload }> {
   const { data, error } = await supabase.rpc("update_colis_autonome_statut", {
     p_colis_id: colisId,
     p_new_statut: statut,
+    p_bus_id: busId ?? null,
   });
   if (error) throw error;
   const row = (data ?? {}) as Record<string, unknown>;

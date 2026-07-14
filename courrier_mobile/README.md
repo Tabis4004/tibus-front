@@ -201,6 +201,20 @@ inversement — les deux apps consomment les mêmes RPC/tables Supabase.
     faute de RPC de stats dédiée. Export CSV via `share_plus` (feuille de
     partage native — mail, WhatsApp, Drive...) plutôt qu'un export PDF façon
     `jsPDF`, non répliqué côté mobile pour rester léger.
+12. ✅ **Bus du convoi sur les colis** (migration `colis_bus_convoi` sur le
+    projet Supabase). Colonne `colis_autonomes.bus_id` (FK `Bus`), exposée
+    dans `list_colis_autonomes`/`get_colis_autonome_detail` (`busId`,
+    `busPlateNumber`), assignable dès l'enregistrement (`register_colis_autonome`,
+    param optionnel) ou au passage "Chargé" (`update_colis_autonome_statut`,
+    param optionnel — ne touche pas au bus déjà assigné si omis). Lecture de
+    la liste des bus actifs via un select direct sur la table `Bus`
+    (`ColisService.listBuses`, RLS `bus_select` déjà publique pour les
+    compagnies actives — même accès que `listCompanyBusesSupabase` côté web,
+    pas besoin de nouvelle RPC). Sélecteur de bus affiché dans
+    `ColisScanScreen` et `ColisDetailScreen` uniquement à la transition
+    "Charger en soute" ; filtre "Bus" ajouté dans `ColisManifestScreen` (et
+    dans l'export CSV) ainsi que côté web dans l'onglet Suivi de
+    `ColisAutonomesPage.tsx` et le manifeste owner `SupabaseTripReports.tsx`.
 
 ### Encore ouvert
 

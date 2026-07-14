@@ -44,6 +44,7 @@ class ColisService {
       'p_nature_ids': input.natureIds,
       'p_valeur_marchandise': input.valeurMarchandise,
       'p_pourcentage_percu': input.pourcentagePercu,
+      'p_bus_id': input.busId,
     });
     return data as Map<String, dynamic>;
   }
@@ -65,10 +66,11 @@ class ColisService {
     return (data as num?)?.toDouble() ?? 0;
   }
 
-  Future<Map<String, dynamic>> updateStatut(String colisId, ColisStatut statut) async {
+  Future<Map<String, dynamic>> updateStatut(String colisId, ColisStatut statut, {String? busId}) async {
     final data = await _client.rpc('update_colis_autonome_statut', params: {
       'p_colis_id': colisId,
       'p_new_statut': statut.dbValue,
+      'p_bus_id': busId,
     });
     return data as Map<String, dynamic>;
   }
@@ -108,6 +110,19 @@ class ColisService {
         .map(GareOption.fromMap)
         .where((g) => g.id.isNotEmpty && g.name.isNotEmpty && !g.name.startsWith('__'))
         .toList();
+  }
+
+  /// Bus actifs de la compagnie, pour le sélecteur "bus du convoi" — lecture
+  /// directe de la table Bus (RLS `bus_select` publique pour les compagnies
+  /// actives, même accès que le sélecteur web listCompanyBusesSupabase).
+  Future<List<BusOption>> listBuses(String companyId) async {
+    final rows = await _client
+        .from('Bus')
+        .select('id, model, registrationNumber')
+        .eq('companyId', companyId)
+        .eq('isActive', true)
+        .order('registrationNumber');
+    return (rows as List).map((r) => BusOption.fromMap(r as Map<String, dynamic>)).toList();
   }
 
   /// Caisse (gare) actuellement ouverte par l'agent connecté — voir

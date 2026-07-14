@@ -30,7 +30,7 @@ Future<void> shareColisManifestCsv({
   buffer.writeln();
   buffer.writeln(csvRow([
     'Date', 'Réf.', 'Gare départ', 'Gare destination', 'Expéditeur', 'Tél. exp.',
-    'Destinataire', 'Tél. dest.', 'Nature(s)', 'Contenu', 'Poids (kg)', 'Pièces',
+    'Destinataire', 'Tél. dest.', 'Nature(s)', 'Bus', 'Contenu', 'Poids (kg)', 'Pièces',
     'Montant', 'Statut',
   ]));
   for (final r in rows) {
@@ -44,6 +44,7 @@ Future<void> shareColisManifestCsv({
       r.nomDestinataire,
       r.telephoneDestinataire,
       r.natures.join(', '),
+      r.busPlateNumber ?? '',
       r.descriptionContenu ?? '',
       r.poidsKg?.toString() ?? '',
       r.nombrePieces.toString(),
