@@ -1,0 +1,43 @@
+name: courrier_client
+description: "Courrier Client — suivi de colis et commande de livraison VTC, pour l'expéditeur/destinataire."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Backend — DEUX projets Supabase distincts, voir core/config/env.dart :
+  # 1. Tibus principal (suivi colis, réutilise les RPC Colis Autonome).
+  # 2. Tibus Ride (commande/suivi de livraison VTC, projet séparé, comptes
+  #    séparés — voir README "Deux backends").
+  supabase_flutter: ^2.6.0
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # UI
+  cupertino_icons: ^1.0.6
+  intl: ^0.19.0
+
+  # Local storage / env
+  shared_preferences: ^2.2.3
+  flutter_dotenv: ^5.1.0
+
+  # Position GPS pour la commande de livraison (voir README "Dette technique"
+  # — pas encore de géocodage d'adresse ni de carte, juste "utiliser ma
+  # position actuelle" pour le point de départ et d'arrivée).
+  geolocator: ^13.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env

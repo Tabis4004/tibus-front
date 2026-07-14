@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
 import '../models/colis.dart';
 
@@ -16,7 +15,8 @@ import '../models/colis.dart';
 class PrinterService {
   static const _channel = MethodChannel('com.tibus.courrier/p3_printer');
 
-  bool get isAvailable => !kIsWeb && Platform.isAndroid;
+  bool get isAvailable =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   Future<void> warmUp() async {
     if (!isAvailable) return;

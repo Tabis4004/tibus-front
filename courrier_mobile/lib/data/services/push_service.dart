@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -120,10 +120,9 @@ class PushService {
   /// Ne fait rien silencieusement si Firebase n'est pas initialisé —
   /// permet de garder cet appel inconditionnel dans le reste du code.
   Future<void> registerForPushNotifications() async {
-    // Pas de FCM configuré pour le web (voir main.dart) — et dart:io
-    // Platform (utilisé plus bas dans _registerToken) n'existe pas sur
-    // le web non plus. On garde uniquement le suivi Realtime sur ce
-    // canal (watchColis), qui fonctionne partout.
+    // Pas de FCM configuré pour le web (voir main.dart). On garde
+    // uniquement le suivi Realtime sur ce canal (watchColis), qui
+    // fonctionne partout, y compris web.
     if (kIsWeb) return;
     await init();
     try {
@@ -169,7 +168,8 @@ class PushService {
     try {
       await _client.rpc('register_device_token', params: {
         'p_fcm_token': token,
-        'p_platform': Platform.isIOS ? 'ios' : 'android',
+        'p_platform':
+            defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
         'p_app_version': null,
       });
     } catch (_) {
