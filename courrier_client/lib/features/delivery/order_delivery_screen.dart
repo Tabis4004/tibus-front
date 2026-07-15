@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' as geo;
+import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/colis_summary.dart';
 import '../../data/models/delivery_ride.dart';
 import '../../data/services/ride_backend.dart';
 import 'delivery_status_screen.dart';
+import 'location_picker_screen.dart';
+
+/// Centre par défaut de la carte quand aucun point de référence n'est encore
+/// connu (ni position GPS, ni point déjà choisi) — Lomé, zone de couverture
+/// actuelle de Tibus Ride.
+const _defaultMapCenter = LatLng(6.1319, 1.2228);
 
 /// Commande d'une livraison VTC — lancée soit depuis le suivi d'un colis
 /// (colis non-null : préremplissage adresse/téléphone + code colis tracé
@@ -12,12 +19,14 @@ import 'delivery_status_screen.dart';
 /// null : commande autonome, RideBackend.createDeliveryRide supporte déjà
 /// colisCode/passengerPhone optionnels).
 ///
-/// DETTE TECHNIQUE (v1, assumé pour aller vite) : pas de carte ni de
-/// géocodage d'adresse (nécessiterait la clé Google Maps déjà utilisée par
-/// Tibus Ride, pas encore branchée ici). Les coordonnées GPS sont capturées
-/// via "Utiliser ma position actuelle" — l'utilisateur doit être sur place
-/// (ou taper les coordonnées manuellement) pour chaque point. Le texte
-/// d'adresse, lui, sert d'affichage pour le livreur.
+/// DETTE TECHNIQUE (v1, assumé pour aller vite) : pas de géocodage d'adresse
+/// (nécessiterait la clé Google Maps déjà utilisée par Tibus Ride, pas
+/// encore branchée ici) — donc pas de recherche par texte. Les coordonnées
+/// GPS sont capturées soit via "Ma position" (position actuelle de
+/// l'appareil), soit via "Choisir sur la carte" (LocationPickerScreen, tap
+/// sur une carte OpenStreetMap) pour le point qui n'est pas là où se trouve
+/// l'utilisateur. Le texte d'adresse, lui, sert uniquement d'affichage pour
+/// le livreur.
 class OrderDeliveryScreen extends StatefulWidget {
   final ColisSummary? colis;
   const OrderDeliveryScreen({super.key, this.colis});
@@ -31,8 +40,8 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
   final _dropoffAddressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
-  Position? _pickupPos;
-  Position? _dropoffPos;
+  LatLng? _pickupPos;
+  LatLng? _dropoffPos;
   DeliveryVehicle _vehicle = DeliveryVehicle.motorcycle;
   String _packageType = 'small';
   bool _loading = false;
@@ -54,12 +63,12 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
     _pickupAddressCtrl.text = widget.colis?.gareDestination ?? '';
   }
 
-  Future<Position?> _grabPosition() async {
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+  Future<LatLng?> _grabPosition() async {
+    var permission = await geo.Geolocator.checkPermission();
+    if (permission == geo.LocationPermission.denied) {
+      permission = await geo.Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == geo.LocationPermission.denied || permission == geo.LocationPermission.deniedForever) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Position refusée — activez la localisation pour continuer.')),
@@ -67,17 +76,53 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       }
       return null;
     }
-    return Geolocator.getCurrentPosition();
+    final pos = await geo.Geolocator.getCurrentPosition();
+    return LatLng(pos.latitude, pos.longitude);
   }
 
   Future<void> _usePickupPosition() async {
     final pos = await _grabPosition();
-    if (pos != null) setState(() => _pickupPos = pos);
+    if (pos != null) {
+      setState(() => _pickupPos = pos);
+      _refreshEstimate();
+    }
   }
 
   Future<void> _useDropoffPosition() async {
     final pos = await _grabPosition();
-    if (pos != null) setState(() => _dropoffPos = pos);
+    if (pos != null) {
+      setState(() => _dropoffPos = pos);
+      _refreshEstimate();
+    }
+  }
+
+  /// Alternative à "Utiliser ma position" : choisir un point différent en
+  /// tapant sur une carte (nécessaire pour le point qui n'est PAS la position
+  /// actuelle de l'utilisateur — sinon retrait et livraison se retrouvent au
+  /// même endroit à quelques mètres près, voir LocationPickerScreen).
+  Future<void> _pickOnMap({required bool isPickup}) async {
+    final referencePoint = isPickup ? _dropoffPos : _pickupPos;
+    final currentPoint = isPickup ? _pickupPos : _dropoffPos;
+    final center = currentPoint ?? referencePoint ?? _defaultMapCenter;
+
+    final result = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          title: isPickup ? 'Point de retrait' : 'Point de livraison',
+          initialCenter: center,
+          initialPoint: currentPoint,
+        ),
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      if (isPickup) {
+        _pickupPos = result;
+      } else {
+        _dropoffPos = result;
+      }
+    });
+    _refreshEstimate();
   }
 
   Future<void> _refreshEstimate() async {
@@ -151,14 +196,24 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             decoration: const InputDecoration(labelText: 'Adresse de départ (retrait)'),
           ),
           const SizedBox(height: 4),
-          _PositionRow(position: _pickupPos, onTap: _usePickupPosition, label: 'position de départ'),
+          _PositionRow(
+            position: _pickupPos,
+            onUseMyPosition: _usePickupPosition,
+            onPickOnMap: () => _pickOnMap(isPickup: true),
+            label: 'position de départ',
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: _dropoffAddressCtrl,
             decoration: const InputDecoration(labelText: 'Adresse de livraison'),
           ),
           const SizedBox(height: 4),
-          _PositionRow(position: _dropoffPos, onTap: _useDropoffPosition, label: 'position de livraison'),
+          _PositionRow(
+            position: _dropoffPos,
+            onUseMyPosition: _useDropoffPosition,
+            onPickOnMap: () => _pickOnMap(isPickup: false),
+            label: 'position de livraison',
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: _phoneCtrl,
@@ -220,27 +275,42 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
 }
 
 class _PositionRow extends StatelessWidget {
-  final Position? position;
-  final VoidCallback onTap;
+  final LatLng? position;
+  final VoidCallback onUseMyPosition;
+  final VoidCallback onPickOnMap;
   final String label;
-  const _PositionRow({required this.position, required this.onTap, required this.label});
+  const _PositionRow({
+    required this.position,
+    required this.onUseMyPosition,
+    required this.onPickOnMap,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            position == null
-                ? 'Aucune $label enregistrée'
-                : '${position!.latitude.toStringAsFixed(5)}, ${position!.longitude.toStringAsFixed(5)}',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-          ),
+        Text(
+          position == null
+              ? 'Aucune $label enregistrée'
+              : '${position!.latitude.toStringAsFixed(5)}, ${position!.longitude.toStringAsFixed(5)}',
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
-        TextButton.icon(
-          icon: const Icon(Icons.my_location, size: 16),
-          label: const Text('Utiliser ma position'),
-          onPressed: onTap,
+        Wrap(
+          spacing: 4,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.my_location, size: 16),
+              label: const Text('Ma position'),
+              onPressed: onUseMyPosition,
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.map_outlined, size: 16),
+              label: const Text('Choisir sur la carte'),
+              onPressed: onPickOnMap,
+            ),
+          ],
         ),
       ],
     );
