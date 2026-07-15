@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/colis_ref.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/bordereau_service.dart';
+import 'bordereau_print_sheet.dart';
 
 final bordereauServiceProvider = Provider((ref) => BordereauService());
 
@@ -421,6 +422,11 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       appBar: AppBar(
         title: Text(detail.reference),
         actions: [
+          IconButton(
+            onPressed: detail.colis.isEmpty ? null : () => showBordereauPrintSheet(context, detail),
+            icon: const Icon(Icons.print_outlined),
+            tooltip: 'Imprimer le bordereau',
+          ),
           if (isOpen)
             TextButton.icon(
               onPressed: _busy || detail.colis.isEmpty ? null : _close,

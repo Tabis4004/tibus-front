@@ -1,7 +1,9 @@
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
+import '../../core/utils/bordereau_receipt_lines.dart';
 import '../../core/utils/colis_receipt_lines.dart';
 import '../models/colis.dart';
+import 'bordereau_service.dart';
 
 /// Impression via un vrai pont ESC/POS (USB ou Bluetooth), pour les
 /// imprimantes physiques du guichet non couvertes par les deux autres ponts
@@ -105,6 +107,24 @@ class EscPosPrinterService {
   }) async {
     await printColisReceipt(colis, type: type, paperSize: paperSize, agentName: agentName);
     await printColisTalon(colis, type: type, paperSize: paperSize);
+  }
+
+  /// Bordereau de livraison imprimé sur le pont [type] — mêmes lignes que le
+  /// pont WisePrinter (bordereauReceiptLines()).
+  Future<void> printBordereau(
+    BordereauDetail d, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = _renderLines(generator, bordereauReceiptLines(d));
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(generator.qrcode(d.id));
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
   }
 
   List<int> _renderLines(Generator generator, List<Map<String, dynamic>> lines) {

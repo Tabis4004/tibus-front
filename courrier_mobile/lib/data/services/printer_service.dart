@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/utils/bordereau_receipt_lines.dart';
 import '../../core/utils/colis_receipt_lines.dart';
 import '../models/colis.dart';
+import 'bordereau_service.dart';
 import 'esc_pos_printer_service.dart';
 import 'pos_bridge/pos_bridge.dart';
 
@@ -171,6 +173,47 @@ class PrinterService {
   Future<void> printColisReceiptWithTalon(Colis colis, {int paperWidthMm = 58, String? agentName}) async {
     await printColisReceipt(colis, paperWidthMm: paperWidthMm, agentName: agentName);
     await printColisTalon(colis, paperWidthMm: paperWidthMm);
+  }
+
+  /// Bordereau de livraison — pont P3 natif. Une ligne rows par colis
+  /// (référence + destinataire/montant), voir bordereauReceiptLines pour le
+  /// même contenu côté WisePrinter/ESC-POS.
+  Future<void> printBordereau(BordereauDetail d, {int paperWidthMm = 58}) {
+    final trajet = '${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
+    return printReceipt(
+      header: [d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER', 'Bordereau de livraison'],
+      reference: d.reference,
+      rows: [
+        ['Trajet', trajet],
+        if (d.busPlateNumber != null) ['Bus', d.busPlateNumber!],
+        if (d.createdAt != null) ['Créé le', formatBordereauDate(d.createdAt!)],
+        ['Colis', '${d.colis.length}'],
+        for (var i = 0; i < d.colis.length; i++)
+          [
+            '${i + 1}. ${d.colis[i].reference}',
+            '${d.colis[i].nomDestinataire} · ${d.colis[i].montantFret.toStringAsFixed(0)} FCFA',
+          ],
+        ['Total fret', '${d.totalFret.toStringAsFixed(0)} FCFA'],
+      ],
+      qr: d.id,
+      footer: 'Powered by Tibus',
+      paperWidthMm: paperWidthMm,
+    );
+  }
+
+  /// Bordereau de livraison — pont Xprinter/WisePrinter (desktop).
+  Future<void> printBordereauViaWisePrinter(BordereauDetail d) {
+    if (!hasWisePrinterBridge) {
+      throw StateError('Xprinter indisponible sur cet appareil.');
+    }
+    return _bridge.printViaWisePrinter(
+      header: d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER',
+      lines: bordereauReceiptLines(d),
+      qr: d.id,
+      qrSize: 200,
+      feedLines: 4,
+      cut: true,
+    );
   }
 
   Future<void> release() async {
