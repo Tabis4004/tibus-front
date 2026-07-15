@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/colis_receipt_lines.dart';
 import '../models/colis.dart';
 import 'esc_pos_printer_service.dart';
@@ -90,29 +91,86 @@ class PrinterService {
     });
   }
 
-  /// Reçu pour un colis — construit les lignes à partir du modèle [Colis],
-  /// avec le code de retrait en QR pour un scan rapide côté destinataire.
-  Future<void> printColisReceipt(Colis colis, {int paperWidthMm = 58}) {
+  /// Nom de l'agent connecté, pour le champ "Agent" du reçu — best-effort,
+  /// lu depuis les métadonnées Supabase Auth (full_name), jamais une requête
+  /// réseau supplémentaire. `null`/vide si indisponible : la ligne est alors
+  /// simplement omise (voir colisReceiptLines).
+  String? _currentAgentName() {
+    try {
+      final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
+      final name = meta?['full_name'] as String?;
+      return (name != null && name.trim().isNotEmpty) ? name.trim() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Reçu pour un colis — format "propre et encadré" (en-tête, N° en
+  /// évidence, blocs EXPÉDITEUR / BÉNÉFICIAIRE / CONTENU), avec le code de
+  /// retrait en QR pour un scan rapide côté destinataire. Voir
+  /// colis_receipt_lines.dart pour le même contenu côté ponts
+  /// WisePrinter/ESC-POS (colisReceiptLines) — ici en rows label/valeur
+  /// (API structurée du pont P3 natif, qui ne connaît pas les sections en
+  /// gras : les libellés EXPÉDITEUR/BÉNÉFICIAIRE/CONTENU servent de repère
+  /// visuel en l'absence de mise en forme riche côté imprimante intégrée).
+  Future<void> printColisReceipt(Colis colis, {int paperWidthMm = 58, String? agentName}) {
+    final agent = agentName ?? _currentAgentName();
     return printReceipt(
       header: const ['TIBUS COURRIER'],
-      reference: colis.id.substring(0, 8).toUpperCase(),
+      reference: colisShortRef(colis),
       rows: [
-        ['Expéditeur', colis.nomExpediteur],
-        ['Tél. expéditeur', colis.telephoneExpediteur],
-        ['Destinataire', colis.nomDestinataire],
-        ['Tél. destinataire', colis.telephoneDestinataire],
-        ['Trajet', '${colis.gareDepart} -> ${colis.gareDestination}'],
-        if (colis.poidsKg != null) ['Poids', '${colis.poidsKg} kg'],
-        ['Statut', colis.statut.label],
-        ['Montant', '${colis.montantFret.toStringAsFixed(0)} FCFA'],
+        ['EXPÉDITEUR', colis.nomExpediteur],
+        ['Téléphone', colis.telephoneExpediteur],
+        ["Frais d'envoi", '${colis.montantFret.toStringAsFixed(0)} FCFA'],
         if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
-          ['Valeur marchandise', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'],
+          ['Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'],
+        ['Agence', colis.gareDepart],
+        if (agent != null) ['Agent', agent],
+        ['Déposé le', formatColisDate(colis.createdAt)],
+        ['BÉNÉFICIAIRE', colis.nomDestinataire],
+        ['Téléphone ', colis.telephoneDestinataire],
+        ['Destination', colis.gareDestination],
+        ['CONTENU', colisContentLabel(colis)],
+        if (colis.poidsKg != null) ['Poids', '${colis.poidsKg} kg'],
         if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
           ['Pourcentage perçu', '${colis.pourcentagePercu} %'],
       ],
       qr: colis.id,
+      footer: 'Retrait sous 72h — passé ce délai, frais de magasinage.\nPowered by Tibus',
       paperWidthMm: paperWidthMm,
     );
+  }
+
+  /// Talon (étiquette adhésive à coller sur le colis) — imprimé à la suite
+  /// du reçu, voir printColisReceiptWithTalon. Contenu volontairement
+  /// minimal (référence, destination, montant, destinataire, expéditeur) :
+  /// c'est ce qui reste collé sur le colis physique, pas un document à
+  /// conserver par le client.
+  Future<void> printColisTalon(Colis colis, {int paperWidthMm = 58}) {
+    return printReceipt(
+      header: const ['TIBUS COURRIER'],
+      reference: colisShortRef(colis),
+      rows: [
+        ['Destination', colis.gareDestination],
+        ['Montant', '${colis.montantFret.toStringAsFixed(0)} FCFA'],
+        ['Destinataire', colis.nomDestinataire],
+        ['Téléphone', colis.telephoneDestinataire],
+        ['Expéditeur', colis.nomExpediteur],
+        ['Tél. exp.', colis.telephoneExpediteur],
+      ],
+      qr: colis.id,
+      footer: '',
+      paperWidthMm: paperWidthMm,
+    );
+  }
+
+  /// Reçu + talon en une seule action ("sur le même envoi") — imprimante
+  /// P3 intégrée. Deux impressions successives (chacune terminée par une
+  /// coupe, voir P3PrinterModule.finishPrinter) : le reçu pour le client,
+  /// le talon à détacher et coller sur le colis.
+  Future<void> printColisReceiptWithTalon(Colis colis, {int paperWidthMm = 58, String? agentName}) async {
+    await printColisReceipt(colis, paperWidthMm: paperWidthMm, agentName: agentName);
+    await printColisTalon(colis, paperWidthMm: paperWidthMm);
   }
 
   Future<void> release() async {
@@ -126,13 +184,13 @@ class PrinterService {
 
   /// Reçu colis via le pont Xprinter/WisePrinter (desktop) — même contrat
   /// que printer.printReceipt() côté web (src/lib/printer.ts).
-  Future<void> printColisReceiptViaWisePrinter(Colis colis) {
+  Future<void> printColisReceiptViaWisePrinter(Colis colis, {String? agentName}) {
     if (!hasWisePrinterBridge) {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
       header: 'TIBUS COURRIER',
-      lines: colisReceiptLines(colis),
+      lines: colisReceiptLines(colis, agentName: agentName ?? _currentAgentName()),
       qr: colis.id,
       qrSize: 220,
       feedLines: 4,
@@ -140,9 +198,33 @@ class PrinterService {
     );
   }
 
+  /// Talon via le pont Xprinter/WisePrinter — voir printColisTalon (pont P3).
+  Future<void> printColisTalonViaWisePrinter(Colis colis) {
+    if (!hasWisePrinterBridge) {
+      throw StateError('Xprinter indisponible sur cet appareil.');
+    }
+    return _bridge.printViaWisePrinter(
+      header: 'TIBUS COURRIER',
+      lines: colisTalonLines(colis),
+      qr: colis.id,
+      qrSize: 220,
+      feedLines: 3,
+      cut: true,
+    );
+  }
+
+  /// Reçu + talon en une seule action — pont Xprinter/WisePrinter.
+  Future<void> printColisReceiptWithTalonViaWisePrinter(Colis colis, {String? agentName}) async {
+    await printColisReceiptViaWisePrinter(colis, agentName: agentName);
+    await printColisTalonViaWisePrinter(colis);
+  }
+
   /// Fallback impression navigateur — toujours disponible, aucun pont natif
   /// requis (même logique que printColisReceiptBrowser() côté web,
-  /// src/lib/colis-receipt.ts). Retourne `false` hors web.
+  /// src/lib/colis-receipt.ts). Retourne `false` hors web. Le talon est
+  /// visible dans le même aperçu que le reçu (voir
+  /// colis_receipt_preview_sheet.dart) : une seule impression navigateur
+  /// capture les deux.
   bool printColisReceiptBrowser({bool wide = true}) {
     return _bridge.triggerBrowserPrint(wide: wide);
   }

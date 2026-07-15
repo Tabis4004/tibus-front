@@ -2,22 +2,39 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers.dart';
+import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
 
-/// Aperçu du reçu colis avant impression, avec sélection explicite du pont
-/// imprimante — même logique multi-pont que côté web
+/// Nom de l'agent connecté pour l'affichage — même lecture best-effort que
+/// PrinterService._currentAgentName (métadonnées Supabase Auth uniquement,
+/// jamais de requête réseau supplémentaire).
+String? _currentAgentDisplayName() {
+  try {
+    final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
+    final name = meta?['full_name'] as String?;
+    return (name != null && name.trim().isNotEmpty) ? name.trim() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Aperçu du reçu colis + talon avant impression, avec sélection explicite
+/// du pont imprimante — même logique multi-pont que côté web
 /// (src/lib/colis-receipt.ts, src/lib/ticket-receipt-print.ts) :
 /// - "Xprinter" -> pont desktop (window.WisePrinter), si détecté ;
 /// - "56 mm (Wiseasy P3)" -> imprimante intégrée, Android natif ;
 /// - "80 mm Xprinter (toujours disponible)" -> pont desktop si présent,
-///   sinon fallback impression navigateur (fonctionne partout, y compris
-///   web pur sans wrapper).
+///   sinon fallback impression navigateur (fonctionne partout) ;
+/// - "USB / Bluetooth" -> imprimante physique réelle (Xprinter, Mini
+///   Printer...) via esc_pos_printer_service.dart.
 ///
-/// Remplace l'ancien comportement de colis_detail_screen.dart, qui
-/// imprimait directement ou affichait "Impression indisponible sur cet
-/// appareil" sans aucun aperçu ni choix d'imprimante.
+/// Chaque bouton imprime le REÇU (à conserver) ET le TALON (étiquette à
+/// détacher et coller sur le colis) en une seule action — format "propre et
+/// encadré" repris d'un modèle papier de référence (voir
+/// colis_receipt_lines.dart).
 Future<void> showColisReceiptPreview(BuildContext context, Colis colis) {
   return showModalBottomSheet(
     context: context,
@@ -26,18 +43,8 @@ Future<void> showColisReceiptPreview(BuildContext context, Colis colis) {
   );
 }
 
-class _ColisReceiptPreviewSheet extends ConsumerStatefulWidget {
-  final Colis colis;
-  const _ColisReceiptPreviewSheet({required this.colis});
-
-  @override
-  ConsumerState<_ColisReceiptPreviewSheet> createState() => _ColisReceiptPreviewSheetState();
-}
-
 class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewSheet> {
   bool _printing = false;
-
-  String get _reference => widget.colis.id.substring(0, 8).toUpperCase();
 
   Future<void> _run(Future<void> Function() action, {String? successMessage}) async {
     if (_printing) return;
@@ -60,6 +67,7 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
   Widget build(BuildContext context) {
     final printer = ref.read(printerServiceProvider);
     final colis = widget.colis;
+    final agentName = _currentAgentDisplayName();
 
     return SafeArea(
       child: Padding(
@@ -85,51 +93,33 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               ],
             ),
             const SizedBox(height: 8),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 380),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black12),
-                borderRadius: BorderRadius.circular(8),
-              ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 460),
               child: SingleChildScrollView(
-                child: DefaultTextStyle(
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.4, color: Colors.black87),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text('TIBUS COURRIER',
-                          textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const Text('Reçu expédition colis', textAlign: TextAlign.center),
-                      const SizedBox(height: 6),
-                      Text('Ref: $_reference',
-                          textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const Divider(),
-                      Text('Expéditeur: ${colis.nomExpediteur}'),
-                      Text('Tél. expéditeur: ${colis.telephoneExpediteur}'),
-                      Text('Destinataire: ${colis.nomDestinataire}'),
-                      Text('Tél. destinataire: ${colis.telephoneDestinataire}'),
-                      const Divider(),
-                      Text('Trajet: ${colis.gareDepart} -> ${colis.gareDestination}'),
-                      if (colis.poidsKg != null) Text('Poids: ${colis.poidsKg} kg'),
-                      Text('Statut: ${colis.statut.label}'),
-                      const Divider(),
-                      Text('Montant: ${colis.montantFret.toStringAsFixed(0)} FCFA',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
-                        Text('Valeur marchandise: ${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'),
-                      if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
-                        Text('Pourcentage perçu: ${colis.pourcentagePercu} %'),
-                      const SizedBox(height: 12),
-                      Center(child: QrImageView(data: colis.id, size: 120)),
-                    ],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ReceiptBox(colis: colis, agentName: agentName),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('Talon à coller sur le colis', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _TalonBox(colis: colis),
+                  ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
-              'Choisir une imprimante',
+              'Choisir une imprimante (reçu + talon)',
               style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
             ),
             const SizedBox(height: 8),
@@ -139,8 +129,8 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               enabled: !_printing && printer.hasWisePrinterBridge,
               disabledHint: printer.hasWisePrinterBridge ? null : 'Xprinter non détecté sur cet appareil',
               onPressed: () => _run(
-                () => printer.printColisReceiptViaWisePrinter(colis),
-                successMessage: 'Impression envoyée (Xprinter).',
+                () => printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName),
+                successMessage: 'Reçu + talon envoyés (Xprinter).',
               ),
             ),
             const SizedBox(height: 8),
@@ -150,8 +140,8 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               enabled: !_printing && printer.hasNativeP3,
               disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
               onPressed: () => _run(
-                () => printer.printColisReceipt(colis, paperWidthMm: 58),
-                successMessage: 'Impression envoyée (imprimante intégrée, 56 mm).',
+                () => printer.printColisReceiptWithTalon(colis, paperWidthMm: 58, agentName: agentName),
+                successMessage: 'Reçu + talon envoyés (imprimante intégrée, 56 mm).',
               ),
             ),
             const SizedBox(height: 8),
@@ -161,7 +151,7 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               enabled: !_printing,
               onPressed: () => _run(() async {
                 if (printer.hasWisePrinterBridge) {
-                  await printer.printColisReceiptViaWisePrinter(colis);
+                  await printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName);
                   return;
                 }
                 final ok = printer.printColisReceiptBrowser(wide: true);
@@ -179,7 +169,7 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               onPressed: () => showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                builder: (_) => _EscPosPrinterSheet(colis: colis),
+                builder: (_) => _EscPosPrinterSheet(colis: colis, agentName: agentName),
               ),
             ),
           ],
@@ -189,13 +179,232 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
   }
 }
 
+class _ColisReceiptPreviewSheet extends ConsumerStatefulWidget {
+  final Colis colis;
+  const _ColisReceiptPreviewSheet({required this.colis});
+
+  @override
+  ConsumerState<_ColisReceiptPreviewSheet> createState() => _ColisReceiptPreviewSheetState();
+}
+
+/// Reçu — cadre unique avec sections EXPÉDITEUR / BÉNÉFICIAIRE / CONTENU
+/// séparées par des filets pleins, à l'image du modèle papier de référence
+/// (numéro en évidence, champs alignés label/valeur).
+class _ReceiptBox extends StatelessWidget {
+  final Colis colis;
+  final String? agentName;
+  const _ReceiptBox({required this.colis, this.agentName});
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = colisShortRef(colis);
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black87, width: 1.4),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: DefaultTextStyle(
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.4, color: Colors.black87),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Column(
+                children: const [
+                  Text('TIBUS COURRIER',
+                      textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.black45),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text('N°   $ref',
+                  textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+            _Section(
+              title: 'EXPÉDITEUR',
+              children: [
+                Text(colis.nomExpediteur, style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                _Field('Téléphone', colis.telephoneExpediteur),
+                _Field("Frais d'envoi", '${colis.montantFret.toStringAsFixed(0)} FCFA'),
+                if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
+                  _Field('Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'),
+                _Field('Agence', colis.gareDepart),
+                if (agentName != null) _Field('Agent', agentName!),
+                _Field('Déposé le', formatColisDate(colis.createdAt)),
+              ],
+            ),
+            _Section(
+              title: 'BÉNÉFICIAIRE',
+              children: [
+                Text(colis.nomDestinataire, style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                _Field('Téléphone', colis.telephoneDestinataire),
+                _Field('Destination', colis.gareDestination),
+              ],
+            ),
+            _Section(
+              title: 'CONTENU',
+              isLast: true,
+              children: [
+                Text(colisContentLabel(colis)),
+                if (colis.poidsKg != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text('Poids : ${colis.poidsKg} kg', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Column(
+                children: [
+                  const Divider(height: 16),
+                  const Text(
+                    'Retrait sous 72h — passé ce délai, des frais de\nmagasinage sont imputables.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(child: QrImageView(data: colis.id, size: 96)),
+                  const SizedBox(height: 6),
+                  const Text('Powered by Tibus', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.black54)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  final bool isLast;
+  const _Section({required this.title, required this.children, this.isLast = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(
+        border: Border(
+          top: const BorderSide(color: Colors.black45, width: 1),
+          bottom: isLast ? BorderSide.none : const BorderSide(color: Colors.black12, width: 0.6),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.5)),
+          const SizedBox(height: 4),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _Field extends StatelessWidget {
+  final String label;
+  final String value;
+  const _Field(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Colors.black54))),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Talon — étiquette compacte à détacher et coller sur le colis : référence
+/// + QR en évidence, destination et montant en gros, destinataire, puis
+/// expéditeur en petit (repris du modèle papier de référence).
+class _TalonBox extends StatelessWidget {
+  final Colis colis;
+  const _TalonBox({required this.colis});
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = colisShortRef(colis);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black87, width: 1.4),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: DefaultTextStyle(
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.3, color: Colors.black87),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('TIBUS COURRIER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(border: Border.all(color: Colors.black45), borderRadius: BorderRadius.circular(4)),
+                    child: Text(ref, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                QrImageView(data: colis.id, size: 56),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(colis.gareDestination.toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+                Text('${colis.montantFret.toStringAsFixed(0)} FCFA', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(colis.nomDestinataire, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(colis.telephoneDestinataire),
+            const SizedBox(height: 6),
+            Text('Expéditeur : ${colis.nomExpediteur}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+            Text(colis.telephoneExpediteur, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Sélecteur d'imprimante USB/Bluetooth réelle (Xprinter XP-Q200, Mini
 /// Printer MPT-II…) : scan, tap sur un appareil trouvé -> connexion +
-/// impression directe. Pont dédié (esc_pos_printer_service.dart), distinct
-/// de la P3 intégrée et du pont desktop WisePrinter ci-dessus.
+/// impression directe (reçu + talon). Pont dédié
+/// (esc_pos_printer_service.dart), distinct de la P3 intégrée et du pont
+/// desktop WisePrinter ci-dessus.
 class _EscPosPrinterSheet extends ConsumerStatefulWidget {
   final Colis colis;
-  const _EscPosPrinterSheet({required this.colis});
+  final String? agentName;
+  const _EscPosPrinterSheet({required this.colis, this.agentName});
 
   @override
   ConsumerState<_EscPosPrinterSheet> createState() => _EscPosPrinterSheetState();
@@ -282,7 +491,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
       } else {
         await escPos.connectBluetooth(device);
       }
-      await escPos.printColisReceipt(widget.colis, type: type);
+      await escPos.printColisReceiptWithTalon(widget.colis, type: type, agentName: widget.agentName);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => _error = 'Impression impossible : $e');

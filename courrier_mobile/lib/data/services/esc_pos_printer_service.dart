@@ -56,18 +56,60 @@ class EscPosPrinterService {
 
   /// Reçu colis imprimé sur le pont [type] (USB ou Bluetooth), déjà connecté
   /// via [connectUsb]/[connectBluetooth]. Mêmes lignes que le pont
-  /// WisePrinter (colisReceiptLines()) : en-tête, expéditeur/destinataire,
-  /// trajet, montant, QR du code de retrait.
+  /// WisePrinter (colisReceiptLines()) : en-tête, blocs EXPÉDITEUR/
+  /// BÉNÉFICIAIRE/CONTENU, QR du code de retrait.
   Future<void> printColisReceipt(
+    Colis colis, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+    String? agentName,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = _renderLines(generator, colisReceiptLines(colis, agentName: agentName));
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(generator.qrcode(colis.id));
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  /// Talon (étiquette adhésive) imprimé sur le pont [type] — voir
+  /// PrinterService.printColisTalon pour le même contenu côté pont P3 natif.
+  Future<void> printColisTalon(
     Colis colis, {
     required PrinterType type,
     PaperSize paperSize = PaperSize.mm80,
   }) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(paperSize, profile);
-    final bytes = <int>[];
+    final bytes = _renderLines(generator, colisTalonLines(colis));
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(generator.qrcode(colis.id));
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
 
-    for (final line in colisReceiptLines(colis)) {
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  /// Reçu + talon en une seule action ("sur le même envoi") — deux
+  /// impressions successives sur le même pont, chacune terminée par une
+  /// coupe : le reçu pour le client, le talon à détacher et coller sur le
+  /// colis.
+  Future<void> printColisReceiptWithTalon(
+    Colis colis, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+    String? agentName,
+  }) async {
+    await printColisReceipt(colis, type: type, paperSize: paperSize, agentName: agentName);
+    await printColisTalon(colis, type: type, paperSize: paperSize);
+  }
+
+  List<int> _renderLines(Generator generator, List<Map<String, dynamic>> lines) {
+    final bytes = <int>[];
+    for (final line in lines) {
       final text = (line['text'] as String?) ?? '';
       if (text.isEmpty) {
         bytes.addAll(generator.feed(1));
@@ -84,13 +126,7 @@ class EscPosPrinterService {
         ),
       ));
     }
-
-    bytes.addAll(generator.feed(1));
-    bytes.addAll(generator.qrcode(colis.id));
-    bytes.addAll(generator.feed(3));
-    bytes.addAll(generator.cut());
-
-    await _manager.send(type: type, bytes: bytes);
+    return bytes;
   }
 
   PosAlign _align(String? value) {
