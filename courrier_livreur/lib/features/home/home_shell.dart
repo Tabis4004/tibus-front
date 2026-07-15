@@ -5,6 +5,7 @@ import '../onboarding/pending_approval_screen.dart';
 import 'dashboard_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../profile/profile_screen.dart';
+import '../admin/admin_home_screen.dart';
 
 /// Porte d'entrée post-connexion : attend le profil livreur, puis bascule
 /// entre l'écran "en attente de validation" et l'app complète (nav 3 onglets).
@@ -46,20 +47,32 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         if (!profile.isApproved) {
           return PendingApprovalScreen(profile: profile);
         }
+        // Onglet Admin — visible seulement pour superadmin/admin (voir
+        // canAccessAdminProvider). En cas d'erreur RPC (ex. compte non
+        // connecté), on masque simplement l'onglet plutôt que de bloquer
+        // l'app : la validation admin réelle reste de toute façon appliquée
+        // par le RLS à chaque écriture.
+        final canAdmin = ref.watch(canAccessAdminProvider).maybeWhen(data: (v) => v, orElse: () => false);
+
         final pages = [
           DashboardScreen(profile: profile),
           const WalletScreen(),
           const ProfileScreen(),
+          if (canAdmin) const AdminHomeScreen(),
         ];
+        final safeTab = _tab >= pages.length ? 0 : _tab;
+
         return Scaffold(
-          body: pages[_tab],
+          body: pages[safeTab],
           bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _tab,
+            type: BottomNavigationBarType.fixed,
+            currentIndex: safeTab,
             onTap: (i) => setState(() => _tab = i),
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Livraisons'),
-              BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
-              BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+            items: [
+              const BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Livraisons'),
+              const BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+              const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+              if (canAdmin) const BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings), label: 'Admin'),
             ],
           ),
         );

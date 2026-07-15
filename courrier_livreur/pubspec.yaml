@@ -28,7 +28,14 @@ dependencies:
   # Position GPS (signalement en ligne + position sur course active)
   geolocator: ^13.0.1
 
-  # Appel/WhatsApp destinataire, navigation Google Maps (lien externe, pas de SDK carte)
+  # Appel/WhatsApp destinataire, navigation Google Maps (lien externe pour
+  # l'itinéraire guidé) + carte embarquée OpenStreetMap pour l'aperçu
+  # retrait/livraison/position livreur à l'écran — aucune clé API requise
+  # (contrairement à Google Maps côté tibusride-front/RideTrackingMap.tsx,
+  # qui exige une clé navigateur restreinte par domaine).
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
   url_launcher: ^6.3.0
 
 dev_dependencies:

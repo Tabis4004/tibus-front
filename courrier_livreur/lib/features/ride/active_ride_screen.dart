@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/delivery_map.dart';
 import '../../data/models/active_ride.dart';
 import '../../data/services/driver_backend.dart';
 
@@ -25,6 +27,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   String? _error;
   StreamSubscription? _sub;
   Timer? _locationTimer;
+  LatLng? _driverPos;
 
   @override
   void initState() {
@@ -51,6 +54,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
       }
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
       final pos = await Geolocator.getCurrentPosition();
+      if (mounted) setState(() => _driverPos = LatLng(pos.latitude, pos.longitude));
       await DriverBackend.reportRideLocation(_ride.id, pos.latitude, pos.longitude);
     } catch (_) {}
   }
@@ -111,6 +115,12 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.primaryGreenLight, borderRadius: BorderRadius.circular(16)),
             child: Text(r.status.label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark, fontSize: 16)),
+          ),
+          const SizedBox(height: 16),
+          DeliveryMap(
+            pickup: r.pickupLat != null && r.pickupLng != null ? LatLng(r.pickupLat!, r.pickupLng!) : null,
+            dropoff: r.dropoffLat != null && r.dropoffLng != null ? LatLng(r.dropoffLat!, r.dropoffLng!) : null,
+            driver: _driverPos,
           ),
           const SizedBox(height: 16),
           _AddressRow(icon: Icons.circle, color: AppColors.primaryGreen, label: 'Retrait', address: r.pickupAddress),

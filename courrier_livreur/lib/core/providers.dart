@@ -22,3 +22,28 @@ final authStateProvider = StreamProvider<AuthState>((ref) async* {
 final driverProfileProvider = FutureProvider.autoDispose<DriverProfile>((ref) {
   return DriverBackend.fetchOrCreateProfile();
 });
+
+/// `true` si le compte connecté est superadmin (RPC `is_superadmin`, même
+/// contrat que côté web). Sert uniquement à afficher/masquer l'onglet Admin
+/// — les écritures restent soumises au RLS (voir DriverBackend, section
+/// "Admin / superadmin").
+final isSuperAdminProvider = FutureProvider.autoDispose<bool>((ref) {
+  return DriverBackend.isSuperAdmin();
+});
+
+/// `true` si le compte a le rôle 'admin' (has_role) — nécessaire pour que
+/// les écritures admin passent le RLS, en plus ou à la place de superadmin
+/// selon les policies. Voir README "Rôle superadmin & RLS".
+final hasAdminRoleProvider = FutureProvider.autoDispose<bool>((ref) {
+  return DriverBackend.hasAdminRole();
+});
+
+/// Accès à l'onglet Admin — superadmin ou admin, l'un ou l'autre suffit pour
+/// voir l'onglet (le RLS tranchera ensuite pour chaque écriture précise).
+final canAccessAdminProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final results = await Future.wait([
+    ref.watch(isSuperAdminProvider.future),
+    ref.watch(hasAdminRoleProvider.future),
+  ]);
+  return results.any((v) => v);
+});

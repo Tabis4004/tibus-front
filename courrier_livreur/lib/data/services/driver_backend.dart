@@ -268,4 +268,167 @@ class DriverBackend {
         .limit(limit);
     return (rows as List).cast<Map<String, dynamic>>();
   }
+
+  // ---------------------------------------------------------------------
+  // Admin / superadmin — même RPC/tables que src/lib/admin.functions.ts
+  // côté tibusride-front. IMPORTANT : le panneau web passe par un serveur
+  // (TanStack Start, clé service_role) qui contourne le RLS ; ici, en client
+  // pur, tout passe par le RLS avec le JWT de l'utilisateur connecté. Les
+  // policies "Admins manage drivers" / delivery_pricing_settings etc.
+  // vérifient has_role(uid,'admin') — un compte purement 'superadmin' (sans
+  // ligne 'admin' dans user_roles, cas du compte créé par
+  // scripts/create-superadmin.mjs) passera le gate is_superadmin() ci-dessous
+  // mais peut se voir refuser les écritures par le RLS tant qu'il n'a pas
+  // aussi le rôle 'admin' — voir README "Rôle superadmin & RLS".
+  // ---------------------------------------------------------------------
+
+  static Future<bool> isSuperAdmin() async {
+    if (currentUser == null) return false;
+    try {
+      final res = await client.rpc('is_superadmin', params: {'_uid': currentUser!.id});
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> hasAdminRole() async {
+    if (currentUser == null) return false;
+    try {
+      final res = await client.rpc('has_role', params: {'_user_id': currentUser!.id, '_role': 'admin'});
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Liste des livreurs en attente/à revalider — équivalent Flutter du
+  /// filtre manquant côté web (admin.functions.ts n'a pas de fonction
+  /// dédiée : c'est une requête directe `driver_profiles` filtrée sur le
+  /// statut, voir le rapport d'investigation de cette session).
+  static Future<List<Map<String, dynamic>>> fetchPendingDrivers() async {
+    final rows = await client
+        .from('driver_profiles')
+        .select()
+        .inFilter('status', ['pending', 'under_review'])
+        .order('created_at', ascending: true);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Assigne la catégorie livreur + marque la vérification physique — même
+  /// contrat que assignDriverEnrollment() côté web (prérequis avant
+  /// approbation, voir updateDriverStatus).
+  static Future<void> assignDriverEnrollment(
+    String userId, {
+    String? assignedCategory,
+    bool? physicalVerified,
+    String? enrollmentNotes,
+  }) async {
+    final patch = <String, dynamic>{'updated_at': DateTime.now().toIso8601String()};
+    if (assignedCategory != null && assignedCategory.trim().isNotEmpty) {
+      patch['assigned_category'] = assignedCategory.trim();
+    }
+    if (enrollmentNotes != null) patch['enrollment_notes'] = enrollmentNotes;
+    if (physicalVerified == true) {
+      patch['physical_verified_at'] = DateTime.now().toIso8601String();
+      patch['physical_verified_by'] = currentUser!.id;
+    } else if (physicalVerified == false) {
+      patch['physical_verified_at'] = null;
+      patch['physical_verified_by'] = null;
+    }
+    try {
+      await client.from('driver_profiles').update(patch).eq('user_id', userId);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  /// Change le statut d'un livreur — même garde-fou qu'updateDriverStatus()
+  /// côté web : impossible de passer à 'approved' sans documents + catégorie
+  /// + vérification physique déjà renseignés.
+  static Future<void> updateDriverStatus(
+    String userId,
+    String status, {
+    String? reason,
+  }) async {
+    if (status == 'approved') {
+      final row = await client
+          .from('driver_profiles')
+          .select('license_document_url, vehicle_document_url, vehicle_condition_url, physical_verified_at, assigned_category')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final missingDocs = row == null ||
+          row['license_document_url'] == null ||
+          row['vehicle_document_url'] == null ||
+          row['vehicle_condition_url'] == null ||
+          row['physical_verified_at'] == null ||
+          (row['assigned_category'] as String?)?.trim().isEmpty != false;
+      if (missingDocs) {
+        throw Exception(
+          'Dossier incomplet : documents (permis, carte grise, état véhicule), '
+          'catégorie assignée et vérification physique requis avant approbation.',
+        );
+      }
+    }
+    final patch = <String, dynamic>{
+      'status': status,
+      'status_updated_at': DateTime.now().toIso8601String(),
+      'status_updated_by': currentUser!.id,
+      'rejection_reason': (status == 'rejected' || status == 'suspended') ? reason : null,
+    };
+    try {
+      await client.from('driver_profiles').update(patch).eq('user_id', userId);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — tarifs & commissions livraison (mêmes tables que
+  // delivery_pricing_settings / delivery_package_pricing /
+  // delivery_extras_pricing côté web, voir admin.functions.ts).
+  // ---------------------------------------------------------------------
+
+  static Future<List<Map<String, dynamic>>> fetchDeliveryPricingSettings() async {
+    final rows = await client
+        .from('delivery_pricing_settings')
+        .select()
+        .order('vehicle')
+        .order('country', ascending: true);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> updateDeliveryPricingSetting(String id, Map<String, dynamic> patch) async {
+    try {
+      await client.from('delivery_pricing_settings').update(patch).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchDeliveryPackagePricing() async {
+    final rows = await client.from('delivery_package_pricing').select().order('package_type');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> updateDeliveryPackagePricing(String id, Map<String, dynamic> patch) async {
+    try {
+      await client.from('delivery_package_pricing').update(patch).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchDeliveryExtrasPricing() async {
+    final rows = await client.from('delivery_extras_pricing').select().order('extra_key');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> updateDeliveryExtrasPricing(String id, Map<String, dynamic> patch) async {
+    try {
+      await client.from('delivery_extras_pricing').update(patch).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
 }
