@@ -6,7 +6,11 @@ import '../../data/models/delivery_ride.dart';
 import '../../data/services/ride_backend.dart';
 import 'delivery_status_screen.dart';
 
-/// Commande d'une livraison VTC, lancée depuis le suivi d'un colis.
+/// Commande d'une livraison VTC — lancée soit depuis le suivi d'un colis
+/// (colis non-null : préremplissage adresse/téléphone + code colis tracé
+/// dans les notes de la course), soit directement depuis l'accueil (colis
+/// null : commande autonome, RideBackend.createDeliveryRide supporte déjà
+/// colisCode/passengerPhone optionnels).
 ///
 /// DETTE TECHNIQUE (v1, assumé pour aller vite) : pas de carte ni de
 /// géocodage d'adresse (nécessiterait la clé Google Maps déjà utilisée par
@@ -15,8 +19,8 @@ import 'delivery_status_screen.dart';
 /// (ou taper les coordonnées manuellement) pour chaque point. Le texte
 /// d'adresse, lui, sert d'affichage pour le livreur.
 class OrderDeliveryScreen extends StatefulWidget {
-  final ColisSummary colis;
-  const OrderDeliveryScreen({super.key, required this.colis});
+  final ColisSummary? colis;
+  const OrderDeliveryScreen({super.key, this.colis});
 
   @override
   State<OrderDeliveryScreen> createState() => _OrderDeliveryScreenState();
@@ -47,7 +51,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
   @override
   void initState() {
     super.initState();
-    _pickupAddressCtrl.text = widget.colis.gareDestination;
+    _pickupAddressCtrl.text = widget.colis?.gareDestination ?? '';
   }
 
   Future<Position?> _grabPosition() async {
@@ -98,7 +102,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
     try {
       final ride = await RideBackend.createDeliveryRide(
         pickupAddress: _pickupAddressCtrl.text.trim().isEmpty
-            ? widget.colis.gareDestination
+            ? (widget.colis?.gareDestination ?? '')
             : _pickupAddressCtrl.text.trim(),
         pickupLat: _pickupPos!.latitude,
         pickupLng: _pickupPos!.longitude,
@@ -107,8 +111,10 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
         dropoffLng: _dropoffPos!.longitude,
         vehicle: _vehicle,
         packageType: _packageType,
-        colisCode: widget.colis.id,
-        passengerPhone: _phoneCtrl.text.trim().isEmpty ? widget.colis.telephoneDestinataire : _phoneCtrl.text.trim(),
+        colisCode: widget.colis?.id,
+        passengerPhone: _phoneCtrl.text.trim().isNotEmpty
+            ? _phoneCtrl.text.trim()
+            : widget.colis?.telephoneDestinataire,
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -136,8 +142,10 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Colis ${widget.colis.id.substring(0, 8).toUpperCase()}', style: const TextStyle(color: AppColors.textSecondary)),
-          const SizedBox(height: 16),
+          if (widget.colis != null) ...[
+            Text('Colis ${widget.colis!.id.substring(0, 8).toUpperCase()}', style: const TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+          ],
           TextField(
             controller: _pickupAddressCtrl,
             decoration: const InputDecoration(labelText: 'Adresse de départ (retrait)'),
@@ -157,7 +165,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
               labelText: 'Téléphone contact',
-              hintText: widget.colis.telephoneDestinataire,
+              hintText: widget.colis?.telephoneDestinataire ?? 'ex. 77 123 45 67',
             ),
           ),
           const SizedBox(height: 16),

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../delivery/order_delivery_screen.dart';
 import '../track/track_colis_screen.dart';
 
-/// Entrée unique de l'app : suivre un colis. La commande de livraison VTC se
-/// lance ensuite DEPUIS le résultat du suivi (voir track_colis_screen.dart)
-/// — le code du colis est le point commun entre les deux parcours, pas un
-/// compte partagé (choix produit acté).
+/// Deux entrées depuis l'accueil : suivre un colis (le code sert alors de
+/// lien fonctionnel avec la commande VTC, voir track_colis_screen.dart), ou
+/// commander une livraison directement sans colis (RideBackend supporte déjà
+/// colisCode optionnel — voir order_delivery_screen.dart).
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -35,6 +36,17 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    icon: const Icon(Icons.two_wheeler),
+                    label: const Text('Commander une livraison'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OrderDeliveryScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
                     icon: const Icon(Icons.qr_code),
                     label: const Text('Suivre mon colis'),
                     onPressed: () => Navigator.of(context).push(
