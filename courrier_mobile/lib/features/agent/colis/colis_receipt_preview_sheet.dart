@@ -5,8 +5,27 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers.dart';
 import '../../../core/utils/colis_receipt_lines.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
+
+/// Message WhatsApp de partage du reçu — même contenu informatif que le
+/// reçu papier, pour envoi manuel à l'expéditeur ou au destinataire (voir
+/// buildColisTrackingWhatsAppMessage côté web, src/lib/colis-receipt.ts).
+String _colisWhatsAppShareMessage(Colis colis) {
+  final ref = colisShortRef(colis);
+  return [
+    'TIBUS COURRIER — Reçu colis $ref',
+    'Trajet : ${colis.gareDepart} -> ${colis.gareDestination}',
+    'Contenu : ${colisContentLabel(colis)}',
+    "Frais d'envoi : ${colis.montantFret.toStringAsFixed(0)} FCFA",
+    '',
+    'Expéditeur : ${colis.nomExpediteur} (${colis.telephoneExpediteur})',
+    'Destinataire : ${colis.nomDestinataire} (${colis.telephoneDestinataire})',
+    '',
+    'Retrait sous 72h — passé ce délai, des frais de magasinage sont imputables.',
+  ].join('\n');
+}
 
 /// Nom de l'agent connecté pour l'affichage — même lecture best-effort que
 /// PrinterService._currentAgentName (métadonnées Supabase Auth uniquement,
@@ -46,6 +65,16 @@ Future<void> showColisReceiptPreview(BuildContext context, Colis colis) {
 class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewSheet> {
   bool _printing = false;
 
+  Future<void> _share(String phone, String label) async {
+    final message = _colisWhatsAppShareMessage(widget.colis);
+    final ok = await openWhatsApp(phone, message);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Numéro $label manquant ou invalide.')));
+    }
+  }
+
   Future<void> _run(Future<void> Function() action, {String? successMessage}) async {
     if (_printing) return;
     setState(() => _printing = true);
@@ -69,110 +98,154 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
     final colis = widget.colis;
     final agentName = _currentAgentDisplayName();
 
+    // Tout le contenu (aperçu + boutons) est désormais dans UN SEUL scroll,
+    // borné à ~90% de la hauteur de l'écran : sur une fenêtre desktop/macOS
+    // courte, l'ancienne structure (aperçu scrollable à part, boutons hors
+    // scroll) provoquait un "BOTTOM OVERFLOWED" qui masquait les boutons
+    // d'impression sous la fenêtre.
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text('Aperçu du reçu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Aperçu du reçu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _ReceiptBox(colis: colis, agentName: agentName),
+              const SizedBox(height: 12),
+              Row(
+                children: const [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('Talon à coller sur le colis', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _TalonBox(colis: colis),
+              const SizedBox(height: 16),
+              Text(
+                'Choisir une imprimante (reçu + talon)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.print_outlined,
+                label: 'Xprinter',
+                enabled: !_printing && printer.hasWisePrinterBridge,
+                disabledHint: printer.hasWisePrinterBridge ? null : 'Xprinter non détecté sur cet appareil',
+                onPressed: () => _run(
+                  () => printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName),
+                  successMessage: 'Reçu + talon envoyés (Xprinter).',
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 460),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _ReceiptBox(colis: colis, agentName: agentName),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: const [
-                        Expanded(child: Divider()),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('Talon à coller sur le colis', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        ),
-                        Expanded(child: Divider()),
-                      ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _PrinterButton(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Reçu (56 mm P3)',
+                      enabled: !_printing && printer.hasNativeP3,
+                      disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
+                      onPressed: () => _run(
+                        () => printer.printColisReceipt(colis, paperWidthMm: 58, agentName: agentName),
+                        successMessage: 'Reçu envoyé (imprimante intégrée, 56 mm).',
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    _TalonBox(colis: colis),
-                  ],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _PrinterButton(
+                      icon: Icons.label_outline,
+                      label: 'Étiquette colis (56 mm P3)',
+                      enabled: !_printing && printer.hasNativeP3,
+                      disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
+                      onPressed: () => _run(
+                        () => printer.printColisTalon(colis, paperWidthMm: 58),
+                        successMessage: 'Étiquette envoyée (imprimante intégrée, 56 mm) — à coller sur le colis.',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.local_print_shop_outlined,
+                label: '80 mm Xprinter (toujours disponible)',
+                enabled: !_printing,
+                onPressed: () => _run(() async {
+                  if (printer.hasWisePrinterBridge) {
+                    await printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName);
+                    return;
+                  }
+                  final ok = printer.printColisReceiptBrowser(wide: true);
+                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
+                }, successMessage: 'Impression envoyée (80 mm).'),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.usb,
+                label: 'USB / Bluetooth (Xprinter, Mini Printer…)',
+                enabled: !_printing && printer.hasEscPosSupport,
+                disabledHint: printer.hasEscPosSupport
+                    ? null
+                    : 'Disponible uniquement sur l\'app native (Android/iOS/Windows)',
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => _EscPosPrinterSheet(colis: colis, agentName: agentName),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Choisir une imprimante (reçu + talon)',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.print_outlined,
-              label: 'Xprinter',
-              enabled: !_printing && printer.hasWisePrinterBridge,
-              disabledHint: printer.hasWisePrinterBridge ? null : 'Xprinter non détecté sur cet appareil',
-              onPressed: () => _run(
-                () => printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName),
-                successMessage: 'Reçu + talon envoyés (Xprinter).',
+              const SizedBox(height: 16),
+              Text(
+                'Partager sur WhatsApp',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
               ),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.receipt_long_outlined,
-              label: '56 mm (Wiseasy P3)',
-              enabled: !_printing && printer.hasNativeP3,
-              disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
-              onPressed: () => _run(
-                () => printer.printColisReceiptWithTalon(colis, paperWidthMm: 58, agentName: agentName),
-                successMessage: 'Reçu + talon envoyés (imprimante intégrée, 56 mm).',
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _PrinterButton(
+                      icon: Icons.chat,
+                      label: 'Expéditeur',
+                      enabled: true,
+                      onPressed: () => _share(colis.telephoneExpediteur, 'expéditeur'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _PrinterButton(
+                      icon: Icons.chat,
+                      label: 'Destinataire',
+                      enabled: true,
+                      onPressed: () => _share(colis.telephoneDestinataire, 'destinataire'),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.local_print_shop_outlined,
-              label: '80 mm Xprinter (toujours disponible)',
-              enabled: !_printing,
-              onPressed: () => _run(() async {
-                if (printer.hasWisePrinterBridge) {
-                  await printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName);
-                  return;
-                }
-                final ok = printer.printColisReceiptBrowser(wide: true);
-                if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
-              }, successMessage: 'Impression envoyée (80 mm).'),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.usb,
-              label: 'USB / Bluetooth (Xprinter, Mini Printer…)',
-              enabled: !_printing && printer.hasEscPosSupport,
-              disabledHint: printer.hasEscPosSupport
-                  ? null
-                  : 'Disponible uniquement sur l\'app native (Android/iOS/Windows)',
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => _EscPosPrinterSheet(colis: colis, agentName: agentName),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
