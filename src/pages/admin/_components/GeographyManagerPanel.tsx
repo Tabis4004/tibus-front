@@ -66,15 +66,31 @@ type DeleteTarget =
 
 type Props = {
   canManage: boolean;
+  // Défini (non null) pour un admin_pays : restreint la gestion (ajout,
+  // modification, suppression) aux villes de CE pays uniquement. La création
+  // / modification / suppression de pays reste réservée au super_admin dans
+  // tous les cas (RLS countries_insert_admin / countries_delete_admin).
+  // null/undefined = pas de restriction (super_admin).
+  restrictToCountryId?: string | null;
   onDataChanged?: () => void;
 };
 
-// CRUD Pays & Villes (onglet géographie du panneau super admin).
+// CRUD Pays & Villes (onglet géographie du panneau super admin, aussi
+// accessible à un admin_pays avec le droit "manage_geography" — scope villes
+// de son pays uniquement, voir restrictToCountryId).
 // Les écritures sont protégées côté DB par RLS :
-// is_super_admin() OR has_global_droit('manage_country').
-export default function GeographyManagerPanel({ canManage, onDataChanged }: Props) {
+// is_super_admin() OR has_country_droit(countryId, 'manage_geography').
+export default function GeographyManagerPanel({ canManage, restrictToCountryId, onDataChanged }: Props) {
   const { t } = useTranslation("admin");
   const { t: tc } = useTranslation("common");
+
+  // Seul le super_admin peut créer/modifier/supprimer des PAYS. Un
+  // admin_pays restreint (restrictToCountryId défini) ne gère que les villes.
+  const canManageCountries = canManage && !restrictToCountryId;
+  const canManageCityInCountry = useCallback(
+    (cityCountryId: string) => canManage && (!restrictToCountryId || cityCountryId === restrictToCountryId),
+    [canManage, restrictToCountryId],
+  );
 
   const [countries, setCountries] = useState<CountryRow[] | null>(null);
   const [countriesError, setCountriesError] = useState<string | null>(null);
@@ -119,6 +135,13 @@ export default function GeographyManagerPanel({ canManage, onDataChanged }: Prop
   useEffect(() => {
     loadCountries();
   }, [loadCountries]);
+
+  // Admin_pays restreint : pré-filtre sur son propre pays à l'ouverture (il
+  // reste libre de basculer sur "Tous les pays" pour consulter en lecture
+  // seule, mais démarre sur ce qui le concerne).
+  useEffect(() => {
+    if (restrictToCountryId) setCityFilterCountryId(restrictToCountryId);
+  }, [restrictToCountryId]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedCitySearch(citySearch), 300);
@@ -276,7 +299,7 @@ export default function GeographyManagerPanel({ canManage, onDataChanged }: Prop
                 </Badge>
               ) : null}
             </CardTitle>
-            {canManage ? (
+            {canManageCountries ? (
               <Button
                 size="sm"
                 className="cursor-pointer"
@@ -313,7 +336,7 @@ export default function GeographyManagerPanel({ canManage, onDataChanged }: Prop
                       {country.currency ?? "—"}
                     </div>
                   </div>
-                  {canManage ? (
+                  {canManageCountries ? (
                     <div className="flex items-center gap-1 shrink-0">
                       <Button
                         variant="ghost"
@@ -376,7 +399,8 @@ export default function GeographyManagerPanel({ canManage, onDataChanged }: Prop
                     id: null,
                     name: "",
                     countryId:
-                      cityFilterCountryId === ALL_COUNTRIES ? "" : cityFilterCountryId,
+                      restrictToCountryId ??
+                      (cityFilterCountryId === ALL_COUNTRIES ? "" : cityFilterCountryId),
                   })
                 }
               >
@@ -440,7 +464,7 @@ export default function GeographyManagerPanel({ canManage, onDataChanged }: Prop
                         {city.countryName ?? "—"}
                       </div>
                     </div>
-                    {canManage ? (
+                    {canManageCityInCountry(city.countryId) ? (
                       <div className="flex items-center gap-1 shrink-0">
                         <Button
                           variant="ghost"
@@ -575,6 +599,7 @@ export default function GeographyManagerPanel({ canManage, onDataChanged }: Prop
               <Label>{t("geo.select_country")} *</Label>
               <Select
                 value={cityDraft?.countryId ?? ""}
+                disabled={Boolean(restrictToCountryId)}
                 onValueChange={(value) =>
                   setCityDraft((draft) =>
                     draft ? { ...draft, countryId: value } : draft,

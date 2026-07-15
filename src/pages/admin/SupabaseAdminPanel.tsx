@@ -111,6 +111,7 @@ import { cn } from "@/lib/utils.ts";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminTabAuditHub from "./_components/AdminTabAuditHub.tsx";
+import RolesPermissionsManager from "./_components/RolesPermissionsManager.tsx";
 
 function resolveCompanyCommissionDisplay(
   company: SupabaseCompanyRow,
@@ -203,6 +204,10 @@ export default function SupabaseAdminPanel() {
   // pour les droits en base, pas le pays du profil — un utilisateur peut être
   // admin pays d'un autre pays que son pays d'origine.
   const adminCountryId = appUser.adminPaysCountryIds[0] ?? null;
+  // Un admin_pays peut gérer les villes de son pays si le super_admin lui a
+  // accordé le droit "manage_geography" (écran Rôles & Permissions).
+  const canManageGeography =
+    appUser.isSuperAdmin || (isAdminPays && appUser.hasDroit("manage_geography"));
 
   const adminDataScope = useMemo(() => {
     if (appUser.isSuperAdmin) {
@@ -248,14 +253,19 @@ export default function SupabaseAdminPanel() {
     if (!isTabId(tabParam)) return;
 
     if (!appUser.isSuperAdmin) {
-      if (tabParam === "commissions" || tabParam === "guarantee_fund" || tabParam === "companies") {
+      if (
+        tabParam === "commissions" ||
+        tabParam === "guarantee_fund" ||
+        tabParam === "companies" ||
+        (tabParam === "geography" && canManageGeography)
+      ) {
         setTab(tabParam);
       }
       return;
     }
 
     setTab(tabParam);
-  }, [appUser.isReady, appUser.isSuperAdmin, searchParams]);
+  }, [appUser.isReady, appUser.isSuperAdmin, canManageGeography, searchParams]);
 
   const selectTab = (id: TabId) => {
     setTab(id);
@@ -400,7 +410,13 @@ export default function SupabaseAdminPanel() {
   ];
   const visibleTabs = appUser.isSuperAdmin
     ? tabs
-    : tabs.filter((item) => item.id === "commissions" || item.id === "guarantee_fund" || item.id === "companies");
+    : tabs.filter(
+        (item) =>
+          item.id === "commissions" ||
+          item.id === "guarantee_fund" ||
+          item.id === "companies" ||
+          (item.id === "geography" && canManageGeography),
+      );
   return (
     <AdminAccessGate>
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -956,7 +972,8 @@ export default function SupabaseAdminPanel() {
       {tab === "geography" && (
         <AdminTabSuspense>
           <GeographyManagerPanel
-            canManage={appUser.isSuperAdmin || isAdminPays}
+            canManage={canManageGeography}
+            restrictToCountryId={appUser.isSuperAdmin ? null : adminCountryId}
             onDataChanged={reloadCurrentTab}
           />
         </AdminTabSuspense>
@@ -977,27 +994,9 @@ export default function SupabaseAdminPanel() {
               <LoadingRows />
             ) : errors.roles ? (
               <p className="text-sm text-destructive">{errors.roles}</p>
-            ) : data.roles.length === 0 ? (
-              <EmptyState icon={KeyIcon} title={t("roles.no_custom")} description={t("roles.builtin_desc")} />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {data.roles.map((role) => (
-                  <div key={role.id} className="rounded-xl border p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold">{tc(`roles.${role.name}`, { defaultValue: role.name })}</p>
-                      <Badge variant={role.scope === "platform" ? "default" : "secondary"}>{role.scope ?? "role"}</Badge>
-                    </div>
-                    {role.description && <p className="text-xs text-muted-foreground">{role.description}</p>}
-                    <div className="flex flex-wrap gap-1">
-                      {role.droits.slice(0, 6).map((permission) => (
-                        <Badge key={permission} variant="outline">{permission}</Badge>
-                      ))}
-                      {role.droits.length > 6 && <Badge variant="secondary">+{role.droits.length - 6}</Badge>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            ) : appUser.isSuperAdmin ? (
+              <RolesPermissionsManager roles={data.roles} onChanged={reloadCurrentTab} />
+            ) : null}
           </CardContent>
         </Card>
       )}

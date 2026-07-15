@@ -53,6 +53,7 @@ export type SupabaseRoleRow = {
   scope: string | null;
   description: string | null;
   droits: string[];
+  isSystem: boolean;
 };
 
 export type SupabasePlanRow = {
@@ -373,6 +374,7 @@ async function loadRoles(): Promise<Pick<AdminDataSlice, "roles">> {
       scope: (row.scope as string | null) ?? null,
       description: (row.description as string | null) ?? null,
       droits: (row.droits as string[] | null) ?? [],
+      isSystem: Boolean(row.isSystem),
     })),
   };
 }

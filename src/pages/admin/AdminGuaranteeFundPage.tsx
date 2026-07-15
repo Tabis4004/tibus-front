@@ -52,9 +52,13 @@ export default function AdminGuaranteeFundPage() {
     } else if (
       !appUser.isSuperAdmin &&
       appUser.roles.includes("admin_pays") &&
-      appUser.profile?.countryId
+      appUser.adminPaysCountryIds.length > 0
     ) {
-      query = query.eq("countryId", appUser.profile.countryId);
+      // Fail-closed sur le pays du RÔLE admin_pays (UserRoles.countryId),
+      // pas celui du profil personnel — un utilisateur peut administrer un
+      // pays différent du sien (même critère que partout ailleurs : voir
+      // SupabaseAdminCompanyManager.tsx, SupabaseAdminPanel.tsx).
+      query = query.in("countryId", appUser.adminPaysCountryIds);
     }
 
     void query

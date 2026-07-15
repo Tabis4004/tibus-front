@@ -60,15 +60,34 @@ export default function SupabaseAdminCompanyManager() {
   const { lng, companyId } = useParams<{ lng: string; companyId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("common");
-  const { isSuperAdmin, isReady, profile, roles, ownedCompanyIds, adminPaysCountryIds } = useAppUser();
+  const { isSuperAdmin, isReady, profile, roles, ownedCompanyIds, adminPaysCountryIds, hasDroit } = useAppUser();
   const isAdminPays = isAdminPaysRole(roles);
   const isDemarcheur = isDemarcheurRole(roles);
-  const canManageModules =
+  // Utilisé uniquement pour l'accès à la page (le cas owner ne dépend pas du
+  // chargement de la compagnie) — isAdminPays seul couvre déjà l'accès page
+  // pour un admin_pays, la portée pays réelle est vérifiée une fois la
+  // compagnie chargée (voir canManageModules plus bas, après le fail-closed
+  // sur adminPaysCountryIds).
+  const canManageModulesForPageAccess =
     Boolean(companyId) &&
-    canManageCompanyFeatureModules(roles, isSuperAdmin, companyId ?? "", ownedCompanyIds);
+    canManageCompanyFeatureModules(roles, isSuperAdmin, companyId ?? "", ownedCompanyIds, hasDroit);
   const canAccessCompanyAdmin =
-    isSuperAdmin || isAdminPays || isDemarcheur || canManageModules;
+    isSuperAdmin || isAdminPays || isDemarcheur || canManageModulesForPageAccess;
   const [company, setCompany] = useState<CompanyOverview | null | undefined>(undefined);
+  // Capacité réelle d'édition des modules, une fois la compagnie chargée (le
+  // fail-closed pays de l'effet ci-dessous garantit déjà, pour un admin_pays,
+  // que company.countryId correspond à son pays assigné).
+  const canManageModules =
+    Boolean(company) &&
+    canManageCompanyFeatureModules(
+      roles,
+      isSuperAdmin,
+      company?.id ?? "",
+      ownedCompanyIds,
+      hasDroit,
+      company?.countryId ?? null,
+      adminPaysCountryIds,
+    );
   const [recruiterOptions, setRecruiterOptions] = useState<{ id: string; label: string }[]>([]);
   const [recruiterDraft, setRecruiterDraft] = useState<string>("__none");
   const [savingRecruiter, setSavingRecruiter] = useState(false);

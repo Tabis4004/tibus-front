@@ -33,6 +33,22 @@ export async function countPlatformUsersForAdminSupabase() {
   return Number(data ?? 0);
 }
 
+// Super_admin uniquement (vérifié côté DB) : accorde/retire des droits sur un
+// rôle. Alimente l'écran "Rôles & Permissions" rendu éditable.
+export async function updateRoleDroitsSupabase(
+  roleName: string,
+  droits: string[],
+): Promise<{ id: string; name: string; droits: string[] }> {
+  const { data, error } = await supabase.rpc("admin_update_role_droits", {
+    p_role_name: roleName,
+    p_droits: droits,
+  });
+  if (error) throw error;
+  const row = (data ?? [])[0] as { id: string; name: string; droits: string[] } | undefined;
+  if (!row) throw new Error("Mise à jour des droits impossible.");
+  return row;
+}
+
 export function isAdminUsersRpcMissingError(message: string) {
   return (
     message.includes("list_platform_users_for_admin") ||

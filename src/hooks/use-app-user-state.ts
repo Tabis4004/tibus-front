@@ -156,7 +156,7 @@ export function useAppUserState() {
 
       const { data: userRoles, error: urError } = await supabase
         .from("UserRoles")
-        .select("roleId, companyId, countryId, Role(name)")
+        .select("roleId, companyId, countryId, Role(name, droits)")
         .eq("userId", appUserId);
 
       if (urError) throw urError;
@@ -175,24 +175,42 @@ export function useAppUserState() {
         ),
       );
 
-      const fallbackRoleNames = joinedRoleNames.length
-        ? []
-        : roleIds.length
-          ? await supabase
-              .from("Role")
-              .select("id, name")
-              .in("id", roleIds)
-              .then(({ data, error: rolesError }) => {
-                if (rolesError) throw rolesError;
-                const namesById = new Map(
-                  (data ?? []).map((role) => [role.id as string, role.name as string]),
-                );
-                return roleIds
-                  .map((roleId) => namesById.get(roleId))
-                  .filter((name): name is string => Boolean(name));
-              })
-          : [];
+      // Union des droits (Role.droits) de tous les rôles attribués à
+      // l'utilisateur — alimente hasDroit() côté front, en miroir du même
+      // mécanisme utilisé côté base par has_company_droit()/has_country_droit().
+      const joinedDroits = Array.from(
+        new Set(
+          (userRoles ?? []).flatMap((row) => {
+            const role = row.Role as { droits?: string[] } | { droits?: string[] }[] | null;
+            const roleObj = Array.isArray(role) ? role[0] : role;
+            return roleObj?.droits ?? [];
+          }),
+        ),
+      );
+
+      let fallbackRoleNames: string[] = [];
+      let fallbackDroits: string[] = [];
+      if (!joinedRoleNames.length && roleIds.length) {
+        const { data: fallbackRoles, error: rolesError } = await supabase
+          .from("Role")
+          .select("id, name, droits")
+          .in("id", roleIds);
+        if (rolesError) throw rolesError;
+        const byId = new Map(
+          (fallbackRoles ?? []).map((role) => [
+            role.id as string,
+            { name: role.name as string, droits: (role.droits as string[] | null) ?? [] },
+          ]),
+        );
+        fallbackRoleNames = roleIds
+          .map((roleId) => byId.get(roleId)?.name)
+          .filter((name): name is string => Boolean(name));
+        fallbackDroits = Array.from(
+          new Set(roleIds.flatMap((roleId) => byId.get(roleId)?.droits ?? [])),
+        );
+      }
       const roleNames = joinedRoleNames.length ? joinedRoleNames : fallbackRoleNames;
+      const droits = joinedRoleNames.length ? joinedDroits : fallbackDroits;
 
       const ownedCompanyIds = Array.from(
         new Set(
@@ -250,6 +268,7 @@ export function useAppUserState() {
       if (!cancelled) {
         setProfile(profileRow);
         setRoles(roleNames);
+        setDroits(droits);
         setOwnedCompanyIds(ownedCompanyIds);
         setAdminPaysCountryIds(adminPaysCountryIds);
         setMerchantAgentApplicationStatus(
@@ -263,6 +282,7 @@ export function useAppUserState() {
           setError(err instanceof Error ? err : new Error("Profil"));
           setProfile(null);
           setRoles([]);
+          setDroits([]);
           setOwnedCompanyIds([]);
           setAdminPaysCountryIds([]);
           setMerchantAgentApplicationStatus(null);
@@ -306,11 +326,21 @@ export function useAppUserState() {
       merchantAgentApplicationStatus as (typeof MERCHANT_AGENT_CTA_BLOCKING_APPLICATION_STATUSES)[number],
     );
   const hasDbSuperAdmin = roles.includes("super_admin");
+  const isSuperAdminNow = effectiveRoles.includes("super_admin");
+  // Union des droits (Role.droits) de tous les rôles réellement attribués en
+  // base — le sandbox super_admin (dev only) ne rejoue pas cette union, il
+  // s'appuie sur isSuperAdmin qui bypass hasDroit() de toute façon.
+  const hasDroit = useCallback(
+    (droit: string) => isSuperAdminNow || droits.includes(droit),
+    [droits, isSuperAdminNow],
+  );
 
   return useMemo(
     () => ({
       profile,
       roles: effectiveRoles,
+      droits,
+      hasDroit,
       ownedCompanyIds,
       adminPaysCountryIds,
       hasSellerRole: hasAnyRole(effectiveRoles, SELLER_ROLE_NAMES),
@@ -337,9 +367,11 @@ export function useAppUserState() {
     [
       adminPaysCountryIds,
       appUserId,
+      droits,
       effectiveRoles,
       error,
       hasDbSuperAdmin,
+      hasDroit,
       hasMerchantAgentApplication,
       isAdminSandbox,
       isLoading,
