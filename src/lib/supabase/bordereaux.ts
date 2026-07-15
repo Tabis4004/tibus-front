@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { ColisSmsPayload, ColisStatut } from "@/lib/supabase/colis-autonomes.ts";
+import { mapColisRow, type ColisAutonomeRow, type ColisSmsPayload, type ColisStatut } from "@/lib/supabase/colis-autonomes.ts";
 
 export type BordereauListRow = {
   id: string;
@@ -166,4 +166,25 @@ export async function getBordereauSupabase(bordereauId: string): Promise<Bordere
   });
   if (error) throw error;
   return mapDetail((data ?? {}) as Record<string, unknown>);
+}
+
+/**
+ * Colis déjà enregistrés (gare de départ/destination du bordereau, même
+ * compagnie, pas livrés, pas déjà sur un bordereau ouvert) pouvant être
+ * ajoutés au bordereau en un clic — alternative au scan / à la saisie
+ * manuelle de la référence CL-… (plus user-friendly au guichet).
+ */
+export async function listColisDisponiblesBordereauSupabase(
+  bordereauId: string,
+  limit = 200,
+): Promise<ColisAutonomeRow[]> {
+  const { data, error } = await supabase.rpc("list_colis_disponibles_bordereau", {
+    p_bordereau_id: bordereauId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  const rows = Array.isArray(data) ? data : [];
+  return rows
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+    .map(mapColisRow);
 }

@@ -36,6 +36,7 @@ import {
   COLIS_STATUT_LABELS,
   resolveColisRetraitCodeSupabase,
   sendColisSmsSupabase,
+  type ColisAutonomeRow,
   type ColisBusOption,
   type ColisSmsPayload,
   type ColisStatut,
@@ -46,6 +47,7 @@ import {
   createBordereauSupabase,
   getBordereauSupabase,
   listBordereauxSupabase,
+  listColisDisponiblesBordereauSupabase,
   removeColisFromBordereauSupabase,
   type BordereauDetail,
   type BordereauListRow,
@@ -90,8 +92,10 @@ export default function BordereauPanel({
   const [busId, setBusId] = useState("");
   const [manualRef, setManualRef] = useState("");
   const [adding, setAdding] = useState(false);
+  const [addingId, setAddingId] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [lastScan, setLastScan] = useState("");
+  const [available, setAvailable] = useState<ColisAutonomeRow[] | undefined>(undefined);
 
   const loadList = useCallback(() => {
     setList(undefined);
@@ -114,6 +118,28 @@ export default function BordereauPanel({
       toast.error(supabaseErrorMessage(err, "Bordereau introuvable"));
     }
   };
+
+  // Colis déjà enregistrés à la gare de départ (et destination, si fixée)
+  // du bordereau, pas encore livrés ni sur un autre bordereau ouvert —
+  // alternative au scan / à la saisie manuelle, en un clic.
+  const loadAvailable = useCallback((bordereauId: string) => {
+    setAvailable(undefined);
+    void listColisDisponiblesBordereauSupabase(bordereauId)
+      .then(setAvailable)
+      .catch((err) => {
+        toast.error(supabaseErrorMessage(err, "Chargement des colis disponibles impossible"));
+        setAvailable([]);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (detail && detail.statut === "ouvert") {
+      loadAvailable(detail.id);
+    } else {
+      setAvailable(undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.id, detail?.statut]);
 
   const handleCreate = async () => {
     if (!gareDepartId) {
@@ -139,6 +165,23 @@ export default function BordereauPanel({
     }
   };
 
+  // Cœur commun scan / saisie manuelle / bouton "Ajouter" de la liste : le
+  // colis est déjà identifié (colisId), il ne reste qu'à l'ajouter et
+  // rafraîchir le détail + la liste des colis encore disponibles.
+  const finalizeAddColis = useCallback(
+    async (colisId: string) => {
+      if (!detail) return;
+      const result = await addColisToBordereauSupabase(detail.id, colisId);
+      void maybeSendChargeSms(result.id, result.statutColis, result.sms);
+      const next = await getBordereauSupabase(detail.id);
+      setDetail(next);
+      loadAvailable(detail.id);
+      onColisChanged?.();
+      toast.success(`Colis ajouté (${next.colis.length} sur le bordereau)`);
+    },
+    [detail, onColisChanged, loadAvailable],
+  );
+
   const addColis = useCallback(
     async (raw: string) => {
       if (!detail || detail.statut !== "ouvert" || adding) return;
@@ -149,13 +192,8 @@ export default function BordereauPanel({
       try {
         const colisId = await resolveColisRetraitCodeSupabase(code);
         if (!colisId) throw new Error("Colis introuvable — scannez le QR du reçu ou saisissez CL-XXXXXXXX");
-        const result = await addColisToBordereauSupabase(detail.id, colisId);
-        void maybeSendChargeSms(result.id, result.statutColis, result.sms);
-        const next = await getBordereauSupabase(detail.id);
-        setDetail(next);
+        await finalizeAddColis(colisId);
         setManualRef("");
-        onColisChanged?.();
-        toast.success(`Colis ajouté (${next.colis.length} sur le bordereau)`);
       } catch (err) {
         toast.error(supabaseErrorMessage(err, "Ajout impossible"));
       } finally {
@@ -163,7 +201,23 @@ export default function BordereauPanel({
         window.setTimeout(() => setLastScan(""), 2500);
       }
     },
-    [detail, adding, lastScan, onColisChanged],
+    [detail, adding, lastScan, finalizeAddColis],
+  );
+
+  // Ajout direct depuis la liste des colis disponibles (sans scan ni saisie).
+  const addColisDirect = useCallback(
+    async (colisId: string) => {
+      if (!detail || detail.statut !== "ouvert" || addingId) return;
+      setAddingId(colisId);
+      try {
+        await finalizeAddColis(colisId);
+      } catch (err) {
+        toast.error(supabaseErrorMessage(err, "Ajout impossible"));
+      } finally {
+        setAddingId(null);
+      }
+    },
+    [detail, addingId, finalizeAddColis],
   );
 
   const handleRemove = async (colisId: string) => {
@@ -171,6 +225,7 @@ export default function BordereauPanel({
     try {
       await removeColisFromBordereauSupabase(detail.id, colisId);
       setDetail(await getBordereauSupabase(detail.id));
+      loadAvailable(detail.id);
     } catch (err) {
       toast.error(supabaseErrorMessage(err, "Retrait impossible"));
     }
@@ -281,6 +336,64 @@ export default function BordereauPanel({
                   {t("colis.bordereau_add", { defaultValue: "Ajouter" })}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {isOpen ? (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <p className="text-sm font-semibold">
+                {t("colis.bordereau_available_title", {
+                  defaultValue: "Colis en attente à cette gare — ajout en un clic",
+                })}
+              </p>
+              {available === undefined ? (
+                <Skeleton className="h-16 w-full" />
+              ) : available.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("colis.bordereau_available_empty", {
+                    defaultValue: "Aucun colis en attente pour cette gare de départ / destination.",
+                  })}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {available.map((row) => (
+                    <div
+                      key={row.id}
+                      className="flex items-start justify-between gap-3 rounded-md border p-2.5"
+                    >
+                      <div className="min-w-0 text-sm">
+                        <p className="font-semibold">
+                          CL-{row.id.slice(0, 8).toUpperCase()}
+                          <span className="ml-2 font-normal text-muted-foreground">
+                            {row.gareDepart} → {row.gareDestination}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {row.nomExpediteur} ({row.telephoneExpediteur}) → {row.nomDestinataire} ({row.telephoneDestinataire})
+                        </p>
+                        <p className="text-xs">
+                          {row.natures.join(", ")} · {row.nombrePieces} pièce(s)
+                          {row.poidsKg != null ? ` · ${row.poidsKg} kg` : ""}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="cursor-pointer gap-1 shrink-0"
+                        disabled={Boolean(addingId) || adding}
+                        onClick={() => void addColisDirect(row.id)}
+                      >
+                        <PlusIcon className="w-3.5 h-3.5" />
+                        {addingId === row.id
+                          ? "…"
+                          : t("colis.bordereau_add", { defaultValue: "Ajouter" })}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : null}

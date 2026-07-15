@@ -40,6 +40,21 @@ class BordereauService {
     return BordereauDetail.fromMap(data as Map<String, dynamic>);
   }
 
+  /// Colis déjà enregistrés à la gare de départ (et destination, si fixée)
+  /// du bordereau, pas encore livrés ni sur un autre bordereau ouvert —
+  /// alternative au scan / à la saisie manuelle de la référence CL-…
+  /// (migration 172, même RPC que le web).
+  Future<List<BordereauColisRow>> listAvailable(String bordereauId, {int limit = 200}) async {
+    final data = await _client.rpc('list_colis_disponibles_bordereau', params: {
+      'p_bordereau_id': bordereauId,
+      'p_limit': limit,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(BordereauColisRow.fromMap)
+        .toList();
+  }
+
   /// Retourne le payload SMS « chargé » ({send, message, phones…}) si le
   /// statut a avancé — à envoyer via la fonction Edge comme côté web.
   Future<Map<String, dynamic>> addColis(String bordereauId, String colisId) async {

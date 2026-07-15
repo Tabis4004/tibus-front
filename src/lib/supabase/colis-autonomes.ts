@@ -114,7 +114,7 @@ function mapSettings(data: Record<string, unknown>): CompanyColisSettings {
   };
 }
 
-function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
+export function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
   const natures = Array.isArray(row.natures)
     ? row.natures.map((n) => String(n))
     : [];

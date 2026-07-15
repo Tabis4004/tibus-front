@@ -266,6 +266,8 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
   BordereauDetail? _detail;
   bool _busy = false;
   String _lastScan = '';
+  List<BordereauColisRow>? _available;
+  String? _addingId;
 
   @override
   void initState() {
@@ -284,6 +286,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     try {
       final detail = await ref.read(bordereauServiceProvider).get(widget.bordereauId);
       if (mounted) setState(() => _detail = detail);
+      if (detail.isOpen) unawaited(_loadAvailable());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bordereau introuvable : $e')));
@@ -292,9 +295,34 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     }
   }
 
+  /// Colis déjà enregistrés à la gare de départ (et destination, si fixée)
+  /// du bordereau, pas encore livrés ni sur un autre bordereau ouvert —
+  /// alternative au scan / à la saisie manuelle, en un tap.
+  Future<void> _loadAvailable() async {
+    setState(() => _available = null);
+    try {
+      final rows = await ref.read(bordereauServiceProvider).listAvailable(widget.bordereauId);
+      if (mounted) setState(() => _available = rows);
+    } catch (e) {
+      if (mounted) setState(() => _available = const []);
+      _toast('Chargement des colis disponibles impossible : $e');
+    }
+  }
+
   void _toast(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // Cœur commun scan / saisie manuelle / tap sur la liste des colis
+  // disponibles : le colis est déjà identifié (colisId), il ne reste qu'à
+  // l'ajouter et rafraîchir le détail + la liste des colis disponibles.
+  Future<void> _finalizeAddColis(String colisId) async {
+    final detail = _detail;
+    if (detail == null) return;
+    await ref.read(bordereauServiceProvider).addColis(detail.id, colisId);
+    await _load();
+    _toast('Colis ajouté (${(_detail?.colis.length ?? 0)} sur le bordereau)');
   }
 
   Future<void> _addColis(String raw) async {
@@ -310,15 +338,27 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       if (colisId == null) {
         throw Exception('Colis introuvable — scannez le QR du reçu ou saisissez CL-XXXXXXXX');
       }
-      await ref.read(bordereauServiceProvider).addColis(detail.id, colisId);
+      await _finalizeAddColis(colisId);
       _manualCtrl.clear();
-      await _load();
-      _toast('Colis ajouté (${(_detail?.colis.length ?? 0)} sur le bordereau)');
     } catch (e) {
       _toast('Ajout impossible : ${e.toString().replaceFirst("Exception: ", "")}');
     } finally {
       if (mounted) setState(() => _busy = false);
       Future.delayed(const Duration(milliseconds: 2500), () => _lastScan = '');
+    }
+  }
+
+  // Ajout direct depuis la liste des colis disponibles (sans scan ni saisie).
+  Future<void> _addColisDirect(String colisId) async {
+    final detail = _detail;
+    if (detail == null || !detail.isOpen || _addingId != null) return;
+    setState(() => _addingId = colisId);
+    try {
+      await _finalizeAddColis(colisId);
+    } catch (e) {
+      _toast('Ajout impossible : ${e.toString().replaceFirst("Exception: ", "")}');
+    } finally {
+      if (mounted) setState(() => _addingId = null);
     }
   }
 
@@ -461,6 +501,55 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                 ),
               ],
             ),
+          ],
+          if (isOpen) ...[
+            const SizedBox(height: 16),
+            const Text('Colis en attente à cette gare — ajout en un tap',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (_available == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_available!.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'Aucun colis en attente pour cette gare de départ / destination.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              )
+            else
+              ..._available!.map((row) {
+                final busyRow = _addingId == row.id;
+                return Card(
+                  child: ListTile(
+                    dense: true,
+                    title: Text(
+                      '${row.reference} · ${row.gareDepart} → ${row.gareDestination}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      '${row.nomExpediteur} → ${row.nomDestinataire}'
+                      '\n${row.natures.join(", ")} · ${row.nombrePieces} pièce(s)'
+                      '${row.poidsKg != null ? " · ${row.poidsKg} kg" : ""}',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    isThreeLine: true,
+                    trailing: ElevatedButton(
+                      onPressed: _addingId != null ? null : () => unawaited(_addColisDirect(row.id)),
+                      child: busyRow
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Ajouter'),
+                    ),
+                  ),
+                );
+              }),
           ],
           const SizedBox(height: 16),
           Text('Colis sur le bordereau (${detail.colis.length})',
