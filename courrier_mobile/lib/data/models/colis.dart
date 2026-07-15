@@ -186,6 +186,11 @@ class OpenStationCash {
   final double? openingFloat;
   final String? openedAt;
   final StationCashStatus? status;
+  /// Compagnie propriétaire de la gare de cette caisse — source de vérité
+  /// serveur pour la "compagnie de travail" effective (voir
+  /// activeCompanyIdProvider). Null si la RPC ne la renvoie pas encore
+  /// (anciens déploiements) ou si aucune caisse n'est ouverte.
+  final String? companyId;
 
   const OpenStationCash({
     required this.open,
@@ -198,6 +203,7 @@ class OpenStationCash {
     this.openingFloat,
     this.openedAt,
     this.status,
+    this.companyId,
   });
 
   factory OpenStationCash.fromMap(Map<String, dynamic> map) => OpenStationCash(
@@ -211,6 +217,7 @@ class OpenStationCash {
         openingFloat: (map['openingFloat'] as num?)?.toDouble(),
         openedAt: map['openedAt'] as String?,
         status: StationCashStatusX.fromDb(map['status'] as String?),
+        companyId: map['companyId'] as String?,
       );
 }
 

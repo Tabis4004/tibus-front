@@ -110,6 +110,11 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
             gareId: _selectedGareId!,
             openingFloat: float,
           );
+      // La "compagnie active" (activeCompanyIdProvider) doit désormais
+      // refléter cette caisse tout juste ouverte, pas la valeur mise en
+      // cache avant son ouverture — sans quoi colis_create_screen etc.
+      // continueraient d'utiliser l'ancienne résolution par rôle.
+      ref.invalidate(activeCompanyIdProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Caisse ouverte')));
       }
@@ -136,6 +141,10 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
     setState(() => _saving = true);
     try {
       await ref.read(colisServiceProvider).submitStationCashReversal(cash.id!, amount);
+      // La caisse se ferme (en_reversement) : activeCompanyIdProvider doit
+      // retomber sur la résolution par rôle tant qu'aucune nouvelle caisse
+      // n'est ouverte.
+      ref.invalidate(activeCompanyIdProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Reversement soumis au comptable')),

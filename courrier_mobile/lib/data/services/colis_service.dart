@@ -155,6 +155,11 @@ class ColisService {
       balance: (row['balance'] as num?)?.toDouble(),
       openingFloat: (row['openingFloat'] as num?)?.toDouble(),
       status: StationCashStatusX.fromDb(row['status'] as String?),
+      // La compagnie validée côté serveur pour cette ouverture est celle
+      // qu'on vient d'envoyer (open_station_cash_register ne la renvoie pas
+      // dans son jsonb, voir migration 165) — sûr de la réutiliser ici car
+      // la RPC a déjà vérifié le rôle de vente de l'agent dans cette compagnie.
+      companyId: companyId,
     );
   }
 
