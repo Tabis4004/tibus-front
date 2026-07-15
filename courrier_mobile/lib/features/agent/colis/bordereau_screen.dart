@@ -94,7 +94,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: gareDepartId,
+                  initialValue: gareDepartId,
                   decoration: const InputDecoration(labelText: 'Gare de départ *'),
                   items: gares
                       .map((g) => DropdownMenuItem(value: g.id, child: Text(g.name)))
@@ -103,7 +103,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String?>(
-                  value: gareDestId,
+                  initialValue: gareDestId,
                   decoration: const InputDecoration(labelText: 'Gare de destination (optionnel)'),
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('Toutes destinations')),
@@ -115,7 +115,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String?>(
-                  value: busId,
+                  initialValue: busId,
                   decoration: const InputDecoration(labelText: 'Bus du convoi (optionnel)'),
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('—')),
