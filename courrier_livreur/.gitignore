@@ -1,0 +1,29 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+*.iml
+*.ipr
+*.iws
+
+# Secrets
+.env
+
+# Platform (générés par `flutter create .`)
+android/
+ios/
+web/
+macos/
+linux/
+windows/
+
+# IDE
+.idea/
+.vscode/
+
+.DS_Store
+*.bak
