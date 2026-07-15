@@ -131,12 +131,22 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       _pickupPos!.latitude, _pickupPos!.longitude,
       _dropoffPos!.latitude, _dropoffPos!.longitude,
     );
-    final price = await RideBackend.estimatePriceXof(
-      vehicle: _vehicle,
-      distanceKm: distance,
-      packageType: _packageType,
-    );
-    if (mounted) setState(() => _estimate = price);
+    try {
+      final price = await RideBackend.estimatePriceXof(
+        vehicle: _vehicle,
+        distanceKm: distance,
+        packageType: _packageType,
+      );
+      if (mounted) setState(() {
+        _estimate = price;
+        _error = null;
+      });
+    } catch (e) {
+      // Ne bloque pas la commande (le prix réel est recalculé serveur au
+      // moment de createDeliveryRide) — juste un aperçu manquant, mais on
+      // le signale plutôt que de laisser le bouton sans effet visible.
+      if (mounted) setState(() => _error = 'Estimation indisponible : $e');
+    }
   }
 
   Future<void> _submit() async {
