@@ -31,38 +31,53 @@ class RideBackend {
     authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
   );
 
+  /// Email synthétique du compte miroir — dérivé de l'id Tibus, PAS le vrai
+  /// email de la personne. Un vrai email peut déjà avoir un compte Ride pour
+  /// une tout autre raison (livreur, passager tibusride-front direct...) —
+  /// observé en pratique avec le compte superadmin de test, qui a un mot de
+  /// passe Ride réel sans rapport avec celui dérivé ici, d'où un
+  /// "already registered" au lieu d'un signIn réussi. Domaine `.internal`
+  /// jamais résolu/mailé : ce compte ne sert qu'à satisfaire la contrainte
+  /// `rides.passenger_id`, jamais à contacter qui que ce soit (le livreur
+  /// utilise `rides.passenger_phone`, pas cet email).
+  static String _mirrorEmail(String tibusUserId) =>
+      'courrier-client-$tibusUserId@mirror.tibus-ride.internal';
+
   /// Mot de passe déterministe du compte miroir — dérivé de l'id du compte
   /// Tibus principal, JAMAIS du vrai mot de passe de l'utilisateur (qu'on
   /// n'a de toute façon jamais en clair après un signIn). Stable : le même
-  /// compte Tibus retombe toujours sur le même mot de passe côté Ride, donc
-  /// signIn réussit dès la 2e commande sans qu'on ait besoin de stocker quoi
-  /// que ce soit nous-mêmes.
+  /// compte Tibus retombe toujours sur le même couple email/mot de passe
+  /// côté Ride, donc signIn réussit dès la 2e commande sans qu'on ait besoin
+  /// de stocker quoi que ce soit nous-mêmes.
   static String _mirrorPassword(String tibusUserId) {
     final digest = sha256.convert(utf8.encode('tibus-ride-mirror::v1::$tibusUserId'));
     return digest.toString();
   }
 
-  /// Garantit une session Ride "réelle" (pas anonyme), identifiée par le
-  /// même email que le compte Tibus principal — signIn si le compte miroir
-  /// existe déjà (commandes suivantes), sinon signUp (première commande).
-  /// Deux lignes `auth.users` distinctes (deux projets Supabase séparés, pas
-  /// de réplication native entre eux) mais mêmes identifiants du point de
-  /// vue de la personne : c'est le sens de "compte qui se duplique sur Ride".
+  /// Garantit une session Ride "réelle" (pas anonyme) pour le compte miroir
+  /// dérivé de [tibusUserId] — signIn si le compte miroir existe déjà
+  /// (commandes suivantes), sinon signUp (première commande). [tibusEmail]
+  /// n'est stocké qu'à titre de référence dans les métadonnées (traçabilité
+  /// support), jamais utilisé comme identifiant de connexion côté Ride.
   static Future<void> ensureMirroredSession({
     required String tibusUserId,
-    required String email,
+    String? tibusEmail,
   }) async {
+    final mirrorEmail = _mirrorEmail(tibusUserId);
     final current = client.auth.currentUser;
-    if (current != null && current.email == email) return;
+    if (current != null && current.email == mirrorEmail) return;
 
     final password = _mirrorPassword(tibusUserId);
     try {
-      await client.auth.signInWithPassword(email: email, password: password);
+      await client.auth.signInWithPassword(email: mirrorEmail, password: password);
     } on AuthException {
       await client.auth.signUp(
-        email: email,
+        email: mirrorEmail,
         password: password,
-        data: {'mirrored_from_tibus_user_id': tibusUserId},
+        data: {
+          'mirrored_from_tibus_user_id': tibusUserId,
+          if (tibusEmail != null) 'tibus_email': tibusEmail,
+        },
       );
     }
   }
@@ -191,7 +206,7 @@ class RideBackend {
     bool urgent = false,
     bool insulatedBag = false,
   }) async {
-    await ensureMirroredSession(tibusUserId: tibusUserId, email: tibusEmail);
+    await ensureMirroredSession(tibusUserId: tibusUserId, tibusEmail: tibusEmail);
     final distanceKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
     final priceXof = await estimatePriceXof(
       vehicle: vehicle,
