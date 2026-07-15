@@ -60,6 +60,17 @@ class DriverBackend {
 
   static Future<void> signOut() => client.auth.signOut();
 
+  /// Envoie l'email "mot de passe oublié" — même mécanisme que côté
+  /// tibusride-front (src/routes/auth.tsx), qui a déjà un écran
+  /// /reset-password fonctionnel. On ne précise pas `redirectTo` : le lien
+  /// utilise l'URL de site configurée côté projet Supabase Tibus Ride (donc
+  /// tibusride-front), pas la peine de dupliquer cet écran ici — le livreur
+  /// termine la réinitialisation là-bas puis revient se connecter ici avec
+  /// le nouveau mot de passe.
+  static Future<void> resetPasswordForEmail(String email) {
+    return client.auth.resetPasswordForEmail(email);
+  }
+
   // ---------------------------------------------------------------------
   // Profil livreur
   // ---------------------------------------------------------------------
