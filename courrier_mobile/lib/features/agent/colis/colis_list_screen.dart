@@ -8,6 +8,7 @@ import 'colis_create_screen.dart';
 import 'colis_detail_screen.dart';
 import 'colis_scan_screen.dart';
 import 'colis_manifest_screen.dart';
+import 'bordereau_screen.dart';
 
 /// Liste des colis — réplique la maquette 2/3 : recherche, filtres
 /// Date/Statut, cartes de colis avec badge de statut.
@@ -43,6 +44,17 @@ class _ColisListScreenState extends ConsumerState<ColisListScreen> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ColisManifestScreen()),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.assignment_outlined),
+            tooltip: 'Bordereau de livraison',
+            onPressed: () {
+              final companyId = ref.read(activeCompanyIdProvider).value;
+              if (companyId == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => BordereauListScreen(companyId: companyId)),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.add),
