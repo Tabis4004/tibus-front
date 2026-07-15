@@ -27,10 +27,18 @@ dependencies:
   shared_preferences: ^2.2.3
   flutter_dotenv: ^5.1.0
 
-  # Position GPS pour la commande de livraison (voir README "Dette technique"
-  # — pas encore de géocodage d'adresse ni de carte, juste "utiliser ma
-  # position actuelle" pour le point de départ et d'arrivée).
+  # Position GPS pour la commande de livraison ("utiliser ma position
+  # actuelle" pour le point de départ et d'arrivée — pas de géocodage
+  # d'adresse).
   geolocator: ^13.0.1
+
+  # Carte embarquée pour le suivi de livraison (retrait/livraison/position
+  # livreur) — mêmes packages que courrier_livreur
+  # (core/widgets/delivery_map.dart y est dupliqué à l'identique, pas de
+  # package Flutter partagé entre les deux apps) : tuiles OpenStreetMap,
+  # aucune clé API requise.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:

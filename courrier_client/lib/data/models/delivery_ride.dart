@@ -57,7 +57,11 @@ class DeliveryRide {
   final String id;
   final RideStatus status;
   final String pickupAddress;
+  final double? pickupLat;
+  final double? pickupLng;
   final String dropoffAddress;
+  final double? dropoffLat;
+  final double? dropoffLng;
   final int priceXof;
   final double? driverLat;
   final double? driverLng;
@@ -68,7 +72,11 @@ class DeliveryRide {
     required this.id,
     required this.status,
     required this.pickupAddress,
+    this.pickupLat,
+    this.pickupLng,
     required this.dropoffAddress,
+    this.dropoffLat,
+    this.dropoffLng,
     required this.priceXof,
     this.driverLat,
     this.driverLng,
@@ -80,7 +88,11 @@ class DeliveryRide {
         id: map['id'] as String,
         status: RideStatusX.fromDb(map['status'] as String? ?? 'requested'),
         pickupAddress: map['pickup_address'] as String? ?? '',
+        pickupLat: (map['pickup_lat'] as num?)?.toDouble(),
+        pickupLng: (map['pickup_lng'] as num?)?.toDouble(),
         dropoffAddress: map['dropoff_address'] as String? ?? '',
+        dropoffLat: (map['dropoff_lat'] as num?)?.toDouble(),
+        dropoffLng: (map['dropoff_lng'] as num?)?.toDouble(),
         priceXof: (map['price_xof'] as num?)?.toInt() ?? 0,
         driverLat: (map['driver_lat'] as num?)?.toDouble(),
         driverLng: (map['driver_lng'] as num?)?.toDouble(),

@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/delivery_map.dart';
 import '../../data/models/delivery_ride.dart';
 import '../../data/services/ride_backend.dart';
 
 /// Suivi temps réel d'une livraison VTC — s'abonne à la ligne `rides` côté
-/// Tibus Ride (Postgres changes), affiche statut + position/ETA du livreur
-/// dès qu'assigné (driver_lat/driver_lng/eta_seconds, alimentés par l'app
-/// livreur — voir tibusride-front). Pas de carte ici (v1) : juste les
-/// coordonnées + ETA en texte, voir README "Dette technique".
+/// Tibus Ride (Postgres changes), affiche statut + carte (retrait, livraison,
+/// position live du livreur dès qu'assigné — driver_lat/driver_lng,
+/// alimentés par l'app livreur courrier_livreur) + ETA en texte.
 class DeliveryStatusScreen extends StatefulWidget {
   final String rideId;
   const DeliveryStatusScreen({super.key, required this.rideId});
@@ -59,6 +60,18 @@ class _DeliveryStatusScreenState extends State<DeliveryStatusScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  DeliveryMap(
+                    pickup: ride.pickupLat != null && ride.pickupLng != null
+                        ? LatLng(ride.pickupLat!, ride.pickupLng!)
+                        : null,
+                    dropoff: ride.dropoffLat != null && ride.dropoffLng != null
+                        ? LatLng(ride.dropoffLat!, ride.dropoffLng!)
+                        : null,
+                    driver: ride.driverLat != null && ride.driverLng != null
+                        ? LatLng(ride.driverLat!, ride.driverLng!)
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
