@@ -40,6 +40,15 @@ dependencies:
   shared_preferences: ^2.2.3
   flutter_dotenv: ^5.1.0
 
+  # Impression USB / Bluetooth ESC/POS — imprimantes physiques du guichet
+  # (Xprinter XP-Q200 en USB, Mini Printer MPT-II en Bluetooth), en plus des
+  # ponts P3 natif et WisePrinter desktop existants (printer_service.dart).
+  # image_3 = fork maintenu de flutter_pos_printer_platform (discontinued),
+  # utilise le package `image_v3` pour ne pas entrer en conflit avec la
+  # dépendance `image: ^4.x` d'esc_pos_utils_plus.
+  flutter_pos_printer_platform_image_3: ^1.2.4
+  esc_pos_utils_plus: ^2.0.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

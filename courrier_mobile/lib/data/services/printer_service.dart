@@ -1,7 +1,13 @@
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
+import '../../core/utils/colis_receipt_lines.dart';
 import '../models/colis.dart';
+import 'esc_pos_printer_service.dart';
 import 'pos_bridge/pos_bridge.dart';
+
+export 'esc_pos_printer_service.dart' show EscPosPrinterService;
+export 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart'
+    show PrinterDevice, PrinterType;
 
 /// Impression sur reçu papier côté guichet — même logique multi-pont que
 /// Tibus web (src/lib/webview-bridge.ts, src/lib/colis-receipt.ts,
@@ -17,6 +23,7 @@ import 'pos_bridge/pos_bridge.dart';
 class PrinterService {
   static const _channel = MethodChannel('com.tibus.courrier/p3_printer');
   final PosBridge _bridge = createPosBridge();
+  EscPosPrinterService? _escPos;
 
   bool get isAvailable =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -28,6 +35,17 @@ class PrinterService {
   /// uniquement sur le build web, quand un wrapper l'injecte (même contrat
   /// que window.WisePrinter côté Tibus web).
   bool get hasWisePrinterBridge => _bridge.hasWisePrinter;
+
+  /// Pont USB/Bluetooth ESC/POS (flutter_pos_printer_platform_image_3) —
+  /// couvre les imprimantes physiques réelles du guichet (Xprinter XP-Q200
+  /// en USB, Mini Printer MPT-II en Bluetooth) qui ne sont ni l'imprimante
+  /// P3 intégrée, ni un pont desktop `window`. Disponible partout sauf web
+  /// (le plugin n'implémente pas de pont navigateur).
+  bool get hasEscPosSupport => !kIsWeb;
+
+  /// Découverte/connexion/impression USB & Bluetooth — voir
+  /// esc_pos_printer_service.dart.
+  EscPosPrinterService get escPos => _escPos ??= EscPosPrinterService();
 
   Future<void> warmUp() async {
     if (!isAvailable) return;
@@ -106,42 +124,6 @@ class PrinterService {
     }
   }
 
-  /// Lignes du reçu colis au format générique {text, align, bold, size} —
-  /// même structure que buildColisReceiptLines() côté web
-  /// (src/lib/colis-receipt.ts), utilisée par le pont Xprinter/WisePrinter
-  /// (dont l'API ne connaît que header/lines/qr, contrairement au pont P3
-  /// natif structuré en rows label/valeur).
-  List<Map<String, dynamic>> _colisReceiptLines(Colis colis) => [
-        {'text': 'Reçu expédition colis', 'align': 'center', 'size': 'small'},
-        {'text': ''},
-        {
-          'text': 'Ref: ${colis.id.substring(0, 8).toUpperCase()}',
-          'align': 'center',
-          'bold': true,
-          'size': 'large',
-        },
-        {'text': 'Statut: ${colis.statut.label}'},
-        {'text': ''},
-        {'text': 'Expéditeur', 'bold': true},
-        {'text': colis.nomExpediteur},
-        {'text': colis.telephoneExpediteur, 'size': 'small'},
-        {'text': ''},
-        {'text': 'Destinataire', 'bold': true},
-        {'text': colis.nomDestinataire},
-        {'text': colis.telephoneDestinataire, 'size': 'small'},
-        {'text': ''},
-        {'text': 'Trajet: ${colis.gareDepart} -> ${colis.gareDestination}', 'bold': true},
-        if (colis.poidsKg != null) {'text': 'Poids: ${colis.poidsKg} kg'},
-        {'text': ''},
-        {'text': 'Montant: ${colis.montantFret.toStringAsFixed(0)} FCFA', 'bold': true},
-        if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
-          {'text': 'Valeur marchandise: ${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'},
-        if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
-          {'text': 'Pourcentage perçu: ${colis.pourcentagePercu} %'},
-        {'text': ''},
-        {'text': 'Powered by Tibus', 'align': 'center', 'size': 'small'},
-      ];
-
   /// Reçu colis via le pont Xprinter/WisePrinter (desktop) — même contrat
   /// que printer.printReceipt() côté web (src/lib/printer.ts).
   Future<void> printColisReceiptViaWisePrinter(Colis colis) {
@@ -150,7 +132,7 @@ class PrinterService {
     }
     return _bridge.printViaWisePrinter(
       header: 'TIBUS COURRIER',
-      lines: _colisReceiptLines(colis),
+      lines: colisReceiptLines(colis),
       qr: colis.id,
       qrSize: 220,
       feedLines: 4,
