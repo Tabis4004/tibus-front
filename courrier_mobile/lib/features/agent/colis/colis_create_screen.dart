@@ -32,6 +32,12 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
 
   bool _loadingRefs = true;
   String? _refsError;
+  /// Compagnie effectivement utilisée pour cet écran, dérivée de la caisse
+  /// réellement ouverte (voir _loadReferences) — ne PAS reconfondre avec
+  /// activeCompanyIdProvider qui peut rester périmé si son invalidation a
+  /// été manquée (état Riverpod caché, invalidé seulement à l'ouverture/
+  /// fermeture de caisse).
+  String? _companyId;
   List<GareOption> _gares = [];
   List<ColisNature> _natures = [];
   String? _gareDestinationId;
@@ -61,27 +67,42 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       _loadingRefs = true;
       _refsError = null;
     });
-    final companyId = await ref.read(activeCompanyIdProvider.future);
-    if (!mounted) return;
-    if (companyId == null) {
-      setState(() => _loadingRefs = false);
-      return;
-    }
     final service = ref.read(colisServiceProvider);
+    final fallbackCompanyId = await ref.read(activeCompanyIdProvider.future);
+    if (!mounted) return;
     try {
+      // La caisse réellement ouverte est l'unique source de vérité pour la
+      // compagnie de travail de cet écran : on la récupère D'ABORD et on en
+      // dérive companyId, puis on l'utilise pour les gares/natures/réglages.
+      // Se fier à activeCompanyIdProvider pour ces appels (au lieu de
+      // dériver depuis _openCash comme ici) pouvait renvoyer une compagnie
+      // périmée si son invalidation avait été manquée quelque part — c'était
+      // la cause du bug "Gare de départ (caisse ouverte) : Gare 2" alors que
+      // la liste de destination affichait les gares d'une autre compagnie
+      // (Gare Abobo, Gare Bouake) : deux appels indépendants pouvaient donc
+      // désigner deux compagnies différentes.
+      final openCash = await service.getOpenStationCash();
+      if (!mounted) return;
+      final companyId = (openCash.open ? openCash.companyId : null) ?? fallbackCompanyId;
+      if (companyId == null) {
+        setState(() {
+          _openCash = openCash;
+          _loadingRefs = false;
+        });
+        return;
+      }
       final results = await Future.wait([
         service.listGares(companyId),
         service.listNatures(companyId),
-        service.getOpenStationCash(),
         service.getCompanyColisSettings(companyId),
       ]);
       if (!mounted) return;
       final gares = results[0] as List<GareOption>;
       final natures = (results[1] as List<ColisNature>).where((n) => n.isActive).toList();
-      final openCash = results[2] as OpenStationCash;
-      final settings = results[3] as Map<String, dynamic>;
+      final settings = results[2] as Map<String, dynamic>;
       final defaultPct = (settings['colisPourcentagePercuGeneral'] as num?)?.toDouble();
       setState(() {
+        _companyId = companyId;
         _gares = gares;
         _natures = natures;
         _openCash = openCash;
@@ -101,7 +122,9 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   }
 
   Future<void> _refreshPrixMin() async {
-    final companyId = await ref.read(activeCompanyIdProvider.future);
+    // Priorité à _companyId (résolu depuis la caisse ouverte, voir
+    // _loadReferences) pour rester cohérent avec les gares/natures affichées.
+    final companyId = _companyId ?? await ref.read(activeCompanyIdProvider.future);
     if (!mounted) return;
     if (companyId == null || _selectedNatureId == null) {
       setState(() => _prixMinSuggere = null);
@@ -356,7 +379,11 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: _submitting ? null : () => _submit(companyId),
+                  // _companyId (dérivé de la caisse ouverte) prioritaire sur
+                  // companyId (activeCompanyIdProvider, potentiellement
+                  // périmé) — garantit que l'enregistrement utilise la même
+                  // compagnie que la gare de départ affichée.
+                  onPressed: _submitting ? null : () => _submit(_companyId ?? companyId),
                   child: _submitting
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Text('Enregistrer le colis'),
