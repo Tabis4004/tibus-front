@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/env.dart';
 import '../models/delivery_ride.dart';
@@ -12,27 +14,57 @@ import '../models/delivery_ride.dart';
 /// pointe vers Tibus principal — voir tibus_backend.dart) : on peut donc
 /// avoir les deux backends actifs en même temps dans la même app.
 ///
-/// Auth : compte anonyme Supabase (`signInAnonymously`), créé silencieusement
-/// à la première commande — pas d'écran d'inscription séparé côté Tibus Ride
-/// (choix "chemin le plus simple" : le lien entre les deux systèmes est le
-/// code du colis, pas un compte partagé). À terme, si un vrai suivi
-/// multi-appareils est nécessaire, ce compte anonyme pourra être "upgradé"
-/// (linkIdentity) vers un compte téléphone/email sans perdre l'historique.
+/// Auth : compte MIROIR du compte Tibus principal (voir
+/// [ensureMirroredSession]), pas un compte anonyme — l'auth anonyme est de
+/// toute façon désactivée côté projet Ride, et conceptuellement fausse : la
+/// personne qui commande une livraison est déjà identifiée côté Tibus
+/// (compte "traveler", voir tibus_backend.dart), ce n'est pas un inconnu.
 class RideBackend {
   RideBackend._();
 
   // Flux implicit : le flux PKCE (défaut) exige un pkceAsyncStorage, absent
-  // sur un SupabaseClient brut — signUp/signInAnonymously peuvent planter
-  // avec « Null check operator used on a null value ».
+  // sur un SupabaseClient brut — signUp/signIn peuvent planter avec
+  // « Null check operator used on a null value ».
   static final SupabaseClient client = SupabaseClient(
     Env.rideSupabaseUrl,
     Env.rideSupabaseAnonKey,
     authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
   );
 
-  static Future<void> ensureSession() async {
-    if (client.auth.currentSession != null) return;
-    await client.auth.signInAnonymously();
+  /// Mot de passe déterministe du compte miroir — dérivé de l'id du compte
+  /// Tibus principal, JAMAIS du vrai mot de passe de l'utilisateur (qu'on
+  /// n'a de toute façon jamais en clair après un signIn). Stable : le même
+  /// compte Tibus retombe toujours sur le même mot de passe côté Ride, donc
+  /// signIn réussit dès la 2e commande sans qu'on ait besoin de stocker quoi
+  /// que ce soit nous-mêmes.
+  static String _mirrorPassword(String tibusUserId) {
+    final digest = sha256.convert(utf8.encode('tibus-ride-mirror::v1::$tibusUserId'));
+    return digest.toString();
+  }
+
+  /// Garantit une session Ride "réelle" (pas anonyme), identifiée par le
+  /// même email que le compte Tibus principal — signIn si le compte miroir
+  /// existe déjà (commandes suivantes), sinon signUp (première commande).
+  /// Deux lignes `auth.users` distinctes (deux projets Supabase séparés, pas
+  /// de réplication native entre eux) mais mêmes identifiants du point de
+  /// vue de la personne : c'est le sens de "compte qui se duplique sur Ride".
+  static Future<void> ensureMirroredSession({
+    required String tibusUserId,
+    required String email,
+  }) async {
+    final current = client.auth.currentUser;
+    if (current != null && current.email == email) return;
+
+    final password = _mirrorPassword(tibusUserId);
+    try {
+      await client.auth.signInWithPassword(email: email, password: password);
+    } on AuthException {
+      await client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'mirrored_from_tibus_user_id': tibusUserId},
+      );
+    }
   }
 
   /// Distance à vol d'oiseau (km) — même formule que dispatch_rank_candidates
@@ -143,6 +175,8 @@ class RideBackend {
   /// (point commun entre suivi colis et commande VTC) — stockée dans `notes`
   /// pour traçabilité, tant qu'aucune colonne dédiée n'existe côté Tibus Ride.
   static Future<DeliveryRide> createDeliveryRide({
+    required String tibusUserId,
+    required String tibusEmail,
     required String pickupAddress,
     required double pickupLat,
     required double pickupLng,
@@ -157,7 +191,7 @@ class RideBackend {
     bool urgent = false,
     bool insulatedBag = false,
   }) async {
-    await ensureSession();
+    await ensureMirroredSession(tibusUserId: tibusUserId, email: tibusEmail);
     final distanceKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
     final priceXof = await estimatePriceXof(
       vehicle: vehicle,

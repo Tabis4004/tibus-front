@@ -5,6 +5,8 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/colis_summary.dart';
 import '../../data/models/delivery_ride.dart';
 import '../../data/services/ride_backend.dart';
+import '../../data/services/tibus_backend.dart';
+import '../auth/login_screen.dart';
 import 'delivery_status_screen.dart';
 import 'location_picker_screen.dart';
 
@@ -158,8 +160,18 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       _loading = true;
       _error = null;
     });
+    final tibusUser = TibusBackend.currentUser;
+    if (tibusUser == null || tibusUser.email == null) {
+      setState(() {
+        _loading = false;
+        _error = 'Session expirée — reconnectez-vous.';
+      });
+      return;
+    }
     try {
       final ride = await RideBackend.createDeliveryRide(
+        tibusUserId: tibusUser.id,
+        tibusEmail: tibusUser.email!,
         pickupAddress: _pickupAddressCtrl.text.trim().isEmpty
             ? (widget.colis?.gareDestination ?? '')
             : _pickupAddressCtrl.text.trim(),
@@ -194,8 +206,43 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
     super.dispose();
   }
 
+  /// Une livraison nécessite un compte identifié (voir tibus_backend.dart —
+  /// c'est ce compte qui est ensuite miroité côté Ride, plus d'auth anonyme
+  /// possible). Tant que non connecté, on affiche un écran de connexion
+  /// dédié plutôt que le formulaire — pas de saisie perdue en cours de route.
+  Future<void> _promptLogin() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+    if (result == true && mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!TibusBackend.isLoggedIn) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Commander une livraison')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, size: 48, color: AppColors.textSecondary),
+                const SizedBox(height: 16),
+                const Text(
+                  'Connectez-vous à votre compte Tibus pour commander une livraison.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(onPressed: _promptLogin, child: const Text('Se connecter')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Commander une livraison')),
       body: ListView(
