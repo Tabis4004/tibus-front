@@ -298,9 +298,25 @@ export default function ColisAutonomesPage({
     if (!appUserId && !companyIdProp) return;
     setLoading(true);
     try {
+      // Caisse éventuellement ouverte par l'agent : sa compagnie (companyId,
+      // exposé par la RPC depuis la migration 170) est la seule source de
+      // vérité fiable pour la "compagnie active" d'un vendeur multi-
+      // compagnies. On la récupère avant de résoudre `cid` pour la préférer
+      // à l'heuristique "première compagnie où l'utilisateur a un rôle"
+      // ci-dessous — sinon la liste des gares peut être chargée pour une
+      // compagnie différente de celle de la caisse ouverte, et gareDepartId
+      // (calé sur la caisse) ne correspond à aucune gare de la liste : le
+      // <select> "Gare de départ" reste alors vide (aucune <option> ne
+      // matche sa valeur). Même classe de bug déjà corrigée côté
+      // courrier_mobile (providers.dart / activeCompanyIdProvider).
+      const earlyOpenCash = await getOpenStationCashSupabase().catch(() => null);
+
       let cid = companyIdProp ?? null;
       if (!cid && appUserId) {
-        const profile = await getSellerProfileSupabase(appUserId);
+        const profile = await getSellerProfileSupabase(
+          appUserId,
+          earlyOpenCash?.companyId ?? null,
+        );
         if (!profile?.company?.id) {
           setModuleEnabled(false);
           setCompanyId(null);
@@ -340,11 +356,10 @@ export default function ColisAutonomesPage({
       setModuleEnabled(moduleActive);
       if (!moduleActive) return;
 
-      const [garesResult, naturesResult, listResult, openCashResult, busesResult] = await Promise.allSettled([
+      const [garesResult, naturesResult, listResult, busesResult] = await Promise.allSettled([
         listCompanyStationGaresSupabase(cid),
         listColisNaturesSupabase(cid),
         listColisAutonomesSupabase(cid),
-        getOpenStationCashSupabase(),
         listCompanyBusesSupabase(cid),
       ]);
 
@@ -369,8 +384,7 @@ export default function ColisAutonomesPage({
       setRows(nextRows);
       setBuses(nextBuses);
 
-      const openCash =
-        openCashResult.status === "fulfilled" ? openCashResult.value : null;
+      const openCash = earlyOpenCash;
       if (openCash?.open && openCash.gareId) {
         setCashGareId(openCash.gareId);
         setGareDepartId(openCash.gareId);

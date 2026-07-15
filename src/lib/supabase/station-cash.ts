@@ -21,6 +21,7 @@ export type OpenStationCash = {
   openingFloat?: number;
   openedAt?: string;
   status?: StationCashStatus;
+  companyId?: string;
 };
 
 export type StationCashMovement = {
@@ -102,6 +103,7 @@ export async function getOpenStationCashSupabase(
     openingFloat: row.openingFloat == null ? undefined : num(row.openingFloat),
     openedAt: row.openedAt ? String(row.openedAt) : undefined,
     status: row.status ? (String(row.status) as StationCashStatus) : undefined,
+    companyId: row.companyId ? String(row.companyId) : undefined,
   };
 }
 
