@@ -51,14 +51,21 @@ class RideBackend {
   }
 
   /// Estimation de prix — reprend la formule de delivery_pricing_settings
-  /// (base + par km + par min) et le multiplicateur dynamique de
-  /// dynamic_pricing_settings (resolve_dynamic_pricing_settings), pour rester
-  /// cohérent avec la tarification déjà utilisée côté web Tibus Ride.
-  /// Durée estimée à partir d'une vitesse moyenne urbaine forfaitaire
-  /// (25 km/h) tant qu'aucun routage réel n'est branché.
+  /// (base + par km + par min), le multiplicateur par type de colis
+  /// (delivery_package_pricing — jusqu'ici configurable côté admin mais
+  /// jamais appliqué ici, voir historique), les options (delivery_extras_pricing
+  /// — urgent/sac isotherme, même chose : réglables mais inertes avant ce
+  /// correctif) et le multiplicateur dynamique de dynamic_pricing_settings
+  /// (resolve_dynamic_pricing_settings), pour rester cohérent avec la
+  /// tarification déjà utilisée côté web Tibus Ride. Durée estimée à partir
+  /// d'une vitesse moyenne urbaine forfaitaire (25 km/h) tant qu'aucun
+  /// routage réel n'est branché.
   static Future<int> estimatePriceXof({
     required DeliveryVehicle vehicle,
     required double distanceKm,
+    String? packageType,
+    bool urgent = false,
+    bool insulatedBag = false,
   }) async {
     final pricing = await client
         .from('delivery_pricing_settings')
@@ -74,6 +81,17 @@ class RideBackend {
 
     final durationMin = (distanceKm / 25 * 60).ceil(); // vitesse moyenne 25 km/h
 
+    double packageMultiplier = 1.0;
+    if (packageType != null && packageType.isNotEmpty) {
+      final pkg = await client
+          .from('delivery_package_pricing')
+          .select('multiplier')
+          .eq('package_type', packageType)
+          .eq('active', true)
+          .maybeSingle();
+      packageMultiplier = (pkg?['multiplier'] as num?)?.toDouble() ?? 1.0;
+    }
+
     double multiplier = 1.0;
     int roundingIncrement = 50;
     try {
@@ -88,7 +106,30 @@ class RideBackend {
       // best-effort — l'estimation reste correcte sans le multiplicateur dynamique.
     }
 
-    final raw = base + (perKm * distanceKm) + (perMin * durationMin);
+    double raw = (base + (perKm * distanceKm) + (perMin * durationMin)) * packageMultiplier;
+
+    // Options (urgent / sac isotherme) — frais fixe + % additionnel sur le
+    // montant courant, appliquées avant l'arrondi final. Compoundent entre
+    // elles si les deux sont actives (cas rare en pratique aujourd'hui, une
+    // seule option a un percent_extra non nul).
+    if (urgent || insulatedBag) {
+      final keys = [if (urgent) 'urgent', if (insulatedBag) 'insulated_bag'];
+      try {
+        final extras = await client
+            .from('delivery_extras_pricing')
+            .select('extra_key, fee_xof, percent_extra')
+            .inFilter('extra_key', keys)
+            .eq('active', true);
+        for (final e in (extras as List)) {
+          raw += (e['fee_xof'] as num?)?.toDouble() ?? 0;
+          final pct = (e['percent_extra'] as num?)?.toDouble() ?? 0;
+          if (pct > 0) raw += raw * pct / 100.0;
+        }
+      } catch (_) {
+        // best-effort — l'estimation reste correcte (sans options) en cas d'échec.
+      }
+    }
+
     final adjusted = raw * multiplier;
     final rounded = (adjusted / roundingIncrement).round() * roundingIncrement;
     return max(rounded, minFare);
@@ -118,7 +159,13 @@ class RideBackend {
   }) async {
     await ensureSession();
     final distanceKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    final priceXof = await estimatePriceXof(vehicle: vehicle, distanceKm: distanceKm);
+    final priceXof = await estimatePriceXof(
+      vehicle: vehicle,
+      distanceKm: distanceKm,
+      packageType: packageType,
+      urgent: urgent,
+      insulatedBag: insulatedBag,
+    );
 
     final row = await client
         .from('rides')

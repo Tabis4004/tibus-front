@@ -131,7 +131,11 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       _pickupPos!.latitude, _pickupPos!.longitude,
       _dropoffPos!.latitude, _dropoffPos!.longitude,
     );
-    final price = await RideBackend.estimatePriceXof(vehicle: _vehicle, distanceKm: distance);
+    final price = await RideBackend.estimatePriceXof(
+      vehicle: _vehicle,
+      distanceKm: distance,
+      packageType: _packageType,
+    );
     if (mounted) setState(() => _estimate = price);
   }
 
@@ -244,7 +248,10 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             items: _packageTypes.entries
                 .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                 .toList(),
-            onChanged: (v) => setState(() => _packageType = v ?? _packageType),
+            onChanged: (v) {
+              setState(() => _packageType = v ?? _packageType);
+              _refreshEstimate();
+            },
           ),
           const SizedBox(height: 20),
           if (_pickupPos != null && _dropoffPos != null)
