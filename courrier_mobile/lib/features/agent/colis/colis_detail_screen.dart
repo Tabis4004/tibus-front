@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/models/colis.dart';
+import 'colis_receipt_preview_sheet.dart';
 
 /// Référence publique courte affichée aux clients — même format que le web
 /// (colisPublicReference dans src/lib/colis-receipt.ts).
@@ -69,20 +70,12 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
   }
 
   Future<void> _printReceipt(Colis colis) async {
-    final printer = ref.read(printerServiceProvider);
-    if (!printer.isAvailable) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impression indisponible sur cet appareil (imprimante P3 requise).')),
-        );
-      }
-      return;
-    }
-    try {
-      await printer.printColisReceipt(colis);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur impression : $e')));
-    }
+    // Aperçu du reçu + choix explicite de l'imprimante (Xprinter, imprimante
+    // intégrée 56 mm, ou 80 mm Xprinter toujours disponible) — même logique
+    // multi-pont que côté web (voir colis_receipt_preview_sheet.dart et
+    // printer_service.dart). Remplace l'ancien "impression directe ou
+    // indisponible" qui ne fonctionnait que sur Android natif.
+    await showColisReceiptPreview(context, colis);
   }
 
   Future<void> _sendWhatsApp(Colis colis, {required bool toExpediteur}) async {
