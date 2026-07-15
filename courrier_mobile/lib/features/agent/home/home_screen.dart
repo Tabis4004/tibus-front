@@ -9,6 +9,7 @@ import '../../../data/models/colis.dart';
 import '../colis/colis_list_screen.dart';
 import '../colis/colis_scan_screen.dart';
 import '../colis/colis_manifest_screen.dart';
+import '../colis/bordereau_screen.dart';
 import '../caisse/station_cash_screen.dart';
 
 /// Écran d'accueil agent — réplique la maquette 1 :
@@ -129,6 +130,18 @@ class _HomeBody extends ConsumerWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ColisManifestScreen()),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.assignment_outlined, color: AppColors.primaryGreen),
+              title: const Text('Bordereau de livraison'),
+              subtitle: const Text('Créer un BL et scanner les colis embarqués dans le bus'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => BordereauListScreen(companyId: companyId)),
               ),
             ),
           ),
