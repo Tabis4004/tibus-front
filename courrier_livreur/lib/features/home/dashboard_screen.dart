@@ -31,13 +31,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String? _error;
 
+  int? _walletBalance;
+  int? _totalEarnings;
+
   Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _refreshAll();
+    _loadWalletStats();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _refreshAll(silent: true));
+  }
+
+  /// Solde wallet + gains totaux — affichés sur le tableau de bord (pas
+  /// seulement dans l'onglet Wallet) pour que le livreur voie sa situation
+  /// financière avant même d'accepter une offre : un solde ≤ 0 bloque
+  /// l'acceptation (voir wallet_balance_gating.sql), autant le savoir tout
+  /// de suite plutôt qu'à l'échec de l'acceptation. Chargé séparément du
+  /// polling 4s des offres (pas besoin d'un rafraîchissement aussi agressif
+  /// pour des données financières).
+  Future<void> _loadWalletStats() async {
+    try {
+      final results = await Future.wait([
+        DriverBackend.fetchWalletBalance(),
+        DriverBackend.fetchTotalEarnings(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _walletBalance = results[0];
+        _totalEarnings = results[1];
+      });
+    } catch (_) {
+      // best-effort — l'onglet Wallet reste la source de vérité en cas d'échec ici.
+    }
   }
 
   @override
@@ -125,7 +152,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final body = RefreshIndicator(
-      onRefresh: () => _refreshAll(),
+      onRefresh: () => Future.wait([_refreshAll(), _loadWalletStats()]),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -152,11 +179,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
+              Expanded(child: _StatCard(label: 'Gains totaux', value: _totalEarnings == null ? '…' : _formatXof(_totalEarnings!))),
+              const SizedBox(width: 12),
               Expanded(child: _StatCard(label: 'Livraisons', value: '${widget.profile.ridesCount}')),
               const SizedBox(width: 12),
               Expanded(child: _StatCard(label: 'Note', value: '${widget.profile.ratingAvg.toStringAsFixed(1)} / 5')),
             ],
           ),
+          const SizedBox(height: 12),
+          _WalletBanner(balance: _walletBalance),
           const SizedBox(height: 20),
           if (_activeRides.isNotEmpty) ...[
             const Text('Livraison en cours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -202,6 +233,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Courrier Livreur')),
       body: _isOnline ? LocationReporter(child: body) : body,
+    );
+  }
+}
+
+String _formatXof(num amount) {
+  final s = amount.abs().toStringAsFixed(0);
+  final buf = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+    buf.write(s[i]);
+  }
+  return '${amount < 0 ? '-' : ''}$buf FCFA';
+}
+
+/// Bandeau solde wallet — visible directement sur le tableau de bord, avant
+/// que le livreur essaie d'accepter une offre (voir WalletScreen pour
+/// l'historique complet des mouvements). `null` = pas encore chargé, on
+/// n'affiche rien plutôt qu'un faux zéro.
+class _WalletBanner extends StatelessWidget {
+  final int? balance;
+  const _WalletBanner({required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    if (balance == null) return const SizedBox.shrink();
+    final depleted = balance! <= 0;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: depleted ? AppColors.accentRed.withValues(alpha: 0.08) : AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: depleted ? Border.all(color: AppColors.accentRed) : null,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_balance_wallet, color: depleted ? AppColors.accentRed : AppColors.textSecondary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Solde wallet : ${_formatXof(balance!)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                if (depleted)
+                  const Text(
+                    "Solde épuisé — vous ne pourrez pas accepter de livraison tant qu'il n'est pas rechargé.",
+                    style: TextStyle(fontSize: 12, color: AppColors.accentRed),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

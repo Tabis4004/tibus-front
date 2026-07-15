@@ -266,6 +266,20 @@ class DriverBackend {
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
+  /// Gains totaux (somme des `net_xof`) — même source que "Gains totaux"
+  /// côté web (routes/app/driver.tsx, driverStatsQ) : `ride_payouts`, pas un
+  /// champ dénormalisé sur `driver_profiles`. Affiché sur le tableau de bord,
+  /// aux côtés du solde wallet, pour que le livreur voie sa situation
+  /// financière avant même d'accepter une offre (un solde ≤ 0 bloque
+  /// l'acceptation, voir wallet_balance_gating.sql).
+  static Future<int> fetchTotalEarnings() async {
+    final rows = await client
+        .from('ride_payouts')
+        .select('net_xof')
+        .eq('driver_id', currentUser!.id);
+    return (rows as List).fold<int>(0, (sum, r) => sum + ((r['net_xof'] as num?)?.toInt() ?? 0));
+  }
+
   // ---------------------------------------------------------------------
   // Notes reçues
   // ---------------------------------------------------------------------
