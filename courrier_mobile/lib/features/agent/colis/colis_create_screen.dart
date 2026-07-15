@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/colis.dart';
 import '../caisse/station_cash_screen.dart';
+import 'colis_receipt_preview_sheet.dart';
 
 /// Enregistrement d'un nouveau colis — appelle register_colis_autonome
 /// tel quel (mêmes champs que le formulaire web ColisAutonomesPage.tsx),
@@ -219,7 +220,38 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         pourcentagePercu: _montantAuto ? double.tryParse(_pourcentagePercu.text) : null,
         natureIds: [_selectedNatureId!],
       );
-      await ref.read(colisServiceProvider).registerColis(input);
+      final result = await ref.read(colisServiceProvider).registerColis(input);
+      if (!mounted) return;
+      // Aperçu du reçu (avec choix d'imprimante) ouvert automatiquement
+      // après l'enregistrement — même parcours que le web (ColisReceiptPanel
+      // autoPrint). Avant : simple pop, aucun aperçu proposé.
+      final now = DateTime.now();
+      final colis = Colis(
+        id: result['id'] as String,
+        statut: ColisStatutX.fromDb(result['statutColis'] as String? ?? 'enregistre'),
+        nomExpediteur: input.nomExpediteur,
+        telephoneExpediteur: input.telephoneExpediteur,
+        nomDestinataire: input.nomDestinataire,
+        telephoneDestinataire: input.telephoneDestinataire,
+        descriptionContenu: input.descriptionContenu,
+        poidsKg: input.poidsKg,
+        nombrePieces: input.nombrePieces,
+        montantFret: input.montantFret,
+        valeurMarchandise: input.valeurMarchandise,
+        pourcentagePercu: input.pourcentagePercu,
+        createdAt: now,
+        updatedAt: now,
+        gareDepart: _openCash?.gareName ?? '',
+        gareDestination: _gares
+            .firstWhere((g) => g.id == _gareDestinationId,
+                orElse: () => const GareOption(id: '', name: ''))
+            .name,
+        natures: [
+          for (final n in _natures)
+            if (n.id == _selectedNatureId) n.libelle,
+        ],
+      );
+      await showColisReceiptPreview(context, colis);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
