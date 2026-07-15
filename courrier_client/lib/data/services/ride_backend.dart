@@ -21,9 +21,13 @@ import '../models/delivery_ride.dart';
 class RideBackend {
   RideBackend._();
 
+  // Flux implicit : le flux PKCE (défaut) exige un pkceAsyncStorage, absent
+  // sur un SupabaseClient brut — signUp/signInAnonymously peuvent planter
+  // avec « Null check operator used on a null value ».
   static final SupabaseClient client = SupabaseClient(
     Env.rideSupabaseUrl,
     Env.rideSupabaseAnonKey,
+    authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
   );
 
   static Future<void> ensureSession() async {

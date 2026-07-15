@@ -20,9 +20,13 @@ import '../models/active_ride.dart';
 class DriverBackend {
   DriverBackend._();
 
+  // Flux implicit obligatoire : le flux PKCE (défaut) exige un
+  // pkceAsyncStorage, absent sur un SupabaseClient brut — signUp planterait
+  // avec « Null check operator used on a null value ».
   static final SupabaseClient client = SupabaseClient(
     Env.rideSupabaseUrl,
     Env.rideSupabaseAnonKey,
+    authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
   );
 
   static User? get currentUser => client.auth.currentUser;
