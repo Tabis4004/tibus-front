@@ -209,10 +209,26 @@ class P3PrinterModule(private val ctx: Context) {
             printField(p, "Montant colis", t.parcelAmount, paperWidth)
         }
 
-        // ---- Extra rows (vente directe)
+        // ---- Extra rows (vente directe / reçu colis)
+        // Reçu colis (voir printer_service.dart printColisReceipt) envoie des
+        // labels de section en capitales ("EXPÉDITEUR", "BÉNÉFICIAIRE",
+        // "CONTENU") pour marquer visuellement chaque bloc sur le modèle
+        // papier de référence (cadre + sections). L'imprimante P3 intégrée ne
+        // sait pas dessiner de cadre, donc on imite l'effet avec des
+        // séparateurs + titre en gras/centré au-dessus de chaque bloc.
         if (t.extraFields.isNotEmpty()) {
+            val sectionMarkers = setOf("EXPÉDITEUR", "BÉNÉFICIAIRE", "CONTENU")
+            t.extraFields.forEach { (label, value) ->
+                if (label.uppercase(Locale.US) in sectionMarkers) {
+                    separator(p, paperWidth)
+                    printWrappedLine(p, label.uppercase(Locale.US),
+                        PrintOptions(align = "center", bold = true), paperWidth)
+                    printWrappedLine(p, value, PrintOptions(bold = true), paperWidth)
+                } else {
+                    printField(p, label, value, paperWidth)
+                }
+            }
             separator(p, paperWidth)
-            t.extraFields.forEach { (label, value) -> printField(p, label, value, paperWidth) }
         }
 
         // ---- Total
