@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import ColisReceiptPanel from "@/components/seller/ColisReceiptPanel.tsx";
 import ColisScanWorkflow from "@/pages/verify/_components/ColisScanWorkflow.tsx";
+import BordereauPanel from "@/pages/seller/_components/BordereauPanel.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { getSellerProfileSupabase, getSellerCompanyReceiptInfoSupabase, type SellerCompanyReceiptInfo } from "@/lib/supabase/seller-counter";
 import { supabaseErrorMessage } from "@/lib/supabase/errors";
@@ -639,6 +640,9 @@ export default function ColisAutonomesPage({
           <TabsTrigger value="suivi" className="flex-1 cursor-pointer">
             {t("colis.tab_track", { defaultValue: "Suivi" })}
           </TabsTrigger>
+          <TabsTrigger value="bordereau" className="flex-1 cursor-pointer">
+            {t("colis.tab_bordereau", { defaultValue: "Bordereaux" })}
+          </TabsTrigger>
           <TabsTrigger value="retrait" className="flex-1 cursor-pointer">
             {t("colis.tab_pickup", { defaultValue: "Retrait" })}
           </TabsTrigger>
@@ -988,6 +992,18 @@ export default function ColisAutonomesPage({
               );
             })
           )}
+        </TabsContent>
+
+        <TabsContent value="bordereau" className="space-y-4 mt-4">
+          {companyId ? (
+            <BordereauPanel
+              companyId={companyId}
+              gares={gares}
+              buses={buses}
+              defaultGareDepartId={cashGareId || gareDepartId || null}
+              onColisChanged={() => void refreshListSilently()}
+            />
+          ) : null}
         </TabsContent>
 
         <TabsContent value="retrait" className="space-y-4 mt-4">
