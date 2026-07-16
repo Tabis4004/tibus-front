@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/env.dart';
 import '../models/driver_profile.dart';
 import '../models/active_ride.dart';
+import '../models/earnings_report.dart';
+import '../models/ticket.dart';
 
 /// Backend Tibus Ride, côté livreur. Reprend à l'identique les règles déjà
 /// en place côté web (src/lib/dispatch.functions.ts, routes/app/driver.tsx) :
@@ -97,7 +99,7 @@ class DriverBackend {
           .select()
           .single();
     }
-    return DriverProfile.fromMap(row!);
+    return DriverProfile.fromMap(row);
   }
 
   /// Complète les infos véhicule de base — pas de dossier d'enrôlement
@@ -281,6 +283,247 @@ class DriverBackend {
   }
 
   // ---------------------------------------------------------------------
+  // Recharge wallet en libre-service (Mobile Money) — jusqu'ici la recharge
+  // du wallet FCFA (driver_wallets) était 100% manuelle côté admin
+  // (adminWalletTopup, service_role). Ce chemin s'y ajoute, il ne la
+  // remplace pas : un admin peut toujours créditer manuellement.
+  // Voir Edge Function geniuspay-driver-topup + table driver_topup_orders +
+  // RPC confirm_driver_topup (appelée par le webhook GeniusPay côté
+  // tibusride-front, pas depuis l'app).
+  // ---------------------------------------------------------------------
+
+  /// Crée une session de paiement GeniusPay hébergée pour recharger le
+  /// wallet FCFA du livreur courant — retourne l'URL de checkout à ouvrir
+  /// dans le navigateur de l'appareil. Aucune redirection automatique dans
+  /// l'app (pas de deep link configuré) : la confirmation réelle vient du
+  /// webhook GeniusPay côté serveur, pas de l'URL de retour — l'écran doit
+  /// être rafraîchi manuellement une fois le paiement effectué.
+  static Future<Map<String, dynamic>> createWalletTopup({
+    required int amountXof,
+    required String successUrl,
+    required String errorUrl,
+    String? customerPhone,
+    String? customerName,
+    String? customerEmail,
+  }) async {
+    final res = await client.functions.invoke(
+      'geniuspay-driver-topup',
+      body: {
+        'amount_xof': amountXof,
+        'success_url': successUrl,
+        'error_url': errorUrl,
+        if (customerPhone != null) 'customer_phone': customerPhone,
+        if (customerName != null) 'customer_name': customerName,
+        if (customerEmail != null) 'customer_email': customerEmail,
+      },
+    );
+    final data = res.data;
+    if (data is Map && data['error'] != null) {
+      throw Exception(data['error'].toString());
+    }
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchWalletTopupOrders({int limit = 10}) async {
+    final rows = await client
+        .from('driver_topup_orders')
+        .select()
+        .eq('driver_id', currentUser!.id)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------
+  // Zone d'opération — portage de DriverZoneSettings (driver.tsx) : cercle
+  // centre + rayon, table driver_zones en self-service complet côté RLS
+  // ("Drivers manage own zone", cmd ALL) — pas de RPC nécessaire, accès
+  // direct comme le fait déjà context.supabase côté web.
+  // ---------------------------------------------------------------------
+
+  static Future<Map<String, dynamic>?> getMyZone() async {
+    return client.from('driver_zones').select().eq('driver_id', currentUser!.id).maybeSingle();
+  }
+
+  /// Enregistre/replace la zone — centrée sur la position fournie (position
+  /// actuelle au moment de l'appel, comme côté web), upsert sur driver_id.
+  static Future<void> setMyZone({
+    required double centerLat,
+    required double centerLng,
+    required double radiusKm,
+    bool isActive = true,
+  }) async {
+    await client.from('driver_zones').upsert({
+      'driver_id': currentUser!.id,
+      'center_lat': centerLat,
+      'center_lng': centerLng,
+      'radius_km': radiusKm,
+      'is_active': isActive,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'driver_id');
+  }
+
+  static Future<void> setZoneActive(bool active) async {
+    await client.from('driver_zones').update({'is_active': active}).eq('driver_id', currentUser!.id);
+  }
+
+  static Future<void> clearMyZone() async {
+    await client.from('driver_zones').delete().eq('driver_id', currentUser!.id);
+  }
+
+  // ---------------------------------------------------------------------
+  // Rapport de gains — portage de myEarningsReport (dispatch.functions.ts)
+  // + reporting.ts, voir earnings_report.dart. Toutes les tables lues ici
+  // (ride_payouts, rides, driver_reward_transactions, reward_settings) sont
+  // déjà accessibles en lecture directe au livreur sur ses propres lignes
+  // (mêmes RLS que driverStatsQ côté web, qui utilise aussi le client
+  // "normal" et pas supabaseAdmin) — pas besoin de service_role ici non plus.
+  // ---------------------------------------------------------------------
+
+  static Future<({List<EarningsRow> rows, EarningsTotals totals})> fetchEarningsReport({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final uid = currentUser!.id;
+    final payouts = await client
+        .from('ride_payouts')
+        .select('ride_id, gross_xof, commission_xof, net_xof, processed_at, status')
+        .eq('driver_id', uid)
+        .eq('status', 'paid')
+        .gte('processed_at', from.toIso8601String())
+        .lte('processed_at', to.toIso8601String())
+        .order('processed_at', ascending: false)
+        .limit(5000);
+
+    final payoutRows = (payouts as List).cast<Map<String, dynamic>>();
+    final rideIds = payoutRows.map((p) => p['ride_id'] as String).toList();
+
+    final rideMap = <String, Map<String, dynamic>>{};
+    if (rideIds.isNotEmpty) {
+      final rides = await client.from('rides').select('id, category, city, completed_at').inFilter('id', rideIds);
+      for (final r in (rides as List)) {
+        rideMap[r['id'] as String] = r as Map<String, dynamic>;
+      }
+    }
+
+    final bonusByRide = <String, int>{};
+    if (rideIds.isNotEmpty) {
+      final settings = await client.from('reward_settings').select('driver_point_value_xof').eq('id', true).maybeSingle();
+      final pointValueXof = (settings?['driver_point_value_xof'] as num?)?.toDouble() ?? 1;
+
+      final rewardTx = await client
+          .from('driver_reward_transactions')
+          .select('ride_id, points, type')
+          .eq('driver_id', uid)
+          .inFilter('ride_id', rideIds)
+          .inFilter('type', ['ride_accepted', 'ride_completed', 'referral_bonus']);
+
+      for (final tx in (rewardTx as List)) {
+        final rideId = tx['ride_id'] as String?;
+        if (rideId == null) continue;
+        final points = (tx['points'] as num?)?.toInt() ?? 0;
+        bonusByRide[rideId] = (bonusByRide[rideId] ?? 0) + (points * pointValueXof).round();
+      }
+    }
+
+    final rows = payoutRows.map((p) {
+      final rideId = p['ride_id'] as String;
+      final ride = rideMap[rideId];
+      final completedAtStr = (ride?['completed_at'] as String?) ?? (p['processed_at'] as String);
+      return EarningsRow(
+        rideId: rideId,
+        completedAt: DateTime.tryParse(completedAtStr) ?? DateTime.now(),
+        category: ride?['category'] as String?,
+        city: ride?['city'] as String?,
+        priceXof: (p['gross_xof'] as num?)?.toInt() ?? 0,
+        commissionXof: (p['commission_xof'] as num?)?.toInt() ?? 0,
+        driverEarningsXof: (p['net_xof'] as num?)?.toInt() ?? 0,
+        bonusXof: bonusByRide[rideId] ?? 0,
+      );
+    }).toList();
+
+    final totals = EarningsTotals(
+      rides: rows.length,
+      revenueXof: rows.fold(0, (s, r) => s + r.priceXof),
+      commissionXof: rows.fold(0, (s, r) => s + r.commissionXof),
+      driverEarningsXof: rows.fold(0, (s, r) => s + r.driverEarningsXof),
+      bonusXof: rows.fold(0, (s, r) => s + r.bonusXof),
+    );
+
+    return (rows: rows, totals: totals);
+  }
+
+  // ---------------------------------------------------------------------
+  // Fidélité / récompenses — portage de rewards.tsx + driver-reward.functions.ts
+  // côté web. Wallet reward (points) DISTINCT du wallet marchand FCFA
+  // ci-dessus : gagné en acceptant/terminant des courses et en parrainant
+  // d'autres livreurs (côté base, triggers/RPC déjà en place), perdu en cas
+  // de pénalité, convertible en FCFA sur le wallet marchand via
+  // redeem_driver_points. Pas de création automatique du wallet ici (le
+  // policy RLS n'autorise que SELECT sur sa propre ligne côté client — la
+  // ligne est créée côté base au premier gain de points) : `.maybeSingle()`
+  // renvoie `null` pour un livreur qui n'a encore jamais gagné de points, on
+  // affiche alors simplement 0 pt.
+  // ---------------------------------------------------------------------
+
+  static Future<String> getReferralCode() async {
+    final uid = currentUser!.id;
+    final code = await client.rpc('get_or_create_referral_code', params: {'_user_id': uid});
+    return code as String;
+  }
+
+  static Future<Map<String, dynamic>> registerReferralCode(String code) async {
+    final result = await client.rpc('register_referral', params: {'_code': code.trim().toUpperCase()});
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  static Future<int> fetchRewardPointsBalance() async {
+    final row = await client
+        .from('driver_reward_wallets')
+        .select('points_balance')
+        .eq('user_id', currentUser!.id)
+        .maybeSingle();
+    return (row?['points_balance'] as num?)?.toInt() ?? 0;
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchRewardTransactions({int limit = 20}) async {
+    final rows = await client
+        .from('driver_reward_transactions')
+        .select()
+        .eq('driver_id', currentUser!.id)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchMyReferrals() async {
+    final rows = await client
+        .from('referrals')
+        .select()
+        .eq('referrer_id', currentUser!.id)
+        .order('created_at', ascending: false);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<Map<String, dynamic>?> fetchRewardSettings() {
+    return client.from('reward_settings').select().eq('id', true).maybeSingle();
+  }
+
+  /// Convertit des points reward en FCFA, crédités sur le wallet marchand
+  /// (driver_wallets) — RPC security-definer `redeem_driver_points`.
+  static Future<Map<String, dynamic>> redeemRewardPoints(int points) async {
+    final result = await client.rpc('redeem_driver_points', params: {'_points': points});
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  /// Bonus de partage (limité à N/jour, voir reward_settings.driver_share_daily_cap)
+  /// — RPC security-definer `claim_driver_share_reward`.
+  static Future<Map<String, dynamic>> claimShareReward(String channel) async {
+    final result = await client.rpc('claim_driver_share_reward', params: {'_channel': channel});
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  // ---------------------------------------------------------------------
   // Notes reçues
   // ---------------------------------------------------------------------
 
@@ -455,5 +698,82 @@ class DriverBackend {
     } on PostgrestException catch (e) {
       throw Exception(e.message);
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Support / tickets — portage de support.tsx + ticket.$ticketId.tsx.
+  // support_tickets/ticket_messages sont en libre-service RLS pour le
+  // propriétaire (created_by = auth.uid()) : pas de service_role nécessaire
+  // ici. Table partagée avec courrier_client et l'agent web, filtrée par
+  // rôle côté RLS.
+  // ---------------------------------------------------------------------
+
+  static Future<List<SupportTicket>> listMyTickets() async {
+    final userId = currentUser?.id;
+    if (userId == null) return [];
+    final rows = await client
+        .from('support_tickets')
+        .select()
+        .eq('created_by', userId)
+        .order('last_message_at', ascending: false);
+    return (rows as List).map((r) => SupportTicket.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  static Future<SupportTicket> getTicket(String ticketId) async {
+    final row = await client.from('support_tickets').select().eq('id', ticketId).single();
+    return SupportTicket.fromMap(row);
+  }
+
+  static Future<List<TicketMessage>> listTicketMessages(String ticketId) async {
+    final rows = await client
+        .from('ticket_messages')
+        .select()
+        .eq('ticket_id', ticketId)
+        .order('created_at', ascending: true);
+    return (rows as List).map((r) => TicketMessage.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  /// Crée le ticket puis son premier message — même flux que le formulaire
+  /// "Nouveau ticket" côté web (deux inserts distincts, pas de RPC).
+  static Future<SupportTicket> createTicket({
+    required String subject,
+    required String category,
+    required String body,
+  }) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('Session requise');
+    final row = await client
+        .from('support_tickets')
+        .insert({'created_by': userId, 'subject': subject, 'category': category})
+        .select()
+        .single();
+    final ticket = SupportTicket.fromMap(row);
+    await client.from('ticket_messages').insert({
+      'ticket_id': ticket.id,
+      'author_id': userId,
+      'body': body,
+    });
+    return ticket;
+  }
+
+  static Future<void> sendTicketMessage(String ticketId, String body) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('Session requise');
+    await client.from('ticket_messages').insert({
+      'ticket_id': ticketId,
+      'author_id': userId,
+      'body': body,
+    });
+  }
+
+  /// Réservé au propriétaire — la policy RLS "Owner updates own ticket"
+  /// autorise created_by = auth.uid() à modifier son propre ticket, ce qui
+  /// couvre la fermeture (le changement de statut/priorité par un agent
+  /// utilise une policy séparée, non applicable ici).
+  static Future<void> closeTicket(String ticketId) async {
+    await client.from('support_tickets').update({
+      'status': 'closed',
+      'closed_at': DateTime.now().toIso8601String(),
+    }).eq('id', ticketId);
   }
 }

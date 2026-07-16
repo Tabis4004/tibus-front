@@ -38,6 +38,9 @@ dependencies:
 
   url_launcher: ^6.3.0
 
+  # Partage natif du code de parrainage — voir features/rewards/rewards_screen.dart.
+  share_plus: ^10.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

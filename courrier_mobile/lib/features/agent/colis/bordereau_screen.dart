@@ -470,6 +470,19 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                 height: 240,
                 child: MobileScanner(
                   controller: _scannerController,
+                  // Voir colis_scan_screen.dart : sans errorBuilder, un échec
+                  // de démarrage caméra n'affiche qu'une icône "!" muette.
+                  // Signature à 2 arguments depuis mobile_scanner 7.x.
+                  errorBuilder: (context, error) => Container(
+                    color: Colors.black87,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Caméra indisponible :\n$error',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   onDetect: (capture) {
                     if (_busy) return;
                     final barcodes = capture.barcodes;

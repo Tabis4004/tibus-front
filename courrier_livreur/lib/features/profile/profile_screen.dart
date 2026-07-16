@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/driver_backend.dart';
+import '../rewards/rewards_screen.dart';
+import '../wallet/earnings_report_screen.dart';
+import 'driver_zone_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -81,6 +84,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }),
             const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const RewardsScreen()),
+              ),
+              icon: const Icon(Icons.card_giftcard_outlined, color: AppColors.primaryGreenDark),
+              label: const Text('Fidélité & parrainage'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DriverZoneScreen()),
+              ),
+              icon: const Icon(Icons.my_location_outlined, color: AppColors.primaryGreenDark),
+              label: const Text("Zone d'opération"),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const EarningsReportScreen()),
+              ),
+              icon: const Icon(Icons.bar_chart_outlined, color: AppColors.primaryGreenDark),
+              label: const Text('Statistiques financières'),
+            ),
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => DriverBackend.signOut(),
               icon: const Icon(Icons.logout, color: AppColors.accentRed),

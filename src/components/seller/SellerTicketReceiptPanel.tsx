@@ -91,7 +91,7 @@ export default function SellerTicketReceiptPanel({
 
   const handleThermalPrint = useCallback(
     (paperWidth: ThermalPaperWidth) => {
-      printTicketReceipt(mergedInput, paperWidth);
+      void printTicketReceipt(mergedInput, paperWidth);
     },
     [mergedInput],
   );

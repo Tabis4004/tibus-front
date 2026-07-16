@@ -45,6 +45,14 @@ dependencies:
   # de l'utilisateur, un hash stable dérivé de son identifiant Tibus.
   crypto: ^3.0.3
 
+  # Appeler le livreur depuis l'écran de suivi (tel:) — voir
+  # delivery_status_screen.dart, fiche livreur.
+  url_launcher: ^6.3.0
+
+  # Partage natif du lien/code de parrainage — voir rewards_screen.dart
+  # (équivalent mobile de navigator.share côté web, rewards.tsx).
+  share_plus: ^10.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

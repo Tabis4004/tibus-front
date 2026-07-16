@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../delivery/order_delivery_screen.dart';
+import '../delivery/orders_history_screen.dart';
+import '../rewards/rewards_screen.dart';
 import '../track/track_colis_screen.dart';
 
 /// Deux entrées depuis l'accueil : suivre un colis (le code sert alors de
@@ -51,6 +53,28 @@ class HomeScreen extends StatelessWidget {
                     label: const Text('Suivre mon colis'),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const TrackColisScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.history),
+                    label: const Text('Mes commandes'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OrdersHistoryScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.card_giftcard_outlined),
+                    label: const Text('Fidélité & parrainage'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RewardsScreen()),
                     ),
                   ),
                 ),

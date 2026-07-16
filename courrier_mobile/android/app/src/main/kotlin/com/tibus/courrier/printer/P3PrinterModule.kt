@@ -174,10 +174,14 @@ class P3PrinterModule(private val ctx: Context) {
                 PrintOptions(align = "center", size = "small"), paperWidth)
 
         // ---- Reference
+        // Cadre ASCII (+/-) plutôt que des glyphes Unicode de dessin de boîte :
+        // ces derniers ne sont pas fiables sur toutes les polices ESC/POS
+        // (rendu en caractères parasites sur certains modèles). +/- fonctionne
+        // partout et reproduit l'effet "N° encadré" du modèle papier de
+        // référence. Taille normale (pas "large") pour que la largeur du texte
+        // reste alignée avec celle des bordures.
         if (t.reference.isNotBlank()) {
-            separator(p, paperWidth)
-            printWrappedLine(p, t.reference,
-                PrintOptions(align = "center", bold = true, size = "large"), paperWidth)
+            printBoxedLine(p, "N°  ${t.reference}", paperWidth)
         }
 
         // ---- Passenger block
@@ -213,16 +217,18 @@ class P3PrinterModule(private val ctx: Context) {
         // Reçu colis (voir printer_service.dart printColisReceipt) envoie des
         // labels de section en capitales ("EXPÉDITEUR", "BÉNÉFICIAIRE",
         // "CONTENU") pour marquer visuellement chaque bloc sur le modèle
-        // papier de référence (cadre + sections). L'imprimante P3 intégrée ne
-        // sait pas dessiner de cadre, donc on imite l'effet avec des
-        // séparateurs + titre en gras/centré au-dessus de chaque bloc.
+        // papier de référence (cadre + sections soulignées). L'imprimante P3
+        // intégrée ne sait pas dessiner de cadre, donc chaque section est
+        // rendue comme un titre en gras suivi d'un filet plein (soulignement),
+        // reproduisant l'effet "Expéditeur / Bénéficiaire / Contenu" soulignés
+        // du modèle papier de référence.
         if (t.extraFields.isNotEmpty()) {
             val sectionMarkers = setOf("EXPÉDITEUR", "BÉNÉFICIAIRE", "CONTENU")
+            separator(p, paperWidth)
             t.extraFields.forEach { (label, value) ->
                 if (label.uppercase(Locale.US) in sectionMarkers) {
-                    separator(p, paperWidth)
-                    printWrappedLine(p, label.uppercase(Locale.US),
-                        PrintOptions(align = "center", bold = true), paperWidth)
+                    printWrappedLine(p, label.uppercase(Locale.US), PrintOptions(bold = true), paperWidth)
+                    printWrappedLine(p, "-".repeat(paperWidth.coerceIn(24, 56)), PrintOptions(), paperWidth)
                     printWrappedLine(p, value, PrintOptions(bold = true), paperWidth)
                 } else {
                     printField(p, label, value, paperWidth)
@@ -1186,6 +1192,16 @@ class P3PrinterModule(private val ctx: Context) {
 
     private fun separator(p: Printer, width: Int) {
         printWrappedLine(p, "-".repeat(width.coerceIn(24, 56)), PrintOptions(), width)
+    }
+
+    /** Cadre ASCII (+---+ / | texte | / +---+) autour d'une ligne, taille
+     * normale pour que le texte et les bordures restent alignés en largeur. */
+    private fun printBoxedLine(p: Printer, text: String, width: Int) {
+        val w = width.coerceIn(24, 56)
+        val border = "+" + "-".repeat(w - 2) + "+"
+        printWrappedLine(p, border, PrintOptions(align = "center"), width)
+        printWrappedLine(p, text, PrintOptions(align = "center", bold = true), width)
+        printWrappedLine(p, border, PrintOptions(align = "center"), width)
     }
 
     private fun formatRow(label: String, value: String, width: Int): String {

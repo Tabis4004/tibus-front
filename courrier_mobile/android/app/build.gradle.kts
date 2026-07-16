@@ -9,7 +9,13 @@ plugins {
 
 android {
     namespace = "com.tibus.courrier"
-    compileSdk = flutter.compileSdkVersion
+    // Forcé à 36 (au lieu de flutter.compileSdkVersion) : plusieurs
+    // dépendances transitives de flutter_pos_printer_platform_image_3
+    // (androidx.arch.core, androidx.window.extensions.core...) exigent un
+    // compileSdk >= 33 côté app consommatrice, sinon échec de build Gradle
+    // ("requires libraries and applications that depend on it to compile
+    // against version 33 or later").
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

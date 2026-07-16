@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { RECEIPT_POWERED_BY_LINE } from "@/lib/receipt-branding.ts";
 import { toPng } from "html-to-image";
 import { printer, type PrintLine } from "@/lib/printer.ts";
+import { readTibusBridgeFlags } from "@/lib/webview-bridge.ts";
 import {
   generateReceiptPDF,
   type ReceiptData,
@@ -94,7 +95,11 @@ function tibusP3(): TibusP3Bridge | undefined {
 }
 
 export function isPosPrinterAvailable(): boolean {
-  return printer.isNative && Boolean(tibusP3()?.printReceipt58 || tibusP3()?.printReceipt80);
+  const flags = readTibusBridgeFlags();
+  // Android (P3/Wiseasy intégré) : window.TibusP3. Desktop Electron (guichet,
+  // Xprinter ou tout POS 58/80mm via le spouleur Windows) : window.WisePrinter
+  // (voir electron/src/preload.ts) — même détection que côté colis-receipt.ts.
+  return flags.tibusP3 || flags.wisePrinter || Boolean(tibusP3()?.printReceipt58 || tibusP3()?.printReceipt80);
 }
 
 function buildVerifyUrl(input: TicketReceiptInput): string {
@@ -256,13 +261,36 @@ export function printTicketReceiptBrowser(paperWidth: ThermalPaperWidth = "80mm"
   window.setTimeout(() => htmlEl.classList.remove("print-80mm", "print-56mm"), 1000);
 }
 
-export function printTicketReceipt(
+/**
+ * Pont générique ESC/POS (`window.WisePrinter`, voir src/lib/printer.ts) —
+ * c'est la voie utilisée sur desktop Electron (guichet), qu'il s'agisse
+ * d'une Xprinter (transport `windows`, spouleur Windows) ou de toute autre
+ * imprimante ticket 58/80mm branchée en USB/série (transports `usb`/`serial`),
+ * voir electron/src/printer/README.md pour le choix du transport.
+ */
+async function printViaWisePrinter(input: TicketReceiptInput, lines: PrintLine[]): Promise<boolean> {
+  if (!printer.isNative) return false;
+  try {
+    await printer.printReceipt({
+      header: input.companyName || input.companyInfo?.name || "Tibus",
+      lines,
+      qr: buildVerifyUrl(input),
+    });
+    return true;
+  } catch (error) {
+    console.error("WisePrinter print error:", error);
+    return false;
+  }
+}
+
+export async function printTicketReceipt(
   input: TicketReceiptInput,
   paperWidth: ThermalPaperWidth = "80mm",
-): void {
+): Promise<void> {
   const lines = buildTicketReceiptLines(input, paperWidth);
   try {
     if (printViaTibusP3(input, lines, paperWidth)) return;
+    if (await printViaWisePrinter(input, lines)) return;
     printTicketReceiptBrowser(paperWidth);
   } catch (error) {
     console.error("Print error:", error);

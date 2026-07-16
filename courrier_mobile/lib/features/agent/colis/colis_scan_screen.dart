@@ -183,6 +183,22 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
             height: 300,
             child: MobileScanner(
               controller: _scannerController,
+              // Sans errorBuilder, mobile_scanner affiche juste une icône "!"
+              // sans texte en cas d'échec de démarrage caméra (permission,
+              // caméra déjà utilisée, ML Kit indisponible...) — impossible à
+              // diagnostiquer à distance. On affiche le message d'erreur réel.
+              // Signature à 2 arguments (context, error) depuis mobile_scanner
+              // 7.x — le paramètre `child` a été retiré (inutilisé).
+              errorBuilder: (context, error) => Container(
+                color: Colors.black87,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Caméra indisponible :\n$error',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
               onDetect: (capture) {
                 if (_loading) return;
                 final barcodes = capture.barcodes;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/driver_backend.dart';
 
@@ -7,6 +8,13 @@ const _txLabel = {
   'commission': 'Commission',
   'adjustment': 'Ajustement',
   'refund': 'Remboursement',
+};
+
+const _topupStatusLabel = {
+  'pending': 'En attente',
+  'paid': 'Payé',
+  'failed': 'Échoué',
+  'cancelled': 'Annulé',
 };
 
 String _formatXof(num amount) {
@@ -33,13 +41,23 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   int? _balance;
   List<Map<String, dynamic>> _transactions = [];
+  List<Map<String, dynamic>> _topups = [];
   bool _loading = true;
   String? _error;
+
+  final _amountCtrl = TextEditingController(text: '5000');
+  bool _topupSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -48,17 +66,44 @@ class _WalletScreenState extends State<WalletScreen> {
       final results = await Future.wait([
         DriverBackend.fetchWalletBalance(),
         DriverBackend.fetchWalletTransactions(),
+        DriverBackend.fetchWalletTopupOrders(),
       ]);
       if (!mounted) return;
       setState(() {
         _balance = results[0] as int;
         _transactions = results[1] as List<Map<String, dynamic>>;
+        _topups = results[2] as List<Map<String, dynamic>>;
         _error = null;
       });
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Ouvre le paiement GeniusPay dans le navigateur de l'appareil (pas de
+  /// webview intégrée, pas de deep link configuré pour un retour
+  /// automatique) — la confirmation réelle vient du webhook GeniusPay côté
+  /// serveur, on tire pour rafraîchir une fois le paiement effectué.
+  Future<void> _topup() async {
+    final amount = int.tryParse(_amountCtrl.text.trim()) ?? 0;
+    if (amount < 500 || _topupSubmitting) return;
+    setState(() => _topupSubmitting = true);
+    try {
+      final result = await DriverBackend.createWalletTopup(
+        amountXof: amount,
+        successUrl: 'https://tibusride-front.vercel.app/app/driver?topup=success',
+        errorUrl: 'https://tibusride-front.vercel.app/app/driver?topup=error',
+      );
+      final checkoutUrl = result['checkout_url'] as String?;
+      if (checkoutUrl == null) throw Exception('URL de paiement manquante');
+      await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+      _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    } finally {
+      if (mounted) setState(() => _topupSubmitting = false);
     }
   }
 
@@ -85,13 +130,71 @@ class _WalletScreenState extends State<WalletScreen> {
                         const SizedBox(height: 8),
                         Text(
                           (_balance ?? 0) <= 0
-                              ? "Solde épuisé — vous ne pouvez plus accepter de livraisons. Contactez l'administration pour recharger."
+                              ? 'Solde épuisé — vous ne pouvez plus accepter de livraisons. Rechargez ci-dessous pour continuer.'
                               : 'Commission plateforme débitée automatiquement à chaque livraison terminée.',
                           style: TextStyle(
                             fontSize: 12,
                             color: (_balance ?? 0) <= 0 ? AppColors.accentRed : AppColors.textSecondary,
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Recharger mon wallet', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Paiement Mobile Money via GeniusPay — ouvre le paiement dans votre navigateur, revenez ici et tirez pour rafraîchir une fois effectué.',
+                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _amountCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(labelText: 'Montant (FCFA)', isDense: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: _topupSubmitting ? null : _topup,
+                              child: _topupSubmitting
+                                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Text('Recharger'),
+                            ),
+                          ],
+                        ),
+                        if (_topups.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          const Text('Dernières recharges', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 6),
+                          ..._topups.map((t) {
+                            final status = t['status']?.toString() ?? 'pending';
+                            final color = switch (status) {
+                              'paid' => AppColors.primaryGreenDark,
+                              'failed' || 'cancelled' => AppColors.accentRed,
+                              _ => AppColors.textSecondary,
+                            };
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('${t['amount_xof']} FCFA', style: const TextStyle(fontSize: 12)),
+                                  Text(_topupStatusLabel[status] ?? status, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
                       ],
                     ),
                   ),

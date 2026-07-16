@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/colis_summary.dart';
 import '../../data/models/delivery_ride.dart';
+import '../../core/utils/service_cities.dart';
 import '../../data/services/ride_backend.dart';
 import '../../data/services/tibus_backend.dart';
 import '../auth/login_screen.dart';
@@ -46,6 +47,8 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
   LatLng? _dropoffPos;
   DeliveryVehicle _vehicle = DeliveryVehicle.motorcycle;
   String _packageType = 'small';
+  bool _urgent = false;
+  bool _insulatedBag = false;
   bool _loading = false;
   String? _error;
   int? _estimate;
@@ -138,6 +141,9 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
         vehicle: _vehicle,
         distanceKm: distance,
         packageType: _packageType,
+        country: countryForCoords(_pickupPos!.latitude, _pickupPos!.longitude),
+        urgent: _urgent,
+        insulatedBag: _insulatedBag,
       );
       if (mounted) setState(() {
         _estimate = price;
@@ -182,6 +188,8 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
         dropoffLng: _dropoffPos!.longitude,
         vehicle: _vehicle,
         packageType: _packageType,
+        urgent: _urgent,
+        insulatedBag: _insulatedBag,
         colisCode: widget.colis?.id,
         passengerPhone: _phoneCtrl.text.trim().isNotEmpty
             ? _phoneCtrl.text.trim()
@@ -310,7 +318,28 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
               _refreshEstimate();
             },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _urgent,
+            title: const Text('Livraison urgente'),
+            subtitle: const Text('Priorité + supplément (+800 FCFA, +25%)', style: TextStyle(fontSize: 12)),
+            onChanged: (v) {
+              setState(() => _urgent = v);
+              _refreshEstimate();
+            },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _insulatedBag,
+            title: const Text('Sac isotherme'),
+            subtitle: const Text('Pour repas/produits sensibles (+350 FCFA)', style: TextStyle(fontSize: 12)),
+            onChanged: (v) {
+              setState(() => _insulatedBag = v);
+              _refreshEstimate();
+            },
+          ),
+          const SizedBox(height: 12),
           if (_pickupPos != null && _dropoffPos != null)
             OutlinedButton(onPressed: _refreshEstimate, child: const Text('Estimer le prix')),
           if (_estimate != null) ...[

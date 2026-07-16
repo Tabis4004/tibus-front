@@ -1,0 +1,30 @@
+{
+  "appId": "com.tibus.africa.desktop",
+  "productName": "Tibus Africa",
+  "directories": {
+    "buildResources": "resources"
+  },
+  "files": [
+    "assets/**/*",
+    "build/**/*",
+    "capacitor.config.*",
+    "app/**/*"
+  ],
+  "publish": null,
+  "nsis": {
+    "allowElevation": true,
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  },
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] },
+      { "target": "portable", "arch": ["x64"] }
+    ],
+    "icon": "assets/appIcon.ico"
+  },
+  "mac": {
+    "category": "your.app.category.type",
+    "target": "dmg"
+  }
+}

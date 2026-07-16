@@ -67,6 +67,7 @@ class DeliveryRide {
   final double? driverLng;
   final int? etaSeconds;
   final String? driverId;
+  final DateTime? createdAt;
 
   const DeliveryRide({
     required this.id,
@@ -82,6 +83,7 @@ class DeliveryRide {
     this.driverLng,
     this.etaSeconds,
     this.driverId,
+    this.createdAt,
   });
 
   factory DeliveryRide.fromMap(Map<String, dynamic> map) => DeliveryRide(
@@ -98,5 +100,53 @@ class DeliveryRide {
         driverLng: (map['driver_lng'] as num?)?.toDouble(),
         etaSeconds: (map['eta_seconds'] as num?)?.toInt(),
         driverId: map['driver_id'] as String?,
+        createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'] as String) : null,
       );
+}
+
+/// Fiche livreur "publique" — champs sûrs à afficher au passager, renvoyés
+/// par le RPC security-definer get_ride_driver_public(_ride_id) côté Tibus
+/// Ride (même RPC que tibusride-front, driverQ dans passenger.tsx) : ni
+/// email, ni document d'identité, ni position — juste de quoi identifier et
+/// contacter le livreur pendant la course.
+class DriverPublicInfo {
+  final String? fullName;
+  final String? avatarUrl;
+  final String? phone;
+  final String? vehiclePlate;
+  final String? vehicleModel;
+  final String? vehicleColor;
+  final double? ratingAvg;
+
+  const DriverPublicInfo({
+    this.fullName,
+    this.avatarUrl,
+    this.phone,
+    this.vehiclePlate,
+    this.vehicleModel,
+    this.vehicleColor,
+    this.ratingAvg,
+  });
+
+  factory DriverPublicInfo.fromMap(Map<String, dynamic> map) => DriverPublicInfo(
+        fullName: map['full_name'] as String?,
+        avatarUrl: map['avatar_url'] as String?,
+        phone: map['phone'] as String?,
+        vehiclePlate: map['vehicle_plate'] as String?,
+        vehicleModel: map['vehicle_model'] as String?,
+        vehicleColor: map['vehicle_color'] as String?,
+        ratingAvg: (map['rating_avg'] as num?)?.toDouble(),
+      );
+
+  /// Description véhicule courte ("Moto rouge · AB-1234"), pour affichage —
+  /// même esprit que formatDriverVehicleDescription() côté web.
+  String? get vehicleDescription {
+    final parts = [
+      if (vehicleColor != null && vehicleColor!.isNotEmpty) vehicleColor,
+      if (vehicleModel != null && vehicleModel!.isNotEmpty) vehicleModel,
+    ].join(' ');
+    if (parts.isEmpty && (vehiclePlate == null || vehiclePlate!.isEmpty)) return null;
+    if (vehiclePlate == null || vehiclePlate!.isEmpty) return parts;
+    return parts.isEmpty ? vehiclePlate : '$parts · $vehiclePlate';
+  }
 }

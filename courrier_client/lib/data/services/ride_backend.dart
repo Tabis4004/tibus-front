@@ -4,7 +4,10 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/env.dart';
+import '../../core/utils/service_cities.dart';
 import '../models/delivery_ride.dart';
+import '../models/reward.dart';
+import '../models/ticket.dart';
 
 /// Backend Tibus Ride — projet Supabase SÉPARÉ de Tibus principal (décision
 /// produit actée, voir README "Deux backends"). Gère la commande et le suivi
@@ -111,15 +114,30 @@ class RideBackend {
     required DeliveryVehicle vehicle,
     required double distanceKm,
     String? packageType,
+    String? country,
     bool urgent = false,
     bool insulatedBag = false,
   }) async {
-    final pricing = await client
+    // Résolution par pays avec repli global (country IS NULL) — même
+    // priorité que compute_ride_commission() côté base
+    // (ORDER BY country NULLS LAST LIMIT 1). Un .eq('vehicle', ...).maybeSingle()
+    // simple casserait dès qu'un tarif par pays est ajouté en plus du tarif
+    // global (plusieurs lignes retournées pour le même véhicule).
+    final pricingRows = await client
         .from('delivery_pricing_settings')
-        .select('base_fare_xof, per_km_xof, per_min_xof, min_fare_xof')
+        .select('base_fare_xof, per_km_xof, per_min_xof, min_fare_xof, country')
         .eq('vehicle', vehicle.dbValue)
-        .eq('active', true)
-        .maybeSingle();
+        .eq('active', true);
+    Map<String, dynamic>? pricing;
+    Map<String, dynamic>? globalFallback;
+    for (final row in (pricingRows as List).cast<Map<String, dynamic>>()) {
+      if (country != null && row['country'] == country) {
+        pricing = row;
+        break;
+      }
+      if (row['country'] == null) globalFallback = row;
+    }
+    pricing ??= globalFallback;
 
     final base = (pricing?['base_fare_xof'] as num?)?.toInt() ?? 500;
     final perKm = (pricing?['per_km_xof'] as num?)?.toInt() ?? 250;
@@ -208,10 +226,23 @@ class RideBackend {
   }) async {
     await ensureMirroredSession(tibusUserId: tibusUserId, tibusEmail: tibusEmail);
     final distanceKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+
+    // Pays résolu depuis le point de départ réel (même logique que
+    // countryForCoords() côté web, voir service_cities.dart) — requis : le
+    // trigger enforce_ride_country() côté base rejette toute course sans
+    // pays ("Le pays est obligatoire...") si set_ride_country() n'a pas pu
+    // le déduire du profil (le compte miroir Ride n'a pas de profil rempli).
+    // On calcule aussi la ville la plus proche pour éviter le défaut
+    // 'Dakar' de la colonne (correct seulement pour un départ au Sénégal).
+    final nearest = nearestServiceCity(pickupLat, pickupLng);
+    final country = nearest.country;
+    final resolvedCity = (city != null && city.isNotEmpty) ? city : nearest.city;
+
     final priceXof = await estimatePriceXof(
       vehicle: vehicle,
       distanceKm: distanceKm,
       packageType: packageType,
+      country: country,
       urgent: urgent,
       insulatedBag: insulatedBag,
     );
@@ -226,11 +257,8 @@ class RideBackend {
           'dropoff_address': dropoffAddress,
           'dropoff_lat': dropoffLat,
           'dropoff_lng': dropoffLng,
-          // 'city' omis volontairement si non fourni : la colonne a un
-          // défaut côté base ('Dakar', historique EcoMoto Sénégal) — plutôt
-          // que d'envoyer une valeur fausse/vide, on laisse la base décider
-          // tant qu'aucun géocodage réel n'est branché ici (voir README).
-          if (city != null && city.isNotEmpty) 'city': city,
+          'city': resolvedCity,
+          'country': country,
           'category': 'eco',
           'service_type': 'delivery',
           'delivery_vehicle': vehicle.dbValue,
@@ -247,6 +275,22 @@ class RideBackend {
         .single();
 
     return DeliveryRide.fromMap(row);
+  }
+
+  /// Historique des livraisons commandées par l'utilisateur courant (le
+  /// compte miroir doit déjà avoir une session — voir ensureMirroredSession)
+  /// — équivalent de rides.tsx côté tibusride-front, restreint aux
+  /// livraisons (service_type = 'delivery').
+  static Future<List<DeliveryRide>> listMyRides() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return [];
+    final rows = await client
+        .from('rides')
+        .select()
+        .eq('passenger_id', userId)
+        .eq('service_type', 'delivery')
+        .order('created_at', ascending: false);
+    return (rows as List).map((r) => DeliveryRide.fromMap(r as Map<String, dynamic>)).toList();
   }
 
   static Future<DeliveryRide?> getRide(String rideId) async {
@@ -268,6 +312,17 @@ class RideBackend {
     });
   }
 
+  /// Fiche livreur publique (nom, photo, note, véhicule, téléphone) via le
+  /// RPC security-definer get_ride_driver_public — même RPC que
+  /// tibusride-front (driverQ, passenger.tsx) : vérifie côté base que
+  /// l'appelant est bien le passager ou le livreur de cette course. Renvoie
+  /// null tant qu'aucun livreur n'est assigné (driver_id NULL).
+  static Future<DriverPublicInfo?> getDriverPublic(String rideId) async {
+    final row = await client.rpc('get_ride_driver_public', params: {'_ride_id': rideId}).maybeSingle();
+    if (row == null) return null;
+    return DriverPublicInfo.fromMap(row);
+  }
+
   static Future<void> rateRide(String rideId, {required int score, String? comment}) async {
     final userId = client.auth.currentUser?.id;
     if (userId == null) return;
@@ -280,5 +335,212 @@ class RideBackend {
       'score': score,
       'comment': comment,
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // Fidélité / parrainage — phase 1 du portage de rewards.tsx (voir audit) :
+  // code de parrainage + wallet points passager. Le wallet reward chauffeur
+  // (points_balance, distinct, RPC redeemDriverPoints côté web) reste à
+  // porter côté courrier_livreur — pas dans cette phase.
+  // ---------------------------------------------------------------------
+
+  /// Code de parrainage de l'utilisateur courant — créé au premier appel
+  /// (même RPC security-definer que rewards.tsx, get_or_create_referral_code).
+  static Future<String> getReferralCode() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Session Ride requise');
+    final code = await client.rpc('get_or_create_referral_code', params: {'_user_id': userId});
+    return code as String;
+  }
+
+  /// Enregistre un code de parrainage saisi par l'utilisateur — RPC
+  /// register_referral, retourne {ok: bool, reason?: 'invalid_code'|'already_referred'}.
+  static Future<Map<String, dynamic>> registerReferralCode(String code) async {
+    final result = await client.rpc('register_referral', params: {'_code': code.trim().toUpperCase()});
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  static Future<PassengerWallet> getPassengerWallet() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return const PassengerWallet(balancePts: 0);
+    final row = await client.from('passenger_wallets').select().eq('user_id', userId).maybeSingle();
+    return PassengerWallet.fromMap(row);
+  }
+
+  static Future<List<PassengerWalletTx>> listPassengerWalletTx() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return [];
+    final rows = await client
+        .from('passenger_wallet_transactions')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .limit(20);
+    return (rows as List).map((r) => PassengerWalletTx.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  static Future<List<Referral>> listMyReferrals() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return [];
+    final rows = await client
+        .from('referrals')
+        .select()
+        .eq('referrer_id', userId)
+        .order('created_at', ascending: false);
+    return (rows as List).map((r) => Referral.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  /// Réglages globaux (valeur du point, bonus de parrainage) — pour l'affichage
+  /// uniquement, ligne singleton (id = true) comme côté web.
+  static Future<Map<String, dynamic>?> getRewardSettings() async {
+    return client.from('reward_settings').select().eq('id', true).maybeSingle();
+  }
+
+  // ---------------------------------------------------------------------
+  // Recharge du wallet passager — phase 2 du portage de rewards.tsx.
+  // GeniusPay nécessite une clé secrète (GENIUSPAY_API_KEY) qui ne peut pas
+  // vivre dans l'app Flutter (client pur, pas de serveur) : la création de
+  // session de paiement passe par l'Edge Function `geniuspay-topup` (voir
+  // supabase/functions/geniuspay-topup/index.ts), portage exact de
+  // createGeniuspayTopup côté web. Le webhook de confirmation
+  // (routes/api/public/webhooks/topup.ts) reste inchangé et met à jour
+  // topup_orders.status='paid' automatiquement, quel que soit le client
+  // (web ou mobile) qui a créé la commande.
+  // ---------------------------------------------------------------------
+
+  /// Crée une session de paiement GeniusPay hébergée — retourne l'URL de
+  /// checkout à ouvrir dans le navigateur de l'appareil (voir
+  /// rewards_screen.dart, aucune redirection automatique dans l'app tant
+  /// qu'aucun deep link n'est configuré : la confirmation réelle vient du
+  /// webhook, pas de l'URL de retour).
+  static Future<Map<String, dynamic>> createGeniuspayTopup({
+    required int amountXof,
+    required String successUrl,
+    required String errorUrl,
+    String? customerPhone,
+    String? customerName,
+    String? customerEmail,
+  }) async {
+    final session = client.auth.currentSession;
+    if (session == null) throw Exception('Session Ride requise');
+    final res = await client.functions.invoke(
+      'geniuspay-topup',
+      body: {
+        'amount_xof': amountXof,
+        'success_url': successUrl,
+        'error_url': errorUrl,
+        if (customerPhone != null) 'customer_phone': customerPhone,
+        if (customerName != null) 'customer_name': customerName,
+        if (customerEmail != null) 'customer_email': customerEmail,
+      },
+    );
+    final data = res.data;
+    if (data is Map && data['error'] != null) {
+      throw Exception(data['error'].toString());
+    }
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Recharge "manuelle" (TabisPay, carte...) — même comportement que côté
+  /// web pour les providers autres que GeniusPay : une ligne topup_orders en
+  /// pending, sans intégration live, en attendant confirmation hors-app.
+  static Future<void> createManualTopupOrder({required int amountXof, required String provider}) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Session Ride requise');
+    await client.from('topup_orders').insert({
+      'user_id': userId,
+      'amount_xof': amountXof,
+      'provider': provider,
+      'status': 'pending',
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> listMyTopupOrders({int limit = 10}) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return [];
+    final rows = await client
+        .from('topup_orders')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------
+  // Support / tickets — portage de support.tsx + ticket.$ticketId.tsx.
+  // support_tickets/ticket_messages sont en libre-service RLS pour le
+  // propriétaire (created_by = auth.uid()) : pas de service_role nécessaire
+  // ici. Table partagée avec courrier_livreur et l'agent web, filtrée par
+  // rôle côté RLS.
+  // ---------------------------------------------------------------------
+
+  static Future<List<SupportTicket>> listMyTickets() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return [];
+    final rows = await client
+        .from('support_tickets')
+        .select()
+        .eq('created_by', userId)
+        .order('last_message_at', ascending: false);
+    return (rows as List).map((r) => SupportTicket.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  static Future<SupportTicket> getTicket(String ticketId) async {
+    final row = await client.from('support_tickets').select().eq('id', ticketId).single();
+    return SupportTicket.fromMap(row);
+  }
+
+  static Future<List<TicketMessage>> listTicketMessages(String ticketId) async {
+    final rows = await client
+        .from('ticket_messages')
+        .select()
+        .eq('ticket_id', ticketId)
+        .order('created_at', ascending: true);
+    return (rows as List).map((r) => TicketMessage.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  /// Crée le ticket puis son premier message — même flux que le formulaire
+  /// "Nouveau ticket" côté web (deux inserts distincts, pas de RPC).
+  static Future<SupportTicket> createTicket({
+    required String subject,
+    required String category,
+    required String body,
+  }) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Session Ride requise');
+    final row = await client
+        .from('support_tickets')
+        .insert({'created_by': userId, 'subject': subject, 'category': category})
+        .select()
+        .single();
+    final ticket = SupportTicket.fromMap(row);
+    await client.from('ticket_messages').insert({
+      'ticket_id': ticket.id,
+      'author_id': userId,
+      'body': body,
+    });
+    return ticket;
+  }
+
+  static Future<void> sendTicketMessage(String ticketId, String body) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Session Ride requise');
+    await client.from('ticket_messages').insert({
+      'ticket_id': ticketId,
+      'author_id': userId,
+      'body': body,
+    });
+  }
+
+  /// Réservé au propriétaire — la policy RLS "Owner updates own ticket"
+  /// autorise created_by = auth.uid() à modifier son propre ticket, ce qui
+  /// couvre la fermeture (le changement de statut/priorité par un agent
+  /// utilise une policy séparée, non applicable ici).
+  static Future<void> closeTicket(String ticketId) async {
+    await client.from('support_tickets').update({
+      'status': 'closed',
+      'closed_at': DateTime.now().toIso8601String(),
+    }).eq('id', ticketId);
   }
 }
