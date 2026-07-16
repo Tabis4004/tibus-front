@@ -16,6 +16,23 @@ String colisContentLabel(Colis colis) {
   return (desc != null && desc.isNotEmpty) ? desc : 'Colis';
 }
 
+/// Nature du colis (ex. "Carton", "Colis fragile") — même valeur que
+/// colisContentLabel côté nature, mais affichée séparément du contenu
+/// libre dans le bloc CONTENU du reçu (voir colisReceiptLines,
+/// printer_service.dart, _ReceiptBox). "—" si aucune nature sélectionnée
+/// (même convention que côté web, voir ColisReceiptPanel.tsx).
+String colisNatureLabel(Colis colis) {
+  final joined = colis.natures.where((n) => n.trim().isNotEmpty).join(', ');
+  return joined.isNotEmpty ? joined : '—';
+}
+
+/// Contenu (description libre) du colis — distinct de la nature, voir
+/// colisNatureLabel. "—" si non renseigné.
+String colisDescriptionLabel(Colis colis) {
+  final desc = colis.descriptionContenu?.trim();
+  return (desc != null && desc.isNotEmpty) ? desc : '—';
+}
+
 /// Lignes génériques du REÇU colis au format {text, align, bold, size} —
 /// partagées par tous les ponts d'impression qui ne connaissent pas la
 /// structure label/valeur du pont P3 natif (voir printer_service.dart) :
@@ -34,6 +51,10 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
+    if (colis.gareDepart.isNotEmpty)
+      {'text': colis.gareDepart, 'align': 'center', 'bold': true},
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'large'},
@@ -56,7 +77,8 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': 'Destination     ${colis.gareDestination}'},
     {'text': '--------------------------------'},
     {'text': 'CONTENU', 'bold': true},
-    {'text': colisContentLabel(colis)},
+    {'text': 'Nature du colis: ${colisNatureLabel(colis)}'},
+    {'text': 'Contenu (description): ${colisDescriptionLabel(colis)}'},
     if (colis.poidsKg != null) {'text': 'Poids : ${colis.poidsKg} kg', 'size': 'small'},
     if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
       {'text': 'Pourcentage perçu : ${colis.pourcentagePercu} %', 'size': 'small'},
@@ -78,6 +100,10 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
+    if (colis.gareDepart.isNotEmpty)
+      {'text': colis.gareDepart, 'align': 'center', 'size': 'small'},
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': ref, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},

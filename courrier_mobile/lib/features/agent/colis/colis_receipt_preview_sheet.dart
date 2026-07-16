@@ -1,18 +1,23 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers.dart';
 import '../../../core/utils/colis_receipt_lines.dart';
-import '../../../core/utils/whatsapp.dart';
+import '../../../core/utils/sms.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
 
-/// Message WhatsApp de partage du reçu — même contenu informatif que le
+/// Message texte de partage du reçu (SMS) — même contenu informatif que le
 /// reçu papier, pour envoi manuel à l'expéditeur ou au destinataire (voir
 /// buildColisTrackingWhatsAppMessage côté web, src/lib/colis-receipt.ts).
-String _colisWhatsAppShareMessage(Colis colis) {
+/// WhatsApp partage désormais une image du reçu (voir _shareReceiptImage) :
+/// wa.me ne permet de pré-remplir que du texte, jamais une image jointe à un
+/// contact précis — un vrai reçu visuel nécessite le partage fichier.
+String _colisTextShareMessage(Colis colis) {
   final ref = colisShortRef(colis);
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
@@ -65,14 +70,45 @@ Future<void> showColisReceiptPreview(BuildContext context, Colis colis) {
 
 class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewSheet> {
   bool _printing = false;
+  bool _sharingImage = false;
+  final _receiptImageKey = GlobalKey();
 
-  Future<void> _share(String phone, String label) async {
-    final message = _colisWhatsAppShareMessage(widget.colis);
-    final ok = await openWhatsApp(phone, message);
+  /// Capture le cadre du reçu (RepaintBoundary ci-dessous) en PNG et ouvre la
+  /// feuille de partage native — WhatsApp y figure comme n'importe quelle
+  /// autre app, mais avec l'image réelle du reçu (et non plus juste du
+  /// texte). Contrainte de la plateforme : wa.me ne sait pré-remplir qu'un
+  /// texte, donc impossible de viser directement une conversation WhatsApp
+  /// précise avec un fichier joint — l'utilisateur choisit le contact après
+  /// avoir sélectionné WhatsApp dans la feuille de partage.
+  Future<void> _shareReceiptImage(String label) async {
+    if (_sharingImage) return;
+    setState(() => _sharingImage = true);
+    try {
+      final boundary = _receiptImageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final bytes = byteData!.buffer.asUint8List();
+      final ref = colisShortRef(widget.colis);
+      await Share.shareXFiles(
+        [XFile.fromData(bytes, name: 'recu_$ref.png', mimeType: 'image/png')],
+        text: 'Reçu colis $ref — pour le $label.',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Partage impossible : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _sharingImage = false);
+    }
+  }
+
+  Future<void> _shareSms(String phone, String label) async {
+    final message = _colisTextShareMessage(widget.colis);
+    final ok = await openSms(phone, message);
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Numéro $label manquant ou invalide.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Numéro $label manquant ou invalide, ou app SMS indisponible.')));
     }
   }
 
@@ -130,7 +166,10 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                 ],
               ),
               const SizedBox(height: 8),
-              _ReceiptBox(colis: colis, agentName: agentName),
+              RepaintBoundary(
+                key: _receiptImageKey,
+                child: _ReceiptBox(colis: colis, agentName: agentName),
+              ),
               const SizedBox(height: 12),
               Row(
                 children: const [
@@ -220,7 +259,7 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               ),
               const SizedBox(height: 16),
               Text(
-                'Partager sur WhatsApp',
+                'Partager le reçu (image) — WhatsApp, etc.',
                 style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
               ),
               const SizedBox(height: 8),
@@ -230,8 +269,8 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                     child: _PrinterButton(
                       icon: Icons.chat,
                       label: 'Expéditeur',
-                      enabled: true,
-                      onPressed: () => _share(colis.telephoneExpediteur, 'expéditeur'),
+                      enabled: !_sharingImage,
+                      onPressed: () => _shareReceiptImage('expéditeur'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -239,8 +278,35 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                     child: _PrinterButton(
                       icon: Icons.chat,
                       label: 'Destinataire',
+                      enabled: !_sharingImage,
+                      onPressed: () => _shareReceiptImage('destinataire'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Partager par SMS (texte)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _PrinterButton(
+                      icon: Icons.sms_outlined,
+                      label: 'Expéditeur',
                       enabled: true,
-                      onPressed: () => _share(colis.telephoneDestinataire, 'destinataire'),
+                      onPressed: () => _shareSms(colis.telephoneExpediteur, 'expéditeur'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _PrinterButton(
+                      icon: Icons.sms_outlined,
+                      label: 'Destinataire',
+                      enabled: true,
+                      onPressed: () => _shareSms(colis.telephoneDestinataire, 'destinataire'),
                     ),
                   ),
                 ],
@@ -288,6 +354,12 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  if (colis.gareDepart.isNotEmpty)
+                    Text(colis.gareDepart,
+                        textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  if (colis.gareDepartPhone.isNotEmpty)
+                    Text('Tél: ${colis.gareDepartPhone}',
+                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.black54)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
                 ],
               ),
@@ -329,7 +401,8 @@ class _ReceiptBox extends StatelessWidget {
               title: 'CONTENU',
               isLast: true,
               children: [
-                Text(colisContentLabel(colis)),
+                _Field('Nature du colis', colisNatureLabel(colis)),
+                _Field('Contenu (description)', colisDescriptionLabel(colis)),
                 if (colis.poidsKg != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -432,6 +505,10 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            if (colis.gareDepart.isNotEmpty)
+              Text(colis.gareDepart, style: const TextStyle(fontSize: 9, color: Colors.black54)),
+            if (colis.gareDepartPhone.isNotEmpty)
+              Text('Tél: ${colis.gareDepartPhone}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,

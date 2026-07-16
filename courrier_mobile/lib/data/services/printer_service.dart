@@ -118,7 +118,11 @@ class PrinterService {
   Future<void> printColisReceipt(Colis colis, {int paperWidthMm = 58, String? agentName}) {
     final agent = agentName ?? _currentAgentName();
     return printReceipt(
-      header: [colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER'],
+      header: [
+        colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+        if (colis.gareDepart.isNotEmpty) colis.gareDepart,
+        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+      ],
       reference: colisShortRef(colis),
       rows: [
         ['EXPÉDITEUR', colis.nomExpediteur],
@@ -132,7 +136,9 @@ class PrinterService {
         ['BÉNÉFICIAIRE', colis.nomDestinataire],
         ['Téléphone ', colis.telephoneDestinataire],
         ['Destination', colis.gareDestination],
-        ['CONTENU', colisContentLabel(colis)],
+        ['CONTENU', ''],
+        ['Nature du colis', colisNatureLabel(colis)],
+        ['Contenu (description)', colisDescriptionLabel(colis)],
         if (colis.poidsKg != null) ['Poids', '${colis.poidsKg} kg'],
         if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
           ['Pourcentage perçu', '${colis.pourcentagePercu} %'],
@@ -150,7 +156,11 @@ class PrinterService {
   /// conserver par le client.
   Future<void> printColisTalon(Colis colis, {int paperWidthMm = 58}) {
     return printReceipt(
-      header: [colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER'],
+      header: [
+        colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+        if (colis.gareDepart.isNotEmpty) colis.gareDepart,
+        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+      ],
       reference: colisShortRef(colis),
       rows: [
         ['Destination', colis.gareDestination],

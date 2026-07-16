@@ -64,6 +64,8 @@ export type ColisAutonomeRow = {
   createdAt: string;
   updatedAt: string;
   gareDepart: string;
+  /** Téléphone de la gare de départ — imprimé sur le reçu, distinct du téléphone de la compagnie. */
+  gareDepartPhone?: string | null;
   gareDestination: string;
   natures: string[];
 };
@@ -136,6 +138,7 @@ export function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
     createdAt: String(row.createdAt ?? ""),
     updatedAt: String(row.updatedAt ?? ""),
     gareDepart: String(row.gareDepart ?? ""),
+    gareDepartPhone: row.gareDepartPhone ? String(row.gareDepartPhone) : null,
     gareDestination: String(row.gareDestination ?? ""),
     natures,
   };

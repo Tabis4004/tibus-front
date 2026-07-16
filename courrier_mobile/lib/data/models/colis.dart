@@ -66,6 +66,11 @@ class Colis {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String gareDepart;
+  /// Téléphone de la gare de départ — imprimé sur le reçu colis sous le
+  /// nom de la gare, distinct du téléphone de la compagnie (voir
+  /// colisReceiptLines / printer_service.dart). Vide si non renseigné par
+  /// la compagnie pour cette gare.
+  final String gareDepartPhone;
   final String gareDestination;
   final List<String> natures;
   /// Nom de la compagnie propriétaire du colis (choisi par la compagnie
@@ -94,6 +99,7 @@ class Colis {
     required this.createdAt,
     required this.updatedAt,
     required this.gareDepart,
+    this.gareDepartPhone = '',
     required this.gareDestination,
     required this.natures,
     this.companyName = '',
@@ -118,6 +124,7 @@ class Colis {
       createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? DateTime.now(),
       gareDepart: map['gareDepart'] as String? ?? '',
+      gareDepartPhone: (map['gareDepartPhone'] as String?)?.trim() ?? '',
       gareDestination: map['gareDestination'] as String? ?? '',
       natures: (map['natures'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       companyName: (map['companyName'] as String?)?.trim() ?? '',

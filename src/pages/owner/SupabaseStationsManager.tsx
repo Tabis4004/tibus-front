@@ -73,6 +73,7 @@ const stationSchema = z.object({
   name: z.string().min(2, "Station name required"),
   cityId: z.string().min(1, "City required"),
   googleMapsLink: z.string().optional(),
+  phone: z.string().optional(),
   gestionnaireUserId: z.string().optional(),
   gestionnaireSharePct: z.coerce.number().min(0).max(100),
   gestionnaireSharePctReservation: z.coerce.number().min(0).max(100),
@@ -116,6 +117,7 @@ function StationDialog({
       name: station?.name ?? "",
       cityId: station?.cityId ?? "",
       googleMapsLink: station?.address ?? "",
+      phone: station?.phone ?? "",
       gestionnaireUserId: station?.gestionnaireUserId ?? "",
       gestionnaireSharePct: station?.gestionnaireSharePct ?? 0,
       gestionnaireSharePctReservation: station?.gestionnaireSharePctReservation ?? station?.gestionnaireSharePct ?? 0,
@@ -169,6 +171,7 @@ function StationDialog({
           name: data.name,
           cityId: data.cityId,
           googleMapsLink: data.googleMapsLink,
+          phone: data.phone,
           gestionnaireUserId: data.gestionnaireUserId || null,
           gestionnaireSharePct: data.gestionnaireSharePct,
           gestionnaireSharePctReservation: data.gestionnaireSharePctReservation,
@@ -181,6 +184,7 @@ function StationDialog({
           name: data.name,
           cityId: data.cityId,
           googleMapsLink: data.googleMapsLink,
+          phone: data.phone,
         });
         toast.success(t("stations.station_added"));
       }
@@ -263,6 +267,15 @@ function StationDialog({
               placeholder="https://maps.google.com/..."
               {...register("googleMapsLink")}
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("stations.phone")}</Label>
+            <Input
+              type="tel"
+              placeholder={t("stations.phone_placeholder")}
+              {...register("phone")}
+            />
+            <p className="text-xs text-muted-foreground">{t("stations.phone_hint")}</p>
           </div>
           {station && (
             <>
@@ -464,6 +477,11 @@ export default function SupabaseStationsManager() {
                             >
                               {station.address}
                             </a>
+                          )}
+                          {station.phone && (
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {t("stations.phone")}: {station.phone}
+                            </p>
                           )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">

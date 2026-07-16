@@ -20,6 +20,10 @@ export type SupabaseOwnerStation = {
   id: string;
   name: string;
   address: string;
+  /// Téléphone de la gare — imprimé sur le reçu colis (courrier agent),
+  /// distinct du téléphone de la compagnie (voir colisReceiptLines côté
+  /// mobile et ColisReceiptPanel côté web).
+  phone: string;
   isActive: boolean;
   cityId: string;
   cityName: string;
@@ -173,7 +177,7 @@ export async function listOwnerStationsSupabase(
   const { data, error } = await supabase
     .from("Gares")
     .select(
-      "id, name, googleMapsLink, cityId, gestionnaireUserId, gestionnaireSharePct, gestionnaireSharePctReservation, Cities(name)",
+      "id, name, phone, googleMapsLink, cityId, gestionnaireUserId, gestionnaireSharePct, gestionnaireSharePctReservation, Cities(name)",
     )
     .eq("companyId", resolvedCompanyId)
     .order("name");
@@ -209,6 +213,7 @@ export async function listOwnerStationsSupabase(
       id: station.id as string,
       name: station.name as string,
       address: (station.googleMapsLink as string | null) ?? "",
+      phone: (station.phone as string | null) ?? "",
       isActive: true,
       cityId: station.cityId as string,
       cityName,
@@ -232,6 +237,7 @@ export async function createOwnerStationSupabase(input: {
   name: string;
   cityId: string;
   googleMapsLink?: string;
+  phone?: string;
 }): Promise<void> {
   const companyId = await resolveOwnerCompanyId(input.appUserId, input.companyId);
   if (!companyId) throw new Error("Compagnie introuvable");
@@ -247,6 +253,7 @@ export async function createOwnerStationSupabase(input: {
     companyId,
     cityId: input.cityId,
     googleMapsLink: input.googleMapsLink?.trim() || null,
+    phone: input.phone?.trim() || null,
     latitude,
     longitude,
   });
@@ -261,6 +268,7 @@ export async function updateOwnerStationSupabase(input: {
   name: string;
   cityId: string;
   googleMapsLink?: string;
+  phone?: string;
   gestionnaireUserId?: string | null;
   gestionnaireSharePct?: number;
   gestionnaireSharePctReservation?: number;
@@ -280,6 +288,7 @@ export async function updateOwnerStationSupabase(input: {
       name: input.name.trim(),
       cityId: input.cityId,
       googleMapsLink: input.googleMapsLink?.trim() || null,
+      phone: input.phone?.trim() || null,
       latitude,
       longitude,
     })
