@@ -48,8 +48,15 @@ export default function GareDashboardPage({ variant }: { variant: GareDashboardV
   const [gare, setGare] = useState<GareSummary | null | undefined>(undefined);
   const companyId = ownerCompanyId ?? gare?.companyId ?? null;
 
-  const canManageTeam = appUser.roles.some((role) => isGareManagerRole(role));
-  const canValidateCash = appUser.roles.some((role) => isGareCashValidatorRole(role));
+  // Owner et super_admin voient tout le tableau de bord gérant (équipe,
+  // commissions, reversements) même sans rôle gerant_gare explicite — sinon
+  // ils accèdent à la page (canAccessVariant) mais avec des blocs masqués.
+  const isOwnerLike =
+    appUser.roles.includes("owner") || appUser.roles.includes("super_admin");
+  const canManageTeam =
+    isOwnerLike || appUser.roles.some((role) => isGareManagerRole(role));
+  const canValidateCash =
+    isOwnerLike || appUser.roles.some((role) => isGareCashValidatorRole(role));
   const allowed = canAccessVariant(variant, appUser.roles);
 
   useEffect(() => {
