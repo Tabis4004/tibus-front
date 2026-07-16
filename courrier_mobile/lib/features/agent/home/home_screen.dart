@@ -10,6 +10,7 @@ import '../colis/colis_list_screen.dart';
 import '../colis/colis_scan_screen.dart';
 import '../colis/colis_manifest_screen.dart';
 import '../colis/bordereau_screen.dart';
+import '../colis/pending_colis_screen.dart';
 import '../caisse/station_cash_screen.dart';
 
 /// Écran d'accueil agent — réplique la maquette 1 :
@@ -116,7 +117,9 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
               const CircleAvatar(backgroundColor: AppColors.primaryGreen, child: Text('C', style: TextStyle(color: Colors.white))),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          _PendingSyncBanner(),
+          const SizedBox(height: 4),
           FutureBuilder<ColisStats>(
             future: _statsFuture,
             builder: (context, snapshot) {
@@ -247,6 +250,46 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Bandeau "colis en attente de synchronisation" — visible dès qu'un colis
+/// a été enregistré hors connexion (voir colis_create_screen.dart,
+/// SyncService). `ref.watch(syncServiceProvider)` (ChangeNotifierProvider)
+/// rebuild ce widget à chaque changement de pendingCount, y compris juste
+/// après une synchronisation automatique réussie (AgentShell).
+class _PendingSyncBanner extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sync = ref.watch(syncServiceProvider);
+    if (sync.pendingCount == 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        color: Colors.orange.shade50,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.orange.shade300),
+        ),
+        child: ListTile(
+          leading: Icon(
+            sync.syncing ? Icons.sync : Icons.cloud_off_outlined,
+            color: Colors.deepOrange,
+          ),
+          title: Text(
+            sync.syncing
+                ? 'Synchronisation en cours...'
+                : '${sync.pendingCount} colis en attente de synchronisation',
+            style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.deepOrange),
+          ),
+          subtitle: const Text('Enregistrés hors connexion — appuyez pour voir le détail.'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PendingColisScreen()),
+          ),
+        ),
       ),
     );
   }

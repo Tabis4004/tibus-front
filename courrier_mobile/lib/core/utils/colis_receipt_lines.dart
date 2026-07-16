@@ -54,6 +54,14 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     if (colis.companyPhone.isNotEmpty)
       {'text': 'Tél: ${colis.companyPhone}', 'align': 'center', 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'size': 'small'},
+    // Colis enregistré hors connexion, pas encore confirmé par le serveur
+    // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
+    // remettre ce reçu au client : la référence ci-dessous est provisoire,
+    // remplacée par la vraie référence une fois synchronisé.
+    if (colis.isPendingSync) ...[
+      {'text': '*** REÇU PROVISOIRE ***', 'align': 'center', 'bold': true, 'size': 'small'},
+      {'text': 'En attente de connexion - sera confirmé', 'align': 'center', 'size': 'small'},
+    ],
     {'text': '================================', 'align': 'center'},
     {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},
@@ -104,6 +112,8 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
     {'text': company, 'align': 'center', 'bold': true},
     if (colis.companyPhone.isNotEmpty)
       {'text': 'Tél: ${colis.companyPhone}', 'align': 'center', 'size': 'small'},
+    if (colis.isPendingSync)
+      {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': ref, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},

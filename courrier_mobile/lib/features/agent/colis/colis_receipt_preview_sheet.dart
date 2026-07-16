@@ -362,6 +362,22 @@ class _ReceiptBox extends StatelessWidget {
                 ],
               ),
             ),
+            if (colis.isPendingSync)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  border: Border.all(color: Colors.orange.shade300),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'REÇU PROVISOIRE — enregistré hors connexion, sera confirmé à la synchronisation.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                ),
+              ),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 12),
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -508,6 +524,9 @@ class _TalonBox extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
             if (colis.companyPhone.isNotEmpty)
               Text('Tél: ${colis.companyPhone}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
+            if (colis.isPendingSync)
+              const Text('*** PROVISOIRE ***',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,

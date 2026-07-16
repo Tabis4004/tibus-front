@@ -7,6 +7,9 @@ import '../data/services/promo_service.dart';
 import '../data/services/referral_service.dart';
 import '../data/services/push_service.dart';
 import '../data/services/printer_service.dart';
+import '../data/services/offline_queue_service.dart';
+import '../data/services/reference_cache_service.dart';
+import '../data/services/sync_service.dart';
 import '../data/models/app_role.dart';
 
 final authServiceProvider = Provider((ref) => AuthService());
@@ -17,6 +20,18 @@ final promoServiceProvider = Provider((ref) => PromoService());
 final referralServiceProvider = Provider((ref) => ReferralService());
 final pushServiceProvider = Provider((ref) => PushService());
 final printerServiceProvider = Provider((ref) => PrinterService());
+
+/// Enregistrement de colis hors-ligne + synchronisation (voir demande
+/// "enregistrement même sans connexion") — file d'attente persistée
+/// (offlineQueueServiceProvider), cache des données de référence pour que le
+/// formulaire reste utilisable sans réseau (referenceCacheServiceProvider),
+/// et service de resynchronisation (syncServiceProvider, ChangeNotifier :
+/// `ref.watch` déclenche un rebuild à chaque changement de pendingCount).
+final offlineQueueServiceProvider = Provider((ref) => OfflineQueueService());
+final referenceCacheServiceProvider = Provider((ref) => ReferenceCacheService());
+final syncServiceProvider = ChangeNotifierProvider(
+  (ref) => SyncService(ref.read(colisServiceProvider), ref.read(offlineQueueServiceProvider)),
+);
 
 /// Rôles de l'utilisateur connecté (une entrée par compagnie affectée).
 final myRolesProvider = FutureProvider<List<AppRole>>((ref) async {

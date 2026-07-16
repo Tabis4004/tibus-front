@@ -50,6 +50,11 @@ dependencies:
   # Local storage / env
   shared_preferences: ^2.2.3
   flutter_dotenv: ^5.1.0
+  # Détection de connectivité — enregistrement de colis hors-ligne + file
+  # d'attente de synchronisation (voir data/services/sync_service.dart,
+  # data/services/offline_queue_service.dart). Déclenche la resynchronisation
+  # automatique dès que le réseau revient (AgentShell).
+  connectivity_plus: ^6.0.5
 
   # Impression USB / Bluetooth ESC/POS — imprimantes physiques du guichet
   # (Xprinter XP-Q200 en USB, Mini Printer MPT-II en Bluetooth), en plus des

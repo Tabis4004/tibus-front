@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/providers.dart';
+import '../../../core/utils/connectivity.dart';
 import '../../../data/models/colis.dart';
+import '../../../data/models/pending_colis.dart';
 import '../caisse/station_cash_screen.dart';
 import 'colis_receipt_preview_sheet.dart';
 
@@ -47,6 +52,11 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   String? _selectedNatureId;
   OpenStationCash? _openCash;
   double? _prixMinSuggere;
+  /// Vrai quand _loadReferences a dû retomber sur le cache local (réseau
+  /// indisponible) — affiche un bandeau "mode hors-ligne" et permet de
+  /// savoir que l'enregistrement à venir sera mis en file d'attente plutôt
+  /// qu'envoyé directement (voir ReferenceCacheService, _registerOffline).
+  bool _offline = false;
 
   /// Photo optionnelle prise à l'enregistrement — voir _pickPhoto. Uploadée
   /// APRÈS la création du colis (a besoin de son id), une fois le reçu déjà
@@ -76,7 +86,19 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       _refsError = null;
     });
     final service = ref.read(colisServiceProvider);
-    final fallbackCompanyId = await ref.read(activeCompanyIdProvider.future);
+    final cache = ref.read(referenceCacheServiceProvider);
+    // activeCompanyIdProvider peut lui-même échouer hors connexion (myRolesProvider
+    // appelle fetchMyRoles() en réseau, sans catch, si jamais résolu avec
+    // succès pendant cette session) — on l'isole pour ne pas faire planter
+    // tout le rechargement des références en mode hors-ligne : le fallback
+    // ci-dessous s'appuie alors uniquement sur la dernière caisse ouverte
+    // connue en cache.
+    String? fallbackCompanyId;
+    try {
+      fallbackCompanyId = await ref.read(activeCompanyIdProvider.future);
+    } catch (_) {
+      fallbackCompanyId = null;
+    }
     if (!mounted) return;
     try {
       // La caisse réellement ouverte est l'unique source de vérité pour la
@@ -89,7 +111,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       // la liste de destination affichait les gares d'une autre compagnie
       // (Gare Abobo, Gare Bouake) : deux appels indépendants pouvaient donc
       // désigner deux compagnies différentes.
-      final openCash = await service.getOpenStationCash();
+      final openCash = await service.getOpenStationCash().timeout(const Duration(seconds: 10));
       if (!mounted) return;
       final companyId = (openCash.open ? openCash.companyId : null) ?? fallbackCompanyId;
       if (companyId == null) {
@@ -106,26 +128,66 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       ]);
       if (!mounted) return;
       final gares = results[0] as List<GareOption>;
-      final natures = (results[1] as List<ColisNature>).where((n) => n.isActive).toList();
+      final natures = results[1] as List<ColisNature>;
+      final activeNatures = natures.where((n) => n.isActive).toList();
       final settings = results[2] as Map<String, dynamic>;
       final defaultPct = (settings['colisPourcentagePercuGeneral'] as num?)?.toDouble();
+      // Alimente le cache hors-ligne pour la prochaine fois que le réseau
+      // sera indisponible (voir ReferenceCacheService, branche catch
+      // ci-dessous) — c'est ce qui permet à l'écran de rester utilisable
+      // sans connexion.
+      await cache.saveGares(companyId, gares);
+      await cache.saveNatures(companyId, natures);
+      await cache.saveDefaultPct(companyId, defaultPct);
+      await cache.saveOpenCash(openCash);
       setState(() {
         _companyId = companyId;
         _gares = gares;
-        _natures = natures;
+        _natures = activeNatures;
         _openCash = openCash;
+        _offline = false;
         if (defaultPct != null && _pourcentagePercu.text.isEmpty) {
           _pourcentagePercu.text = defaultPct.toString();
         }
         _loadingRefs = false;
       });
     } catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+      // Réseau indisponible (ou erreur quelconque) : on retombe sur le
+      // dernier instantané connu plutôt que de bloquer tout l'écran — sans
+      // ça, un agent hors connexion ne pourrait même pas ouvrir le
+      // formulaire (voir demande "enregistrement même sans connexion").
+      final cachedOpenCash = await cache.loadOpenCash();
+      final companyId = cachedOpenCash?.companyId ?? fallbackCompanyId;
+      final cachedGares = companyId == null ? null : await cache.loadGares(companyId);
+      final cachedNatures = companyId == null ? null : await cache.loadNatures(companyId);
+      if (!mounted) return;
+      if (companyId == null ||
+          cachedOpenCash == null ||
+          !cachedOpenCash.open ||
+          cachedGares == null ||
+          cachedGares.isEmpty ||
+          cachedNatures == null ||
+          cachedNatures.isEmpty) {
         setState(() {
           _refsError = '$e';
           _loadingRefs = false;
         });
+        return;
       }
+      final cachedPct = await cache.loadDefaultPct(companyId);
+      if (!mounted) return;
+      setState(() {
+        _companyId = companyId;
+        _gares = cachedGares;
+        _natures = cachedNatures.where((n) => n.isActive).toList();
+        _openCash = cachedOpenCash;
+        _offline = true;
+        if (cachedPct != null && _pourcentagePercu.text.isEmpty) {
+          _pourcentagePercu.text = cachedPct.toString();
+        }
+        _loadingRefs = false;
+      });
     }
   }
 
@@ -226,95 +288,119 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       ));
       return;
     }
+    final input = RegisterColisInput(
+      companyId: companyId,
+      gareDepartId: gareDepartId,
+      gareDestinationId: _gareDestinationId!,
+      nomExpediteur: _nomExp.text.trim(),
+      telephoneExpediteur: _telExp.text.trim(),
+      nomDestinataire: _nomDest.text.trim(),
+      telephoneDestinataire: _telDest.text.trim(),
+      descriptionContenu: _description.text.trim().isEmpty ? null : _description.text.trim(),
+      poidsKg: double.tryParse(_poids.text),
+      nombrePieces: int.tryParse(_pieces.text) ?? 1,
+      montantFret: montant,
+      valeurMarchandise: valeur,
+      pourcentagePercu: _montantAuto ? double.tryParse(_pourcentagePercu.text) : null,
+      natureIds: [_selectedNatureId!],
+    );
     setState(() => _submitting = true);
     try {
-      final input = RegisterColisInput(
-        companyId: companyId,
-        gareDepartId: gareDepartId,
-        gareDestinationId: _gareDestinationId!,
-        nomExpediteur: _nomExp.text.trim(),
-        telephoneExpediteur: _telExp.text.trim(),
-        nomDestinataire: _nomDest.text.trim(),
-        telephoneDestinataire: _telDest.text.trim(),
-        descriptionContenu: _description.text.trim().isEmpty ? null : _description.text.trim(),
-        poidsKg: double.tryParse(_poids.text),
-        nombrePieces: int.tryParse(_pieces.text) ?? 1,
-        montantFret: montant,
-        valeurMarchandise: valeur,
-        pourcentagePercu: _montantAuto ? double.tryParse(_pourcentagePercu.text) : null,
-        natureIds: [_selectedNatureId!],
-      );
-      final result = await ref.read(colisServiceProvider).registerColis(input);
-      if (!mounted) return;
-      final colisId = result['id'] as String;
-      String? photoPath;
-      if (_photoBytes != null) {
-        // Best-effort : un échec d'upload de la photo ne doit jamais bloquer
-        // l'enregistrement du colis (déjà créé et payé à ce stade) ni
-        // empêcher l'aperçu/impression du reçu.
-        try {
-          final service = ref.read(colisServiceProvider);
-          photoPath = await service.uploadColisPhoto(
-            companyId: companyId,
-            colisId: colisId,
-            bytes: _photoBytes!,
-          );
-          await service.setColisPhoto(colisId, photoPath);
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Colis enregistré, mais échec de l\'ajout de la photo : $e')),
+      // Pas de réseau détecté : on n'essaie même pas l'appel RPC (évite
+      // d'attendre un timeout) et on part directement en file d'attente
+      // locale (voir demande "enregistrement même sans connexion").
+      if (!await hasNetworkConnection()) {
+        await _registerOffline(input);
+        return;
+      }
+      try {
+        final result = await ref.read(colisServiceProvider).registerColis(input).timeout(const Duration(seconds: 15));
+        if (!mounted) return;
+        final colisId = result['id'] as String;
+        String? photoPath;
+        if (_photoBytes != null) {
+          // Best-effort : un échec d'upload de la photo ne doit jamais bloquer
+          // l'enregistrement du colis (déjà créé et payé à ce stade) ni
+          // empêcher l'aperçu/impression du reçu.
+          try {
+            final service = ref.read(colisServiceProvider);
+            photoPath = await service.uploadColisPhoto(
+              companyId: companyId,
+              colisId: colisId,
+              bytes: _photoBytes!,
             );
+            await service.setColisPhoto(colisId, photoPath);
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Colis enregistré, mais échec de l\'ajout de la photo : $e')),
+              );
+            }
           }
         }
+        // Aperçu du reçu (avec choix d'imprimante) ouvert automatiquement
+        // après l'enregistrement — même parcours que le web (ColisReceiptPanel
+        // autoPrint). Avant : simple pop, aucun aperçu proposé.
+        final now = DateTime.now();
+        var colis = Colis(
+          id: result['id'] as String,
+          statut: ColisStatutX.fromDb(result['statutColis'] as String? ?? 'enregistre'),
+          nomExpediteur: input.nomExpediteur,
+          telephoneExpediteur: input.telephoneExpediteur,
+          nomDestinataire: input.nomDestinataire,
+          telephoneDestinataire: input.telephoneDestinataire,
+          descriptionContenu: input.descriptionContenu,
+          poidsKg: input.poidsKg,
+          nombrePieces: input.nombrePieces,
+          montantFret: input.montantFret,
+          valeurMarchandise: input.valeurMarchandise,
+          pourcentagePercu: input.pourcentagePercu,
+          createdAt: now,
+          updatedAt: now,
+          gareDepart: _openCash?.gareName ?? '',
+          gareDestination: _gares
+              .firstWhere((g) => g.id == _gareDestinationId,
+                  orElse: () => const GareOption(id: '', name: ''))
+              .name,
+          natures: [
+            for (final n in _natures)
+              if (n.id == _selectedNatureId) n.libelle,
+          ],
+        );
+        // register_colis_autonome ne renvoie que id/statutColis/montantFret/sms
+        // (voir migration 169) — ni les téléphones gare/compagnie ni le nom de
+        // la compagnie, d'où leur absence sur le reçu imprimé juste après
+        // l'enregistrement malgré colis_receipt_lines.dart/printer_service.dart
+        // qui savent déjà les afficher. On recharge le détail complet (même
+        // RPC get_colis_autonome_detail que ColisDetailScreen) pour que ces
+        // champs soient bien renseignés sur le tout premier reçu, sans
+        // attendre que l'agent rouvre le colis depuis la liste.
+        try {
+          final detail = await ref.read(colisServiceProvider).getColisDetail(colisId);
+          if (detail != null) colis = Colis.fromMap(detail);
+        } catch (_) {
+          // Best-effort : le colis est déjà enregistré/payé à ce stade — un
+          // échec de rechargement du détail ne doit pas bloquer l'aperçu du
+          // reçu, qui retombe alors sur les données locales ci-dessus.
+        }
+        // Alimente le cache nom/téléphone compagnie (voir
+        // ReferenceCacheService.saveCompanyInfo) pour que le PROCHAIN reçu
+        // provisoire (enregistrement hors-ligne) affiche le bon en-tête,
+        // même si l'agent n'a jamais ouvert le détail d'un colis.
+        if (colis.companyName.isNotEmpty || colis.companyPhone.isNotEmpty) {
+          await ref.read(referenceCacheServiceProvider).saveCompanyInfo(
+                companyId,
+                name: colis.companyName,
+                phone: colis.companyPhone,
+              );
+        }
+        await showColisReceiptPreview(context, colis);
+        if (mounted) Navigator.of(context).pop();
+      } on TimeoutException {
+        await _registerOffline(input);
+      } on SocketException {
+        await _registerOffline(input);
       }
-      // Aperçu du reçu (avec choix d'imprimante) ouvert automatiquement
-      // après l'enregistrement — même parcours que le web (ColisReceiptPanel
-      // autoPrint). Avant : simple pop, aucun aperçu proposé.
-      final now = DateTime.now();
-      var colis = Colis(
-        id: result['id'] as String,
-        statut: ColisStatutX.fromDb(result['statutColis'] as String? ?? 'enregistre'),
-        nomExpediteur: input.nomExpediteur,
-        telephoneExpediteur: input.telephoneExpediteur,
-        nomDestinataire: input.nomDestinataire,
-        telephoneDestinataire: input.telephoneDestinataire,
-        descriptionContenu: input.descriptionContenu,
-        poidsKg: input.poidsKg,
-        nombrePieces: input.nombrePieces,
-        montantFret: input.montantFret,
-        valeurMarchandise: input.valeurMarchandise,
-        pourcentagePercu: input.pourcentagePercu,
-        createdAt: now,
-        updatedAt: now,
-        gareDepart: _openCash?.gareName ?? '',
-        gareDestination: _gares
-            .firstWhere((g) => g.id == _gareDestinationId,
-                orElse: () => const GareOption(id: '', name: ''))
-            .name,
-        natures: [
-          for (final n in _natures)
-            if (n.id == _selectedNatureId) n.libelle,
-        ],
-      );
-      // register_colis_autonome ne renvoie que id/statutColis/montantFret/sms
-      // (voir migration 169) — ni les téléphones gare/compagnie ni le nom de
-      // la compagnie, d'où leur absence sur le reçu imprimé juste après
-      // l'enregistrement malgré colis_receipt_lines.dart/printer_service.dart
-      // qui savent déjà les afficher. On recharge le détail complet (même
-      // RPC get_colis_autonome_detail que ColisDetailScreen) pour que ces
-      // champs soient bien renseignés sur le tout premier reçu, sans
-      // attendre que l'agent rouvre le colis depuis la liste.
-      try {
-        final detail = await ref.read(colisServiceProvider).getColisDetail(colisId);
-        if (detail != null) colis = Colis.fromMap(detail);
-      } catch (_) {
-        // Best-effort : le colis est déjà enregistré/payé à ce stade — un
-        // échec de rechargement du détail ne doit pas bloquer l'aperçu du
-        // reçu, qui retombe alors sur les données locales ci-dessus.
-      }
-      await showColisReceiptPreview(context, colis);
-      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur : $e')));
@@ -322,6 +408,57 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// Enregistrement hors-ligne — met le colis en file d'attente locale
+  /// (voir SyncService/OfflineQueueService) au lieu d'appeler
+  /// register_colis_autonome, puis affiche/imprime immédiatement un reçu
+  /// marqué "PROVISOIRE" (voir Colis.isPendingSync, colisReceiptLines) :
+  /// l'agent peut ainsi encaisser et servir le client tout de suite, la
+  /// vraie référence étant confirmée automatiquement dès que le réseau
+  /// revient (AgentShell écoute la connectivité).
+  Future<void> _registerOffline(RegisterColisInput input) async {
+    final cache = ref.read(referenceCacheServiceProvider);
+    final companyInfo = await cache.loadCompanyInfo(input.companyId);
+    final natureLabel = _natures
+        .where((n) => input.natureIds.contains(n.id))
+        .map((n) => n.libelle)
+        .join(', ');
+    final gareDestinationName = _gares
+        .firstWhere((g) => g.id == input.gareDestinationId, orElse: () => const GareOption(id: '', name: ''))
+        .name;
+    final pending = PendingColis(
+      localId: generateLocalId(),
+      createdAt: DateTime.now(),
+      companyId: input.companyId,
+      gareDepartId: input.gareDepartId,
+      gareDestinationId: input.gareDestinationId,
+      nomExpediteur: input.nomExpediteur,
+      telephoneExpediteur: input.telephoneExpediteur,
+      nomDestinataire: input.nomDestinataire,
+      telephoneDestinataire: input.telephoneDestinataire,
+      descriptionContenu: input.descriptionContenu,
+      poidsKg: input.poidsKg,
+      nombrePieces: input.nombrePieces,
+      montantFret: input.montantFret,
+      valeurMarchandise: input.valeurMarchandise,
+      pourcentagePercu: input.pourcentagePercu,
+      busId: input.busId,
+      natureIds: input.natureIds,
+      gareDepartName: _openCash?.gareName ?? '',
+      gareDestinationName: gareDestinationName,
+      companyName: companyInfo.name,
+      companyPhone: companyInfo.phone,
+      natureLabel: natureLabel,
+      photoBase64: _photoBytes != null ? base64Encode(_photoBytes!) : null,
+    );
+    await ref.read(syncServiceProvider).enqueue(pending);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Pas de connexion — colis enregistré localement, sera synchronisé automatiquement.'),
+    ));
+    await showColisReceiptPreview(context, pending.toColis());
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -351,6 +488,28 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (_offline)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      border: Border.all(color: Colors.orange.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.cloud_off_outlined, color: Colors.deepOrange, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Mode hors-ligne : le colis sera enregistré localement et synchronisé dès le retour du réseau.',
+                            style: TextStyle(color: Colors.deepOrange, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Card(
                   color: Colors.grey.shade100,
                   child: Padding(

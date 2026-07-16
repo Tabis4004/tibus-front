@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../agent/home/home_screen.dart';
@@ -7,6 +8,7 @@ import '../agent/stats/stats_screen.dart';
 import '../agent/profile/profile_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers.dart';
+import '../../core/utils/connectivity.dart';
 
 /// Coquille de navigation "agent" — reproduit la barre basse à 5 entrées
 /// des maquettes de référence (Accueil / Colis / + / Stats / Profil).
@@ -19,6 +21,8 @@ class AgentShell extends ConsumerStatefulWidget {
 
 class _AgentShellState extends ConsumerState<AgentShell> {
   int _index = 0;
+  StreamSubscription<bool>? _connectivitySub;
+  bool? _wasOnline;
 
   static const _screens = [
     HomeScreen(),
@@ -34,6 +38,26 @@ class _AgentShellState extends ConsumerState<AgentShell> {
     // Demande la permission notifications + enregistre le token FCM
     // (no-op silencieux tant que flutterfire configure n'a pas été fait).
     ref.read(pushServiceProvider).registerForPushNotifications();
+
+    // Synchronisation de la file d'attente hors-ligne (voir SyncService,
+    // colis_create_screen.dart) : une tentative silencieuse au démarrage
+    // (au cas où des colis seraient restés en attente d'une session
+    // précédente, déjà reconnectée), puis à chaque fois que la connectivité
+    // repasse de "hors-ligne" à "en ligne" pendant que l'app est ouverte.
+    Future.microtask(() => ref.read(syncServiceProvider).syncAll());
+    _connectivitySub = onConnectivityIsOnline().listen((online) {
+      final wasOffline = _wasOnline == false;
+      _wasOnline = online;
+      if (online && wasOffline) {
+        ref.read(syncServiceProvider).syncAll();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 
   void _onTap(int index) {

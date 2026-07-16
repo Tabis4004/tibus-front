@@ -93,6 +93,15 @@ class Colis {
   /// champ à colisReceiptLines / printer_service.dart (demande client : la
   /// photo ne doit jamais être imprimée sur le reçu).
   final String? photoPath;
+  /// Vrai uniquement pour le Colis "local" construit à partir d'un
+  /// PendingColis (enregistrement fait hors connexion, encore dans la file
+  /// d'attente — voir offline_queue_service.dart / sync_service.dart).
+  /// Toujours false pour un Colis reconstruit depuis les RPC (fromMap) :
+  /// dès que la synchronisation réussit, le colis "réel" n'a plus ce flag.
+  /// Sert uniquement à afficher la mention "REÇU PROVISOIRE" sur le reçu
+  /// (colisReceiptLines / _ReceiptBox) tant que l'ID n'est pas confirmé par
+  /// le serveur.
+  final bool isPendingSync;
 
   const Colis({
     required this.id,
@@ -119,6 +128,7 @@ class Colis {
     this.companyName = '',
     this.companyPhone = '',
     this.photoPath,
+    this.isPendingSync = false,
   });
 
   factory Colis.fromMap(Map<String, dynamic> map) {
