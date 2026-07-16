@@ -130,7 +130,7 @@ class EscPosPrinterService {
   List<int> _renderLines(Generator generator, List<Map<String, dynamic>> lines) {
     final bytes = <int>[];
     for (final line in lines) {
-      final text = (line['text'] as String?) ?? '';
+      final text = _sanitizeForEscPos((line['text'] as String?) ?? '');
       if (text.isEmpty) {
         bytes.addAll(generator.feed(1));
         continue;
@@ -147,6 +147,42 @@ class EscPosPrinterService {
       ));
     }
     return bytes;
+  }
+
+  /// Nettoie le texte avant envoi au générateur ESC/POS.
+  ///
+  /// `esc_pos_utils_plus` encode chaque ligne en Latin-1 (voir
+  /// `generator.text()` -> `_encode()` -> `latin1.encode()` côté package) et
+  /// lève `Invalid argument (string): Contains invalid characters.` dès
+  /// qu'un caractère dépasse le code point 255 — c'est ce qui plantait
+  /// l'impression Bluetooth/USB (Mini Printer MPT-II, Xprinter) sur le tiret
+  /// cadratin "—" du footer ("Retrait sous 72h — passé ce délai…", voir
+  /// colis_receipt_lines.dart) et menaçait aussi le "—" utilisé comme
+  /// valeur par défaut de colisNatureLabel()/colisDescriptionLabel(), sans
+  /// parler des données libres saisies par l'agent (nom, description…).
+  ///
+  /// Le pont P3 natif (MethodChannel) et le pont WisePrinter (desktop, JS)
+  /// n'ont pas cette contrainte — ce nettoyage est spécifique au pont
+  /// ESC/POS USB/Bluetooth de ce fichier.
+  ///
+  /// On remplace d'abord les caractères typographiques Unicode courants par
+  /// leur équivalent ASCII/Latin-1, puis, en dernier recours, tout caractère
+  /// restant hors Latin-1 est substitué par '?' pour ne plus jamais
+  /// bloquer l'impression, même sur une saisie imprévue.
+  String _sanitizeForEscPos(String text) {
+    final replaced = text
+        .replaceAll('—', '-')
+        .replaceAll('–', '-')
+        .replaceAll('…', '...')
+        .replaceAll('’', "'")
+        .replaceAll('‘', "'")
+        .replaceAll('“', '"')
+        .replaceAll('”', '"');
+    final buffer = StringBuffer();
+    for (final rune in replaced.runes) {
+      buffer.writeCharCode(rune <= 0xFF ? rune : 0x3F); // 0x3F = '?'
+    }
+    return buffer.toString();
   }
 
   PosAlign _align(String? value) {
