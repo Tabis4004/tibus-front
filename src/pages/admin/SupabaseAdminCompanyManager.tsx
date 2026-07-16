@@ -213,6 +213,7 @@ export default function SupabaseAdminCompanyManager() {
       await enterSuperAdminOwnerCompanyContext(appUserId, company.id, {
         isSuperAdmin,
         ownedCompanyIds,
+        isAuthorizedAdminPays: canManageModules,
       });
       refreshOwnerCompanyContext();
       navigate(`/${lng ?? "fr"}/owner`);

@@ -271,3 +271,25 @@ export function roleAssignmentKey(role: UserRoleAssignment) {
 export function isCompanyScopedRole(roleName: string) {
   return ["owner", "vendeur", "chauffeur", "controleur", "comptable_compagnie"].includes(roleName);
 }
+
+/** Réservé au super_admin (vérifié aussi côté Edge Function) : définit
+ * directement le mot de passe d'un utilisateur, sans passer par le flux
+ * "mot de passe oublié" — utile quand l'utilisateur n'a pas accès à sa
+ * boîte mail ou son téléphone. */
+export async function adminResetUserPasswordSupabase(input: {
+  userId: string;
+  newPassword: string;
+}): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("admin-reset-password", {
+    body: input,
+  });
+
+  if (error) {
+    throw new Error(await readFunctionError(error as { message?: string; context?: Response }));
+  }
+
+  if (data && typeof data === "object" && "error" in data) {
+    const message = String((data as { error?: string }).error ?? "").trim();
+    if (message) throw new Error(message);
+  }
+}

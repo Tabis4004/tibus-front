@@ -28,7 +28,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user.ts";
-import { canAccessCommercialOffer } from "@/lib/auth/commercial-offer-access.ts";
+import {
+  canAccessCommercialOffer,
+  canManageCompanyFeatureModules,
+} from "@/lib/auth/commercial-offer-access.ts";
 import {
   canAccessPlatformAdminPanel,
   canMutateCompanyOperationalData,
@@ -316,7 +319,7 @@ export default function SupabaseAdminPanel() {
     }
   };
 
-  const handleManageCompanyAsOwner = async (companyId: string) => {
+  const handleManageCompanyAsOwner = async (companyId: string, isAuthorizedAdminPays: boolean) => {
     const appUserId = appUser.profile?.id;
     if (!appUserId) return;
     setManagingCompanyId(companyId);
@@ -324,6 +327,7 @@ export default function SupabaseAdminPanel() {
       await enterSuperAdminOwnerCompanyContext(appUserId, companyId, {
         isSuperAdmin: appUser.isSuperAdmin,
         ownedCompanyIds: appUser.ownedCompanyIds,
+        isAuthorizedAdminPays,
       });
       refreshOwnerCompanyContext();
       navigate(`/${lng ?? "fr"}/owner`);
@@ -610,6 +614,22 @@ export default function SupabaseAdminPanel() {
                     company,
                     data.commissionSettings ?? [],
                   );
+                  // Un admin_pays autorisé (droit "manage_feature_modules"
+                  // accordé pour son pays — écran Rôles & Permissions) peut
+                  // gérer une compagnie de son pays comme un super_admin,
+                  // pas seulement en modifier les modules — voir
+                  // is_company_role_user côté serveur (migration 174).
+                  const canManageAsOwner =
+                    appUser.isSuperAdmin ||
+                    canManageCompanyFeatureModules(
+                      appUser.roles,
+                      appUser.isSuperAdmin,
+                      company.id,
+                      appUser.ownedCompanyIds,
+                      appUser.hasDroit,
+                      company.countryId,
+                      appUser.adminPaysCountryIds,
+                    );
                   return (
                   <div key={company.id} className="py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -644,14 +664,16 @@ export default function SupabaseAdminPanel() {
                           </Link>
                         </Button>
                       )}
-                      {appUser.isSuperAdmin ? (
+                      {canManageAsOwner ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
                           disabled={managingCompanyId === company.id}
-                          onClick={() => void handleManageCompanyAsOwner(company.id)}
+                          onClick={() =>
+                            void handleManageCompanyAsOwner(company.id, !appUser.isSuperAdmin)
+                          }
                         >
                           <LayoutDashboardIcon className="w-3.5 h-3.5 mr-1" />
                           {t("manage_resources")}

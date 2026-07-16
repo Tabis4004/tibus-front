@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   ArrowLeftIcon,
+  KeyRoundIcon,
   ShieldIcon,
   UserPlusIcon,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import {
   adminAssignUserRoleSupabase,
   adminRemoveUserRoleSupabase,
+  adminResetUserPasswordSupabase,
   assertCountryAdminPaysAvailable,
   isCompanyScopedRole,
   listUserRoleAssignmentsSupabase,
@@ -79,6 +81,8 @@ export default function AdminUserFormPage() {
   const [countryId, setCountryId] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [initialAssignments, setInitialAssignments] = useState<UserRoleAssignment[]>([]);
+  const [newPassword, setNewPassword] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const base = `/${lng ?? "fr"}`;
 
@@ -230,6 +234,34 @@ export default function AdminUserFormPage() {
       toast.error(mapRoleAssignErrorMessage(err, countryLabel));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!userId) return;
+    if (newPassword.trim().length < 6) {
+      toast.error(t("users.password_too_short", { defaultValue: "Mot de passe trop court (min. 6 caractères)." }));
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      await adminResetUserPasswordSupabase({ userId, newPassword: newPassword.trim() });
+      toast.success(t("users.password_reset_success", { defaultValue: "Mot de passe mis à jour." }));
+      setNewPassword("");
+      void recordPlatformAuditSupabase({
+        moduleKey: "admin.users",
+        action: "update",
+        summary: `Mot de passe réinitialisé : ${email.trim() || userId}`,
+        metadata: { userId },
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t("users.password_reset_error", { defaultValue: "Mise à jour du mot de passe impossible." }),
+      );
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -405,6 +437,42 @@ export default function AdminUserFormPage() {
               />
               <p className="text-xs text-muted-foreground">{t("users.password_hint")}</p>
             </div>
+          )}
+
+          {isEdit && (
+            <Card className="border-amber-200 bg-amber-50/60">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                  <KeyRoundIcon className="h-4 w-4" />
+                  {t("users.reset_password_title", { defaultValue: "Réinitialiser le mot de passe" })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("users.reset_password_hint", {
+                    defaultValue: "Définit directement le mot de passe de cet utilisateur, sans passer par l'email de récupération.",
+                  })}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    id="newPassword"
+                    type="text"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder={t("users.new_password_placeholder", { defaultValue: "Nouveau mot de passe" })}
+                    className="sm:max-w-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={resettingPassword || newPassword.trim().length < 6}
+                    onClick={() => void handleResetPassword()}
+                  >
+                    {resettingPassword
+                      ? tc("buttons.saving", { defaultValue: "Enregistrement..." })
+                      : t("users.reset_password_btn", { defaultValue: "Mettre à jour le mot de passe" })}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <div className="space-y-3">

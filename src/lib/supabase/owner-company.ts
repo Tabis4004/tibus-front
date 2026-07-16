@@ -291,7 +291,16 @@ export async function resolveOwnerCompanyId(
 export async function enterSuperAdminOwnerCompanyContext(
   appUserId: string,
   companyId: string,
-  options?: { isSuperAdmin?: boolean; ownedCompanyIds?: readonly string[] },
+  options?: {
+    isSuperAdmin?: boolean;
+    ownedCompanyIds?: readonly string[];
+    // Vrai si l'appelant a déjà vérifié qu'un admin_pays a le droit
+    // "manage_feature_modules" ET que la compagnie est dans son pays (voir
+    // canManageCompanyFeatureModules) — un admin_pays autorisé doit pouvoir
+    // ouvrir la console owner d'une compagnie de son pays comme un
+    // propriétaire, sans quoi le bouton "Gérer" échoue silencieusement.
+    isAuthorizedAdminPays?: boolean;
+  },
 ): Promise<void> {
   const isSuperAdmin =
     options?.isSuperAdmin ?? (await isAppUserSuperAdminSupabase(appUserId));
@@ -299,7 +308,11 @@ export async function enterSuperAdminOwnerCompanyContext(
     options?.ownedCompanyIds ??
     (await listOwnedCompaniesOnlySupabase(appUserId)).map((company) => company.id);
 
-  if (!isSuperAdmin && !ownedCompanyIds.includes(companyId)) {
+  if (
+    !isSuperAdmin &&
+    !ownedCompanyIds.includes(companyId) &&
+    !options?.isAuthorizedAdminPays
+  ) {
     throw new Error("Accès refusé : vous n'êtes pas propriétaire de cette compagnie.");
   }
 
