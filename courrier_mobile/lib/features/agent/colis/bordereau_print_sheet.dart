@@ -1,11 +1,29 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/providers.dart';
+import '../../../core/utils/bordereau_pdf.dart';
 import '../../../core/utils/bordereau_receipt_lines.dart';
+import '../../../core/utils/mailto.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/services/bordereau_service.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
+
+/// Message de partage du BL — synthèse (référence, trajet, colis, total),
+/// vers les utilisateurs du module (propriétaire, contrôleur), pas
+/// l'expéditeur/destinataire des colis qui n'ont rien à voir avec ce
+/// document interne au transporteur.
+String _bordereauShareMessage(BordereauDetail d) {
+  return [
+    'TIBUS COURRIER — Bordereau ${d.reference}',
+    'Trajet : ${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}',
+    if (d.busPlateNumber != null) 'Bus : ${d.busPlateNumber}',
+    '${d.colis.length} colis · Total fret ${d.totalFret.toStringAsFixed(0)} FCFA',
+    if (d.createdAt != null) 'Créé le : ${formatBordereauDate(d.createdAt!)}',
+  ].join('\n');
+}
 
 /// Aperçu du bordereau + sélection du pont imprimante — même logique
 /// multi-pont que colis_receipt_preview_sheet.dart (Xprinter desktop, P3
@@ -52,6 +70,187 @@ class _BordereauPrintSheetState extends ConsumerState<_BordereauPrintSheet> {
     final printer = ref.read(printerServiceProvider);
     final detail = widget.detail;
 
+    // Tout le contenu (aperçu + boutons) dans UN SEUL scroll, borné à ~90% de
+    // la hauteur de l'écran — évite le "BOTTOM OVERFLOWED" qui masquait les
+    // boutons d'impression sur une fenêtre desktop/macOS courte (voir même
+    // correctif dans colis_receipt_preview_sheet.dart).
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Aperçu du bordereau', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _BordereauBox(detail: detail),
+              const SizedBox(height: 16),
+              Text(
+                'Choisir une imprimante',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.print_outlined,
+                label: 'Xprinter',
+                enabled: !_printing && printer.hasWisePrinterBridge,
+                disabledHint: printer.hasWisePrinterBridge ? null : 'Xprinter non détecté sur cet appareil',
+                onPressed: () => _run(
+                  () => printer.printBordereauViaWisePrinter(detail),
+                  successMessage: 'Bordereau envoyé (Xprinter).',
+                ),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.receipt_long_outlined,
+                label: 'Imprimante intégrée (56 mm P3)',
+                enabled: !_printing && printer.hasNativeP3,
+                disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
+                onPressed: () => _run(
+                  () => printer.printBordereau(detail, paperWidthMm: 58),
+                  successMessage: 'Bordereau envoyé (imprimante intégrée, 56 mm).',
+                ),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.local_print_shop_outlined,
+                label: '80 mm Xprinter (toujours disponible)',
+                enabled: !_printing,
+                onPressed: () => _run(() async {
+                  if (printer.hasWisePrinterBridge) {
+                    await printer.printBordereauViaWisePrinter(detail);
+                    return;
+                  }
+                  final ok = printer.printColisReceiptBrowser(wide: true);
+                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
+                }, successMessage: 'Impression envoyée (80 mm).'),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.usb,
+                label: 'USB / Bluetooth (Xprinter, Mini Printer…)',
+                enabled: !_printing && printer.hasEscPosSupport,
+                disabledHint: printer.hasEscPosSupport
+                    ? null
+                    : 'Disponible uniquement sur l\'app native (Android/iOS/Windows)',
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => _BordereauEscPosPrinterSheet(detail: detail),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.picture_as_pdf_outlined,
+                label: 'Exporter en PDF (A4)',
+                enabled: !_printing,
+                onPressed: () => _run(() async {
+                  await Printing.layoutPdf(
+                    onLayout: (format) => buildBordereauPdfA4(detail),
+                    name: '${detail.reference}.pdf',
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Partager',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.share_outlined,
+                label: 'Envoyer à… (propriétaire, contrôleur)',
+                enabled: !_printing,
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => _BordereauShareSheet(detail: detail),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Liste des destinataires possibles du BL (propriétaire, contrôleur de la
+/// compagnie) avec, pour chacun, un accès direct WhatsApp/email pré-rempli —
+/// contacts résolus côté serveur (list_bordereau_notify_contacts), pas de
+/// saisie manuelle.
+class _BordereauShareSheet extends StatefulWidget {
+  final BordereauDetail detail;
+  const _BordereauShareSheet({required this.detail});
+
+  @override
+  State<_BordereauShareSheet> createState() => _BordereauShareSheetState();
+}
+
+class _BordereauShareSheetState extends State<_BordereauShareSheet> {
+  final _service = BordereauService();
+  List<BordereauContact>? _contacts;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await _service.listNotifyContacts(widget.detail.companyId);
+      if (mounted) setState(() => _contacts = rows);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _sendWhatsApp(BordereauContact contact) async {
+    final phone = contact.phone ?? '';
+    final ok = await openWhatsApp(phone, _bordereauShareMessage(widget.detail));
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Numéro manquant ou invalide pour ${contact.displayName}.')));
+    }
+  }
+
+  Future<void> _sendEmail(BordereauContact contact) async {
+    final email = contact.email ?? '';
+    final ok = await openMailto(
+      email,
+      subject: 'Bordereau ${widget.detail.reference}',
+      body: _bordereauShareMessage(widget.detail),
+    );
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Email manquant pour ${contact.displayName}.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final contacts = _contacts;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -67,74 +266,53 @@ class _BordereauPrintSheetState extends ConsumerState<_BordereauPrintSheet> {
             Row(
               children: [
                 const Expanded(
-                  child: Text('Aperçu du bordereau', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: Text('Envoyer le bordereau à…', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
               ],
             ),
             const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 380),
-              child: SingleChildScrollView(child: _BordereauBox(detail: detail)),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Choisir une imprimante',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.print_outlined,
-              label: 'Xprinter',
-              enabled: !_printing && printer.hasWisePrinterBridge,
-              disabledHint: printer.hasWisePrinterBridge ? null : 'Xprinter non détecté sur cet appareil',
-              onPressed: () => _run(
-                () => printer.printBordereauViaWisePrinter(detail),
-                successMessage: 'Bordereau envoyé (Xprinter).',
-              ),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.receipt_long_outlined,
-              label: 'Imprimante intégrée (56 mm P3)',
-              enabled: !_printing && printer.hasNativeP3,
-              disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
-              onPressed: () => _run(
-                () => printer.printBordereau(detail, paperWidthMm: 58),
-                successMessage: 'Bordereau envoyé (imprimante intégrée, 56 mm).',
-              ),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.local_print_shop_outlined,
-              label: '80 mm Xprinter (toujours disponible)',
-              enabled: !_printing,
-              onPressed: () => _run(() async {
-                if (printer.hasWisePrinterBridge) {
-                  await printer.printBordereauViaWisePrinter(detail);
-                  return;
-                }
-                final ok = printer.printColisReceiptBrowser(wide: true);
-                if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
-              }, successMessage: 'Impression envoyée (80 mm).'),
-            ),
-            const SizedBox(height: 8),
-            _PrinterButton(
-              icon: Icons.usb,
-              label: 'USB / Bluetooth (Xprinter, Mini Printer…)',
-              enabled: !_printing && printer.hasEscPosSupport,
-              disabledHint: printer.hasEscPosSupport
-                  ? null
-                  : 'Disponible uniquement sur l\'app native (Android/iOS/Windows)',
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => _BordereauEscPosPrinterSheet(detail: detail),
-              ),
-            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('Chargement impossible : $_error', style: const TextStyle(color: Colors.red, fontSize: 12)),
+              )
+            else if (contacts == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (contacts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Aucun propriétaire ou contrôleur trouvé pour cette compagnie.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              )
+            else
+              ...contacts.map((c) => Card(
+                    child: ListTile(
+                      dense: true,
+                      title: Text(c.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      subtitle: Text(c.roleLabel, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.chat, color: Colors.green),
+                            tooltip: (c.phone?.isNotEmpty ?? false) ? 'WhatsApp' : 'Numéro indisponible',
+                            onPressed: () => _sendWhatsApp(c),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.email_outlined),
+                            tooltip: (c.email?.isNotEmpty ?? false) ? 'Email' : 'Email indisponible',
+                            onPressed: () => _sendEmail(c),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
           ],
         ),
       ),

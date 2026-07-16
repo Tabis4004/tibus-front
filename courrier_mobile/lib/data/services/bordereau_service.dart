@@ -78,6 +78,53 @@ class BordereauService {
     });
     return BordereauDetail.fromMap(data as Map<String, dynamic>);
   }
+
+  /// Contacts vers qui partager le BL (propriétaire, contrôleur) — pas les
+  /// expéditeur/destinataire des colis, sans rapport avec ce document
+  /// interne au transporteur (migration 173).
+  Future<List<BordereauContact>> listNotifyContacts(String companyId) async {
+    final data = await _client.rpc('list_bordereau_notify_contacts', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(BordereauContact.fromMap)
+        .toList();
+  }
+}
+
+class BordereauContact {
+  final String userId;
+  final String firstName;
+  final String lastName;
+  final String? email;
+  final String? phone;
+  final String roleName;
+
+  const BordereauContact({
+    required this.userId,
+    required this.firstName,
+    required this.lastName,
+    this.email,
+    this.phone,
+    required this.roleName,
+  });
+
+  String get displayName {
+    final full = '$firstName $lastName'.trim();
+    return full.isNotEmpty ? full : (email ?? phone ?? 'Utilisateur');
+  }
+
+  String get roleLabel => roleName == 'owner' ? 'Propriétaire' : 'Contrôleur';
+
+  factory BordereauContact.fromMap(Map<String, dynamic> map) => BordereauContact(
+        userId: map['user_id'] as String,
+        firstName: (map['firstName'] ?? '') as String,
+        lastName: (map['lastName'] ?? '') as String,
+        email: map['email'] as String?,
+        phone: map['phone'] as String?,
+        roleName: (map['role_name'] ?? '') as String,
+      );
 }
 
 class BordereauSummary {
@@ -166,6 +213,7 @@ class BordereauDetail {
   final String id;
   final String reference;
   final String statut;
+  final String companyId;
   final String companyName;
   final String gareDepart;
   final String? gareDestination;
@@ -178,6 +226,7 @@ class BordereauDetail {
     required this.id,
     required this.reference,
     required this.statut,
+    required this.companyId,
     required this.companyName,
     required this.gareDepart,
     this.gareDestination,
@@ -194,6 +243,7 @@ class BordereauDetail {
         id: map['id'] as String,
         reference: (map['reference'] ?? '') as String,
         statut: (map['statut'] ?? 'ouvert') as String,
+        companyId: (map['companyId'] ?? '') as String,
         companyName: (map['companyName'] ?? '') as String,
         gareDepart: (map['gareDepart'] ?? '') as String,
         gareDestination: map['gareDestination'] as String?,

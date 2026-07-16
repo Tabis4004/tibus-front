@@ -49,6 +49,13 @@ dependencies:
   flutter_pos_printer_platform_image_3: ^1.2.4
   esc_pos_utils_plus: ^2.0.4
 
+  # Export bordereau en PDF A4 (impression classique / enregistrement) — en
+  # plus des tickets thermiques 56/80mm ci-dessus. `printing` ouvre le
+  # dialogue natif impression/enregistrer-en-PDF sur toutes les plateformes.
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  barcode: ^2.2.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
