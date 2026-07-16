@@ -136,6 +136,40 @@ class ColisService {
     return (data ?? {}) as Map<String, dynamic>;
   }
 
+  /// Statistiques colis — calculées côté base (get_colis_autonome_stats),
+  /// avec filtres optionnels par agent (vendeur), gare de départ et
+  /// période. `mineTotal`/`mineMontantTotal` sont toujours scopés à
+  /// l'utilisateur connecté, indépendamment de [vendeurId] — voir
+  /// stats_screen.dart, carte "Mes ventes".
+  Future<Map<String, dynamic>> getColisStats({
+    required String companyId,
+    String? vendeurId,
+    String? gareDepartId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
+    final data = await _client.rpc('get_colis_autonome_stats', params: {
+      'p_company_id': companyId,
+      'p_vendeur_id': vendeurId,
+      'p_gare_depart_id': gareDepartId,
+      'p_date_from': dateFrom?.toIso8601String(),
+      'p_date_to': dateTo?.toIso8601String(),
+    });
+    return (data ?? {}) as Map<String, dynamic>;
+  }
+
+  /// Agents ayant enregistré au moins un colis pour cette compagnie — pour
+  /// le filtre "par agent" de la page Stats.
+  Future<List<ColisVendeur>> listVendeurs(String companyId) async {
+    final data = await _client.rpc('list_company_colis_vendeurs', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(ColisVendeur.fromMap)
+        .toList();
+  }
+
   /// Gares de la compagnie accessibles à l'agent pour un envoi — même RPC
   /// que le sélecteur web (list_company_station_gares).
   Future<List<GareOption>> listGares(String companyId) async {

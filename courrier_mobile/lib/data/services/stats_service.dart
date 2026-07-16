@@ -1,13 +1,14 @@
 import 'colis_service.dart';
-import '../models/colis.dart';
 
-/// NOTE IMPORTANTE : il n'existe pas aujourd'hui, côté Tibus, de RPC dédiée
-/// au calcul des statistiques colis (total, montant du jour, répartition
-/// par statut...). L'app web les recompose ailleurs (journal de caisse).
-/// En v1, Courrier calcule ces indicateurs côté client à partir de
-/// `list_colis_autonomes`. Recommandation : ajouter une RPC
-/// `get_colis_autonome_stats(company_id)` côté base dès que le volume de
-/// colis rendra ce calcul client trop coûteux (voir README, section Dette).
+/// Statistiques colis — calculées côté base par get_colis_autonome_stats
+/// (migration 177), avec filtres optionnels par agent/gare/période
+/// (voir StatsFilter). Remplace l'ancien calcul client sur
+/// list_colis_autonomes limité à 1000 lignes.
+///
+/// [mineTotal]/[mineMontantTotal] : toujours scopés à l'utilisateur
+/// connecté, indépendamment du filtre "par agent" — alimente la carte
+/// "Mes ventes" affichée en plus du total compagnie (voir stats_screen.dart),
+/// y compris quand le owner effectue lui-même des envois.
 class ColisStats {
   final int total;
   final int today;
@@ -17,6 +18,8 @@ class ColisStats {
   final double montantTotal;
   final int delivered;
   final int pending;
+  final int mineTotal;
+  final double mineMontantTotal;
 
   const ColisStats({
     required this.total,
@@ -27,35 +30,50 @@ class ColisStats {
     required this.montantTotal,
     required this.delivered,
     required this.pending,
+    required this.mineTotal,
+    required this.mineMontantTotal,
   });
+
+  factory ColisStats.fromMap(Map<String, dynamic> map) => ColisStats(
+        total: (map['total'] as num?)?.toInt() ?? 0,
+        today: (map['today'] as num?)?.toInt() ?? 0,
+        thisMonth: (map['thisMonth'] as num?)?.toInt() ?? 0,
+        montantToday: (map['montantToday'] as num?)?.toDouble() ?? 0,
+        montantThisMonth: (map['montantThisMonth'] as num?)?.toDouble() ?? 0,
+        montantTotal: (map['montantTotal'] as num?)?.toDouble() ?? 0,
+        delivered: (map['delivered'] as num?)?.toInt() ?? 0,
+        pending: (map['pending'] as num?)?.toInt() ?? 0,
+        mineTotal: (map['mineTotal'] as num?)?.toInt() ?? 0,
+        mineMontantTotal: (map['mineMontantTotal'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+/// Filtre appliqué à la page Stats — par agent (vendeur), gare de départ
+/// et/ou période. `null` = pas de filtre sur cette dimension (voir
+/// get_colis_autonome_stats, paramètres optionnels).
+class StatsFilter {
+  final String? vendeurId;
+  final String? gareDepartId;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+
+  const StatsFilter({this.vendeurId, this.gareDepartId, this.dateFrom, this.dateTo});
+
+  bool get isEmpty => vendeurId == null && gareDepartId == null && dateFrom == null && dateTo == null;
 }
 
 class StatsService {
   final ColisService _colisService;
   StatsService(this._colisService);
 
-  Future<ColisStats> computeStats(String companyId) async {
-    final all = await _colisService.listColis(companyId: companyId, limit: 1000);
-    final now = DateTime.now();
-
-    bool isToday(DateTime d) => d.year == now.year && d.month == now.month && d.day == now.day;
-    bool isThisMonth(DateTime d) => d.year == now.year && d.month == now.month;
-
-    final todayList = all.where((c) => isToday(c.createdAt)).toList();
-    final monthList = all.where((c) => isThisMonth(c.createdAt)).toList();
-    final delivered = all.where((c) => c.statut == ColisStatut.livre).length;
-
-    double sum(Iterable<Colis> l) => l.fold(0.0, (acc, c) => acc + c.montantFret);
-
-    return ColisStats(
-      total: all.length,
-      today: todayList.length,
-      thisMonth: monthList.length,
-      montantToday: sum(todayList),
-      montantThisMonth: sum(monthList),
-      montantTotal: sum(all),
-      delivered: delivered,
-      pending: all.length - delivered,
+  Future<ColisStats> computeStats(String companyId, {StatsFilter filter = const StatsFilter()}) async {
+    final data = await _colisService.getColisStats(
+      companyId: companyId,
+      vendeurId: filter.vendeurId,
+      gareDepartId: filter.gareDepartId,
+      dateFrom: filter.dateFrom,
+      dateTo: filter.dateTo,
     );
+    return ColisStats.fromMap(data);
   }
 }

@@ -185,6 +185,22 @@ class GareOption {
       );
 }
 
+/// Agent (vendeur) ayant enregistré au moins un colis pour la compagnie —
+/// alimente le filtre "par agent" de la page Stats (voir
+/// list_company_colis_vendeurs, stats_screen.dart). Inclut le owner s'il
+/// vend lui-même : vendeur_id est le même champ pour tout le monde.
+class ColisVendeur {
+  final String id;
+  final String name;
+
+  const ColisVendeur({required this.id, required this.name});
+
+  factory ColisVendeur.fromMap(Map<String, dynamic> map) => ColisVendeur(
+        id: map['id'] as String? ?? '',
+        name: map['name'] as String? ?? '',
+      );
+}
+
 /// Statut d'une session de caisse — même valeurs que la colonne
 /// caisses_gares.statut côté base.
 enum StationCashStatus { ouverte, enReversement, cloturee, unknown }
