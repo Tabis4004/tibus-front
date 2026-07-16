@@ -272,7 +272,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       // après l'enregistrement — même parcours que le web (ColisReceiptPanel
       // autoPrint). Avant : simple pop, aucun aperçu proposé.
       final now = DateTime.now();
-      final colis = Colis(
+      var colis = Colis(
         id: result['id'] as String,
         statut: ColisStatutX.fromDb(result['statutColis'] as String? ?? 'enregistre'),
         nomExpediteur: input.nomExpediteur,
@@ -297,6 +297,22 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
             if (n.id == _selectedNatureId) n.libelle,
         ],
       );
+      // register_colis_autonome ne renvoie que id/statutColis/montantFret/sms
+      // (voir migration 169) — ni les téléphones gare/compagnie ni le nom de
+      // la compagnie, d'où leur absence sur le reçu imprimé juste après
+      // l'enregistrement malgré colis_receipt_lines.dart/printer_service.dart
+      // qui savent déjà les afficher. On recharge le détail complet (même
+      // RPC get_colis_autonome_detail que ColisDetailScreen) pour que ces
+      // champs soient bien renseignés sur le tout premier reçu, sans
+      // attendre que l'agent rouvre le colis depuis la liste.
+      try {
+        final detail = await ref.read(colisServiceProvider).getColisDetail(colisId);
+        if (detail != null) colis = Colis.fromMap(detail);
+      } catch (_) {
+        // Best-effort : le colis est déjà enregistré/payé à ce stade — un
+        // échec de rechargement du détail ne doit pas bloquer l'aperçu du
+        // reçu, qui retombe alors sur les données locales ci-dessus.
+      }
       await showColisReceiptPreview(context, colis);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
