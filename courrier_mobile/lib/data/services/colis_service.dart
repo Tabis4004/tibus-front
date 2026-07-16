@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import '../models/colis.dart';
@@ -85,6 +86,40 @@ class ColisService {
   Future<Map<String, dynamic>> deliverColis(String retraitCode) async {
     final data = await _client.rpc('deliver_colis_autonome', params: {'p_retrait_code': retraitCode});
     return data as Map<String, dynamic>;
+  }
+
+  /// Upload de la photo prise à l'enregistrement — bucket privé dédié
+  /// `colis-photos`, dossier = companyId (même schéma de scoping que les
+  /// autres buckets privés, voir migration colis_photo_capture). Retourne le
+  /// chemin stocké (à passer ensuite à setColisPhoto). Consultable
+  /// uniquement sur le détail — jamais utilisé par le flux reçu/impression.
+  Future<String> uploadColisPhoto({
+    required String companyId,
+    required String colisId,
+    required Uint8List bytes,
+  }) async {
+    final path = '$companyId/$colisId.jpg';
+    await _client.storage.from('colis-photos').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
+        );
+    return path;
+  }
+
+  /// Associe le chemin de la photo au colis — via set_colis_autonome_photo
+  /// (même contrôle d'accès is_company_role_user que le reste du module).
+  Future<void> setColisPhoto(String colisId, String photoPath) async {
+    await _client.rpc('set_colis_autonome_photo', params: {
+      'p_colis_id': colisId,
+      'p_photo_path': photoPath,
+    });
+  }
+
+  /// URL signée temporaire pour afficher la photo (bucket privé) — voir
+  /// ColisDetailScreen. Expire après 1h, régénérée à chaque ouverture d'écran.
+  Future<String> getColisPhotoUrl(String photoPath) async {
+    return _client.storage.from('colis-photos').createSignedUrl(photoPath, 3600);
   }
 
   Future<List<ColisNature>> listNatures(String companyId) async {

@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/colis.dart';
 import '../caisse/station_cash_screen.dart';
@@ -45,6 +47,11 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   String? _selectedNatureId;
   OpenStationCash? _openCash;
   double? _prixMinSuggere;
+
+  /// Photo optionnelle prise à l'enregistrement — voir _pickPhoto. Uploadée
+  /// APRÈS la création du colis (a besoin de son id), une fois le reçu déjà
+  /// généré : consultable ensuite sur ColisDetailScreen, jamais imprimée.
+  Uint8List? _photoBytes;
 
   @override
   void initState() {
@@ -161,6 +168,23 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   List<GareOption> get _destinationGares =>
       _gares.where((g) => g.id != _openCash?.gareId).toList();
 
+  /// Prend/choisit une photo du colis — bouton "optionnel" au formulaire.
+  /// image_picker gère aussi bien caméra que galerie et fonctionne sur
+  /// Flutter Web (input file caché), même déploiement que le reste de
+  /// l'écran (voir pubspec.yaml).
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final picked = await ImagePicker().pickImage(source: source, imageQuality: 70, maxWidth: 1600);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (mounted) setState(() => _photoBytes = bytes);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Impossible de charger la photo : $e')));
+      }
+    }
+  }
+
   Future<void> _submit(String companyId) async {
     if (!_formKey.currentState!.validate()) return;
     final gareDepartId = _openCash?.gareId;
@@ -222,6 +246,28 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       );
       final result = await ref.read(colisServiceProvider).registerColis(input);
       if (!mounted) return;
+      final colisId = result['id'] as String;
+      String? photoPath;
+      if (_photoBytes != null) {
+        // Best-effort : un échec d'upload de la photo ne doit jamais bloquer
+        // l'enregistrement du colis (déjà créé et payé à ce stade) ni
+        // empêcher l'aperçu/impression du reçu.
+        try {
+          final service = ref.read(colisServiceProvider);
+          photoPath = await service.uploadColisPhoto(
+            companyId: companyId,
+            colisId: colisId,
+            bytes: _photoBytes!,
+          );
+          await service.setColisPhoto(colisId, photoPath);
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Colis enregistré, mais échec de l\'ajout de la photo : $e')),
+            );
+          }
+        }
+      }
       // Aperçu du reçu (avec choix d'imprimante) ouvert automatiquement
       // après l'enregistrement — même parcours que le web (ColisReceiptPanel
       // autoPrint). Avant : simple pop, aucun aperçu proposé.
@@ -408,6 +454,46 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Photo du colis (optionnel)', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                const Text(
+                  'Consultable sur le détail du colis — non imprimée sur le reçu.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                if (_photoBytes != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(_photoBytes!, height: 160, fit: BoxFit.cover),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickPhoto(ImageSource.camera),
+                        icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                        label: const Text('Prendre une photo'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickPhoto(ImageSource.gallery),
+                        icon: const Icon(Icons.photo_library_outlined, size: 18),
+                        label: const Text('Galerie'),
+                      ),
+                    ),
+                    if (_photoBytes != null)
+                      IconButton(
+                        tooltip: 'Retirer la photo',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() => _photoBytes = null),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(

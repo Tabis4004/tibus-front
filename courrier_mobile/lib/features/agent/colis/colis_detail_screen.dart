@@ -41,6 +41,10 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
   bool _updating = false;
   List<BusOption> _buses = const [];
   String? _selectedBusId;
+  /// URL signée (bucket privé colis-photos) régénérée à chaque chargement —
+  /// voir _load. Null si le colis n'a pas de photo ou si la génération
+  /// échoue (best-effort, n'empêche jamais l'affichage du reste du détail).
+  String? _photoUrl;
 
   @override
   void initState() {
@@ -56,6 +60,7 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
       _detail = detail;
       _loading = false;
       _selectedBusId = null;
+      _photoUrl = null;
     });
     final companyId = detail?['companyId'] as String?;
     final statut = detail != null ? ColisStatutX.fromDb(detail['statutColis'] as String? ?? 'enregistre') : null;
@@ -65,6 +70,15 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
         if (mounted) setState(() => _buses = buses);
       } catch (_) {
         // Sélection bus best-effort — l'avancement reste possible sans bus.
+      }
+    }
+    final photoPath = detail?['photoPath'] as String?;
+    if (photoPath != null && photoPath.isNotEmpty) {
+      try {
+        final url = await service.getColisPhotoUrl(photoPath);
+        if (mounted) setState(() => _photoUrl = url);
+      } catch (_) {
+        // Best-effort — l'absence de photo affichable ne bloque rien d'autre.
       }
     }
   }
@@ -200,6 +214,23 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
               ),
             ),
           ),
+          if (_photoUrl != null) ...[
+            const SizedBox(height: 20),
+            const Text('Photo du colis', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: GestureDetector(
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => Dialog(
+                    child: InteractiveViewer(child: Image.network(_photoUrl!)),
+                  ),
+                ),
+                child: Image.network(_photoUrl!, height: 180, fit: BoxFit.cover),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           if (colis.statut.next == ColisStatut.charge && _buses.isNotEmpty) ...[
             DropdownButtonFormField<String?>(

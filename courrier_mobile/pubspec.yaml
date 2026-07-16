@@ -21,9 +21,20 @@ dependencies:
   cupertino_icons: ^1.0.6
   intl: ^0.19.0
   qr_flutter: ^4.1.0
-  mobile_scanner: ^5.2.3
+  # 7.x (au lieu de 5.2.3) : le changelog 7.0.0-beta.1 mentionne
+  # explicitement un correctif pour "issues regarding initialization of the
+  # MobileScannerController, which could result in a black screen without
+  # error message" — symptôme identique au bug caméra Android observé (NPE
+  # générique "getClass() on a null object reference" au démarrage,
+  # reproductible sur plusieurs appareils). Nécessite Flutter >= 3.29.0.
+  mobile_scanner: ^7.2.0
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
+  # Photo du colis à l'enregistrement (voir colis_create_screen.dart) —
+  # consultable sur le détail, jamais imprimée sur le reçu. Fonctionne aussi
+  # sur Flutter Web (input file caché), donc compatible avec le déploiement
+  # Vercel de courrier-agent.
+  image_picker: ^1.1.2
   # Ouverture de liens externes (wa.me pour les notifications WhatsApp colis)
   url_launcher: ^6.3.0
   # Export/partage du manifeste colis (CSV) — voir colis_manifest_screen.dart
