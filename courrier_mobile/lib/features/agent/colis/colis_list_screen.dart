@@ -76,7 +76,7 @@ class _ColisListScreenState extends ConsumerState<ColisListScreen> {
   }
 }
 
-class _ListBody extends ConsumerWidget {
+class _ListBody extends ConsumerStatefulWidget {
   final String companyId;
   final TextEditingController search;
   final ColisStatut? statutFilter;
@@ -90,9 +90,47 @@ class _ListBody extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colisService = ref.read(colisServiceProvider);
+  ConsumerState<_ListBody> createState() => _ListBodyState();
+}
 
+class _ListBodyState extends ConsumerState<_ListBody> {
+  late Future<List<Colis>> _colisFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _colisFuture = _fetch();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ListBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.statutFilter != widget.statutFilter || oldWidget.companyId != widget.companyId) {
+      setState(() => _colisFuture = _fetch());
+    }
+  }
+
+  Future<List<Colis>> _fetch() {
+    return ref.read(colisServiceProvider).listColis(companyId: widget.companyId, statut: widget.statutFilter);
+  }
+
+  /// Tire-pour-rafraîchir — voir home_screen.dart pour le contexte complet :
+  /// sans invalidation explicite, activeCompanyIdProvider (résolu par
+  /// l'écran parent) et cette liste restaient figés sur leur premier
+  /// résultat, montrant potentiellement des colis d'une compagnie
+  /// désactivée/supprimée après coup tant que l'onglet reste ouvert.
+  Future<void> _refresh() async {
+    ref.invalidate(myRolesProvider);
+    ref.invalidate(activeCompanyIdProvider);
+    final f = _fetch();
+    setState(() => _colisFuture = f);
+    try {
+      await f;
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
@@ -100,7 +138,7 @@ class _ListBody extends ConsumerWidget {
           child: Column(
             children: [
               TextField(
-                controller: search,
+                controller: widget.search,
                 decoration: const InputDecoration(
                   hintText: 'Rechercher un colis...',
                   prefixIcon: Icon(Icons.search),
@@ -119,7 +157,7 @@ class _ListBody extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: PopupMenuButton<ColisStatut?>(
-                      onSelected: onStatutChanged,
+                      onSelected: widget.onStatutChanged,
                       itemBuilder: (context) => [
                         const PopupMenuItem(value: null, child: Text('Tous les statuts')),
                         ...ColisStatut.values.map((s) => PopupMenuItem(value: s, child: Text(s.label))),
@@ -127,7 +165,7 @@ class _ListBody extends ConsumerWidget {
                       child: OutlinedButton.icon(
                         onPressed: null,
                         icon: const Icon(Icons.filter_list, size: 16),
-                        label: Text(statutFilter?.label ?? 'Statut'),
+                        label: Text(widget.statutFilter?.label ?? 'Statut'),
                       ),
                     ),
                   ),
@@ -137,36 +175,46 @@ class _ListBody extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: FutureBuilder<List<Colis>>(
-            future: colisService.listColis(companyId: companyId, statut: statutFilter),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              var items = snapshot.data!;
-              final query = search.text.trim().toLowerCase();
-              if (query.isNotEmpty) {
-                items = items
-                    .where((c) => c.nomDestinataire.toLowerCase().contains(query) || c.id.toLowerCase().contains(query))
-                    .toList();
-              }
-              if (items.isEmpty) {
-                return const Center(child: Text('Aucun colis trouvé.', style: TextStyle(color: AppColors.textSecondary)));
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, i) {
-                  final c = items[i];
-                  return ColisCard(
-                    colis: c,
-                    reference: c.id.substring(0, 8).toUpperCase(),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => ColisDetailScreen(colisId: c.id)),
-                    ),
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            child: FutureBuilder<List<Colis>>(
+              future: _colisFuture,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                var items = snapshot.data!;
+                final query = widget.search.text.trim().toLowerCase();
+                if (query.isNotEmpty) {
+                  items = items
+                      .where((c) => c.nomDestinataire.toLowerCase().contains(query) || c.id.toLowerCase().contains(query))
+                      .toList();
+                }
+                if (items.isEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 120),
+                      Center(child: Text('Aucun colis trouvé.', style: TextStyle(color: AppColors.textSecondary))),
+                    ],
                   );
-                },
-              );
-            },
+                }
+                return ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, i) {
+                    final c = items[i];
+                    return ColisCard(
+                      colis: c,
+                      reference: c.id.substring(0, 8).toUpperCase(),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => ColisDetailScreen(colisId: c.id)),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],

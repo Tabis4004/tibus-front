@@ -40,18 +40,65 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeBody extends ConsumerWidget {
+class _HomeBody extends ConsumerStatefulWidget {
   final String companyId;
   const _HomeBody({required this.companyId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final statsService = ref.read(statsServiceProvider);
-    final colisService = ref.read(colisServiceProvider);
+  ConsumerState<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends ConsumerState<_HomeBody> {
+  late Future<ColisStats> _statsFuture;
+  late Future<List<Colis>> _colisFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statsFuture = ref.read(statsServiceProvider).computeStats(widget.companyId);
+    _colisFuture = ref.read(colisServiceProvider).listColis(companyId: widget.companyId, limit: 5);
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.companyId != widget.companyId) {
+      _statsFuture = ref.read(statsServiceProvider).computeStats(widget.companyId);
+      _colisFuture = ref.read(colisServiceProvider).listColis(companyId: widget.companyId, limit: 5);
+    }
+  }
+
+  /// Tire-pour-rafraîchir : ré-invalide la compagnie active et les rôles
+  /// (au cas où ils auraient changé côté admin — compagnie désactivée,
+  /// rôle retiré...) puis relance les requêtes colis avec la compagnie
+  /// éventuellement mise à jour. Sans ça, activeCompanyIdProvider et les
+  /// FutureBuilder restaient figés sur leur premier résultat pour toute la
+  /// durée de vie de l'onglet/session, d'où des écrans montrant encore des
+  /// données liées à une compagnie supprimée entre-temps.
+  Future<void> _refresh() async {
+    ref.invalidate(myRolesProvider);
+    ref.invalidate(activeCompanyIdProvider);
+    final stats = ref.read(statsServiceProvider).computeStats(widget.companyId);
+    final colis = ref.read(colisServiceProvider).listColis(companyId: widget.companyId, limit: 5);
+    setState(() {
+      _statsFuture = stats;
+      _colisFuture = colis;
+    });
+    try {
+      await Future.wait([stats, colis]);
+    } catch (_) {
+      // Les FutureBuilder ci-dessous affichent déjà l'état d'erreur.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final companyId = widget.companyId;
 
     return RefreshIndicator(
-      onRefresh: () async {},
+      onRefresh: _refresh,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
           Row(
@@ -71,7 +118,7 @@ class _HomeBody extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           FutureBuilder<ColisStats>(
-            future: statsService.computeStats(companyId),
+            future: _statsFuture,
             builder: (context, snapshot) {
               final stats = snapshot.data;
               return Row(
@@ -152,7 +199,7 @@ class _HomeBody extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: FutureBuilder<ColisStats>(
-                future: statsService.computeStats(companyId),
+                future: _statsFuture,
                 builder: (context, snapshot) {
                   final stats = snapshot.data;
                   return Column(
@@ -180,7 +227,7 @@ class _HomeBody extends ConsumerWidget {
             ],
           ),
           FutureBuilder<List<Colis>>(
-            future: colisService.listColis(companyId: companyId, limit: 5),
+            future: _colisFuture,
             builder: (context, snapshot) {
               final items = snapshot.data ?? [];
               if (!snapshot.hasData) {

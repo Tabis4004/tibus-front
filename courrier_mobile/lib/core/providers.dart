@@ -23,6 +23,13 @@ final myRolesProvider = FutureProvider<List<AppRole>>((ref) async {
   return ref.read(authServiceProvider).fetchMyRoles();
 });
 
+/// Email + téléphone du compte connecté — affichage sur l'écran Profil,
+/// pour lever toute ambiguïté sur "qui est réellement connecté" (voir
+/// AuthService.fetchMyContact).
+final myContactProvider = FutureProvider<({String? email, String? phone})>((ref) async {
+  return ref.read(authServiceProvider).fetchMyContact();
+});
+
 /// Compagnie "active" pour la session agent.
 ///
 /// Priorité à la compagnie de la caisse (gare) réellement ouverte par

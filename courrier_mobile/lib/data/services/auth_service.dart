@@ -139,6 +139,29 @@ class AuthService {
     return profile['id'] as String;
   }
 
+  /// Email + téléphone du compte connecté, pour affichage sur l'écran
+  /// Profil. Users.email/phone sont la source d'affichage (peuvent avoir été
+  /// mis à jour manuellement en base) ; on retombe sur authUser.email si la
+  /// ligne Users n'a pas d'email renseigné.
+  Future<({String? email, String? phone})> fetchMyContact() async {
+    final authUser = currentSession?.user;
+    if (authUser == null) return (email: null, phone: null);
+    final row = await _client
+        .from('Users')
+        .select('email, phone')
+        .eq('auth_user_id', authUser.id)
+        .maybeSingle();
+    final email = (row?['email'] as String?) ?? authUser.email;
+    final phone = row?['phone'] as String?;
+    return (email: email, phone: phone);
+  }
+
+  /// Change le mot de passe du compte Supabase Auth connecté. L'écran Profil
+  /// n'étant accessible qu'après connexion, une session active est garantie.
+  Future<void> updatePassword(String newPassword) {
+    return _client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
   /// Rôles de l'utilisateur courant, toutes compagnies confondues.
   /// Reprend UserRoles -> Role -> Companies (jointure applicative simple,
   /// à remplacer par une RPC dédiée `list_my_roles` si le volume le justifie).

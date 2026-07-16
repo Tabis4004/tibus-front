@@ -12,12 +12,70 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rolesAsync = ref.watch(myRolesProvider);
+    final contactAsync = ref.watch(myContactProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profil')),
-      body: ListView(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          // myRolesProvider/myContactProvider ne sont jamais invalidés
+          // ailleurs : sans ce tirer-pour-rafraîchir, un rôle ajouté après
+          // le premier chargement (ex. juste après une inscription) restait
+          // invisible jusqu'au redémarrage complet de l'app — même bug de
+          // fond que sur l'écran Accueil (voir home_screen.dart).
+          ref.invalidate(myRolesProvider);
+          ref.invalidate(myContactProvider);
+          ref.invalidate(activeCompanyIdProvider);
+          try {
+            await Future.wait([
+              ref.read(myRolesProvider.future),
+              ref.read(myContactProvider.future),
+            ]);
+          } catch (_) {
+            // Les .when() ci-dessous affichent déjà l'état d'erreur.
+          }
+        },
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
+          // Identité du compte connecté (email, téléphone) + changement de
+          // mot de passe — évite toute ambiguïté sur "qui est connecté" en
+          // regard des rôles affichés juste en dessous.
+          contactAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            ),
+            error: (e, _) => Text('Erreur compte : $e'),
+            data: (contact) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Mon compte', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    _ContactRow(icon: Icons.email_outlined, label: 'Email', value: contact.email),
+                    if (contact.phone != null && contact.phone!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      _ContactRow(icon: Icons.phone_outlined, label: 'Téléphone', value: contact.phone),
+                    ],
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.lock_outline, size: 18),
+                      label: const Text('Modifier le mot de passe'),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => const _ChangePasswordDialog(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           rolesAsync.when(
             loading: () => const CircularProgressIndicator(),
             error: (e, _) => Text('Erreur : $e'),
@@ -52,8 +110,135 @@ class ProfileScreen extends ConsumerWidget {
             color: AppColors.accentRed,
             onTap: () => ref.read(authServiceProvider).signOut(),
           ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? value;
+  const _ContactRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Text('$label : ', style: const TextStyle(color: AppColors.textSecondary)),
+        Expanded(
+          child: Text(
+            (value == null || value!.trim().isEmpty) ? 'Non renseigné' : value!,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Formulaire de changement de mot de passe — deux champs (nouveau mot de
+/// passe + confirmation), même règle minimale que Supabase Auth (6
+/// caractères). Aucune ré-authentification n'est demandée : l'utilisateur a
+/// déjà une session active pour accéder à cet écran.
+class _ChangePasswordDialog extends ConsumerStatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  ConsumerState<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final next = _newCtrl.text;
+    if (next.length < 6) {
+      setState(() => _error = 'Le mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+    if (next != _confirmCtrl.text) {
+      setState(() => _error = 'Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authServiceProvider).updatePassword(next);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mot de passe mis à jour.')),
+        );
+      }
+    } catch (e) {
+      setState(() => _error = 'Échec : $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Modifier le mot de passe'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _newCtrl,
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              labelText: 'Nouveau mot de passe',
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _confirmCtrl,
+            obscureText: _obscure,
+            decoration: const InputDecoration(labelText: 'Confirmer le mot de passe'),
+            onSubmitted: (_) => _submit(),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: AppColors.accentRed, fontSize: 12)),
+          ],
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Enregistrer'),
+        ),
+      ],
     );
   }
 }
