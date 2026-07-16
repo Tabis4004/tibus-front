@@ -36,6 +36,7 @@ const companySchema = z.object({
   countryId: z.string().optional(),
   logo: z.string().optional(),
   managerName: z.string().optional(),
+  phone: z.string().optional(),
   voyageColisMsg: z.string().max(500).optional(),
 });
 
@@ -71,6 +72,7 @@ export default function SupabaseCompanySettings() {
       countryId: "",
       logo: "",
       managerName: "",
+      phone: "",
       voyageColisMsg: "",
     },
   });
@@ -101,6 +103,7 @@ export default function SupabaseCompanySettings() {
         countryId: countries[0]?._id ?? "",
         logo: "",
         managerName: "",
+        phone: "",
         voyageColisMsg: "",
       });
       return;
@@ -120,6 +123,7 @@ export default function SupabaseCompanySettings() {
             countryId: row.countryId ?? "",
             logo: row.logo ?? "",
             managerName: row.managerName ?? "",
+            phone: row.phone ?? "",
             voyageColisMsg: row.voyageColisMsg ?? "",
           });
         }
@@ -165,6 +169,7 @@ export default function SupabaseCompanySettings() {
         name: data.name.trim(),
         logo: data.logo?.trim() || null,
         managerName: data.managerName?.trim() || null,
+        phone: data.phone?.trim() || null,
         voyageColisMsg: data.voyageColisMsg?.trim() || null,
       });
       const refreshed = await getOwnerCompanyDetailsSupabase(appUserId!, companyId);
@@ -175,6 +180,7 @@ export default function SupabaseCompanySettings() {
           countryId: refreshed.countryId ?? countryIdValue,
           logo: refreshed.logo ?? "",
           managerName: refreshed.managerName ?? "",
+          phone: refreshed.phone ?? "",
           voyageColisMsg: refreshed.voyageColisMsg ?? "",
         });
       }
@@ -289,6 +295,13 @@ export default function SupabaseCompanySettings() {
             <div className="space-y-1.5">
               <Label htmlFor="managerName">Responsable</Label>
               <Input id="managerName" {...register("managerName")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">Téléphone de la compagnie</Label>
+              <Input id="phone" type="tel" placeholder="07 00 00 00 00" {...register("phone")} />
+              <p className="text-xs text-muted-foreground">
+                Affiché en en-tête du reçu colis, sous le nom de la compagnie.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="voyageColisMsg">Message embarquement / colis</Label>

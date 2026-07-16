@@ -5,6 +5,9 @@ export type OwnerCompany = {
   name: string;
   logo: string | null;
   managerName: string | null;
+  /** Téléphone de la compagnie — affiché en en-tête du reçu colis, sous le nom.
+   * Optionnel : seul getOwnerCompanyDetailsSupabase le peuple pour l'instant. */
+  phone?: string | null;
   commissionRate: number;
   isActive: boolean;
   currency: string | null;
@@ -376,7 +379,7 @@ export async function getOwnerCompanyDetailsSupabase(
   const { data, error } = await supabase
     .from("Companies")
     .select(
-      "id, name, logo, managerName, commissionRate, isActive, countryId, voyageColisMsg, arretReservation",
+      "id, name, logo, managerName, phone, commissionRate, isActive, countryId, voyageColisMsg, arretReservation",
     )
     .eq("id", companyId)
     .maybeSingle();
@@ -397,6 +400,7 @@ export async function getOwnerCompanyDetailsSupabase(
     name: data.name as string,
     logo: (data.logo as string | null) ?? null,
     managerName: (data.managerName as string | null) ?? null,
+    phone: (data.phone as string | null) ?? null,
     commissionRate: data.commissionRate as number,
     isActive: data.isActive as boolean,
     currency: (country?.currency as string | null) ?? "XOF",
@@ -412,6 +416,7 @@ export async function updateOwnerCompanySupabase(
     name?: string;
     logo?: string | null;
     managerName?: string | null;
+    phone?: string | null;
     voyageColisMsg?: string | null;
     arretReservation?: boolean;
   },

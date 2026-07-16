@@ -120,8 +120,7 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        if (colis.gareDepart.isNotEmpty) colis.gareDepart,
-        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+        if (colis.companyPhone.isNotEmpty) 'Tél: ${colis.companyPhone}',
       ],
       reference: colisShortRef(colis),
       rows: [
@@ -131,11 +130,13 @@ class PrinterService {
         if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
           ['Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'],
         ['Agence', colis.gareDepart],
+        if (colis.gareDepartPhone.isNotEmpty) ['Tél. agence', colis.gareDepartPhone],
         if (agent != null) ['Agent', agent],
         ['Déposé le', formatColisDate(colis.createdAt)],
         ['BÉNÉFICIAIRE', colis.nomDestinataire],
         ['Téléphone ', colis.telephoneDestinataire],
         ['Destination', colis.gareDestination],
+        if (colis.gareDestinationPhone.isNotEmpty) ['Tél. destination', colis.gareDestinationPhone],
         ['CONTENU', ''],
         ['Nature du colis', colisNatureLabel(colis)],
         ['Contenu (description)', colisDescriptionLabel(colis)],
@@ -158,8 +159,7 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        if (colis.gareDepart.isNotEmpty) colis.gareDepart,
-        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+        if (colis.companyPhone.isNotEmpty) 'Tél: ${colis.companyPhone}',
       ],
       reference: colisShortRef(colis),
       rows: [

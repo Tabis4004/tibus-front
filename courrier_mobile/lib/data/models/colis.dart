@@ -72,6 +72,10 @@ class Colis {
   /// la compagnie pour cette gare.
   final String gareDepartPhone;
   final String gareDestination;
+  /// Téléphone de la gare de destination — imprimé sur le reçu sous le
+  /// champ Destination, symétrique à gareDepartPhone. Vide si non
+  /// renseigné pour cette gare.
+  final String gareDestinationPhone;
   final List<String> natures;
   /// Nom de la compagnie propriétaire du colis (choisi par la compagnie
   /// dans ses paramètres, ex. "SIS COURRIER") — déjà renvoyé par les RPC
@@ -80,6 +84,9 @@ class Colis {
   /// Vide si non fourni : les reçus retombent alors sur 'TIBUS COURRIER'
   /// (voir colisReceiptLines et printer_service.dart).
   final String companyName;
+  /// Téléphone de la compagnie — affiché en en-tête du reçu, sous le nom
+  /// de la compagnie (distinct du téléphone de gare, voir gareDepartPhone).
+  final String companyPhone;
 
   const Colis({
     required this.id,
@@ -101,8 +108,10 @@ class Colis {
     required this.gareDepart,
     this.gareDepartPhone = '',
     required this.gareDestination,
+    this.gareDestinationPhone = '',
     required this.natures,
     this.companyName = '',
+    this.companyPhone = '',
   });
 
   factory Colis.fromMap(Map<String, dynamic> map) {
@@ -126,8 +135,10 @@ class Colis {
       gareDepart: map['gareDepart'] as String? ?? '',
       gareDepartPhone: (map['gareDepartPhone'] as String?)?.trim() ?? '',
       gareDestination: map['gareDestination'] as String? ?? '',
+      gareDestinationPhone: (map['gareDestinationPhone'] as String?)?.trim() ?? '',
       natures: (map['natures'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       companyName: (map['companyName'] as String?)?.trim() ?? '',
+      companyPhone: (map['companyPhone'] as String?)?.trim() ?? '',
     );
   }
 }

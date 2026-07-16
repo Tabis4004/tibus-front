@@ -51,10 +51,8 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
-    if (colis.gareDepart.isNotEmpty)
-      {'text': colis.gareDepart, 'align': 'center', 'bold': true},
-    if (colis.gareDepartPhone.isNotEmpty)
-      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'size': 'small'},
+    if (colis.companyPhone.isNotEmpty)
+      {'text': 'Tél: ${colis.companyPhone}', 'align': 'center', 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'large'},
@@ -67,6 +65,8 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
       {'text': 'Valeur          ${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'},
     {'text': 'Agence          ${colis.gareDepart}'},
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél. agence     ${colis.gareDepartPhone}'},
     if (agentName != null && agentName.isNotEmpty) {'text': 'Agent           $agentName'},
     {'text': 'Déposé le       ${formatColisDate(colis.createdAt)}'},
     {'text': '--------------------------------'},
@@ -75,6 +75,8 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': ''},
     {'text': 'Téléphone       ${colis.telephoneDestinataire}'},
     {'text': 'Destination     ${colis.gareDestination}'},
+    if (colis.gareDestinationPhone.isNotEmpty)
+      {'text': 'Tél. destination ${colis.gareDestinationPhone}'},
     {'text': '--------------------------------'},
     {'text': 'CONTENU', 'bold': true},
     {'text': 'Nature du colis: ${colisNatureLabel(colis)}'},
@@ -100,10 +102,8 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
-    if (colis.gareDepart.isNotEmpty)
-      {'text': colis.gareDepart, 'align': 'center', 'size': 'small'},
-    if (colis.gareDepartPhone.isNotEmpty)
-      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'size': 'small'},
+    if (colis.companyPhone.isNotEmpty)
+      {'text': 'Tél: ${colis.companyPhone}', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': ref, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},

@@ -73,8 +73,12 @@ export type ColisAutonomeRow = {
 export type ColisAutonomeDetail = ColisAutonomeRow & {
   companyId: string;
   companyName: string;
+  /** Téléphone de la compagnie — affiché en en-tête du reçu, sous le nom. */
+  companyPhone?: string | null;
   gareDepartId: string;
   gareDestinationId: string;
+  /** Téléphone de la gare de destination — affiché sous le champ Destination du reçu. */
+  gareDestinationPhone?: string | null;
   sourceVente: string;
   natureIds: string[];
 };
@@ -377,8 +381,10 @@ export async function getColisAutonomeDetailSupabase(
     ...base,
     companyId: String(row.companyId ?? ""),
     companyName: String(row.companyName ?? ""),
+    companyPhone: row.companyPhone ? String(row.companyPhone) : null,
     gareDepartId: String(row.gareDepartId ?? ""),
     gareDestinationId: String(row.gareDestinationId ?? ""),
+    gareDestinationPhone: row.gareDestinationPhone ? String(row.gareDestinationPhone) : null,
     sourceVente: String(row.sourceVente ?? "guichet_cash"),
     natureIds,
   };

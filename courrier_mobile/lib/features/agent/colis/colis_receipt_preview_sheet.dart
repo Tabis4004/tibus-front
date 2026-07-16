@@ -354,11 +354,8 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  if (colis.gareDepart.isNotEmpty)
-                    Text(colis.gareDepart,
-                        textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  if (colis.gareDepartPhone.isNotEmpty)
-                    Text('Tél: ${colis.gareDepartPhone}',
+                  if (colis.companyPhone.isNotEmpty)
+                    Text('Tél: ${colis.companyPhone}',
                         textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.black54)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
                 ],
@@ -384,6 +381,7 @@ class _ReceiptBox extends StatelessWidget {
                 if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
                   _Field('Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'),
                 _Field('Agence', colis.gareDepart),
+                if (colis.gareDepartPhone.isNotEmpty) _Field('Tél. agence', colis.gareDepartPhone),
                 if (agentName != null) _Field('Agent', agentName!),
                 _Field('Déposé le', formatColisDate(colis.createdAt)),
               ],
@@ -395,6 +393,8 @@ class _ReceiptBox extends StatelessWidget {
                 const SizedBox(height: 4),
                 _Field('Téléphone', colis.telephoneDestinataire),
                 _Field('Destination', colis.gareDestination),
+                if (colis.gareDestinationPhone.isNotEmpty)
+                  _Field('Tél. destination', colis.gareDestinationPhone),
               ],
             ),
             _Section(
@@ -505,10 +505,8 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            if (colis.gareDepart.isNotEmpty)
-              Text(colis.gareDepart, style: const TextStyle(fontSize: 9, color: Colors.black54)),
-            if (colis.gareDepartPhone.isNotEmpty)
-              Text('Tél: ${colis.gareDepartPhone}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
+            if (colis.companyPhone.isNotEmpty)
+              Text('Tél: ${colis.companyPhone}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
