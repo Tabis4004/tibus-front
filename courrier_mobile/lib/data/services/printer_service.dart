@@ -118,7 +118,7 @@ class PrinterService {
   Future<void> printColisReceipt(Colis colis, {int paperWidthMm = 58, String? agentName}) {
     final agent = agentName ?? _currentAgentName();
     return printReceipt(
-      header: const ['TIBUS COURRIER'],
+      header: [colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER'],
       reference: colisShortRef(colis),
       rows: [
         ['EXPÉDITEUR', colis.nomExpediteur],
@@ -150,7 +150,7 @@ class PrinterService {
   /// conserver par le client.
   Future<void> printColisTalon(Colis colis, {int paperWidthMm = 58}) {
     return printReceipt(
-      header: const ['TIBUS COURRIER'],
+      header: [colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER'],
       reference: colisShortRef(colis),
       rows: [
         ['Destination', colis.gareDestination],
@@ -232,7 +232,7 @@ class PrinterService {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
-      header: 'TIBUS COURRIER',
+      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
       lines: colisReceiptLines(colis, agentName: agentName ?? _currentAgentName()),
       qr: colis.id,
       qrSize: 220,
@@ -247,7 +247,7 @@ class PrinterService {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
-      header: 'TIBUS COURRIER',
+      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
       lines: colisTalonLines(colis),
       qr: colis.id,
       qrSize: 220,

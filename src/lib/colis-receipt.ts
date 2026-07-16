@@ -75,13 +75,14 @@ function printViaTibusP3(
   detail: ColisAutonomeDetail,
   lines: PrintLine[],
   paperWidth: ThermalPaperWidth,
+  companyName: string,
 ): boolean {
   const p3 = tibusP3();
   if (!p3?.printReceipt58 && !p3?.printReceipt80) return false;
 
   const qr = colisQrPayload(detail);
   const payload = JSON.stringify({
-    title: detail.companyName || "TIBUS COLIS",
+    title: companyName,
     text: lines.map((line) => line.text).join("\n"),
     qr,
     reference: qr,
@@ -91,15 +92,15 @@ function printViaTibusP3(
   });
 
   if (paperWidth === "80mm" && p3.printReceipt80) {
-    p3.printReceipt80(detail.companyName || "TIBUS COLIS", payload);
+    p3.printReceipt80(companyName, payload);
     return true;
   }
   if (p3.printReceipt58) {
-    p3.printReceipt58(detail.companyName || "TIBUS COLIS", payload);
+    p3.printReceipt58(companyName, payload);
     return true;
   }
   if (p3.printReceipt80) {
-    p3.printReceipt80(detail.companyName || "TIBUS COLIS", payload);
+    p3.printReceipt80(companyName, payload);
     return true;
   }
   return false;
@@ -117,14 +118,16 @@ export function printColisReceipt(
   detail: ColisAutonomeDetail,
   currency = "XOF",
   paperWidth: ThermalPaperWidth = "80mm",
+  companyName?: string,
 ): void {
+  const resolvedName = companyName || detail.companyName || "TIBUS COLIS";
   const lines = buildColisReceiptLines(detail, currency);
   const qr = colisQrPayload(detail);
   try {
-    if (printViaTibusP3(detail, lines, paperWidth)) return;
+    if (printViaTibusP3(detail, lines, paperWidth, resolvedName)) return;
     if (printer.isNative) {
       void printer.printReceipt({
-        header: detail.companyName || "TIBUS COLIS",
+        header: resolvedName,
         lines,
         qr,
         qrSize: 220,

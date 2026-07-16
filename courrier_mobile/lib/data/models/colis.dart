@@ -68,6 +68,13 @@ class Colis {
   final String gareDepart;
   final String gareDestination;
   final List<String> natures;
+  /// Nom de la compagnie propriétaire du colis (choisi par la compagnie
+  /// dans ses paramètres, ex. "SIS COURRIER") — déjà renvoyé par les RPC
+  /// list_colis_autonomes / get_colis_autonome_detail (voir
+  /// colis_detail_screen.dart), simplement absent du modèle jusqu'ici.
+  /// Vide si non fourni : les reçus retombent alors sur 'TIBUS COURRIER'
+  /// (voir colisReceiptLines et printer_service.dart).
+  final String companyName;
 
   const Colis({
     required this.id,
@@ -89,6 +96,7 @@ class Colis {
     required this.gareDepart,
     required this.gareDestination,
     required this.natures,
+    this.companyName = '',
   });
 
   factory Colis.fromMap(Map<String, dynamic> map) {
@@ -112,6 +120,7 @@ class Colis {
       gareDepart: map['gareDepart'] as String? ?? '',
       gareDestination: map['gareDestination'] as String? ?? '',
       natures: (map['natures'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      companyName: (map['companyName'] as String?)?.trim() ?? '',
     );
   }
 }

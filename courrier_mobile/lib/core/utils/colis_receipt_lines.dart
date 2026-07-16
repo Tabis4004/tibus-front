@@ -31,8 +31,9 @@ String colisContentLabel(Colis colis) {
 /// disponible (voir PrinterService._currentAgentName) — omis sinon.
 List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final ref = colisShortRef(colis);
+  final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
-    {'text': 'TIBUS COURRIER', 'align': 'center', 'bold': true, 'size': 'large'},
+    {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'large'},
@@ -74,8 +75,9 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
 /// ESC-POS.
 List<Map<String, dynamic>> colisTalonLines(Colis colis) {
   final ref = colisShortRef(colis);
+  final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
-    {'text': 'TIBUS COURRIER', 'align': 'center', 'bold': true},
+    {'text': company, 'align': 'center', 'bold': true},
     {'text': '================================', 'align': 'center'},
     {'text': ref, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},

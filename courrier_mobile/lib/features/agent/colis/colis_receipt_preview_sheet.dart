@@ -14,8 +14,9 @@ import '../../../data/services/printer_service.dart' show PrinterDevice, Printer
 /// buildColisTrackingWhatsAppMessage côté web, src/lib/colis-receipt.ts).
 String _colisWhatsAppShareMessage(Colis colis) {
   final ref = colisShortRef(colis);
+  final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
-    'TIBUS COURRIER — Reçu colis $ref',
+    '$company — Reçu colis $ref',
     'Trajet : ${colis.gareDepart} -> ${colis.gareDestination}',
     'Contenu : ${colisContentLabel(colis)}',
     "Frais d'envoi : ${colis.montantFret.toStringAsFixed(0)} FCFA",
@@ -284,10 +285,10 @@ class _ReceiptBox extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Column(
-                children: const [
-                  Text('TIBUS COURRIER',
-                      textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
+                children: [
+                  Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+                      textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
                 ],
               ),
             ),
@@ -429,7 +430,8 @@ class _TalonBox extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('TIBUS COURRIER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,

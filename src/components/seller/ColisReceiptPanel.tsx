@@ -74,18 +74,18 @@ export default function ColisReceiptPanel({
     if (!autoPrint || autoPrintedRef.current || !qrDataUrl) return;
     if (!posNative) return;
     autoPrintedRef.current = true;
-    printColisReceipt(detail, currency, "80mm");
-  }, [autoPrint, currency, detail, posNative, qrDataUrl]);
+    printColisReceipt(detail, currency, "80mm", companyName);
+  }, [autoPrint, currency, detail, posNative, qrDataUrl, companyName]);
 
   const handleThermalPrint = useCallback(
     (paperWidth: ThermalPaperWidth) => {
       if (isColisPosPrinterAvailable()) {
-        printColisReceipt(detail, currency, paperWidth);
+        printColisReceipt(detail, currency, paperWidth, companyName);
         return;
       }
       printColisReceiptBrowser(paperWidth);
     },
-    [currency, detail],
+    [currency, detail, companyName],
   );
 
   const handleWhatsAppShare = useCallback(
