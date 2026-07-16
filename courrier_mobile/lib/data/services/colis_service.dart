@@ -177,13 +177,26 @@ class ColisService {
         .toList();
   }
 
-  /// Soumet le reversement de fin de service — la session passe en
-  /// `en_reversement` (ventes bloquées) jusqu'à validation par le comptable
-  /// ou l'owner sur Tibus web. Même RPC que le web (submit_station_cash_reversal).
+  /// Soumet un reversement de fin (ou de milieu) de service — n'affecte plus
+  /// le statut de la caisse : les ventes continuent sans attendre la
+  /// validation comptable/owner. La validation ne fait plus que consigner
+  /// l'historique (montant, date, à qui la remise a été faite). Plusieurs
+  /// remises peuvent être soumises dans la même journée pour une même caisse.
   Future<void> submitStationCashReversal(String caisseId, double amount) async {
     await _client.rpc('submit_station_cash_reversal', params: {
       'p_caisse_id': caisseId,
       'p_montant_reverse': amount.round().clamp(1, 1 << 31),
+    });
+  }
+
+  /// Clôture explicite de la session de caisse — action séparée de la
+  /// remise/validation comptable (voir close_station_cash_register côté
+  /// base) : le vendeur (ou le comptable/owner) décide seul quand sa
+  /// journée de vente est terminée, indépendamment de la validation d'un
+  /// éventuel reversement encore en attente.
+  Future<void> closeStationCash(String caisseId) async {
+    await _client.rpc('close_station_cash_register', params: {
+      'p_caisse_id': caisseId,
     });
   }
 

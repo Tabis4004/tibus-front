@@ -6,11 +6,13 @@ import '../../../data/models/colis.dart';
 
 /// Caisse physique guichet — réplique StationCashPanel.tsx (web) :
 /// ouverture (gare + fond de roulement), solde + journal de mouvements
-/// pendant la session, soumission du reversement de fin de service.
+/// pendant la session, remises au comptable et clôture de session.
 /// Mêmes RPC des deux côtés (open_station_cash_register,
-/// list_station_cash_movements, submit_station_cash_reversal) — la
-/// validation du reversement reste réservée au comptable/owner sur Tibus
-/// web (pas de rôle comptable_gare dans Courrier pour l'instant).
+/// list_station_cash_movements, submit_station_cash_reversal,
+/// close_station_cash_register). Depuis le fix "caisse jamais bloquante" :
+/// soumettre une remise n'arrête plus les ventes (c'est un simple
+/// historique), et la clôture de session est une action séparée et
+/// explicite, indépendante de la validation comptable/owner du reversement.
 class StationCashScreen extends ConsumerStatefulWidget {
   const StationCashScreen({super.key});
 
@@ -141,19 +143,58 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
     setState(() => _saving = true);
     try {
       await ref.read(colisServiceProvider).submitStationCashReversal(cash.id!, amount);
-      // La caisse se ferme (en_reversement) : activeCompanyIdProvider doit
-      // retomber sur la résolution par rôle tant qu'aucune nouvelle caisse
-      // n'est ouverte.
-      ref.invalidate(activeCompanyIdProvider);
+      // La caisse reste ouverte (les ventes continuent) : pas besoin
+      // d'invalider activeCompanyIdProvider ici, seul close_station_cash
+      // change réellement la compagnie/caisse active.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reversement soumis au comptable')),
+          const SnackBar(content: Text('Remise enregistrée — vous pouvez continuer les ventes.')),
         );
       }
       await _load();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Soumission impossible : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Clôture explicite de la session — indépendante de toute soumission ou
+  /// validation de reversement (voir docstring de closeStationCash).
+  Future<void> _closeCash() async {
+    final cash = _cash;
+    if (cash == null || !cash.open || cash.id == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Clôturer la caisse ?'),
+        content: Text(
+          'Solde espèces actuel : ${(cash.balance ?? 0).toStringAsFixed(0)} FCFA.\n'
+          'Vous ne pourrez plus enregistrer de ventes sur cette session après clôture.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Clôturer')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(colisServiceProvider).closeStationCash(cash.id!);
+      // La compagnie/caisse active change réellement ici : la résolution
+      // doit retomber sur la règle par rôle tant qu'aucune nouvelle caisse
+      // n'est ouverte.
+      ref.invalidate(activeCompanyIdProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Caisse clôturée.')));
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Clôture impossible : $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -202,6 +243,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               reversalController: _reversalAmount,
               saving: _saving,
               onSubmitReversal: _submitReversal,
+              onCloseCash: _closeCash,
               dateFmt: _dateFmt,
             ),
           const SizedBox(height: 20),
@@ -287,6 +329,7 @@ class _OpenCashDetails extends StatelessWidget {
   final TextEditingController reversalController;
   final bool saving;
   final VoidCallback onSubmitReversal;
+  final VoidCallback onCloseCash;
   final DateFormat dateFmt;
 
   const _OpenCashDetails({
@@ -294,6 +337,7 @@ class _OpenCashDetails extends StatelessWidget {
     required this.reversalController,
     required this.saving,
     required this.onSubmitReversal,
+    required this.onCloseCash,
     required this.dateFmt,
   });
 
@@ -342,11 +386,11 @@ class _OpenCashDetails extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Reversement fin de service', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Remise au comptable', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 const Text(
-                  'Clôturez votre service : les ventes cash seront bloquées jusqu\'à validation '
-                  'par le comptable ou l\'owner sur Tibus web.',
+                  'Enregistre une remise d\'espèces au comptable/owner (historique — date, montant, '
+                  'à qui). La caisse reste ouverte et les ventes continuent normalement.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
@@ -358,7 +402,30 @@ class _OpenCashDetails extends StatelessWidget {
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: saving ? null : onSubmitReversal,
-                  child: Text(saving ? '…' : 'Soumettre au comptable'),
+                  child: Text(saving ? '…' : 'Enregistrer la remise'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Clôturer la session', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Action séparée de la remise ci-dessus : à faire quand votre journée de vente '
+                  'est terminée, indépendamment d\'une validation comptable en attente.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: saving ? null : onCloseCash,
+                  child: Text(saving ? '…' : 'Clôturer la caisse'),
                 ),
               ],
             ),
