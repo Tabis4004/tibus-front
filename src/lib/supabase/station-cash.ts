@@ -181,6 +181,21 @@ export async function validateStationCashReversalSupabase(
   if (error) throw error;
 }
 
+// Clôture explicite de session, indépendante de la soumission/validation
+// d'un reversement (voir migration separate_close_station_cash_from_validation) :
+// soumettre un reversement ne bloque plus les ventes, la caisse reste
+// ouverte jusqu'à un appel explicite ici. Même RPC partagée par
+// courrier_mobile (close_station_cash_register) — un seul modèle de caisse
+// pour toute la plateforme Tibus, billetterie comme colis.
+export async function closeStationCashRegisterSupabase(
+  caisseId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("close_station_cash_register", {
+    p_caisse_id: caisseId,
+  });
+  if (error) throw error;
+}
+
 export async function listCompanyStationGaresSupabase(
   companyId: string,
 ): Promise<StationGareOption[]> {

@@ -12,6 +12,7 @@ import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { isBrowserOnline } from "@/lib/offline/network.ts";
 import { resolveOpenStationCashForSeller } from "@/lib/offline/counter-sale-offline.ts";
 import {
+  closeStationCashRegisterSupabase,
   getOpenStationCashSupabase,
   listCompanyStationGaresSupabase,
   listStationCashMovementsSupabase,
@@ -169,10 +170,33 @@ export default function StationCashPanel({
     setSaving(true);
     try {
       await submitStationCashReversalSupabase(cash.id, parsed);
-      toast.success("Reversement soumis au comptable");
+      toast.success("Remise enregistrée — vous pouvez continuer les ventes");
       await load(true);
     } catch (err) {
       toast.error(supabaseErrorMessage(err, "Soumission impossible"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClose = async () => {
+    if (!cash?.open || !cash.id) return;
+    if (
+      !window.confirm(
+        `Solde espèces actuel : ${(cash.balance ?? 0).toLocaleString()} FCFA.\n` +
+          "Vous ne pourrez plus enregistrer de ventes sur cette session après clôture. Confirmer ?",
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await closeStationCashRegisterSupabase(cash.id);
+      toast.success("Caisse clôturée");
+      window.dispatchEvent(new CustomEvent("tibus:station-cash-refresh"));
+      await load();
+    } catch (err) {
+      toast.error(supabaseErrorMessage(err, "Clôture impossible"));
     } finally {
       setSaving(false);
     }
@@ -219,13 +243,13 @@ export default function StationCashPanel({
             },
             {
               step: "3",
-              title: "Fin de service",
-              text: "Soumettez le reversement vers le compte consolidé compagnie.",
+              title: "Remise",
+              text: "Remettez les espèces au comptable quand vous le souhaitez — les ventes continuent.",
             },
             {
               step: "4",
-              title: "Validation",
-              text: "Le comptable ou l'owner approuve et clôture la session.",
+              title: "Clôture",
+              text: "Clôturez votre session en fin de journée, indépendamment de la validation comptable.",
             },
           ].map((item, index) => {
             const tile = consoleTileStyle(index);
@@ -332,10 +356,10 @@ export default function StationCashPanel({
             </div>
 
             <div className="rounded-xl border p-4 space-y-3">
-              <p className="text-sm font-semibold">Reversement fin de service</p>
+              <p className="text-sm font-semibold">Remise au comptable</p>
               <p className="text-xs text-muted-foreground">
-                Clôturez votre service : les ventes cash seront bloquées jusqu&apos;à validation par le comptable
-                ou l&apos;owner sur le compte consolidé de la compagnie.
+                Enregistre une remise d&apos;espèces au comptable/owner (historique — date, montant, à qui).
+                La caisse reste ouverte et les ventes continuent normalement.
               </p>
               <div className="flex flex-wrap gap-2 items-end">
                 <div className="space-y-1.5 flex-1 min-w-[180px]">
@@ -349,9 +373,20 @@ export default function StationCashPanel({
                   />
                 </div>
                 <Button onClick={handleReversal} disabled={saving} className="cursor-pointer">
-                  Soumettre au comptable
+                  Enregistrer la remise
                 </Button>
               </div>
+            </div>
+
+            <div className="rounded-xl border p-4 space-y-3">
+              <p className="text-sm font-semibold">Clôturer la session</p>
+              <p className="text-xs text-muted-foreground">
+                Action séparée de la remise ci-dessus : à faire quand votre journée de vente est terminée,
+                indépendamment d&apos;une validation comptable en attente.
+              </p>
+              <Button onClick={handleClose} disabled={saving} variant="outline" className="cursor-pointer">
+                Clôturer la caisse
+              </Button>
             </div>
           </>
         )}
