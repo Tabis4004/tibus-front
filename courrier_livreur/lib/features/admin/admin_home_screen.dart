@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import 'driver_validation_screen.dart';
+import 'fraud_admin_screen.dart';
+import 'audit_log_screen.dart';
+import 'billing_admin_screen.dart';
+import 'commission_report_screen.dart';
+import 'insurance_admin_screen.dart';
+import 'metrics_screen.dart';
 import 'pricing_settings_screen.dart';
+import 'rewards_settings_screen.dart';
+import 'rides_admin_screen.dart';
+import 'roles_permissions_screen.dart';
+import 'users_admin_screen.dart';
 import 'wallets_admin_screen.dart';
 
 /// Point d'entrée admin/superadmin — visible uniquement quand
@@ -42,6 +52,96 @@ class AdminHomeScreen extends StatelessWidget {
             subtitle: 'Solde, recharge, ajustement',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const WalletsAdminScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.shield_outlined,
+            title: 'Assurance — validation',
+            subtitle: 'Dossiers, documents, validation',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const InsuranceAdminScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.gpp_maybe_outlined,
+            title: 'Anti-fraude',
+            subtitle: 'Journal des signaux de fraude',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const FraudAdminScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.people_outline,
+            title: 'Utilisateurs',
+            subtitle: 'Recherche, rôles, blocage, pays',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const UsersAdminScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.admin_panel_settings_outlined,
+            title: 'Rôles & permissions',
+            subtitle: 'Admins par pays, mot de passe (superadmin)',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RolesPermissionsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.query_stats_outlined,
+            title: 'Suivi financier KPI',
+            subtitle: 'Rapport de commission, export CSV',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CommissionReportScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.receipt_long_outlined,
+            title: 'Facturation',
+            subtitle: 'Entités corporate, factures, paiements',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BillingAdminScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.history_outlined,
+            title: "Journal d'audit",
+            subtitle: 'Réservé superadmin',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AuditLogScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.card_giftcard_outlined,
+            title: 'Récompenses',
+            subtitle: 'Réglages fidélité, pénalités livreur',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RewardsSettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.local_taxi_outlined,
+            title: 'Courses',
+            subtitle: 'Historique plateforme, détail commission',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RidesAdminScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.insights_outlined,
+            title: 'Métriques',
+            subtitle: "Vue d'ensemble plateforme",
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MetricsScreen()),
             ),
           ),
         ],

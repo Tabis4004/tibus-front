@@ -799,6 +799,504 @@ class DriverBackend {
   }
 
   // ---------------------------------------------------------------------
+  // Admin — Assurance, validation (tâche #33). Portage de InsuranceTab /
+  // insurer.tsx : list_insured_drivers / verify_driver_insurance /
+  // get_insurance_document_path sont tous SECURITY DEFINER avec contrôle
+  // interne (has_role 'insurer' ou 'admin', voir audit RLS de cette
+  // session) — appelables directement depuis Flutter, contrairement aux
+  // wallets. L'admin a par ailleurs un accès Storage complet sur
+  // driver-documents ("Admins manage driver-documents", ALL, sans
+  // restriction de dossier) donc createSignedUrl fonctionne pour n'importe
+  // quel livreur, pas seulement le sien.
+  // ---------------------------------------------------------------------
+
+  static Future<List<Map<String, dynamic>>> fetchInsuredDrivers() async {
+    final rows = await client.rpc('list_insured_drivers');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> verifyDriverInsuranceAdmin(String driverId) async {
+    await client.rpc('verify_driver_insurance', params: {'_driver_id': driverId});
+  }
+
+  static Future<String> getAdminInsuranceDocumentSignedUrl(String driverId) async {
+    final path = await client.rpc('get_insurance_document_path', params: {'_driver_id': driverId});
+    if (path == null) throw Exception('Aucun document pour ce livreur.');
+    return client.storage.from(_insuranceBucket).createSignedUrl(path as String, 600);
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Anti-fraude (tâche #34). Portage de FraudTab (admin.tsx) —
+  // fraud_logs est en lecture directe pour l'admin (RLS "Admins read fraud
+  // logs", SELECT), pas d'écriture prévue côté admin (les lignes sont
+  // insérées par les fonctions SECURITY DEFINER elles-mêmes, ex.
+  // claim_driver_share_reward).
+  // ---------------------------------------------------------------------
+
+  static const fraudLogKinds = [
+    'share_cooldown',
+    'share_daily_cap',
+    'referral_duplicate',
+    'referral_invalid_code',
+    'referral_self',
+    'referral_same_phone',
+    'duplicate_payout_attempt',
+  ];
+
+  static Future<List<Map<String, dynamic>>> fetchFraudLogs({String? kind}) async {
+    dynamic query = client.from('fraud_logs').select();
+    if (kind != null && kind.isNotEmpty) query = query.eq('kind', kind);
+    final rows = await query.order('created_at', ascending: false).limit(200);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Suivi financier KPI (tâche #37). Portage de commissionReport
+  // (admin.functions.ts) — utilise context.supabase (PAS supabaseAdmin)
+  // côté web, donc en libre-service RLS ici aussi. RLS "Admin sees rides
+  // scoped" applique déjà elle-même le cantonnement pays d'un admin non-
+  // superadmin (admin_country(auth.uid())) — inutile de le reproduire
+  // manuellement comme pour /users, la base le fait pour nous.
+  // ---------------------------------------------------------------------
+
+  static const rideCategories = ['taxi', 'eco', 'confort', 'confort_plus', 'vip'];
+
+  static Future<Map<String, dynamic>> fetchCommissionReport({
+    required DateTime from,
+    required DateTime to,
+    String? category,
+    String? driverId,
+    String? country,
+  }) async {
+    dynamic query = client
+        .from('rides')
+        .select('id, completed_at, category, driver_id, passenger_id, price_xof, commission_xof, commission_rate, driver_earnings_xof, city, country, program_id')
+        .eq('status', 'completed')
+        .gte('completed_at', from.toIso8601String())
+        .lte('completed_at', to.toIso8601String());
+    if (category != null) query = query.eq('category', category);
+    if (driverId != null) query = query.eq('driver_id', driverId);
+    if (country != null) query = query.eq('country', country);
+    final rides = ((await query.order('completed_at', ascending: false).limit(5000)) as List).cast<Map<String, dynamic>>();
+
+    final driverIds = rides.map((r) => r['driver_id'] as String?).whereType<String>().toSet().toList();
+    final driverMap = <String, String>{};
+    if (driverIds.isNotEmpty) {
+      final profs = await client.from('profiles').select('id, full_name').inFilter('id', driverIds);
+      for (final p in (profs as List)) {
+        driverMap[p['id'] as String] = p['full_name'] as String? ?? '';
+      }
+    }
+
+    final rideIds = rides.map((r) => r['id'] as String).toList();
+    final bonusByRide = <String, int>{};
+    if (rideIds.isNotEmpty) {
+      final settings = await client.from('reward_settings').select('driver_point_value_xof').eq('id', true).maybeSingle();
+      final pointValueXof = (settings?['driver_point_value_xof'] as num?)?.toDouble() ?? 1;
+      final rewardTx = await client
+          .from('driver_reward_transactions')
+          .select('ride_id, points')
+          .inFilter('ride_id', rideIds)
+          .inFilter('type', ['ride_accepted', 'ride_completed', 'referral_bonus']);
+      for (final tx in (rewardTx as List)) {
+        final rId = tx['ride_id'] as String?;
+        if (rId == null) continue;
+        final pts = (tx['points'] as num?)?.toInt() ?? 0;
+        bonusByRide[rId] = (bonusByRide[rId] ?? 0) + (pts * pointValueXof).round();
+      }
+    }
+
+    final rows = rides.map((r) {
+      final id = r['id'] as String;
+      return {...r, 'driver_name': driverMap[r['driver_id']], 'bonus_xof': bonusByRide[id] ?? 0};
+    }).toList();
+
+    int sumField(String f) => rows.fold(0, (s, r) => s + ((r[f] as num?)?.toInt() ?? 0));
+    final totals = {
+      'rides': rows.length,
+      'revenue_xof': sumField('price_xof'),
+      'commission_xof': sumField('commission_xof'),
+      'driver_earnings_xof': sumField('driver_earnings_xof'),
+      'bonus_xof': sumField('bonus_xof'),
+    };
+
+    final byCategory = <String, Map<String, dynamic>>{};
+    final byDriver = <String, Map<String, dynamic>>{};
+    for (final r in rows) {
+      final cat = r['category'] as String? ?? '?';
+      final c = byCategory.putIfAbsent(cat, () => {'category': cat, 'rides': 0, 'revenue_xof': 0, 'commission_xof': 0, 'bonus_xof': 0});
+      c['rides'] = (c['rides'] as int) + 1;
+      c['revenue_xof'] = (c['revenue_xof'] as int) + ((r['price_xof'] as num?)?.toInt() ?? 0);
+      c['commission_xof'] = (c['commission_xof'] as int) + ((r['commission_xof'] as num?)?.toInt() ?? 0);
+      c['bonus_xof'] = (c['bonus_xof'] as int) + ((r['bonus_xof'] as num?)?.toInt() ?? 0);
+
+      final drvId = r['driver_id'] as String?;
+      if (drvId != null) {
+        final d = byDriver.putIfAbsent(drvId, () => {
+              'driver_id': drvId,
+              'driver_name': r['driver_name'],
+              'rides': 0,
+              'revenue_xof': 0,
+              'commission_xof': 0,
+              'earnings_xof': 0,
+              'bonus_xof': 0,
+            });
+        d['rides'] = (d['rides'] as int) + 1;
+        d['revenue_xof'] = (d['revenue_xof'] as int) + ((r['price_xof'] as num?)?.toInt() ?? 0);
+        d['commission_xof'] = (d['commission_xof'] as int) + ((r['commission_xof'] as num?)?.toInt() ?? 0);
+        d['earnings_xof'] = (d['earnings_xof'] as int) + ((r['driver_earnings_xof'] as num?)?.toInt() ?? 0);
+        d['bonus_xof'] = (d['bonus_xof'] as int) + ((r['bonus_xof'] as num?)?.toInt() ?? 0);
+      }
+    }
+
+    return {
+      'rows': rows,
+      'totals': totals,
+      'byCategory': byCategory.values.toList(),
+      'byDriver': byDriver.values.toList(),
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Facturation (tâche #38). Portage de listCorporates/
+  // createCorporate/listInvoices/createInvoice/updateInvoiceStatus/
+  // recordInvoicePayment (admin.functions.ts) — toutes utilisent
+  // context.supabase (PAS supabaseAdmin) côté web : en libre-service RLS
+  // ici aussi (comme pricing_settings, PAS comme wallets/utilisateurs).
+  // "Admins manage corporates/invoices scoped" applique déjà le
+  // cantonnement pays d'un admin non-superadmin, comme pour rides.
+  // ---------------------------------------------------------------------
+
+  static const invoiceStatusLabel = {'draft': 'Brouillon', 'issued': 'Émise', 'paid': 'Payée', 'cancelled': 'Annulée'};
+  static const paymentMethodLabel = {'bank_transfer': 'Virement', 'mobile_money': 'Mobile Money', 'cash': 'Espèces', 'card': 'Carte', 'other': 'Autre'};
+
+  static Future<List<Map<String, dynamic>>> fetchCorporates() async {
+    final rows = await client.from('corporate_accounts').select().order('name');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> createCorporate(Map<String, dynamic> payload) async {
+    try {
+      await client.from('corporate_accounts').insert(payload);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchInvoices() async {
+    final rows = await client.from('invoices').select('*, corporate:corporate_accounts(id,name,country)').order('created_at', ascending: false).limit(500);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> createInvoice({
+    required String corporateId,
+    String? periodStart,
+    String? periodEnd,
+    String? dueDate,
+    String? notes,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('Session requise');
+    int subtotal = 0;
+    for (final it in items) {
+      subtotal += ((it['quantity'] as num) * (it['unit_price_xof'] as num)).round();
+    }
+    final vat = (subtotal * 0.18).round();
+    final total = subtotal + vat;
+    try {
+      final inv = await client.from('invoices').insert({
+        'corporate_id': corporateId,
+        'period_start': periodStart,
+        'period_end': periodEnd,
+        'due_date': dueDate,
+        'notes': notes,
+        'subtotal_xof': subtotal,
+        'vat_rate': 18,
+        'vat_xof': vat,
+        'total_xof': total,
+        'created_by': userId,
+      }).select().single();
+      final invoiceId = inv['id'] as String;
+      await client.from('invoice_items').insert(items
+          .map((it) => {
+                'invoice_id': invoiceId,
+                'description': it['description'],
+                'quantity': it['quantity'],
+                'unit_price_xof': it['unit_price_xof'],
+                'total_xof': ((it['quantity'] as num) * (it['unit_price_xof'] as num)).round(),
+              })
+          .toList());
+      await client.from('audit_logs').insert({
+        'actor_id': userId,
+        'action': 'invoice.create',
+        'target_type': 'invoices',
+        'target_id': invoiceId,
+        'details': {'total_xof': total},
+      });
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<void> updateInvoiceStatus(String invoiceId, String status) async {
+    final userId = currentUser?.id;
+    final now = DateTime.now().toIso8601String();
+    final patch = <String, dynamic>{'status': status};
+    if (status == 'issued') patch['issued_at'] = now;
+    if (status == 'paid') patch['paid_at'] = now;
+    if (status == 'cancelled') patch['cancelled_at'] = now;
+    try {
+      await client.from('invoices').update(patch).eq('id', invoiceId);
+      if (userId != null) {
+        await client.from('audit_logs').insert({
+          'actor_id': userId,
+          'action': 'invoice.status',
+          'target_type': 'invoices',
+          'target_id': invoiceId,
+          'details': {'status': status},
+        });
+      }
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<void> recordInvoicePayment({
+    required String invoiceId,
+    required int amountXof,
+    required String method,
+    String? reference,
+    String? paidOn,
+    String? notes,
+  }) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('Session requise');
+    try {
+      await client.from('invoice_payments').insert({
+        'invoice_id': invoiceId,
+        'amount_xof': amountXof,
+        'method': method,
+        'reference': reference,
+        'paid_on': paidOn ?? DateTime.now().toIso8601String().substring(0, 10),
+        'notes': notes,
+        'recorded_by': userId,
+      });
+
+      final payments = await client.from('invoice_payments').select('amount_xof').eq('invoice_id', invoiceId);
+      final paidTotal = (payments as List).fold<int>(0, (s, p) => s + ((p['amount_xof'] as num?)?.toInt() ?? 0));
+
+      final inv = await client.from('invoices').select('total_xof, status').eq('id', invoiceId).single();
+      final patch = <String, dynamic>{'paid_xof': paidTotal};
+      if (paidTotal >= ((inv['total_xof'] as num?)?.toInt() ?? 0) && inv['status'] != 'paid') {
+        patch['status'] = 'paid';
+        patch['paid_at'] = DateTime.now().toIso8601String();
+      }
+      await client.from('invoices').update(patch).eq('id', invoiceId);
+
+      await client.from('audit_logs').insert({
+        'actor_id': userId,
+        'action': 'invoice.payment',
+        'target_type': 'invoices',
+        'target_id': invoiceId,
+        'details': {'amount_xof': amountXof, 'method': method, if (reference != null) 'reference': reference},
+      });
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchInvoicePayments(String invoiceId) async {
+    final rows = await client.from('invoice_payments').select().eq('invoice_id', invoiceId).order('paid_on', ascending: false);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Journal d'audit (tâche #39). Portage de listAuditLogs
+  // (admin.functions.ts) — audit_logs est lisible en direct, réservé
+  // superadmin par RLS ("Superadmins read audit logs" SELECT) : un admin
+  // pays simple obtient une liste vide, pas d'erreur, cohérent avec le web
+  // qui masque cet onglet pour les non-superadmins.
+  // ---------------------------------------------------------------------
+
+  static Future<List<Map<String, dynamic>>> fetchAuditLogs() async {
+    final rows = await client.from('audit_logs').select().order('created_at', ascending: false).limit(500);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Récompenses, réglages (tâche #40). reward_settings (ligne
+  // unique id=true) et driver_penalty_rules sont tous deux en libre-
+  // service RLS pour l'admin (UPDATE/ALL has_role 'admin'), pas de
+  // scoping pays (réglages globaux) — accès direct, comme pricing_settings.
+  // ---------------------------------------------------------------------
+
+  static Future<Map<String, dynamic>> fetchRewardSettingsAdmin() async {
+    final row = await client.from('reward_settings').select().eq('id', true).single();
+    return row;
+  }
+
+  static Future<void> updateRewardSettingsAdmin(Map<String, dynamic> patch) async {
+    try {
+      await client.from('reward_settings').update(patch).eq('id', true);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchPenaltyRules() async {
+    final rows = await client.from('driver_penalty_rules').select().order('code');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> updatePenaltyRule(String id, Map<String, dynamic> patch) async {
+    try {
+      await client.from('driver_penalty_rules').update(patch).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<void> createPenaltyRule(Map<String, dynamic> payload) async {
+    try {
+      await client.from('driver_penalty_rules').insert(payload);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Courses (tâche #41). Portage de RidesTab + getRideCommissionDetail
+  // (admin.tsx / admin.functions.ts) — tous deux utilisent context.supabase
+  // (pas supabaseAdmin) : libre-service RLS ici aussi. "Admin sees rides
+  // scoped" applique déjà le cantonnement pays.
+  // ---------------------------------------------------------------------
+
+  static Future<List<Map<String, dynamic>>> fetchAllRides({int limit = 100}) async {
+    final rows = await client.from('rides').select().order('created_at', ascending: false).limit(limit);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Reflète resolveCommissionFor() : priorité à un commission_schedules
+  /// actif couvrant la date, sinon repli sur pricing_settings par défaut
+  /// pour la catégorie.
+  static Future<Map<String, dynamic>> fetchRideCommissionDetail(String rideId) async {
+    final ride = await client.from('rides').select().eq('id', rideId).single();
+    final category = ride['category'] as String;
+    final at = (ride['completed_at'] ?? ride['updated_at'] ?? DateTime.now().toIso8601String()) as String;
+
+    final sched = await client
+        .from('commission_schedules')
+        .select()
+        .eq('category', category)
+        .eq('active', true)
+        .lte('starts_at', at)
+        .or('ends_at.is.null,ends_at.gt.$at')
+        .order('priority', ascending: false)
+        .order('starts_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    Map<String, dynamic> resolved;
+    if (sched != null) {
+      resolved = {
+        'source': 'schedule',
+        'schedule_id': sched['id'],
+        'notes': sched['notes'],
+        'commission_type': sched['commission_type'],
+        'commission_rate': sched['commission_rate'],
+        'commission_flat_xof': sched['commission_flat_xof'],
+      };
+    } else {
+      final def = await client.from('pricing_settings').select().eq('category', category).eq('active', true).limit(1).maybeSingle();
+      if (def != null) {
+        resolved = {
+          'source': 'default',
+          'schedule_id': null,
+          'notes': null,
+          'commission_type': def['commission_type'] ?? 'percent',
+          'commission_rate': def['commission_rate'] ?? 0,
+          'commission_flat_xof': def['commission_flat_xof'] ?? 0,
+        };
+      } else {
+        resolved = {'source': 'none', 'schedule_id': null, 'notes': null, 'commission_type': 'percent', 'commission_rate': 0, 'commission_flat_xof': 0};
+      }
+    }
+
+    final walletTx = await client.from('wallet_transactions').select().eq('ride_id', rideId).order('created_at', ascending: false);
+    return {'ride': ride, 'resolved': resolved, 'wallet_tx': (walletTx as List).cast<Map<String, dynamic>>()};
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Métriques (tâche #42). Portage de MetricsTab (admin.tsx) —
+  // 4 requêtes directes (count + somme), RLS scope déjà pays pour un admin
+  // non-superadmin sur rides/driver_profiles.
+  // ---------------------------------------------------------------------
+
+  static Future<Map<String, dynamic>> fetchAdminMetrics() async {
+    final totalRidesRes = await client.from('rides').count();
+    final completedRes = await client.from('rides').select().eq('status', 'completed').count();
+    final revRows = await client.from('rides').select('price_xof').eq('status', 'completed');
+    final driversRes = await client.from('driver_profiles').select().eq('status', 'approved').count();
+
+    final total = (revRows as List).fold<int>(0, (s, r) => s + ((r['price_xof'] as num?)?.toInt() ?? 0));
+    final commission = (total * 0.15).round();
+
+    return {
+      'totalRides': totalRidesRes.count,
+      'completed': completedRes.count,
+      'total': total,
+      'commission': commission,
+      'drivers': driversRes.count,
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Utilisateurs (tâche #35). Comme les wallets, passe par une Edge
+  // Function service_role (admin-users) : auth.users (email, banned_until,
+  // dernière connexion) n'est accessible par aucun rôle client, et le
+  // ban/unban exige auth.admin.updateUserById. Voir le fichier pour le
+  // détail des garde-fous reproduits (scoping pays, auto-protection,
+  // réservé superadmin) — identiques à admin.functions.ts côté web.
+  // ---------------------------------------------------------------------
+
+  static const serviceCountries = [
+    'Sénégal', "Côte d'Ivoire", 'Togo', 'Bénin', 'Niger', 'Nigeria', 'Mali', 'Burkina Faso', 'Ghana', 'Guinée',
+  ];
+
+  static const assignableRoles = ['admin', 'driver', 'passenger', 'support', 'insurer', 'superadmin'];
+
+  static Future<Map<String, dynamic>> _callAdminUsersFn(Map<String, dynamic> body) async {
+    final res = await client.functions.invoke('admin-users', body: body);
+    final data = res.data;
+    if (data is Map && data['error'] != null) {
+      throw Exception(data['error'].toString());
+    }
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchAllUsers() async {
+    final res = await _callAdminUsersFn({'action': 'list'});
+    return (res['users'] as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> setUserBanned(String userId, bool banned, {String? reason}) =>
+      _callAdminUsersFn({'action': 'setBanned', 'user_id': userId, 'banned': banned, if (reason != null) 'reason': reason});
+
+  static Future<void> setUserRole(String userId, String role, bool grant) =>
+      _callAdminUsersFn({'action': 'setRole', 'user_id': userId, 'role': role, 'grant': grant});
+
+  static Future<void> setUserCountry(String userId, String? country) =>
+      _callAdminUsersFn({'action': 'setCountry', 'user_id': userId, 'country': country});
+
+  static Future<void> promoteCountryAdmin(String userId, String country) =>
+      _callAdminUsersFn({'action': 'promoteCountryAdmin', 'user_id': userId, 'country': country});
+
+  /// Réservé superadmin côté Edge Function (tâche #36).
+  static Future<void> setUserPassword(String userId, String password) =>
+      _callAdminUsersFn({'action': 'setPassword', 'user_id': userId, 'password': password});
+
+  // ---------------------------------------------------------------------
   // Admin — Wallets livreurs (tâche #32). Contrairement aux tarifs
   // (pricing_settings, RLS "Admins manage..." en libre-service), les tables
   // wallet n'ont AUCUNE policy d'écriture pour l'admin, et
