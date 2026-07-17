@@ -42,6 +42,12 @@ extension ColisStatutX on ColisStatut {
 
 class Colis {
   final String id;
+  /// Numéro de reçu séquentiel par gare de départ (migration 180) :
+  /// 4 premiers caractères du nom de la gare + ordre sur 6 chiffres
+  /// (ex. ABOI000001 pour le 1er colis d'Aboisso). Attribué par trigger en
+  /// base — null uniquement pour un colis local hors connexion pas encore
+  /// synchronisé ; les reçus retombent alors sur la référence CL-XXXXXXXX.
+  final String? numeroRecu;
   final ColisStatut statut;
   final String nomExpediteur;
   final String telephoneExpediteur;
@@ -105,6 +111,7 @@ class Colis {
 
   const Colis({
     required this.id,
+    this.numeroRecu,
     required this.statut,
     required this.nomExpediteur,
     required this.telephoneExpediteur,
@@ -134,6 +141,7 @@ class Colis {
   factory Colis.fromMap(Map<String, dynamic> map) {
     return Colis(
       id: map['id'] as String,
+      numeroRecu: (map['numeroRecu'] as String?)?.trim(),
       statut: ColisStatutX.fromDb(map['statutColis'] as String? ?? 'enregistre'),
       nomExpediteur: map['nomExpediteur'] as String? ?? '',
       telephoneExpediteur: map['telephoneExpediteur'] as String? ?? '',
