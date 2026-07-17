@@ -156,7 +156,7 @@ class P3PrinterModule(private val ctx: Context) {
         val total: String = "",
         val extraFields: List<Pair<String, String>> = emptyList(),
         val qr: String = "",
-        val footer: String = "Powered by Tibus",
+        val footer: String = "Powered by www.tibus.app",
     )
 
     /** Single source of truth: layout used by sale, reservation and reprint. */
@@ -169,10 +169,10 @@ class P3PrinterModule(private val ctx: Context) {
         // Téléphones gare de départ + destination sous le nom de la
         // compagnie, en GRAS (demande explicite).
         if (t.companyPhone.isNotBlank())
-            printWrappedLine(p, "Tel: ${t.companyPhone}",
+            printWrappedLine(p, "Tél siège: ${t.companyPhone}",
                 PrintOptions(align = "center", size = "small", bold = true), paperWidth)
         if (t.destinationPhone.isNotBlank())
-            printWrappedLine(p, "Tel dest: ${t.destinationPhone}",
+            printWrappedLine(p, "Tél dest: ${t.destinationPhone}",
                 PrintOptions(align = "center", size = "small", bold = true), paperWidth)
         if (t.companyEmail.isNotBlank())
             printWrappedLine(p, t.companyEmail,
@@ -356,12 +356,19 @@ class P3PrinterModule(private val ctx: Context) {
         val companyEmail = (cleanHeader.firstOrNull { it.contains("@") }
             ?.let { Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}").find(it)?.value }
             ?: map["email"]).orEmpty()
+        // IMPORTANT : pas de repli sur map["telephone"] ici. Ce repli servait
+        // à retrouver un téléphone "perdu" dans des lignes bruitées, mais il
+        // capte aussi bien le téléphone du VOYAGEUR/EXPÉDITEUR (ligne
+        // "Téléphone" des rows, ex. reçu colis) que celui de la compagnie —
+        // un colis sans companyPhone explicite en en-tête affichait alors à
+        // tort le numéro personnel de l'expéditeur/destinataire sous "Tel:".
+        // Si l'appelant (Dart) n'a pas mis de ligne téléphone explicite dans
+        // le header, on n'affiche simplement rien plutôt que de deviner.
         val companyPhone = (cleanHeader.firstOrNull {
             (Regex("(?i)t[ée]l").containsMatchIn(it) || it.contains("+")) &&
                 !Regex("(?i)dest").containsMatchIn(it)
         }
-            ?.let { Regex("\\+?\\d{8,15}").find(it)?.value }
-            ?: map["telephone"]).orEmpty()
+            ?.let { Regex("\\+?\\d{8,15}").find(it)?.value }).orEmpty()
         // Ligne d'en-tête « Tél dest: … » (téléphone gare de destination) —
         // sinon elle serait simplement perdue (seuls company/phone/email/
         // subtitle sont rendus).
@@ -414,7 +421,7 @@ class P3PrinterModule(private val ctx: Context) {
             total = if (useExactRows) "" else cleanTotal(pickFirst(map, "total", "montant", "prix")),
             extraFields = if (useExactRows) dedupeExtraFields(exactRows) else emptyList(),
             qr = resolvedQr,
-            footer = footer.ifBlank { "Powered by Tibus" }
+            footer = footer.ifBlank { "Powered by www.tibus.app" }
         )
     }
 
@@ -812,7 +819,7 @@ class P3PrinterModule(private val ctx: Context) {
             parcelAmount = parcelAmount,
             total = total,
             qr = qrContent.ifBlank { reference },
-            footer = "Powered by Tibus"
+            footer = "Powered by www.tibus.app"
         )
     }
 
@@ -1024,7 +1031,7 @@ class P3PrinterModule(private val ctx: Context) {
             total = cleanTotal(values["total"].orEmpty()),
             extraFields = dedupeExtraFields(extraFields),
             qr = resolvedQr,
-            footer = "Powered by Tibus"
+            footer = "Powered by www.tibus.app"
         )
     }
 

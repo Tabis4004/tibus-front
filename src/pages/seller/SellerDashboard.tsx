@@ -312,7 +312,7 @@ async function shareTicketText(trip: Trip, confirmedRef: string, passengerName: 
     `${trip.currency} ${trip.priceAmount.toLocaleString()}`,
     "",
     `Verification: ${window.location.origin}/${lng}/verify/${confirmedRef}`,
-    "Powered by Tibus",
+    "Powered by www.tibus.app",
   ].join("\n");
 
   if (typeof navigator.share === "function") {
@@ -605,7 +605,7 @@ function ReceiptPage({ trip, confirmedRef, passengerName, passengerPhone, parcel
       `${trip.currency} ${totalPrice.toLocaleString()}`,
       "",
       `Verification: ${window.location.origin}/${lng ?? "fr"}/verify/${confirmedRef}`,
-      "Powered by Tibus",
+      "Powered by www.tibus.app",
     ].join("\n");
     void shareTicketReceiptImageViaWhatsapp(receiptRef.current, {
       reference: confirmedRef,

@@ -78,7 +78,7 @@ function buildShareText(booking: BookingData): string {
   }
   lines.push("");
   lines.push(`Vérification: ${window.location.origin}/verify/${booking.bookingReference}`);
-  lines.push("Powered by Tibus");
+  lines.push("Powered by www.tibus.app");
   return lines.join("\n");
 }
 

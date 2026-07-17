@@ -49,7 +49,7 @@ class P3PrinterChannel(context: Context) : MethodCallHandler {
                     if (row.size >= 2) row[0].toString() to row[1].toString() else null
                 }
                 val qr = call.argument<String>("qr") ?: ""
-                val footer = call.argument<String>("footer") ?: "Powered by Tibus"
+                val footer = call.argument<String>("footer") ?: "Powered by www.tibus.app"
                 val widthMm = call.argument<Int>("paperWidthMm") ?: 58
                 if (widthMm >= 80) printer.printReceipt80(header, reference, rows, qr, footer)
                 else printer.printReceipt58(header, reference, rows, qr, footer)

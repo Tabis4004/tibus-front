@@ -42,7 +42,7 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
     {'text': '--------------------------------'},
     {'text': 'Total fret : ${d.totalFret.toStringAsFixed(0)} FCFA', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},
-    {'text': 'Powered by Tibus', 'align': 'center', 'size': 'small'},
+    {'text': 'Powered by www.tibus.app', 'align': 'center', 'size': 'small'},
   ]);
 
   return lines;

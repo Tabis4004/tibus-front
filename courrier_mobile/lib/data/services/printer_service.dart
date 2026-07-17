@@ -77,7 +77,7 @@ class PrinterService {
     required String reference,
     required List<List<String>> rows,
     String qr = '',
-    String footer = 'Powered by Tibus',
+    String footer = 'Powered by www.tibus.app',
     int paperWidthMm = 58,
   }) async {
     if (!isAvailable) {
@@ -159,7 +159,7 @@ class PrinterService {
       qr: '',
       // Tiret ASCII (pas « — ») : le cadratin faisait perdre le « R » de
       // « Retrait » au rendu P3 (« etrait sous 72h » sur le papier).
-      footer: 'Retrait sous 72h - passé ce délai,\nfrais de magasinage.\nPowered by Tibus',
+      footer: 'Retrait sous 72h - passé ce délai,\nfrais de magasinage.\nPowered by www.tibus.app',
       paperWidthMm: paperWidthMm,
     );
   }
@@ -229,7 +229,7 @@ class PrinterService {
         ['Total fret', '${d.totalFret.toStringAsFixed(0)} FCFA'],
       ],
       qr: d.id,
-      footer: 'Powered by Tibus',
+      footer: 'Powered by www.tibus.app',
       paperWidthMm: paperWidthMm,
     );
   }

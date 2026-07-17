@@ -110,7 +110,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': '================================', 'align': 'center', 'bold': true},
     {'text': 'Retrait sous 72h - passé ce délai, des frais', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'de magasinage sont imputables.', 'align': 'center', 'bold': true, 'size': 'small'},
-    {'text': 'Powered by Tibus', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Powered by www.tibus.app', 'align': 'center', 'bold': true, 'size': 'small'},
   ];
 }
 

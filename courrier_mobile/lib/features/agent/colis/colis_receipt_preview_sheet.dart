@@ -475,7 +475,7 @@ class _ReceiptBox extends StatelessWidget {
                   // aperçu : l'aperçu doit refléter le rendu papier. Le QR
                   // reste sur le TALON uniquement (voir _TalonBox).
                   const SizedBox(height: 6),
-                  const Text('Powered by Tibus', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.black54)),
+                  const Text('Powered by www.tibus.app', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.black54)),
                 ],
               ),
             ),

@@ -57,7 +57,7 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
       footer: (context) => pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text('Powered by Tibus', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+          pw.Text('Powered by www.tibus.app', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
           pw.Text('Page ${context.pageNumber} / ${context.pagesCount}',
               style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
         ],
