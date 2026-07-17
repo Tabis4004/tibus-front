@@ -61,16 +61,12 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
-    // Téléphone affiché sous le nom de la compagnie = celui de la GARE DE
-    // DÉPART (pas celui de la compagnie) — demande explicite : "SIS
-    // COURRIER <Numéro Gare de départ>" en en-tête. La ligne "Tél. agence"
-    // qui était sous le champ Agence a été retirée (redondante avec
-    // l'en-tête) ; le téléphone de la gare de DESTINATION reste lui à sa
-    // place actuelle, sous le champ Destination (voir plus bas).
-    if (colis.gareDepartPhone.isNotEmpty)
-      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
-    // Téléphone gare de destination aussi en en-tête (gras), déplacé depuis
-    // le bloc BÉNÉFICIAIRE — même mise en page que le pont P3 natif.
+    // Téléphone du SIÈGE (compagnie) sous le nom de la compagnie, et
+    // téléphone de la gare de DESTINATION juste en dessous. Le téléphone de
+    // la gare de DÉPART est lui affiché plus bas, dans le bloc EXPÉDITEUR
+    // (voir "Tél. agence" ci-dessous, à côté du champ Agence).
+    if (colis.companyPhone.isNotEmpty)
+      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.gareDestinationPhone.isNotEmpty)
       {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
@@ -93,6 +89,8 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
       {'text': 'Valeur          ${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA', 'bold': true},
     {'text': 'Agence          ${colis.gareDepart}', 'bold': true},
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél. agence     ${colis.gareDepartPhone}', 'bold': true},
     if (agentName != null && agentName.isNotEmpty) {'text': 'Agent           $agentName', 'bold': true},
     {'text': 'Déposé le       ${formatColisDate(colis.createdAt)}', 'bold': true},
     {'text': '--------------------------------', 'bold': true},
@@ -127,11 +125,12 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
-    // Même en-tête que le reçu (voir colisReceiptLines) : téléphones gare de
-    // départ ET destination, puis sous-titre explicite — demande explicite
-    // du 17/07 pour uniformiser talon et reçu.
-    if (colis.gareDepartPhone.isNotEmpty)
-      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Même en-tête que le reçu (voir colisReceiptLines) : téléphone du
+    // siège (compagnie) ET de la gare de destination, puis sous-titre
+    // explicite. Le téléphone de la gare de DÉPART est lui dans le bloc
+    // expédition, plus bas (voir "Agence"/"Tél. agence" ci-dessous).
+    if (colis.companyPhone.isNotEmpty)
+      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.gareDestinationPhone.isNotEmpty)
       {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
@@ -148,5 +147,10 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
     {'text': ''},
     {'text': 'Expéditeur : ${colis.nomExpediteur}', 'size': 'small'},
     {'text': colis.telephoneExpediteur, 'size': 'small'},
+    // Bloc expédition : agence de départ + son téléphone (déplacé depuis
+    // l'en-tête, voir plus haut).
+    {'text': 'Agence : ${colis.gareDepart}', 'size': 'small'},
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél. agence : ${colis.gareDepartPhone}', 'size': 'small'},
   ];
 }

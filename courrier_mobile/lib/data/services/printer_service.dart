@@ -120,14 +120,11 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        // Téléphone de la GARE DE DÉPART sous le nom de la compagnie (pas
-        // celui de la compagnie) — voir colisReceiptLines pour le détail de
-        // la demande. La ligne "Tél. agence" a donc été retirée des rows
-        // ci-dessous (redondante avec l'en-tête) ; le téléphone de la gare
-        // de destination reste lui affiché sous "Destination".
-        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
-        // Téléphone de la gare de DESTINATION aussi en en-tête (en gras,
-        // comme le départ) — déplacé depuis le bloc BÉNÉFICIAIRE.
+        // Téléphone du SIÈGE (compagnie) sous le nom de la compagnie, et
+        // téléphone de la gare de DESTINATION juste en dessous — le
+        // téléphone de la gare de DÉPART est lui affiché dans le bloc
+        // EXPÉDITEUR ci-dessous (voir rows, ligne "Tél. agence").
+        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
         if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
         // Sous-titre EXPLICITE : sans lui, le module P3 natif retombe sur
         // « Ticket » par défaut (normalizeStructured, P3PrinterModule.kt).
@@ -142,6 +139,7 @@ class PrinterService {
         if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
           ['Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'],
         ['Agence', colis.gareDepart],
+        if (colis.gareDepartPhone.isNotEmpty) ['Tél. agence', colis.gareDepartPhone],
         if (agent != null) ['Agent', agent],
         ['Déposé le', formatColisDate(colis.createdAt)],
         ['BÉNÉFICIAIRE', colis.nomDestinataire],
@@ -175,10 +173,12 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        // Même en-tête que le reçu (voir printColisReceipt) : téléphones
-        // gare de départ ET destination, puis sous-titre explicite — sans
-        // lui, le module P3 natif retombe sur « Ticket » par défaut.
-        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+        // Même en-tête que le reçu (voir printColisReceipt) : téléphone du
+        // siège (compagnie) ET de la gare de destination, puis sous-titre
+        // explicite — sans lui, le module P3 natif retombe sur « Ticket ».
+        // Le téléphone de la gare de départ est lui dans le bloc expédition
+        // ci-dessous (ligne "Tél. agence").
+        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
         if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
         'Reçu expédition colis',
       ],
@@ -190,6 +190,8 @@ class PrinterService {
         ['Téléphone', colis.telephoneDestinataire],
         ['Expéditeur', colis.nomExpediteur],
         ['Tél. exp.', colis.telephoneExpediteur],
+        ['Agence', colis.gareDepart],
+        if (colis.gareDepartPhone.isNotEmpty) ['Tél. agence', colis.gareDepartPhone],
       ],
       qr: colis.id,
       footer: '',

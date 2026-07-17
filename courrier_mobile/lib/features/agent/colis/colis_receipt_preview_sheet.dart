@@ -379,15 +379,13 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  // Téléphone de la GARE DE DÉPART sous le nom de la
-                  // compagnie (pas celui de la compagnie) — voir
-                  // colisReceiptLines pour le détail de la demande. La ligne
-                  // "Tél. agence" qui était dans le bloc EXPÉDITEUR a donc
-                  // été retirée ci-dessous (redondante avec l'en-tête) ; le
-                  // téléphone de la gare de destination reste lui affiché
-                  // sous "Destination".
-                  if (colis.gareDepartPhone.isNotEmpty)
-                    Text('Tél: ${colis.gareDepartPhone}',
+                  // Téléphone du SIÈGE (compagnie) sous le nom de la
+                  // compagnie, et téléphone de la gare de destination juste
+                  // en dessous. Le téléphone de la gare de DÉPART est lui
+                  // affiché dans le bloc EXPÉDITEUR (voir _Field
+                  // 'Tél. agence' plus bas).
+                  if (colis.companyPhone.isNotEmpty)
+                    Text('Tél siège: ${colis.companyPhone}',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   if (colis.gareDestinationPhone.isNotEmpty)
@@ -434,6 +432,7 @@ class _ReceiptBox extends StatelessWidget {
                 if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
                   _Field('Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'),
                 _Field('Agence', colis.gareDepart),
+                if (colis.gareDepartPhone.isNotEmpty) _Field('Tél. agence', colis.gareDepartPhone),
                 if (agentName != null) _Field('Agent', agentName!),
                 _Field('Déposé le', formatColisDate(colis.createdAt)),
               ],
@@ -558,10 +557,12 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            // Même en-tête que le reçu (voir _ReceiptBox) : téléphones gare
-            // de départ ET destination, en gras, puis sous-titre explicite.
-            if (colis.gareDepartPhone.isNotEmpty)
-              Text('Tél: ${colis.gareDepartPhone}',
+            // Même en-tête que le reçu (voir _ReceiptBox) : téléphone du
+            // siège (compagnie) et de la gare de destination, en gras, puis
+            // sous-titre explicite. Le téléphone de la gare de départ est
+            // lui affiché plus bas, dans le bloc expédition.
+            if (colis.companyPhone.isNotEmpty)
+              Text('Tél siège: ${colis.companyPhone}',
                   style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
             if (colis.gareDestinationPhone.isNotEmpty)
               Text('Tél dest: ${colis.gareDestinationPhone}',
@@ -602,6 +603,12 @@ class _TalonBox extends StatelessWidget {
             const SizedBox(height: 6),
             Text('Expéditeur : ${colis.nomExpediteur}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
             Text(colis.telephoneExpediteur, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+            // Bloc expédition : agence de départ + son téléphone (déplacé
+            // depuis l'en-tête, voir plus haut).
+            Text('Agence : ${colis.gareDepart}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+            if (colis.gareDepartPhone.isNotEmpty)
+              Text('Tél. agence : ${colis.gareDepartPhone}',
+                  style: const TextStyle(fontSize: 10, color: Colors.black54)),
           ],
         ),
       ),
