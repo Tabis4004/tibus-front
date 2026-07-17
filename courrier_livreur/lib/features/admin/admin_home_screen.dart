@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import 'driver_validation_screen.dart';
 import 'pricing_settings_screen.dart';
+import 'wallets_admin_screen.dart';
 
 /// Point d'entrée admin/superadmin — visible uniquement quand
 /// canAccessAdminProvider est vrai (voir core/providers.dart et home_shell).
@@ -32,6 +33,15 @@ class AdminHomeScreen extends StatelessWidget {
             subtitle: 'Véhicules, types de colis, options (urgent, sac isotherme)',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const PricingSettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Wallets livreurs',
+            subtitle: 'Solde, recharge, ajustement',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const WalletsAdminScreen()),
             ),
           ),
         ],

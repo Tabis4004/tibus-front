@@ -799,6 +799,45 @@ class DriverBackend {
   }
 
   // ---------------------------------------------------------------------
+  // Admin — Wallets livreurs (tâche #32). Contrairement aux tarifs
+  // (pricing_settings, RLS "Admins manage..." en libre-service), les tables
+  // wallet n'ont AUCUNE policy d'écriture pour l'admin, et
+  // apply_wallet_transaction n'a pas de contrôle de rôle interne — un accès
+  // direct depuis Flutter serait donc soit bloqué par RLS, soit (avant le
+  // correctif de cette session, voir migration lock_down_wallet_credit_rpcs)
+  // dangereusement permissif. On passe donc par l'Edge Function
+  // admin-driver-wallets (service_role côté serveur, vérifie
+  // admin/superadmin avant d'agir), seule façon sûre de faire ça depuis un
+  // client public — même contrat que listDriverWallets/adminWalletTopup/
+  // adminWalletAdjust côté web (wallet.functions.ts, via supabaseAdmin).
+  // ---------------------------------------------------------------------
+
+  static Future<Map<String, dynamic>> _callAdminWalletsFn(Map<String, dynamic> body) async {
+    final res = await client.functions.invoke('admin-driver-wallets', body: body);
+    final data = res.data;
+    if (data is Map && data['error'] != null) {
+      throw Exception(data['error'].toString());
+    }
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchAllDriverWallets() async {
+    final res = await _callAdminWalletsFn({'action': 'list'});
+    return (res['wallets'] as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<int> adminWalletTopup({required String driverId, required int amountXof, String? notes}) async {
+    final res = await _callAdminWalletsFn({'action': 'topup', 'driver_id': driverId, 'amount_xof': amountXof, 'notes': notes});
+    return res['balance_xof'] as int;
+  }
+
+  /// [amountXof] peut être négatif (débit) — même contrat qu'adminWalletAdjust.
+  static Future<int> adminWalletAdjust({required String driverId, required int amountXof, required String notes}) async {
+    final res = await _callAdminWalletsFn({'action': 'adjust', 'driver_id': driverId, 'amount_xof': amountXof, 'notes': notes});
+    return res['balance_xof'] as int;
+  }
+
+  // ---------------------------------------------------------------------
   // Support / tickets — portage de support.tsx + ticket.$ticketId.tsx.
   // support_tickets/ticket_messages sont en libre-service RLS pour le
   // propriétaire (created_by = auth.uid()) : pas de service_role nécessaire

@@ -22,5 +22,5 @@ If you are a plugin author, please migrate your plugin to Built-in Kotlin using 
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 11284 bytes (99.3% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-Running Gradle task 'assembleRelease'...                          116,9s
+Running Gradle task 'assembleRelease'...                          188,6s
 ✓ Built build/app/outputs/flutter-apk/app-release.apk (77.9MB)
