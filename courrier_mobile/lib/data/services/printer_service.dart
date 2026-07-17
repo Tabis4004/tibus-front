@@ -120,7 +120,12 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        if (colis.companyPhone.isNotEmpty) 'Tél: ${colis.companyPhone}',
+        // Téléphone de la GARE DE DÉPART sous le nom de la compagnie (pas
+        // celui de la compagnie) — voir colisReceiptLines pour le détail de
+        // la demande. La ligne "Tél. agence" a donc été retirée des rows
+        // ci-dessous (redondante avec l'en-tête) ; le téléphone de la gare
+        // de destination reste lui affiché sous "Destination".
+        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
       ],
       reference: colisShortRef(colis),
       rows: [
@@ -130,7 +135,6 @@ class PrinterService {
         if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
           ['Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'],
         ['Agence', colis.gareDepart],
-        if (colis.gareDepartPhone.isNotEmpty) ['Tél. agence', colis.gareDepartPhone],
         if (agent != null) ['Agent', agent],
         ['Déposé le', formatColisDate(colis.createdAt)],
         ['BÉNÉFICIAIRE', colis.nomDestinataire],
@@ -144,7 +148,10 @@ class PrinterService {
         if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
           ['Pourcentage perçu', '${colis.pourcentagePercu} %'],
       ],
-      qr: colis.id,
+      // Pas de QR sur le reçu client — voir demande "enlever le QR code du
+      // reçu du client". Le QR reste sur le talon (printColisTalon
+      // ci-dessous), nécessaire au scan pendant chargement/arrivée/livraison.
+      qr: '',
       footer: 'Retrait sous 72h — passé ce délai, frais de magasinage.\nPowered by Tibus',
       paperWidthMm: paperWidthMm,
     );
@@ -244,7 +251,9 @@ class PrinterService {
     return _bridge.printViaWisePrinter(
       header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
       lines: colisReceiptLines(colis, agentName: agentName ?? _currentAgentName()),
-      qr: colis.id,
+      // Pas de QR sur le reçu client — voir printColisReceipt (pont P3) et
+      // demande "enlever le QR code du reçu du client".
+      qr: '',
       qrSize: 220,
       feedLines: 4,
       cut: true,

@@ -59,7 +59,10 @@ class EscPosPrinterService {
   /// Reçu colis imprimé sur le pont [type] (USB ou Bluetooth), déjà connecté
   /// via [connectUsb]/[connectBluetooth]. Mêmes lignes que le pont
   /// WisePrinter (colisReceiptLines()) : en-tête, blocs EXPÉDITEUR/
-  /// BÉNÉFICIAIRE/CONTENU, QR du code de retrait.
+  /// BÉNÉFICIAIRE/CONTENU. Pas de QR sur cette copie client (voir demande
+  /// "enlever le QR code du reçu du client") — il reste sur le talon
+  /// (printColisTalon ci-dessous), seul document réellement scanné pendant
+  /// le cycle chargement/arrivée/livraison.
   Future<void> printColisReceipt(
     Colis colis, {
     required PrinterType type,
@@ -69,8 +72,6 @@ class EscPosPrinterService {
     final profile = await CapabilityProfile.load();
     final generator = Generator(paperSize, profile);
     final bytes = _renderLines(generator, colisReceiptLines(colis, agentName: agentName));
-    bytes.addAll(generator.feed(1));
-    bytes.addAll(generator.qrcode(colis.id));
     bytes.addAll(generator.feed(3));
     bytes.addAll(generator.cut());
 

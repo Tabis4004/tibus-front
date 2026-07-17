@@ -51,51 +51,55 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
-    if (colis.companyPhone.isNotEmpty)
-      {'text': 'Tél: ${colis.companyPhone}', 'align': 'center', 'size': 'small'},
-    {'text': 'Reçu expédition colis', 'align': 'center', 'size': 'small'},
+    // Téléphone affiché sous le nom de la compagnie = celui de la GARE DE
+    // DÉPART (pas celui de la compagnie) — demande explicite : "SIS
+    // COURRIER <Numéro Gare de départ>" en en-tête. La ligne "Tél. agence"
+    // qui était sous le champ Agence a été retirée (redondante avec
+    // l'en-tête) ; le téléphone de la gare de DESTINATION reste lui à sa
+    // place actuelle, sous le champ Destination (voir plus bas).
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     // Colis enregistré hors connexion, pas encore confirmé par le serveur
     // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
     // remettre ce reçu au client : la référence ci-dessous est provisoire,
     // remplacée par la vraie référence une fois synchronisé.
     if (colis.isPendingSync) ...[
       {'text': '*** REÇU PROVISOIRE ***', 'align': 'center', 'bold': true, 'size': 'small'},
-      {'text': 'En attente de connexion - sera confirmé', 'align': 'center', 'size': 'small'},
+      {'text': 'En attente de connexion - sera confirmé', 'align': 'center', 'bold': true, 'size': 'small'},
     ],
-    {'text': '================================', 'align': 'center'},
+    {'text': '================================', 'align': 'center', 'bold': true},
     {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'large'},
-    {'text': '================================', 'align': 'center'},
+    {'text': '================================', 'align': 'center', 'bold': true},
     {'text': 'EXPÉDITEUR', 'bold': true},
-    {'text': colis.nomExpediteur},
+    {'text': colis.nomExpediteur, 'bold': true},
     {'text': ''},
-    {'text': 'Téléphone       ${colis.telephoneExpediteur}'},
-    {'text': "Frais d'envoi   ${colis.montantFret.toStringAsFixed(0)} FCFA"},
+    {'text': 'Téléphone       ${colis.telephoneExpediteur}', 'bold': true},
+    {'text': "Frais d'envoi   ${colis.montantFret.toStringAsFixed(0)} FCFA", 'bold': true},
     if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
-      {'text': 'Valeur          ${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'},
-    {'text': 'Agence          ${colis.gareDepart}'},
-    if (colis.gareDepartPhone.isNotEmpty)
-      {'text': 'Tél. agence     ${colis.gareDepartPhone}'},
-    if (agentName != null && agentName.isNotEmpty) {'text': 'Agent           $agentName'},
-    {'text': 'Déposé le       ${formatColisDate(colis.createdAt)}'},
-    {'text': '--------------------------------'},
+      {'text': 'Valeur          ${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA', 'bold': true},
+    {'text': 'Agence          ${colis.gareDepart}', 'bold': true},
+    if (agentName != null && agentName.isNotEmpty) {'text': 'Agent           $agentName', 'bold': true},
+    {'text': 'Déposé le       ${formatColisDate(colis.createdAt)}', 'bold': true},
+    {'text': '--------------------------------', 'bold': true},
     {'text': 'BÉNÉFICIAIRE', 'bold': true},
-    {'text': colis.nomDestinataire},
+    {'text': colis.nomDestinataire, 'bold': true},
     {'text': ''},
-    {'text': 'Téléphone       ${colis.telephoneDestinataire}'},
-    {'text': 'Destination     ${colis.gareDestination}'},
+    {'text': 'Téléphone       ${colis.telephoneDestinataire}', 'bold': true},
+    {'text': 'Destination     ${colis.gareDestination}', 'bold': true},
     if (colis.gareDestinationPhone.isNotEmpty)
-      {'text': 'Tél. destination ${colis.gareDestinationPhone}'},
-    {'text': '--------------------------------'},
+      {'text': 'Tél. destination ${colis.gareDestinationPhone}', 'bold': true},
+    {'text': '--------------------------------', 'bold': true},
     {'text': 'CONTENU', 'bold': true},
-    {'text': 'Nature du colis: ${colisNatureLabel(colis)}'},
-    {'text': 'Contenu (description): ${colisDescriptionLabel(colis)}'},
-    if (colis.poidsKg != null) {'text': 'Poids : ${colis.poidsKg} kg', 'size': 'small'},
+    {'text': 'Nature du colis: ${colisNatureLabel(colis)}', 'bold': true},
+    {'text': 'Contenu (description): ${colisDescriptionLabel(colis)}', 'bold': true},
+    if (colis.poidsKg != null) {'text': 'Poids : ${colis.poidsKg} kg', 'bold': true, 'size': 'small'},
     if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
-      {'text': 'Pourcentage perçu : ${colis.pourcentagePercu} %', 'size': 'small'},
-    {'text': '================================', 'align': 'center'},
-    {'text': 'Retrait sous 72h — passé ce délai, des frais', 'align': 'center', 'size': 'small'},
-    {'text': 'de magasinage sont imputables.', 'align': 'center', 'size': 'small'},
-    {'text': 'Powered by Tibus', 'align': 'center', 'size': 'small'},
+      {'text': 'Pourcentage perçu : ${colis.pourcentagePercu} %', 'bold': true, 'size': 'small'},
+    {'text': '================================', 'align': 'center', 'bold': true},
+    {'text': 'Retrait sous 72h — passé ce délai, des frais', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'de magasinage sont imputables.', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Powered by Tibus', 'align': 'center', 'bold': true, 'size': 'small'},
   ];
 }
 

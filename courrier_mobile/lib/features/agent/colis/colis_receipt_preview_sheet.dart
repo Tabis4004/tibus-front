@@ -345,7 +345,17 @@ class _ReceiptBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
       child: DefaultTextStyle(
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.4, color: Colors.black87),
+        // Tout le texte du reçu en gras (demande explicite) — les styles
+        // explicites ci-dessous (ex. couleur grise des libellés) ne
+        // redéfinissent volontairement pas fontWeight : ils héritent donc
+        // tous de ce gras ambiant (voir _Field, qui ne fixe que la couleur).
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 12,
+          height: 1.4,
+          color: Colors.black87,
+          fontWeight: FontWeight.bold,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -355,8 +365,15 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  if (colis.companyPhone.isNotEmpty)
-                    Text('Tél: ${colis.companyPhone}',
+                  // Téléphone de la GARE DE DÉPART sous le nom de la
+                  // compagnie (pas celui de la compagnie) — voir
+                  // colisReceiptLines pour le détail de la demande. La ligne
+                  // "Tél. agence" qui était dans le bloc EXPÉDITEUR a donc
+                  // été retirée ci-dessous (redondante avec l'en-tête) ; le
+                  // téléphone de la gare de destination reste lui affiché
+                  // sous "Destination".
+                  if (colis.gareDepartPhone.isNotEmpty)
+                    Text('Tél: ${colis.gareDepartPhone}',
                         textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.black54)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
                 ],
@@ -391,14 +408,13 @@ class _ReceiptBox extends StatelessWidget {
             _Section(
               title: 'EXPÉDITEUR',
               children: [
-                Text(colis.nomExpediteur, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(colis.nomExpediteur, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 _Field('Téléphone', colis.telephoneExpediteur),
                 _Field("Frais d'envoi", '${colis.montantFret.toStringAsFixed(0)} FCFA'),
                 if (colis.valeurMarchandise != null && colis.valeurMarchandise! > 0)
                   _Field('Valeur', '${colis.valeurMarchandise!.toStringAsFixed(0)} FCFA'),
                 _Field('Agence', colis.gareDepart),
-                if (colis.gareDepartPhone.isNotEmpty) _Field('Tél. agence', colis.gareDepartPhone),
                 if (agentName != null) _Field('Agent', agentName!),
                 _Field('Déposé le', formatColisDate(colis.createdAt)),
               ],
@@ -406,7 +422,7 @@ class _ReceiptBox extends StatelessWidget {
             _Section(
               title: 'BÉNÉFICIAIRE',
               children: [
-                Text(colis.nomDestinataire, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(colis.nomDestinataire, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 _Field('Téléphone', colis.telephoneDestinataire),
                 _Field('Destination', colis.gareDestination),
@@ -437,6 +453,10 @@ class _ReceiptBox extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10, color: Colors.black54),
                   ),
+                  // QR conservé dans l'APERÇU à l'écran (utile à l'agent
+                  // avant impression) — retiré uniquement de l'impression
+                  // physique du reçu (voir printer_service.dart,
+                  // esc_pos_printer_service.dart : printColisReceipt).
                   const SizedBox(height: 8),
                   Center(child: QrImageView(data: colis.id, size: 96)),
                   const SizedBox(height: 6),
