@@ -98,8 +98,15 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
           // Sélection bus best-effort — l'avancement reste possible sans bus.
         }
       }
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Colis introuvable pour ce code.');
+    } catch (e) {
+      // Ne pas tout réduire à « introuvable » : une erreur de droits ou de
+      // session expirée doit être visible telle quelle pour être diagnostiquée.
+      if (mounted) {
+        final msg = e.toString().replaceFirst('Exception: ', '');
+        setState(() => _error = msg.contains('introuvable')
+            ? 'Colis introuvable pour ce code — la référence fait 8 caractères (CL-XXXXXXXX).'
+            : 'Échec : $msg');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
