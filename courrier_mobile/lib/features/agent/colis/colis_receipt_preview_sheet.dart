@@ -338,7 +338,7 @@ class _ReceiptBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ref = colisShortRef(colis);
+    final ref = colisReceiptNumber(colis);
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black87, width: 1.4),
@@ -374,7 +374,12 @@ class _ReceiptBox extends StatelessWidget {
                   // sous "Destination".
                   if (colis.gareDepartPhone.isNotEmpty)
                     Text('Tél: ${colis.gareDepartPhone}',
-                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  if (colis.gareDestinationPhone.isNotEmpty)
+                    Text('Tél dest: ${colis.gareDestinationPhone}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
                 ],
               ),
@@ -403,7 +408,7 @@ class _ReceiptBox extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text('N°   $ref',
-                  textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
             _Section(
               title: 'EXPÉDITEUR',
@@ -426,8 +431,7 @@ class _ReceiptBox extends StatelessWidget {
                 const SizedBox(height: 4),
                 _Field('Téléphone', colis.telephoneDestinataire),
                 _Field('Destination', colis.gareDestination),
-                if (colis.gareDestinationPhone.isNotEmpty)
-                  _Field('Tél. destination', colis.gareDestinationPhone),
+                // Tél. destination déplacé en en-tête (voir plus haut).
               ],
             ),
             _Section(
@@ -449,9 +453,9 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   const Divider(height: 16),
                   const Text(
-                    'Retrait sous 72h — passé ce délai, des frais de\nmagasinage sont imputables.',
+                    'Retrait sous 72h - passé ce délai, des frais de\nmagasinage sont imputables.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10, color: Colors.black54),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                   // Pas de QR sur le reçu — ni à l'impression (voir
                   // printer_service.dart / P3PrinterModule.kt), ni dans cet
@@ -526,7 +530,7 @@ class _TalonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ref = colisShortRef(colis);
+    final ref = colisReceiptNumber(colis);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

@@ -8,6 +8,16 @@ import '../../data/models/colis.dart';
 String colisShortRef(Colis colis) =>
     'CL-${colis.id.replaceAll('-', '').toUpperCase().substring(0, 8)}';
 
+/// Numéro affiché sur le reçu/talon : numérotation séquentielle par gare de
+/// départ (ex. ABOI000001, migration 180) si disponible, sinon repli sur la
+/// référence CL-XXXXXXXX (colis hors connexion pas encore synchronisé).
+/// La recherche manuelle accepte les deux formats
+/// (resolve_colis_retrait_code, migration 181).
+String colisReceiptNumber(Colis colis) {
+  final numero = colis.numeroRecu;
+  return (numero != null && numero.isNotEmpty) ? numero : colisShortRef(colis);
+}
+
 String formatColisDate(DateTime dt) => DateFormat('dd/MM/yy HH:mm').format(dt);
 
 String colisContentLabel(Colis colis) {
@@ -47,7 +57,7 @@ String colisDescriptionLabel(Colis colis) {
 /// [agentName] : nom de l'agent guichet ayant enregistré le colis, si
 /// disponible (voir PrinterService._currentAgentName) — omis sinon.
 List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
-  final ref = colisShortRef(colis);
+  final ref = colisReceiptNumber(colis);
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
@@ -59,6 +69,10 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     // place actuelle, sous le champ Destination (voir plus bas).
     if (colis.gareDepartPhone.isNotEmpty)
       {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Téléphone gare de destination aussi en en-tête (gras), déplacé depuis
+    // le bloc BÉNÉFICIAIRE — même mise en page que le pont P3 natif.
+    if (colis.gareDestinationPhone.isNotEmpty)
+      {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     // Colis enregistré hors connexion, pas encore confirmé par le serveur
     // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
@@ -87,8 +101,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': ''},
     {'text': 'Téléphone       ${colis.telephoneDestinataire}', 'bold': true},
     {'text': 'Destination     ${colis.gareDestination}', 'bold': true},
-    if (colis.gareDestinationPhone.isNotEmpty)
-      {'text': 'Tél. destination ${colis.gareDestinationPhone}', 'bold': true},
+    // Tél. destination déplacé en en-tête (voir plus haut).
     {'text': '--------------------------------', 'bold': true},
     {'text': 'CONTENU', 'bold': true},
     {'text': 'Nature du colis: ${colisNatureLabel(colis)}', 'bold': true},
@@ -97,7 +110,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
       {'text': 'Pourcentage perçu : ${colis.pourcentagePercu} %', 'bold': true, 'size': 'small'},
     {'text': '================================', 'align': 'center', 'bold': true},
-    {'text': 'Retrait sous 72h — passé ce délai, des frais', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Retrait sous 72h - passé ce délai, des frais', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'de magasinage sont imputables.', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Powered by Tibus', 'align': 'center', 'bold': true, 'size': 'small'},
   ];
@@ -110,7 +123,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
 /// PrinterService.printColisReceiptWithTalon() et équivalents WisePrinter /
 /// ESC-POS.
 List<Map<String, dynamic>> colisTalonLines(Colis colis) {
-  final ref = colisShortRef(colis);
+  final ref = colisReceiptNumber(colis);
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},

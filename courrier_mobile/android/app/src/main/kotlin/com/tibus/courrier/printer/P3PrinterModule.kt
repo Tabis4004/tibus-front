@@ -136,6 +136,9 @@ class P3PrinterModule(private val ctx: Context) {
         val company: String = "TIBUS",
         val companyEmail: String = "",
         val companyPhone: String = "",
+        /** Téléphone de la gare de DESTINATION, affiché sous companyPhone en
+         * en-tête (reçu colis — voir printer_service.dart). */
+        val destinationPhone: String = "",
         val subtitle: String = "Ticket de reservation",
         val reference: String = "",
         val passenger: String = "",
@@ -163,9 +166,14 @@ class P3PrinterModule(private val ctx: Context) {
         // ---- Header
         printWrappedLine(p, t.company.ifBlank { "TIBUS" },
             PrintOptions(align = "center", size = "large", bold = true), paperWidth)
+        // Téléphones gare de départ + destination sous le nom de la
+        // compagnie, en GRAS (demande explicite).
         if (t.companyPhone.isNotBlank())
             printWrappedLine(p, "Tel: ${t.companyPhone}",
-                PrintOptions(align = "center", size = "small"), paperWidth)
+                PrintOptions(align = "center", size = "small", bold = true), paperWidth)
+        if (t.destinationPhone.isNotBlank())
+            printWrappedLine(p, "Tel dest: ${t.destinationPhone}",
+                PrintOptions(align = "center", size = "small", bold = true), paperWidth)
         if (t.companyEmail.isNotBlank())
             printWrappedLine(p, t.companyEmail,
                 PrintOptions(align = "center", size = "small"), paperWidth)
@@ -255,7 +263,7 @@ class P3PrinterModule(private val ctx: Context) {
         // ---- Footer
         if (t.footer.isNotBlank()) {
             t.footer.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.forEach {
-                printWrappedLine(p, it, PrintOptions(align = "center", size = "small"), paperWidth)
+                printWrappedLine(p, it, PrintOptions(align = "center", size = "small", bold = true), paperWidth)
             }
         }
 
@@ -348,9 +356,18 @@ class P3PrinterModule(private val ctx: Context) {
         val companyEmail = (cleanHeader.firstOrNull { it.contains("@") }
             ?.let { Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}").find(it)?.value }
             ?: map["email"]).orEmpty()
-        val companyPhone = (cleanHeader.firstOrNull { Regex("(?i)t[ée]l").containsMatchIn(it) || it.contains("+") }
+        val companyPhone = (cleanHeader.firstOrNull {
+            (Regex("(?i)t[ée]l").containsMatchIn(it) || it.contains("+")) &&
+                !Regex("(?i)dest").containsMatchIn(it)
+        }
             ?.let { Regex("\\+?\\d{8,15}").find(it)?.value }
             ?: map["telephone"]).orEmpty()
+        // Ligne d'en-tête « Tél dest: … » (téléphone gare de destination) —
+        // sinon elle serait simplement perdue (seuls company/phone/email/
+        // subtitle sont rendus).
+        val destinationPhone = cleanHeader.firstOrNull {
+            Regex("(?i)t[ée]l").containsMatchIn(it) && Regex("(?i)dest").containsMatchIn(it)
+        }?.let { Regex("\\+?\\d{8,15}").find(it)?.value }.orEmpty()
         val subtitle = cleanHeader.drop(1).firstOrNull {
             !it.contains("@") && !it.startsWith("+") && !Regex("(?i)t[ée]l").containsMatchIn(it)
         }.orEmpty()
@@ -379,6 +396,7 @@ class P3PrinterModule(private val ctx: Context) {
             company = map["company"]?.let { cleanTitle(it) }?.ifBlank { companyFromHeader } ?: companyFromHeader,
             companyEmail = companyEmail,
             companyPhone = companyPhone,
+            destinationPhone = destinationPhone,
             subtitle = subtitle.ifBlank { "Ticket" },
             reference = resolvedReference,
             passenger = if (useExactRows) "" else pickFirst(map, "voyageur", "passager", "nom", "client", "nom du passager", "nom et prenom"),
@@ -1181,6 +1199,7 @@ class P3PrinterModule(private val ctx: Context) {
         if (line.isBlank()) { blank(p); return }
         val effectiveWidth = when (opts.size) {
             "large" -> (width * 0.62f).toInt().coerceAtLeast(18)
+            "medium" -> (width * 0.92f).toInt().coerceAtLeast(20)
             "small" -> (width * 1.18f).toInt().coerceAtLeast(width)
             else -> width
         }
@@ -1188,7 +1207,7 @@ class P3PrinterModule(private val ctx: Context) {
             checkCode("printString", p.printString(
                 part,
                 if (opts.bold) Printer.Font.DEFAULT_BOLD else Printer.Font.MONOSPACE,
-                when (opts.size) { "large" -> 30; "small" -> 20; else -> 24 },
+                when (opts.size) { "large" -> 30; "medium" -> 26; "small" -> 20; else -> 24 },
                 when (opts.align) { "center" -> Printer.Align.CENTER; "right" -> Printer.Align.RIGHT; else -> Printer.Align.LEFT },
                 opts.bold, false, false
             ))
@@ -1207,7 +1226,9 @@ class P3PrinterModule(private val ctx: Context) {
         val w = width.coerceIn(24, 56)
         val border = "+" + "-".repeat(w - 2) + "+"
         printWrappedLine(p, border, PrintOptions(align = "center"), width)
-        printWrappedLine(p, text, PrintOptions(align = "center", bold = true), width)
+        // Référence en "medium" (26 pts, +2 vs normal) — demande explicite ;
+        // le texte est centré sans barres latérales, pas de désalignement.
+        printWrappedLine(p, text, PrintOptions(align = "center", bold = true, size = "medium"), width)
         printWrappedLine(p, border, PrintOptions(align = "center"), width)
     }
 

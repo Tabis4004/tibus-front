@@ -126,11 +126,15 @@ class PrinterService {
         // ci-dessous (redondante avec l'en-tête) ; le téléphone de la gare
         // de destination reste lui affiché sous "Destination".
         if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+        // Téléphone de la gare de DESTINATION aussi en en-tête (en gras,
+        // comme le départ) — déplacé depuis le bloc BÉNÉFICIAIRE.
+        if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
         // Sous-titre EXPLICITE : sans lui, le module P3 natif retombe sur
         // « Ticket » par défaut (normalizeStructured, P3PrinterModule.kt).
         'Reçu expédition colis',
       ],
-      reference: colisShortRef(colis),
+      // Numéro séquentiel par gare (ex. ABOI000001) — repli CL-XXXXXXXX.
+      reference: colisReceiptNumber(colis),
       rows: [
         ['EXPÉDITEUR', colis.nomExpediteur],
         ['Téléphone', colis.telephoneExpediteur],
@@ -143,7 +147,7 @@ class PrinterService {
         ['BÉNÉFICIAIRE', colis.nomDestinataire],
         ['Téléphone ', colis.telephoneDestinataire],
         ['Destination', colis.gareDestination],
-        if (colis.gareDestinationPhone.isNotEmpty) ['Tél. destination', colis.gareDestinationPhone],
+        // Tél. destination déplacé en en-tête (voir header ci-dessus).
         ['CONTENU', ''],
         ['Nature du colis', colisNatureLabel(colis)],
         ['Description', colisDescriptionLabel(colis)],
@@ -155,7 +159,9 @@ class PrinterService {
       // reçu du client". Le QR reste sur le talon (printColisTalon
       // ci-dessous), nécessaire au scan pendant chargement/arrivée/livraison.
       qr: '',
-      footer: 'Retrait sous 72h — passé ce délai, frais de magasinage.\nPowered by Tibus',
+      // Tiret ASCII (pas « — ») : le cadratin faisait perdre le « R » de
+      // « Retrait » au rendu P3 (« etrait sous 72h » sur le papier).
+      footer: 'Retrait sous 72h - passé ce délai,\nfrais de magasinage.\nPowered by Tibus',
       paperWidthMm: paperWidthMm,
     );
   }
@@ -171,7 +177,7 @@ class PrinterService {
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
         if (colis.companyPhone.isNotEmpty) 'Tél: ${colis.companyPhone}',
       ],
-      reference: colisShortRef(colis),
+      reference: colisReceiptNumber(colis),
       rows: [
         ['Destination', colis.gareDestination],
         ['Montant', '${colis.montantFret.toStringAsFixed(0)} FCFA'],
