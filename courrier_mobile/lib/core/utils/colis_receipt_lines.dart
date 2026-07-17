@@ -127,8 +127,14 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
-    if (colis.companyPhone.isNotEmpty)
-      {'text': 'Tél: ${colis.companyPhone}', 'align': 'center', 'size': 'small'},
+    // Même en-tête que le reçu (voir colisReceiptLines) : téléphones gare de
+    // départ ET destination, puis sous-titre explicite — demande explicite
+    // du 17/07 pour uniformiser talon et reçu.
+    if (colis.gareDepartPhone.isNotEmpty)
+      {'text': 'Tél: ${colis.gareDepartPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    if (colis.gareDestinationPhone.isNotEmpty)
+      {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.isPendingSync)
       {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': '================================', 'align': 'center'},

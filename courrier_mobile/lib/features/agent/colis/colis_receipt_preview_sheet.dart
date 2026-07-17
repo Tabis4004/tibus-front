@@ -261,7 +261,7 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               const SizedBox(height: 8),
               _PrinterButton(
                 icon: Icons.usb,
-                label: 'USB / Bluetooth (Xprinter, Mini Printer…)',
+                label: 'USB / Bluetooth / Réseau (Xprinter, YHD-8390…)',
                 enabled: !_printing && printer.hasEscPosSupport,
                 disabledHint: printer.hasEscPosSupport
                     ? null
@@ -558,8 +558,15 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            if (colis.companyPhone.isNotEmpty)
-              Text('Tél: ${colis.companyPhone}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
+            // Même en-tête que le reçu (voir _ReceiptBox) : téléphones gare
+            // de départ ET destination, en gras, puis sous-titre explicite.
+            if (colis.gareDepartPhone.isNotEmpty)
+              Text('Tél: ${colis.gareDepartPhone}',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+            if (colis.gareDestinationPhone.isNotEmpty)
+              Text('Tél dest: ${colis.gareDestinationPhone}',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+            const Text('Reçu expédition colis', style: TextStyle(fontSize: 9)),
             if (colis.isPendingSync)
               const Text('*** PROVISOIRE ***',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
@@ -620,15 +627,61 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
   StreamSubscription<PrinterDevice>? _sub;
   final List<PrinterDevice> _usbDevices = [];
   final List<PrinterDevice> _btDevices = [];
+  final _ipCtrl = TextEditingController();
   bool _scanningUsb = false;
   bool _scanningBt = false;
   bool _busy = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // Pré-remplit avec la dernière IP réseau utilisée (YHD-8390, etc.).
+    ref.read(printerServiceProvider).escPos.lastNetworkIp().then((ip) {
+      if (mounted && ip != null && ip.isNotEmpty && _ipCtrl.text.isEmpty) {
+        setState(() => _ipCtrl.text = ip);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _sub?.cancel();
+    _ipCtrl.dispose();
     super.dispose();
+  }
+
+  /// Impression réseau LAN/WiFi (TCP 9100) — ex. YHD-8390. L'IP est celle du
+  /// ticket d'auto-test de l'imprimante (maintenir FEED à l'allumage).
+  Future<void> _printOnNetwork() async {
+    final ip = _ipCtrl.text.trim();
+    if (ip.isEmpty) {
+      setState(() => _error = "Saisissez l'adresse IP de l'imprimante (ticket d'auto-test).");
+      return;
+    }
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final escPos = ref.read(printerServiceProvider).escPos;
+    try {
+      await escPos.connectNetwork(ip);
+      await escPos.printColisReceiptWithTalon(
+        widget.colis,
+        type: PrinterType.network,
+        agentName: widget.agentName,
+      );
+      await escPos.saveNetworkIp(ip);
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error =
+            'Impression réseau impossible ($ip) : $e — vérifiez que l\'imprimante est sur le même réseau WiFi/LAN.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _scan(PrinterType type) {
@@ -743,7 +796,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
             Row(
               children: [
                 const Expanded(
-                  child: Text('Imprimante USB / Bluetooth',
+                  child: Text('Imprimante USB / Bluetooth / Réseau',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
@@ -788,6 +841,40 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
               ],
             ),
             _deviceList(_btDevices, _scanningBt, Icons.bluetooth, PrinterType.bluetooth),
+            const Divider(),
+            const Text('Réseau LAN / WiFi (ex: YHD-8390, port 9100)',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            const Text(
+              "IP affichée sur le ticket d'auto-test de l'imprimante (maintenir FEED à l'allumage).",
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _ipCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Adresse IP',
+                      hintText: '192.168.1.87',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _printOnNetwork,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.wifi, size: 18),
+                  label: const Text('Imprimer'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

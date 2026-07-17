@@ -175,7 +175,12 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        if (colis.companyPhone.isNotEmpty) 'Tél: ${colis.companyPhone}',
+        // Même en-tête que le reçu (voir printColisReceipt) : téléphones
+        // gare de départ ET destination, puis sous-titre explicite — sans
+        // lui, le module P3 natif retombe sur « Ticket » par défaut.
+        if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+        if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
+        'Reçu expédition colis',
       ],
       reference: colisReceiptNumber(colis),
       rows: [

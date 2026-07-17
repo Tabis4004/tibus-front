@@ -1,5 +1,6 @@
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/bordereau_receipt_lines.dart';
 import '../../core/utils/colis_receipt_lines.dart';
 import '../models/colis.dart';
@@ -12,7 +13,11 @@ import 'bordereau_service.dart';
 ///
 /// Couvre notamment :
 /// - Xprinter XP-Q200 (reçu 80mm, interface USB) ;
-/// - Mini Printer MPT-II (48mm, Bluetooth classique/SPP).
+/// - Mini Printer MPT-II (48mm, Bluetooth classique/SPP) ;
+/// - YHD-8390 (reçu 80mm, USB + LAN + Bluetooth + WiFi) — TPE ESC/POS
+///   générique : pas de SDK propriétaire, il parle ESC/POS standard sur
+///   toutes ses interfaces. En LAN/WiFi il écoute en TCP brut ("RAW/JetDirect",
+///   port 9100) : voir connectNetwork() ci-dessous.
 ///
 /// Bibliothèques : flutter_pos_printer_platform_image_3 (fork maintenu de
 /// flutter_pos_printer_platform, discontinued) gère la découverte/connexion
@@ -53,6 +58,27 @@ class EscPosPrinterService {
       ),
     );
   }
+
+  /// Connexion réseau LAN/WiFi (TCP brut port 9100, dit "RAW/JetDirect") —
+  /// couvre les imprimantes Ethernet/WiFi type YHD-8390. Pas de découverte
+  /// automatique fiable en réseau : l'agent saisit l'adresse IP affichée par
+  /// le ticket d'auto-test de l'imprimante (bouton FEED maintenu à
+  /// l'allumage), mémorisée ensuite via [saveNetworkIp].
+  Future<void> connectNetwork(String ipAddress, {int port = 9100}) {
+    return _manager.connect(
+      type: PrinterType.network,
+      model: TcpPrinterInput(ipAddress: ipAddress.trim(), port: port),
+    );
+  }
+
+  static const _lastNetworkIpKey = 'escpos_last_network_ip';
+
+  /// Dernière IP réseau utilisée avec succès (pré-remplit le champ).
+  Future<String?> lastNetworkIp() async =>
+      (await SharedPreferences.getInstance()).getString(_lastNetworkIpKey);
+
+  Future<void> saveNetworkIp(String ip) async =>
+      (await SharedPreferences.getInstance()).setString(_lastNetworkIpKey, ip.trim());
 
   Future<void> disconnect(PrinterType type) => _manager.disconnect(type: type);
 
