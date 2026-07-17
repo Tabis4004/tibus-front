@@ -19,8 +19,8 @@ class AdminHomeScreen extends StatelessWidget {
         children: [
           _AdminTile(
             icon: Icons.badge_outlined,
-            title: 'Validation des livreurs',
-            subtitle: 'Approuver ou refuser les livreurs en attente',
+            title: 'Chauffeurs & livreurs',
+            subtitle: 'Recherche, filtres, documents, validation, suspension',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const DriverValidationScreen()),
             ),

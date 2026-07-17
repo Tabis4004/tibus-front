@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/driver_backend.dart';
 import '../rewards/rewards_screen.dart';
+import '../support/support_screen.dart';
 import '../wallet/earnings_report_screen.dart';
 import 'driver_zone_screen.dart';
+import 'insurance_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -106,6 +108,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               icon: const Icon(Icons.bar_chart_outlined, color: AppColors.primaryGreenDark),
               label: const Text('Statistiques financières'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SupportScreen()),
+              ),
+              icon: const Icon(Icons.support_agent_outlined, color: AppColors.primaryGreenDark),
+              label: const Text('Support'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const InsuranceScreen()),
+              ),
+              icon: const Icon(Icons.shield_outlined, color: AppColors.primaryGreenDark),
+              label: const Text('Assurance véhicule'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

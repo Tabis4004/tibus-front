@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/ticket.dart';
-import '../../data/services/ride_backend.dart';
-import '../../data/services/tibus_backend.dart';
-import '../auth/login_screen.dart';
+import '../../data/services/driver_backend.dart';
 import 'ticket_thread_screen.dart';
 
-/// Support / tickets — portage de support.tsx côté tibusride-front. Même
-/// verrou de connexion que orders_history_screen.dart : nécessite le compte
-/// Tibus, dont dérive la session miroir Ride utilisée pour lire/écrire
-/// support_tickets.
+/// Support / tickets — portage de support.tsx côté tibusride-front. Le
+/// livreur est déjà authentifié directement (pas de compte miroir ici,
+/// contrairement à courrier_client) donc pas de verrou de connexion : cet
+/// écran n'est de toute façon accessible que depuis le profil, déjà
+/// protégé.
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
@@ -24,7 +23,7 @@ class _SupportScreenState extends State<SupportScreen> {
   @override
   void initState() {
     super.initState();
-    if (TibusBackend.isLoggedIn) _load();
+    _load();
   }
 
   Future<void> _load() async {
@@ -32,11 +31,8 @@ class _SupportScreenState extends State<SupportScreen> {
       _tickets = null;
       _error = null;
     });
-    final tibusUser = TibusBackend.currentUser;
-    if (tibusUser == null || tibusUser.email == null) return;
     try {
-      await RideBackend.ensureMirroredSession(tibusUserId: tibusUser.id, tibusEmail: tibusUser.email!);
-      final tickets = await RideBackend.listMyTickets();
+      final tickets = await DriverBackend.listMyTickets();
       if (mounted) setState(() => _tickets = tickets);
     } catch (e) {
       if (mounted) {
@@ -46,13 +42,6 @@ class _SupportScreenState extends State<SupportScreen> {
         });
       }
     }
-  }
-
-  Future<void> _promptLogin() async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
-    if (result == true && mounted) _load();
   }
 
   Future<void> _openNewTicket() async {
@@ -79,27 +68,6 @@ class _SupportScreenState extends State<SupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!TibusBackend.isLoggedIn) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Support')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock_outline, size: 48, color: AppColors.textSecondary),
-                const SizedBox(height: 16),
-                const Text('Connectez-vous pour contacter le support.', textAlign: TextAlign.center),
-                const SizedBox(height: 20),
-                ElevatedButton(onPressed: _promptLogin, child: const Text('Se connecter')),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     final tickets = _tickets;
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -134,7 +102,8 @@ class _SupportScreenState extends State<SupportScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final t = tickets[index];
-                      return Card(
+                      return Container(
+                        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
                         child: ListTile(
                           title: Text(t.subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           subtitle: Text(
@@ -147,7 +116,7 @@ class _SupportScreenState extends State<SupportScreen> {
                             backgroundColor: _statusColor(t.status),
                           ),
                           onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => TicketThreadScreen(ticketId: t.id, backend: _ClientTicketBackend())),
+                            MaterialPageRoute(builder: (_) => TicketThreadScreen(ticketId: t.id, backend: _DriverTicketBackend())),
                           ),
                         ),
                       );
@@ -191,7 +160,7 @@ class _NewTicketSheetState extends State<_NewTicketSheet> {
       _error = null;
     });
     try {
-      await RideBackend.createTicket(subject: subject, category: _category, body: body);
+      await DriverBackend.createTicket(subject: subject, category: _category, body: body);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -249,17 +218,17 @@ class _NewTicketSheetState extends State<_NewTicketSheet> {
   }
 }
 
-/// Implémentation de [TicketBackend] adossée à RideBackend, injectée dans
+/// Implémentation de [TicketBackend] adossée à DriverBackend, injectée dans
 /// l'écran de fil partagé — voir ticket_thread_screen.dart.
-class _ClientTicketBackend implements TicketBackend {
+class _DriverTicketBackend implements TicketBackend {
   @override
-  String? get currentUserId => RideBackend.client.auth.currentUser?.id;
+  String? get currentUserId => DriverBackend.currentUser?.id;
   @override
-  Future<SupportTicket> getTicket(String ticketId) => RideBackend.getTicket(ticketId);
+  Future<SupportTicket> getTicket(String ticketId) => DriverBackend.getTicket(ticketId);
   @override
-  Future<List<TicketMessage>> listMessages(String ticketId) => RideBackend.listTicketMessages(ticketId);
+  Future<List<TicketMessage>> listMessages(String ticketId) => DriverBackend.listTicketMessages(ticketId);
   @override
-  Future<void> sendMessage(String ticketId, String body) => RideBackend.sendTicketMessage(ticketId, body);
+  Future<void> sendMessage(String ticketId, String body) => DriverBackend.sendTicketMessage(ticketId, body);
   @override
-  Future<void> closeTicket(String ticketId) => RideBackend.closeTicket(ticketId);
+  Future<void> closeTicket(String ticketId) => DriverBackend.closeTicket(ticketId);
 }

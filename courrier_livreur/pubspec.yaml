@@ -41,6 +41,9 @@ dependencies:
   # Partage natif du code de parrainage — voir features/rewards/rewards_screen.dart.
   share_plus: ^10.1.0
 
+  # Photo du justificatif d'assurance — voir features/profile/insurance_screen.dart.
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

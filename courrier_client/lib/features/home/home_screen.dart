@@ -3,6 +3,7 @@ import '../../core/theme/app_colors.dart';
 import '../delivery/order_delivery_screen.dart';
 import '../delivery/orders_history_screen.dart';
 import '../rewards/rewards_screen.dart';
+import '../support/support_screen.dart';
 import '../track/track_colis_screen.dart';
 
 /// Deux entrées depuis l'accueil : suivre un colis (le code sert alors de
@@ -75,6 +76,17 @@ class HomeScreen extends StatelessWidget {
                     label: const Text('Fidélité & parrainage'),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const RewardsScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.support_agent_outlined),
+                    label: const Text('Support'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SupportScreen()),
                     ),
                   ),
                 ),

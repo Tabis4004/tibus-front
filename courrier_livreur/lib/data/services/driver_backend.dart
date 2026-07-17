@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/env.dart';
 import '../models/driver_profile.dart';
@@ -701,6 +702,103 @@ class DriverBackend {
   }
 
   // ---------------------------------------------------------------------
+  // Admin — tarifs course VTC (pricing_settings) + tarification dynamique
+  // (dynamic_pricing_settings) — portage de CountryPricingOverview
+  // (admin.tsx). Une ligne `country IS NULL` = tarif global par défaut pour
+  // la catégorie ; une ligne `country` renseigné = dérogation pays (créée/
+  // supprimée séparément, jamais en modifiant le pays d'une ligne
+  // existante — même contrat que côté web). pricing_settings : écriture
+  // ouverte au rôle 'admin' (RLS simple, pas de scoping pays côté DB,
+  // contrairement à driver_profiles). dynamic_pricing_settings : écriture
+  // réservée au superadmin (RLS "Superadmins manage..."), lecture limitée
+  // aux lignes actives pour un admin non-superadmin — voir isSuperAdmin().
+  // ---------------------------------------------------------------------
+
+  static Future<List<Map<String, dynamic>>> fetchRidePricingSettings() async {
+    final rows = await client.from('pricing_settings').select().order('category').order('country');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> updateRidePricingSetting(String id, Map<String, dynamic> patch) async {
+    try {
+      await client.from('pricing_settings').update(patch).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  /// Duplique la ligne globale (country=null) de [category] en une nouvelle
+  /// dérogation pour [country] — mêmes valeurs de départ, à ajuster ensuite.
+  static Future<void> createRidePricingOverride(String category, String country) async {
+    final base = await client.from('pricing_settings').select().eq('category', category).isFilter('country', null).maybeSingle();
+    final patch = <String, dynamic>{
+      'category': category,
+      'country': country,
+      'base_fare_xof': base?['base_fare_xof'] ?? 0,
+      'per_km_xof': base?['per_km_xof'] ?? 0,
+      'per_min_xof': base?['per_min_xof'] ?? 0,
+      'min_fare_xof': base?['min_fare_xof'] ?? 0,
+      'commission_type': base?['commission_type'] ?? 'percent',
+      'commission_rate': base?['commission_rate'] ?? 0,
+      'commission_flat_xof': base?['commission_flat_xof'] ?? 0,
+      'active': true,
+    };
+    try {
+      await client.from('pricing_settings').insert(patch);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<void> deleteRidePricingOverride(String id) async {
+    try {
+      await client.from('pricing_settings').delete().eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchDynamicPricingSettings() async {
+    final rows = await client.from('dynamic_pricing_settings').select().order('country');
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> updateDynamicPricingSetting(String id, Map<String, dynamic> patch) async {
+    try {
+      await client.from('dynamic_pricing_settings').update(patch).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<void> createDynamicPricingOverride(String country) async {
+    final base = await client.from('dynamic_pricing_settings').select().isFilter('country', null).maybeSingle();
+    final patch = <String, dynamic>{
+      'country': country,
+      'traffic_coefficient': base?['traffic_coefficient'] ?? 1,
+      'traffic_ratio_cap': base?['traffic_ratio_cap'] ?? 2,
+      'weather_rainy_multiplier': base?['weather_rainy_multiplier'] ?? 1,
+      'weather_cloudy_multiplier': base?['weather_cloudy_multiplier'] ?? 1,
+      'weather_sunny_multiplier': base?['weather_sunny_multiplier'] ?? 1,
+      'rounding_increment_xof': base?['rounding_increment_xof'] ?? 50,
+      'active': true,
+    };
+    try {
+      await client.from('dynamic_pricing_settings').insert(patch);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  static Future<void> deleteDynamicPricingOverride(String id) async {
+    try {
+      await client.from('dynamic_pricing_settings').delete().eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Support / tickets — portage de support.tsx + ticket.$ticketId.tsx.
   // support_tickets/ticket_messages sont en libre-service RLS pour le
   // propriétaire (created_by = auth.uid()) : pas de service_role nécessaire
@@ -775,5 +873,159 @@ class DriverBackend {
       'status': 'closed',
       'closed_at': DateTime.now().toIso8601String(),
     }).eq('id', ticketId);
+  }
+
+  // ---------------------------------------------------------------------
+  // Assurance véhicule — portage de InsuranceStatusCard + EnrollmentWizard
+  // (kind "insurance") côté tibusride-front. driver_profiles est en
+  // libre-service RLS pour son propriétaire ("Driver manages own profile",
+  // cmd=ALL), tout comme le bucket Storage `driver-documents` scopé sur
+  // `{auth.uid()}/...` — pas de service_role/Edge Function nécessaire.
+  // Validation (insurance_status → 'verified') reste réservée à
+  // l'assureur/admin (RPC verify_driver_insurance, non accessible ici).
+  // ---------------------------------------------------------------------
+
+  static const _insuranceBucket = 'driver-documents';
+
+  static Future<Map<String, dynamic>?> fetchInsuranceInfo() async {
+    final userId = currentUser?.id;
+    if (userId == null) return null;
+    return client
+        .from('driver_profiles')
+        .select('insurance_status, insurance_expires_at, insurance_document_url, insurance_verified_at')
+        .eq('user_id', userId)
+        .maybeSingle();
+  }
+
+  /// Envoie le fichier dans `driver-documents/{uid}/insurance-{ts}.{ext}`,
+  /// puis met à jour `insurance_document_url` — deux étapes distinctes,
+  /// comme côté web (upload storage + update table), mais ici en direct
+  /// sans passer par une Edge Function puisque RLS l'autorise déjà.
+  static Future<void> uploadInsuranceDocument({
+    required Uint8List bytes,
+    required String ext,
+    required String contentType,
+  }) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('Session requise');
+    final path = '$userId/insurance-${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await client.storage.from(_insuranceBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    await client.from('driver_profiles').update({'insurance_document_url': path}).eq('user_id', userId);
+  }
+
+  /// URL signée (10 min, comme côté web) — bucket privé, jamais d'URL
+  /// publique pour un document d'identité/assurance.
+  static Future<String> getInsuranceDocumentSignedUrl(String path) async {
+    return client.storage.from(_insuranceBucket).createSignedUrl(path, 600);
+  }
+
+  /// Renouvellement — reflète exactement renew_my_insurance(_expires_at) :
+  /// remet insurance_status à 'pending' et efface verified_at/by, en
+  /// attendant une nouvelle validation assureur/admin.
+  static Future<void> renewMyInsurance(DateTime expiresAt) async {
+    final date = '${expiresAt.year.toString().padLeft(4, '0')}-${expiresAt.month.toString().padLeft(2, '0')}-${expiresAt.day.toString().padLeft(2, '0')}';
+    await client.rpc('renew_my_insurance', params: {'_expires_at': date});
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Chauffeurs & livreurs, parité complète (tâche #30). Étend
+  // fetchPendingDrivers (conservée, toujours utilisée pour le flux de
+  // validation initial) à tous les statuts + recherche + filtres, comme
+  // DriversTab côté web. driver_profiles est en libre-service RLS pour
+  // l'admin ("Admins manage drivers scoped", cmd=ALL, scopé pays sauf
+  // superadmin) — pas de service_role nécessaire.
+  //
+  // Note jointure : driver_profiles.user_id référence auth.users(id), PAS
+  // profiles(id) directement — PostgREST ne peut donc pas embarquer
+  // `profiles` automatiquement via cette FK. On fait deux requêtes et on
+  // fusionne côté client (même limite que côté web, qui utilise
+  // supabaseAdmin pour ça ; ici on reste sur des données publiques de
+  // `profiles`, pas besoin d'auth.users).
+  // ---------------------------------------------------------------------
+
+  static const driverStatusLabel = {
+    'pending': 'En attente',
+    'under_review': 'En revue',
+    'approved': 'Approuvé',
+    'rejected': 'Refusé',
+    'suspended': 'Suspendu',
+  };
+
+  static Future<List<Map<String, dynamic>>> fetchAllDrivers({
+    String? status,
+    bool onlineOnly = false,
+    String? city,
+    String? search,
+  }) async {
+    dynamic query = client.from('driver_profiles').select();
+    if (status != null && status != 'all') {
+      query = query.eq('status', status);
+    }
+    if (onlineOnly) {
+      query = query.eq('is_online', true);
+    }
+    if (city != null && city.trim().isNotEmpty) {
+      query = query.ilike('city', '%${city.trim()}%');
+    }
+    final rows = await query.order('created_at', ascending: false);
+    var drivers = (rows as List).cast<Map<String, dynamic>>();
+
+    final userIds = drivers.map((d) => d['user_id'] as String).toList();
+    if (userIds.isNotEmpty) {
+      final profiles = await client.from('profiles').select('id, full_name, phone, city, country').inFilter('id', userIds);
+      final profileMap = {for (final p in (profiles as List)) p['id'] as String: p as Map<String, dynamic>};
+      drivers = drivers.map((d) => {...d, '_profile': profileMap[d['user_id']]}).toList();
+    }
+
+    if (search != null && search.trim().isNotEmpty) {
+      final q = search.trim().toLowerCase();
+      drivers = drivers.where((d) {
+        final profile = d['_profile'] as Map<String, dynamic>?;
+        final name = (profile?['full_name'] as String?)?.toLowerCase() ?? '';
+        final phone = (profile?['phone'] as String?)?.toLowerCase() ?? '';
+        final plate = (d['vehicle_plate'] as String?)?.toLowerCase() ?? '';
+        return name.contains(q) || phone.contains(q) || plate.contains(q);
+      }).toList();
+    }
+    return drivers;
+  }
+
+  /// URL signée (10 min) pour n'importe quel document livreur (permis,
+  /// carte grise, état véhicule, assurance) — l'admin a un accès Storage
+  /// complet sur le bucket via "Admins manage driver-documents" (ALL, sans
+  /// restriction de dossier), contrairement au livreur limité à son propre
+  /// `{uid}/`.
+  static Future<String> getDriverDocumentSignedUrl(String path) async {
+    return client.storage.from(_insuranceBucket).createSignedUrl(path, 600);
+  }
+
+  /// Re-upload d'un document par un admin, au nom du livreur — même bucket/
+  /// convention de chemin que le self-service (`{userId}/{kind}-{ts}.{ext}`,
+  /// voir uploadInsuranceDocument), juste avec targetUserId ≠ l'admin.
+  static Future<void> adminUploadDriverDocument({
+    required String targetUserId,
+    required String kind,
+    required Uint8List bytes,
+    required String ext,
+    required String contentType,
+  }) async {
+    final column = switch (kind) {
+      'license' => 'license_document_url',
+      'vehicle' => 'vehicle_document_url',
+      'vehicle_condition' => 'vehicle_condition_url',
+      'insurance' => 'insurance_document_url',
+      _ => throw Exception('kind inconnu : $kind'),
+    };
+    final path = '$targetUserId/$kind-${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await client.storage.from(_insuranceBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    await client.from('driver_profiles').update({column: path}).eq('user_id', targetUserId);
   }
 }
