@@ -11,6 +11,15 @@ export function colisPublicReference(colisId: string): string {
   return `CL-${compact.slice(0, 8)}`;
 }
 
+/**
+ * Numéro affiché sur le reçu : numérotation séquentielle par gare de départ
+ * (ex. ABOI000001, migration 180) si disponible, sinon repli CL-XXXXXXXX.
+ * resolve_colis_retrait_code accepte les deux formats (migration 181).
+ */
+export function colisReceiptNumber(detail: Pick<ColisAutonomeDetail, "id" | "numeroRecu">): string {
+  return detail.numeroRecu?.trim() || colisPublicReference(detail.id);
+}
+
 export function colisQrPayload(detail: ColisAutonomeDetail): string {
   return colisPublicReference(detail.id);
 }
@@ -31,7 +40,7 @@ function tibusP3(): TibusP3Bridge | undefined {
 }
 
 export function buildColisReceiptLines(detail: ColisAutonomeDetail, currency: string): PrintLine[] {
-  const ref = colisPublicReference(detail.id);
+  const ref = colisReceiptNumber(detail);
   const natureLabel = detail.natures.filter(Boolean).join(", ") || "—";
   const description = detail.descriptionContenu?.trim() || "—";
 

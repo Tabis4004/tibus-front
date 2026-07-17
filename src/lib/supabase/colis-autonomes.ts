@@ -44,6 +44,12 @@ export type CompanyColisSettings = {
 
 export type ColisAutonomeRow = {
   id: string;
+  /**
+   * Numéro de reçu séquentiel par gare de départ (migration 180) :
+   * 4 premiers caractères du nom de la gare + ordre sur 6 chiffres
+   * (ex. ABOI000001). Null pour un colis antérieur non synchronisé.
+   */
+  numeroRecu?: string | null;
   statutColis: ColisStatut;
   nomExpediteur: string;
   telephoneExpediteur: string;
@@ -126,6 +132,7 @@ export function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
     : [];
   return {
     id: String(row.id),
+    numeroRecu: row.numeroRecu ? String(row.numeroRecu) : null,
     statutColis: String(row.statutColis) as ColisStatut,
     nomExpediteur: String(row.nomExpediteur ?? ""),
     telephoneExpediteur: String(row.telephoneExpediteur ?? ""),

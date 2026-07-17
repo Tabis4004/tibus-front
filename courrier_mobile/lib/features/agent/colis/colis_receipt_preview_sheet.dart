@@ -201,12 +201,26 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                 ),
               ),
               const SizedBox(height: 8),
+              // Parcours guichet à l'enregistrement : UNE action imprime le
+              // reçu (remis au client) PUIS le talon (collé sur le colis).
+              _PrinterButton(
+                icon: Icons.receipt_long,
+                label: 'Reçu + talon (56 mm P3)',
+                enabled: !_printing && printer.hasNativeP3,
+                disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
+                onPressed: () => _run(
+                  () => printer.printColisReceiptWithTalon(colis, paperWidthMm: 58, agentName: agentName),
+                  successMessage: 'Reçu (client) puis talon (à coller) envoyés — 56 mm.',
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Réimpressions séparées ultérieures (depuis le détail du colis).
               Row(
                 children: [
                   Expanded(
                     child: _PrinterButton(
                       icon: Icons.receipt_long_outlined,
-                      label: 'Reçu (56 mm P3)',
+                      label: 'Reçu seul (56 mm P3)',
                       enabled: !_printing && printer.hasNativeP3,
                       disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
                       onPressed: () => _run(
@@ -219,12 +233,12 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                   Expanded(
                     child: _PrinterButton(
                       icon: Icons.label_outline,
-                      label: 'Étiquette colis (56 mm P3)',
+                      label: 'Talon seul (56 mm P3)',
                       enabled: !_printing && printer.hasNativeP3,
                       disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
                       onPressed: () => _run(
                         () => printer.printColisTalon(colis, paperWidthMm: 58),
-                        successMessage: 'Étiquette envoyée (imprimante intégrée, 56 mm) — à coller sur le colis.',
+                        successMessage: 'Talon envoyé (56 mm) — à coller sur le colis.',
                       ),
                     ),
                   ),

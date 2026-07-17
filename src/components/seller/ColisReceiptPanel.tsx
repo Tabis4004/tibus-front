@@ -10,8 +10,8 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import {
   buildColisTrackingWhatsAppMessage,
-  colisPublicReference,
   colisQrPayload,
+  colisReceiptNumber,
   isColisPosPrinterAvailable,
   openColisWhatsApp,
   printColisReceipt,
@@ -53,7 +53,8 @@ export default function ColisReceiptPanel({
   const receiptRef = useRef<HTMLDivElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const autoPrintedRef = useRef(false);
-  const reference = colisPublicReference(detail.id);
+  // Numéro séquentiel par gare (ABOI000001) — repli CL-XXXXXXXX (migration 180).
+  const reference = colisReceiptNumber(detail);
   const natureLabel = detail.natures.filter(Boolean).join(", ") || "—";
   const description = detail.descriptionContenu?.trim() || "—";
   const posNative = isColisPosPrinterAvailable();
