@@ -92,7 +92,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': '--------------------------------', 'bold': true},
     {'text': 'CONTENU', 'bold': true},
     {'text': 'Nature du colis: ${colisNatureLabel(colis)}', 'bold': true},
-    {'text': 'Contenu (description): ${colisDescriptionLabel(colis)}', 'bold': true},
+    {'text': 'Description: ${colisDescriptionLabel(colis)}', 'bold': true},
     if (colis.poidsKg != null) {'text': 'Poids : ${colis.poidsKg} kg', 'bold': true, 'size': 'small'},
     if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
       {'text': 'Pourcentage perçu : ${colis.pourcentagePercu} %', 'bold': true, 'size': 'small'},

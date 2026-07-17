@@ -360,7 +360,11 @@ class P3PrinterModule(private val ctx: Context) {
             if (ref.isNotBlank()) map["reference"] = ref
         }
         val resolvedReference = cleanReference(reference.ifBlank { map["reference"].orEmpty() })
-        val resolvedQr = resolveQrContent(
+        // qrContent vide = demande EXPLICITE de ne pas imprimer de QR (ex.
+        // reçu colis client, voir printer_service.dart printColisReceipt) —
+        // ne PAS retomber sur la référence comme le fait resolveQrContent,
+        // sinon un QR réapparaît sur le reçu malgré qr: ''.
+        val resolvedQr = if (qrContent.isBlank()) "" else resolveQrContent(
             qrContent = qrContent,
             reference = resolvedReference,
             reference,
@@ -1157,12 +1161,15 @@ class P3PrinterModule(private val ctx: Context) {
         val cleanLabel = label.trim().trimEnd(':')
         val cleanValue = value.replace(Regex("\\s+"), " ").trim().trim(':', '-', '|')
         if (cleanLabel.isBlank() || cleanValue.isBlank()) return
+        // Valeurs en GRAS (demande explicite : « Téléphone: *5555555* ») —
+        // l'imprimante ne gère qu'un style par ligne, donc la ligne complète
+        // label+valeur est imprimée en gras, comme l'aperçu à l'écran.
         val oneLine = "$cleanLabel: $cleanValue"
         if (oneLine.length <= width) {
-            printWrappedLine(p, oneLine, PrintOptions(), width)
+            printWrappedLine(p, oneLine, PrintOptions(bold = true), width)
         } else {
             printWrappedLine(p, "$cleanLabel:", PrintOptions(bold = true), width)
-            printWrappedLine(p, cleanValue, PrintOptions(), width)
+            printWrappedLine(p, cleanValue, PrintOptions(bold = true), width)
         }
     }
 

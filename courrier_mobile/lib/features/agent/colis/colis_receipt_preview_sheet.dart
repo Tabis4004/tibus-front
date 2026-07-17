@@ -435,7 +435,7 @@ class _ReceiptBox extends StatelessWidget {
               isLast: true,
               children: [
                 _Field('Nature du colis', colisNatureLabel(colis)),
-                _Field('Contenu (description)', colisDescriptionLabel(colis)),
+                _Field('Description', colisDescriptionLabel(colis)),
                 if (colis.poidsKg != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -453,12 +453,10 @@ class _ReceiptBox extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10, color: Colors.black54),
                   ),
-                  // QR conservé dans l'APERÇU à l'écran (utile à l'agent
-                  // avant impression) — retiré uniquement de l'impression
-                  // physique du reçu (voir printer_service.dart,
-                  // esc_pos_printer_service.dart : printColisReceipt).
-                  const SizedBox(height: 8),
-                  Center(child: QrImageView(data: colis.id, size: 96)),
+                  // Pas de QR sur le reçu — ni à l'impression (voir
+                  // printer_service.dart / P3PrinterModule.kt), ni dans cet
+                  // aperçu : l'aperçu doit refléter le rendu papier. Le QR
+                  // reste sur le TALON uniquement (voir _TalonBox).
                   const SizedBox(height: 6),
                   const Text('Powered by Tibus', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.black54)),
                 ],

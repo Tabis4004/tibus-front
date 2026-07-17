@@ -126,6 +126,9 @@ class PrinterService {
         // ci-dessous (redondante avec l'en-tête) ; le téléphone de la gare
         // de destination reste lui affiché sous "Destination".
         if (colis.gareDepartPhone.isNotEmpty) 'Tél: ${colis.gareDepartPhone}',
+        // Sous-titre EXPLICITE : sans lui, le module P3 natif retombe sur
+        // « Ticket » par défaut (normalizeStructured, P3PrinterModule.kt).
+        'Reçu expédition colis',
       ],
       reference: colisShortRef(colis),
       rows: [
@@ -143,7 +146,7 @@ class PrinterService {
         if (colis.gareDestinationPhone.isNotEmpty) ['Tél. destination', colis.gareDestinationPhone],
         ['CONTENU', ''],
         ['Nature du colis', colisNatureLabel(colis)],
-        ['Contenu (description)', colisDescriptionLabel(colis)],
+        ['Description', colisDescriptionLabel(colis)],
         if (colis.poidsKg != null) ['Poids', '${colis.poidsKg} kg'],
         if (colis.pourcentagePercu != null && colis.pourcentagePercu! > 0)
           ['Pourcentage perçu', '${colis.pourcentagePercu} %'],
