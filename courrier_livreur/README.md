@@ -10,8 +10,12 @@ produit actée (pas de reprise telle quelle du code React/Capacitor).
 
 Un seul backend : **Tibus Ride** (`bjtklpjdsmqmzhncfflu`, projet
 `tibusride-front`). Cette app ne parle jamais au Supabase Tibus principal.
-`driver_profiles.partner_type` est toujours forcé à `'delivery'` (livraison de
-colis uniquement, jamais transport de passagers).
+`driver_profiles.partner_type` est toujours forcé à `'delivery'` — livraison de
+colis en capacité principale. Depuis la tâche #28, un livreur peut en plus
+activer une capacité secondaire "transport de passagers (VTC)"
+(`passenger_rides_status`/`assigned_ride_category`), soumise à validation
+admin ; voir "Dette technique" point 7 pour ce qui manque encore côté
+réception effective de courses passagers.
 
 ## Ce que ça fait
 
@@ -57,6 +61,14 @@ colis uniquement, jamais transport de passagers).
 6. **Pas de notifications push natives** pour les nouvelles offres — l'app
    doit être ouverte (polling toutes les 3-4s), voir `push_service.dart` de
    `courrier_mobile` pour le schéma à reprendre si besoin.
+7. **VTC (tâche #28) : phase 1 uniquement.** Le toggle auto-service +
+   validation admin + moteur de dispatch (`dispatch_rank_candidates`) sont en
+   place, mais aucun écran ne gère encore la réception/le déroulé d'une
+   course passager (`service_type='ride'`) : `fetchOpenDeliveries`,
+   `pending_offer_card.dart` et l'écran de course active sont tous câblés en
+   dur sur `service_type='delivery'`. Un livreur approuvé VTC ne recevra donc
+   pas encore d'offres passager dans l'app — la mécanique est prête,
+   l'interface reste à construire (phase 2).
 
 ## Pour démarrer
 

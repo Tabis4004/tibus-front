@@ -6,6 +6,7 @@ import '../support/support_screen.dart';
 import '../wallet/earnings_report_screen.dart';
 import 'driver_zone_screen.dart';
 import 'insurance_screen.dart';
+import 'passenger_rides_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -124,6 +125,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               icon: const Icon(Icons.shield_outlined, color: AppColors.primaryGreenDark),
               label: const Text('Assurance véhicule'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PassengerRidesScreen()),
+              ),
+              icon: const Icon(Icons.directions_car_outlined, color: AppColors.primaryGreenDark),
+              label: const Text('Transport de passagers (VTC)'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

@@ -7,6 +7,7 @@ import 'billing_admin_screen.dart';
 import 'commission_report_screen.dart';
 import 'insurance_admin_screen.dart';
 import 'metrics_screen.dart';
+import 'passenger_rides_admin_screen.dart';
 import 'pricing_settings_screen.dart';
 import 'rewards_settings_screen.dart';
 import 'rides_admin_screen.dart';
@@ -142,6 +143,15 @@ class AdminHomeScreen extends StatelessWidget {
             subtitle: "Vue d'ensemble plateforme",
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MetricsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _AdminTile(
+            icon: Icons.directions_car_filled_outlined,
+            title: 'VTC — validation',
+            subtitle: 'Dossiers transport de passagers, catégorie, approbation',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PassengerRidesAdminScreen()),
             ),
           ),
         ],

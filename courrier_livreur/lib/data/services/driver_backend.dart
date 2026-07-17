@@ -1469,6 +1469,25 @@ class DriverBackend {
   }
 
   // ---------------------------------------------------------------------
+  // Transport de passagers (VTC) — auto-service (tâche #28, phase 1).
+  // Capacité secondaire togglable pour un livreur (partner_type reste
+  // 'delivery') : le toggle passe uniquement par la RPC
+  // request_passenger_rides_toggle, qui ne peut jamais mettre
+  // passenger_rides_status à 'approved' ni choisir assigned_ride_category —
+  // ces deux colonnes sont verrouillées côté base (trigger
+  // protect_passenger_rides_fields) contre toute écriture directe du
+  // livreur, seul un admin peut les faire évoluer (voir écran de
+  // validation). Le dispatch (dispatch_rank_candidates) n'envoie des
+  // courses passagers qu'aux profils passenger_rides_status='approved'.
+  // ---------------------------------------------------------------------
+
+  /// Active (passe en 'pending_validation' si pas déjà 'approved') ou
+  /// désactive (retour à 'inactive', catégorie effacée) la capacité VTC.
+  static Future<void> requestPassengerRidesToggle(bool enable) async {
+    await client.rpc('request_passenger_rides_toggle', params: {'_enable': enable});
+  }
+
+  // ---------------------------------------------------------------------
   // Admin — Chauffeurs & livreurs, parité complète (tâche #30). Étend
   // fetchPendingDrivers (conservée, toujours utilisée pour le flux de
   // validation initial) à tous les statuts + recherche + filtres, comme
@@ -1529,6 +1548,59 @@ class DriverBackend {
       }).toList();
     }
     return drivers;
+  }
+
+  // ---------------------------------------------------------------------
+  // Admin — Transport de passagers (VTC), validation (tâche #28 phase 1).
+  // driver_profiles reste en libre-service RLS pour l'admin (même policy
+  // que #30) : écriture directe, pas de fonction serveur. Le trigger
+  // protect_passenger_rides_fields laisse passer ces écritures admin sans
+  // les verrouiller (il ne bloque que le livreur lui-même sur sa propre
+  // ligne).
+  // ---------------------------------------------------------------------
+
+  static const passengerRidesStatusLabel = {
+    'inactive': 'Inactif',
+    'pending_validation': 'En attente de validation',
+    'approved': 'Approuvé',
+    'rejected': 'Refusé',
+  };
+
+  /// Livreurs ayant une demande VTC en cours ou déjà traitée
+  /// (`passenger_rides_status <> 'inactive'`) — même schéma de fusion
+  /// driver_profiles + profiles que [fetchAllDrivers].
+  static Future<List<Map<String, dynamic>>> fetchPassengerRidesApplications() async {
+    final rows = await client.from('driver_profiles').select().neq('passenger_rides_status', 'inactive').order('updated_at', ascending: false);
+    var drivers = (rows as List).cast<Map<String, dynamic>>();
+    final userIds = drivers.map((d) => d['user_id'] as String).toList();
+    if (userIds.isNotEmpty) {
+      final profiles = await client.from('profiles').select('id, full_name, phone, city, country').inFilter('id', userIds);
+      final profileMap = {for (final p in (profiles as List)) p['id'] as String: p as Map<String, dynamic>};
+      drivers = drivers.map((d) => {...d, '_profile': profileMap[d['user_id']]}).toList();
+    }
+    return drivers;
+  }
+
+  /// Approuve la capacité VTC et fixe sa catégorie (doit respecter
+  /// `passenger_ride_category_vehicle_check` : moto -> taxi/eco uniquement).
+  static Future<void> approvePassengerRides(String driverId, String category) async {
+    await client.from('driver_profiles').update({
+      'passenger_rides_status': 'approved',
+      'assigned_ride_category': category,
+      'passenger_rides_validated_at': DateTime.now().toIso8601String(),
+      'passenger_rides_validated_by': DriverBackend.currentUser!.id,
+      'passenger_rides_rejection_reason': null,
+    }).eq('user_id', driverId);
+  }
+
+  static Future<void> rejectPassengerRides(String driverId, String reason) async {
+    await client.from('driver_profiles').update({
+      'passenger_rides_status': 'rejected',
+      'assigned_ride_category': null,
+      'passenger_rides_validated_at': DateTime.now().toIso8601String(),
+      'passenger_rides_validated_by': DriverBackend.currentUser!.id,
+      'passenger_rides_rejection_reason': reason,
+    }).eq('user_id', driverId);
   }
 
   /// URL signée (10 min) pour n'importe quel document livreur (permis,
