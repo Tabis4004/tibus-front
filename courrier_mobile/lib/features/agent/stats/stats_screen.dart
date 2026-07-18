@@ -145,7 +145,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   _buildMesVentes(s),
                   const SizedBox(height: 24),
                   Text(
-                    _hasFilters ? 'Vue filtrée' : "Vue d'ensemble (toute la compagnie)",
+                    // Rôle non privilégié : le serveur force les stats sur
+                    // sa propre activité (migration 182) — libellé honnête.
+                    !s.fullAccess
+                        ? 'Mon activité uniquement'
+                        : _hasFilters
+                            ? 'Vue filtrée'
+                            : "Vue d'ensemble (toute la compagnie)",
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -245,23 +251,28 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _FilterChipDropdown<String?>(
-              label: _vendeurName ?? 'Agent : tous',
-              icon: Icons.person_outline,
-              onSelected: (id) {
-                setState(() {
-                  _vendeurId = id;
-                  _vendeurName = id == null
-                      ? null
-                      : _vendeurs?.firstWhere((v) => v.id == id, orElse: () => ColisVendeur(id: id, name: id)).name;
-                });
-                _reload(companyId);
-              },
-              items: [
-                const PopupMenuItem(value: null, child: Text('Tous les agents')),
-                ...?_vendeurs?.map((v) => PopupMenuItem(value: v.id, child: Text(v.name))),
-              ],
-            ),
+            // Filtre "par agent" réservé aux rôles privilégiés : pour les
+            // autres, list_company_colis_vendeurs renvoie [] (migration 182)
+            // et le serveur force de toute façon les stats sur leur propre
+            // activité — le chip est donc masqué.
+            if (_vendeurs != null && _vendeurs!.isNotEmpty)
+              _FilterChipDropdown<String?>(
+                label: _vendeurName ?? 'Agent : tous',
+                icon: Icons.person_outline,
+                onSelected: (id) {
+                  setState(() {
+                    _vendeurId = id;
+                    _vendeurName = id == null
+                        ? null
+                        : _vendeurs?.firstWhere((v) => v.id == id, orElse: () => ColisVendeur(id: id, name: id)).name;
+                  });
+                  _reload(companyId);
+                },
+                items: [
+                  const PopupMenuItem(value: null, child: Text('Tous les agents')),
+                  ...?_vendeurs?.map((v) => PopupMenuItem(value: v.id, child: Text(v.name))),
+                ],
+              ),
             _FilterChipDropdown<String?>(
               label: _gareName ?? 'Gare : toutes',
               icon: Icons.store_outlined,

@@ -20,6 +20,11 @@ class ColisStats {
   final int pending;
   final int mineTotal;
   final double mineMontantTotal;
+  /// Vrai pour owner/super_admin/comptable_compagnie : stats de toute la
+  /// compagnie + filtre par agent. Faux pour les autres rôles : le serveur
+  /// force toutes les stats sur la propre activité de l'utilisateur
+  /// (migration 182) — l'UI masque alors le filtre agent.
+  final bool fullAccess;
 
   const ColisStats({
     required this.total,
@@ -32,6 +37,7 @@ class ColisStats {
     required this.pending,
     required this.mineTotal,
     required this.mineMontantTotal,
+    this.fullAccess = false,
   });
 
   factory ColisStats.fromMap(Map<String, dynamic> map) => ColisStats(
@@ -45,6 +51,7 @@ class ColisStats {
         pending: (map['pending'] as num?)?.toInt() ?? 0,
         mineTotal: (map['mineTotal'] as num?)?.toInt() ?? 0,
         mineMontantTotal: (map['mineMontantTotal'] as num?)?.toDouble() ?? 0,
+        fullAccess: map['fullAccess'] == true,
       );
 }
 
