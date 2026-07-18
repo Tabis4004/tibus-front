@@ -11,10 +11,14 @@ import 'bordereau_print_sheet.dart';
 
 final bordereauServiceProvider = Provider((ref) => BordereauService());
 
-/// Bordereau de livraison (BL-XXXXXXXX) — pratique terrain : le bordereau est
-/// CRÉÉ au chargement du bus, puis rempli en scannant les colis embarqués
-/// (chaque scan passe le colis « chargé » côté serveur). Même flux que
-/// l'onglet Bordereaux du web (BordereauPanel.tsx).
+/// Emballage — l'emballeur regroupe les colis en LOTS par destination : un
+/// lot est créé pour UNE destination, rempli en scannant les colis
+/// correspondants (le scan ne change plus le statut du colis, voir migration
+/// 182), puis clôturé pour imprimer l'étiquette (numéro de lot entier). Le
+/// chargement (chargeur) et la réception (distributeur) se font ensuite en
+/// scannant le LOT lui-même, pas chaque colis (voir BordereauChargeurScreen /
+/// BordereauDistributeurScreen). Même flux que l'onglet Bordereaux du web
+/// (BordereauPanel.tsx).
 class BordereauListScreen extends ConsumerStatefulWidget {
   final String companyId;
   const BordereauListScreen({super.key, required this.companyId});
@@ -87,10 +91,11 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Créer un bordereau', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                const Text('Créer un lot', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 const Text(
-                  'Le bordereau accompagne le bus : scannez ensuite chaque colis embarqué.',
+                  'Un lot regroupe les colis d\'UNE SEULE destination : scannez ensuite chaque colis '
+                  'à emballer, puis clôturez pour imprimer l\'étiquette du lot.',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
@@ -105,13 +110,11 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String?>(
                   initialValue: gareDestId,
-                  decoration: const InputDecoration(labelText: 'Gare de destination (optionnel)'),
-                  items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('Toutes destinations')),
-                    ...gares
-                        .where((g) => g.id != gareDepartId)
-                        .map((g) => DropdownMenuItem<String?>(value: g.id, child: Text(g.name))),
-                  ],
+                  decoration: const InputDecoration(labelText: 'Gare de destination *'),
+                  items: gares
+                      .where((g) => g.id != gareDepartId)
+                      .map((g) => DropdownMenuItem<String?>(value: g.id, child: Text(g.name)))
+                      .toList(),
                   onChanged: (v) => setSheetState(() => gareDestId = v),
                 ),
                 const SizedBox(height: 10),
@@ -132,7 +135,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.qr_code_scanner),
                     label: Text(creating ? 'Création…' : 'Créer et scanner'),
-                    onPressed: creating || gareDepartId == null
+                    onPressed: creating || gareDepartId == null || gareDestId == null
                         ? null
                         : () async {
                             setSheetState(() => creating = true);
@@ -140,7 +143,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                               final detail = await ref.read(bordereauServiceProvider).create(
                                     companyId: widget.companyId,
                                     gareDepartId: gareDepartId!,
-                                    gareDestinationId: gareDestId,
+                                    gareDestinationId: gareDestId!,
                                     busId: busId,
                                   );
                               if (sheetContext.mounted) {
@@ -176,11 +179,11 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
     final items = _items;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Bordereaux de livraison')),
+      appBar: AppBar(title: const Text('Emballage — Lots par destination')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: const Icon(Icons.add),
-        label: const Text('Créer un bordereau'),
+        label: const Text('Créer un lot'),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -196,7 +199,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                         child: Text(
                           _error != null
                               ? 'Erreur : $_error'
-                              : 'Aucun bordereau.\nCréez-en un au prochain chargement de bus.',
+                              : 'Aucun lot.\nCréez-en un pour regrouper les colis d\'une destination.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.grey),
                         ),
@@ -212,22 +215,21 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                       return Card(
                         child: ListTile(
                           title: Text(
-                            '${row.reference} · ${row.gareDepart} → ${row.gareDestination ?? "toutes destinations"}',
+                            'Lot ${row.numeroLot ?? '—'} · ${row.gareDepart} → ${row.gareDestination ?? "?"}',
                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                           ),
                           subtitle: Text(
-                            '${row.colisCount} colis'
+                            '${row.reference} · ${row.colisCount} colis'
                             '${row.busPlateNumber != null ? " · Bus ${row.busPlateNumber}" : ""}'
                             '${row.createdAt != null ? " · ${_fmtDate(row.createdAt!)}" : ""}',
                           ),
                           trailing: Chip(
                             visualDensity: VisualDensity.compact,
                             label: Text(
-                              row.isOpen ? 'En cours' : 'Clôturé',
+                              _lotStatutLabel(row.statut),
                               style: const TextStyle(fontSize: 11, color: Colors.white),
                             ),
-                            backgroundColor:
-                                row.isOpen ? AppColors.primaryGreen : Colors.grey,
+                            backgroundColor: _lotStatutColor(row.statut),
                           ),
                           onTap: () async {
                             await Navigator.of(context).push(
@@ -251,6 +253,24 @@ String _fmtDate(DateTime d) {
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
 }
+
+/// Libellé du statut de lot — ouvert (emballage), clos (prêt à charger),
+/// charge (parti), arrive (reçu à destination) — voir migration 182.
+String _lotStatutLabel(String statut) => switch (statut) {
+      'ouvert' => 'Emballage en cours',
+      'clos' => 'Prêt à charger',
+      'charge' => 'Parti (chargé)',
+      'arrive' => 'Arrivé',
+      _ => statut,
+    };
+
+Color _lotStatutColor(String statut) => switch (statut) {
+      'ouvert' => AppColors.primaryGreen,
+      'clos' => Colors.orange,
+      'charge' => Colors.blueGrey,
+      'arrive' => Colors.blue,
+      _ => Colors.grey,
+    };
 
 /// Détail : scan des colis embarqués + liste + clôture.
 class BordereauDetailScreen extends ConsumerStatefulWidget {
@@ -420,12 +440,12 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(detail.reference),
+        title: Text('Lot ${detail.numeroLot ?? detail.reference}'),
         actions: [
           IconButton(
             onPressed: detail.colis.isEmpty ? null : () => showBordereauPrintSheet(context, detail),
             icon: const Icon(Icons.print_outlined),
-            tooltip: 'Imprimer le bordereau',
+            tooltip: 'Imprimer l\'étiquette du lot',
           ),
           if (isOpen)
             TextButton.icon(
@@ -445,14 +465,14 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${detail.gareDepart} → ${detail.gareDestination ?? "toutes destinations"}',
+                    '${detail.gareDepart} → ${detail.gareDestination ?? "?"}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${detail.colis.length} colis · Total fret ${detail.totalFret.toStringAsFixed(0)} XOF'
                     '${detail.busPlateNumber != null ? " · Bus ${detail.busPlateNumber}" : ""}'
-                    '${isOpen ? "" : " · CLÔTURÉ"}',
+                    '${isOpen ? "" : " · ${_lotStatutLabel(detail.statut)}"}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
@@ -461,7 +481,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
           ),
           if (isOpen) ...[
             const SizedBox(height: 12),
-            const Text('Scannez le QR du reçu de chaque colis embarqué',
+            const Text('Scannez le QR du reçu de chaque colis à emballer dans ce lot',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ClipRRect(

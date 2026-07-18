@@ -299,6 +299,38 @@ export async function getCompanyAccountingDashboardSupabase(
   return normalizeDashboard(data);
 }
 
+export type CompanyGareRevenue = {
+  gareId: string;
+  gareName: string;
+  ticketRevenue: number;
+  colisRevenue: number;
+  totalRevenue: number;
+  openCaisseBalance: number;
+  currency: string;
+};
+
+/** Récapitulatif des montants PAR AGENCE (voir migration 182) — le
+ * dashboard global (get_company_accounting_dashboard) n'expose qu'un
+ * montant unique pour toute la compagnie, sans détail par gare ni les
+ * ventes colis. */
+export async function getCompanyRevenueByGareSupabase(
+  companyId: string,
+): Promise<CompanyGareRevenue[]> {
+  const { data, error } = await supabase.rpc("get_company_revenue_by_gare", {
+    p_company_id: companyId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    gareId: String(row.gareId),
+    gareName: String(row.gareName ?? ""),
+    ticketRevenue: numberValue(row.ticketRevenue),
+    colisRevenue: numberValue(row.colisRevenue),
+    totalRevenue: numberValue(row.totalRevenue),
+    openCaisseBalance: numberValue(row.openCaisseBalance),
+    currency: String(row.currency ?? "XOF"),
+  }));
+}
+
 export async function getSellerCommissionSummarySupabase(): Promise<SellerCommissionSummary> {
   const { data, error } = await supabase.rpc("get_seller_commission_summary");
 

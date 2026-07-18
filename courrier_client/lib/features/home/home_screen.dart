@@ -31,7 +31,7 @@ class HomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark),
                 ),
                 const Text(
-                  'Suivez votre colis, commandez une livraison',
+                  'Suivez votre colis, commandez une livraison ou une course',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
@@ -40,7 +40,7 @@ class HomeScreen extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.two_wheeler),
-                    label: const Text('Commander une livraison'),
+                    label: const Text('Commander une livraison ou une course'),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const OrderDeliveryScreen()),
                     ),

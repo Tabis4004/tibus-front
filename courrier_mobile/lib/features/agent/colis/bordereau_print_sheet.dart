@@ -352,8 +352,15 @@ class _BordereauBox extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(border: Border.all(color: Colors.black45), borderRadius: BorderRadius.circular(4)),
-                child: Text(detail.reference,
-                    textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                child: Column(
+                  children: [
+                    if (detail.numeroLot != null)
+                      Text('LOT N°  ${detail.numeroLot}',
+                          textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(detail.reference,
+                        textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
               Text(trajet, style: const TextStyle(fontWeight: FontWeight.w600)),

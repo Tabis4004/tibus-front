@@ -29,7 +29,26 @@ extension RideStatusX on RideStatus {
         RideStatus.completed => 'Livré',
         RideStatus.cancelled => 'Annulé',
       };
+
+  /// Libellés "course passager" (VTC, tâche #28 phase 2).
+  String get labelRide => switch (this) {
+        RideStatus.requested => 'Recherche d\'un chauffeur...',
+        RideStatus.accepted => 'Chauffeur assigné',
+        RideStatus.arriving => 'Chauffeur en approche',
+        RideStatus.inProgress => 'Course en cours',
+        RideStatus.completed => 'Terminée',
+        RideStatus.cancelled => 'Annulée',
+      };
 }
+
+/// Catégories VTC — libellés partagés (sélection, suivi).
+const rideCategoryLabel = {
+  'taxi': 'Taxi',
+  'eco': 'Éco',
+  'confort': 'Confort',
+  'confort_plus': 'Confort+',
+  'vip': 'VIP',
+};
 
 /// Type de véhicule livreur — enum texte côté Tibus Ride (delivery_vehicle),
 /// distinct de vehicle_category (qui sert aux courses passager).
@@ -55,6 +74,8 @@ extension DeliveryVehicleX on DeliveryVehicle {
 
 class DeliveryRide {
   final String id;
+  final String serviceType; // 'delivery' | 'ride'
+  final String? category; // catégorie VTC, null si delivery
   final RideStatus status;
   final String pickupAddress;
   final double? pickupLat;
@@ -71,6 +92,8 @@ class DeliveryRide {
 
   const DeliveryRide({
     required this.id,
+    this.serviceType = 'delivery',
+    this.category,
     required this.status,
     required this.pickupAddress,
     this.pickupLat,
@@ -86,8 +109,13 @@ class DeliveryRide {
     this.createdAt,
   });
 
+  bool get isRide => serviceType != 'delivery';
+  String get statusLabel => isRide ? status.labelRide : status.label;
+
   factory DeliveryRide.fromMap(Map<String, dynamic> map) => DeliveryRide(
         id: map['id'] as String,
+        serviceType: (map['service_type'] as String?) ?? 'delivery',
+        category: map['category'] as String?,
         status: RideStatusX.fromDb(map['status'] as String? ?? 'requested'),
         pickupAddress: map['pickup_address'] as String? ?? '',
         pickupLat: (map['pickup_lat'] as num?)?.toDouble(),

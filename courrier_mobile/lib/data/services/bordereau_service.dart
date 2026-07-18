@@ -1,9 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
-/// Bordereau de livraison (BL-XXXXXXXX) : mêmes RPC que le web
-/// (migration 171) — create/list/get/add/remove/close. Chaque scan
-/// ajoute le colis au bordereau et le passe « chargé » côté serveur.
+/// Lot colis / bordereau de livraison (BL-XXXXXXXX, numéro de lot entier
+/// affiché sur l'étiquette) : mêmes RPC que le web (migration 182) —
+/// create/list/get/add/remove/close pour l'EMBALLEUR (regroupement par
+/// destination), puis markCharge (chargeur) et markArrive (distributeur)
+/// pour le cycle de vie du lot : ouvert -> clos -> charge -> arrive.
+/// Chaque étape est réservée au rôle gare correspondant côté serveur
+/// (emballeur_gare / chargeur_gare / distributeur_gare) — voir
+/// _assert_lot_access.
 class BordereauService {
   final SupabaseClient _client = SupabaseService.client;
 
@@ -18,10 +23,12 @@ class BordereauService {
         .toList();
   }
 
+  /// Création d'un lot — la gare de destination est désormais OBLIGATOIRE
+  /// (regroupement par destination, demande explicite de l'emballeur).
   Future<BordereauDetail> create({
     required String companyId,
     required String gareDepartId,
-    String? gareDestinationId,
+    required String gareDestinationId,
     String? busId,
   }) async {
     final data = await _client.rpc('create_bordereau_livraison', params: {
@@ -31,6 +38,23 @@ class BordereauService {
       'p_bus_id': busId,
     });
     return BordereauDetail.fromMap(data as Map<String, dynamic>);
+  }
+
+  /// Chargeur : scanne le LOT (pas chaque colis) pour confirmer le
+  /// chargement dans le véhicule — bascule tous ses colis enregistré ->
+  /// chargé côté serveur.
+  Future<BordereauDetail> markCharge(String bordereauId) async {
+    await _client.rpc('mark_bordereau_charge', params: {'p_bordereau_id': bordereauId});
+    return get(bordereauId);
+  }
+
+  /// Distributeur : scanne le LOT à l'arrivée pour confirmer la réception —
+  /// bascule tous ses colis chargé -> arrivé et prépare la notification
+  /// client (voir colis_scan_screen / send-colis-push, appelé par l'écran
+  /// distributeur pour chaque colis concerné).
+  Future<BordereauDetail> markArrive(String bordereauId) async {
+    await _client.rpc('mark_bordereau_arrive', params: {'p_bordereau_id': bordereauId});
+    return get(bordereauId);
   }
 
   Future<BordereauDetail> get(String bordereauId) async {
@@ -130,7 +154,8 @@ class BordereauContact {
 class BordereauSummary {
   final String id;
   final String reference;
-  final String statut; // 'ouvert' | 'clos'
+  final int? numeroLot;
+  final String statut; // 'ouvert' | 'clos' | 'charge' | 'arrive'
   final String gareDepart;
   final String? gareDestination;
   final String? busPlateNumber;
@@ -140,6 +165,7 @@ class BordereauSummary {
   const BordereauSummary({
     required this.id,
     required this.reference,
+    this.numeroLot,
     required this.statut,
     required this.gareDepart,
     this.gareDestination,
@@ -149,10 +175,14 @@ class BordereauSummary {
   });
 
   bool get isOpen => statut == 'ouvert';
+  bool get isClosed => statut == 'clos';
+  bool get isCharge => statut == 'charge';
+  bool get isArrive => statut == 'arrive';
 
   factory BordereauSummary.fromMap(Map<String, dynamic> map) => BordereauSummary(
         id: map['id'] as String,
         reference: (map['reference'] ?? '') as String,
+        numeroLot: (map['numeroLot'] as num?)?.toInt(),
         statut: (map['statut'] ?? 'ouvert') as String,
         gareDepart: (map['gareDepart'] ?? '') as String,
         gareDestination: map['gareDestination'] as String?,
@@ -212,6 +242,7 @@ class BordereauColisRow {
 class BordereauDetail {
   final String id;
   final String reference;
+  final int? numeroLot;
   final String statut;
   final String companyId;
   final String companyName;
@@ -225,6 +256,7 @@ class BordereauDetail {
   const BordereauDetail({
     required this.id,
     required this.reference,
+    this.numeroLot,
     required this.statut,
     required this.companyId,
     required this.companyName,
@@ -237,11 +269,15 @@ class BordereauDetail {
   });
 
   bool get isOpen => statut == 'ouvert';
+  bool get isClosed => statut == 'clos';
+  bool get isCharge => statut == 'charge';
+  bool get isArrive => statut == 'arrive';
   double get totalFret => colis.fold(0, (sum, row) => sum + row.montantFret);
 
   factory BordereauDetail.fromMap(Map<String, dynamic> map) => BordereauDetail(
         id: map['id'] as String,
         reference: (map['reference'] ?? '') as String,
+        numeroLot: (map['numeroLot'] as num?)?.toInt(),
         statut: (map['statut'] ?? 'ouvert') as String,
         companyId: (map['companyId'] ?? '') as String,
         companyName: (map['companyName'] ?? '') as String,

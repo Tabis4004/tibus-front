@@ -61,14 +61,13 @@ réception effective de courses passagers.
 6. **Pas de notifications push natives** pour les nouvelles offres — l'app
    doit être ouverte (polling toutes les 3-4s), voir `push_service.dart` de
    `courrier_mobile` pour le schéma à reprendre si besoin.
-7. **VTC (tâche #28) : phase 1 uniquement.** Le toggle auto-service +
-   validation admin + moteur de dispatch (`dispatch_rank_candidates`) sont en
-   place, mais aucun écran ne gère encore la réception/le déroulé d'une
-   course passager (`service_type='ride'`) : `fetchOpenDeliveries`,
-   `pending_offer_card.dart` et l'écran de course active sont tous câblés en
-   dur sur `service_type='delivery'`. Un livreur approuvé VTC ne recevra donc
-   pas encore d'offres passager dans l'app — la mécanique est prête,
-   l'interface reste à construire (phase 2).
+7. **VTC (tâche #28) : phases 1 et 2 faites.** Toggle auto-service +
+   validation admin + moteur de dispatch + réception d'offres/liste ouverte
+   + écran de trajet passager en cours sont tous en place, aussi bien pour
+   le mode proximity (offres poussées) que self_assign (liste ouverte,
+   restreinte à la catégorie approuvée du livreur). Pas de notifications
+   push natives spécifiques aux courses passager (même limite générale que
+   le point 6 ci-dessus).
 
 ## Pour démarrer
 

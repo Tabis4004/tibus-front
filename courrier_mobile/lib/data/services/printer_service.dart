@@ -208,6 +208,83 @@ class PrinterService {
     await printColisTalon(colis, paperWidthMm: paperWidthMm);
   }
 
+  /// Journal de caisse du jour — l'ensemble des mouvements de la session en
+  /// cours (encaissements/décaissements/reversements), avec le TOTAL en bas
+  /// (solde espèces actuel) — demande explicite du promoteur. Imprimante P3
+  /// intégrée : chaque mouvement devient une ligne label/valeur ; le solde
+  /// final est affiché en gros via le cadre "reference" du pont natif.
+  Future<void> printCaisseJournal({
+    required String companyName,
+    required String sessionLabel,
+    required List<StationCashMovement> movements,
+    required double openingFloat,
+    required double currentBalance,
+    int paperWidthMm = 58,
+  }) {
+    final dateFmt = _journalDateFmt;
+    return printReceipt(
+      header: [
+        companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+        'Journal de caisse — $sessionLabel',
+      ],
+      reference: 'TOTAL  ${currentBalance.toStringAsFixed(0)} FCFA',
+      rows: [
+        ['Fond de roulement', '${openingFloat.toStringAsFixed(0)} FCFA'],
+        ['--------------------------------', ''],
+        for (final m in movements)
+          [
+            '${dateFmt(m.createdAt)}  ${m.typeLabel}',
+            '${m.isDebit ? '-' : '+'}${m.amount.toStringAsFixed(0)} FCFA',
+          ],
+      ],
+      qr: '',
+      footer: '${movements.length} mouvement(s) — Solde final : ${currentBalance.toStringAsFixed(0)} FCFA',
+      paperWidthMm: paperWidthMm,
+    );
+  }
+
+  /// Idem, pont Xprinter/WisePrinter (desktop).
+  Future<void> printCaisseJournalViaWisePrinter({
+    required String companyName,
+    required String sessionLabel,
+    required List<StationCashMovement> movements,
+    required double openingFloat,
+    required double currentBalance,
+  }) {
+    if (!hasWisePrinterBridge) {
+      throw StateError('Xprinter indisponible sur cet appareil.');
+    }
+    final dateFmt = _journalDateFmt;
+    return _bridge.printViaWisePrinter(
+      header: companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+      lines: [
+        {'text': 'Journal de caisse', 'align': 'center', 'bold': true, 'size': 'large'},
+        {'text': sessionLabel, 'align': 'center', 'size': 'small'},
+        {'text': '================================', 'align': 'center'},
+        {'text': 'Fond de roulement : ${openingFloat.toStringAsFixed(0)} FCFA', 'bold': true},
+        {'text': '--------------------------------'},
+        for (final m in movements) ...[
+          {'text': '${dateFmt(m.createdAt)}  ${m.typeLabel}', 'size': 'small'},
+          {'text': '${m.isDebit ? '-' : '+'}${m.amount.toStringAsFixed(0)} FCFA', 'bold': true},
+        ],
+        {'text': '================================', 'align': 'center'},
+        {'text': 'TOTAL (solde final)', 'align': 'center', 'bold': true},
+        {'text': '${currentBalance.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true, 'size': 'large'},
+        {'text': 'Powered by www.tibus.app', 'align': 'center', 'size': 'small'},
+      ],
+      qr: '',
+      qrSize: 220,
+      feedLines: 3,
+      cut: true,
+    );
+  }
+
+  String _journalDateFmt(DateTime dt) {
+    final local = dt.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(local.hour)}:${two(local.minute)}';
+  }
+
   /// Bordereau de livraison — pont P3 natif. Une ligne rows par colis
   /// (référence + destinataire/montant), voir bordereauReceiptLines pour le
   /// même contenu côté WisePrinter/ESC-POS.
@@ -215,7 +292,15 @@ class PrinterService {
     final trajet = '${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
     return printReceipt(
       header: [d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER', 'Bordereau de livraison'],
-      reference: d.reference,
+      // Le pont P3 natif affiche "reference" en gros dans un encadré
+      // (printBoxedLine) : on y met le numéro de lot ENTIER (étiquette à
+      // coller sur le lot, demande explicite), pas la référence technique
+      // BL-XXXXXXXX — le module natif ne garde qu'UNE seule ligne de
+      // sous-titre en plus du nom de la compagnie (normalizeStructured),
+      // donc afficher les deux séparément dans le header les ferait
+      // silencieusement disparaître. La référence BL- reste visible sur
+      // l'aperçu écran et les autres ponts (voir bordereauReceiptLines).
+      reference: d.numeroLot != null ? 'LOT ${d.numeroLot}' : d.reference,
       rows: [
         ['Trajet', trajet],
         if (d.busPlateNumber != null) ['Bus', d.busPlateNumber!],

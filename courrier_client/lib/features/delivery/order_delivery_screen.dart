@@ -53,6 +53,13 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
   String? _error;
   int? _estimate;
 
+  /// Mode Livraison (par défaut) / Course VTC — tâche #28 phase 2. Un seul
+  /// écran de commande, comme passenger.tsx côté web (formulaire unique avec
+  /// bascule delivery/ride), plutôt que dupliquer tout le flux
+  /// adresse/position déjà en place ici.
+  bool _isRideMode = false;
+  String _rideCategory = 'eco';
+
   static const _packageTypes = {
     'documents': 'Documents',
     'small': 'Petit colis',
@@ -137,22 +144,29 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       _dropoffPos!.latitude, _dropoffPos!.longitude,
     );
     try {
-      final price = await RideBackend.estimatePriceXof(
-        vehicle: _vehicle,
-        distanceKm: distance,
-        packageType: _packageType,
-        country: countryForCoords(_pickupPos!.latitude, _pickupPos!.longitude),
-        urgent: _urgent,
-        insulatedBag: _insulatedBag,
-      );
+      final price = _isRideMode
+          ? await RideBackend.estimateRidePriceXof(
+              category: _rideCategory,
+              distanceKm: distance,
+              country: countryForCoords(_pickupPos!.latitude, _pickupPos!.longitude),
+            )
+          : await RideBackend.estimatePriceXof(
+              vehicle: _vehicle,
+              distanceKm: distance,
+              packageType: _packageType,
+              country: countryForCoords(_pickupPos!.latitude, _pickupPos!.longitude),
+              urgent: _urgent,
+              insulatedBag: _insulatedBag,
+            );
       if (mounted) setState(() {
         _estimate = price;
         _error = null;
       });
     } catch (e) {
       // Ne bloque pas la commande (le prix réel est recalculé serveur au
-      // moment de createDeliveryRide) — juste un aperçu manquant, mais on
-      // le signale plutôt que de laisser le bouton sans effet visible.
+      // moment de createDeliveryRide/createRideRequest) — juste un aperçu
+      // manquant, mais on le signale plutôt que de laisser le bouton sans
+      // effet visible.
       if (mounted) setState(() => _error = 'Estimation indisponible : $e');
     }
   }
@@ -175,26 +189,40 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
       return;
     }
     try {
-      final ride = await RideBackend.createDeliveryRide(
-        tibusUserId: tibusUser.id,
-        tibusEmail: tibusUser.email!,
-        pickupAddress: _pickupAddressCtrl.text.trim().isEmpty
-            ? (widget.colis?.gareDestination ?? '')
-            : _pickupAddressCtrl.text.trim(),
-        pickupLat: _pickupPos!.latitude,
-        pickupLng: _pickupPos!.longitude,
-        dropoffAddress: _dropoffAddressCtrl.text.trim(),
-        dropoffLat: _dropoffPos!.latitude,
-        dropoffLng: _dropoffPos!.longitude,
-        vehicle: _vehicle,
-        packageType: _packageType,
-        urgent: _urgent,
-        insulatedBag: _insulatedBag,
-        colisCode: widget.colis?.id,
-        passengerPhone: _phoneCtrl.text.trim().isNotEmpty
-            ? _phoneCtrl.text.trim()
-            : widget.colis?.telephoneDestinataire,
-      );
+      final pickupAddress = _pickupAddressCtrl.text.trim().isEmpty
+          ? (widget.colis?.gareDestination ?? '')
+          : _pickupAddressCtrl.text.trim();
+      final passengerPhone = _phoneCtrl.text.trim().isNotEmpty ? _phoneCtrl.text.trim() : widget.colis?.telephoneDestinataire;
+
+      final ride = _isRideMode
+          ? await RideBackend.createRideRequest(
+              tibusUserId: tibusUser.id,
+              tibusEmail: tibusUser.email!,
+              pickupAddress: pickupAddress,
+              pickupLat: _pickupPos!.latitude,
+              pickupLng: _pickupPos!.longitude,
+              dropoffAddress: _dropoffAddressCtrl.text.trim(),
+              dropoffLat: _dropoffPos!.latitude,
+              dropoffLng: _dropoffPos!.longitude,
+              category: _rideCategory,
+              passengerPhone: passengerPhone,
+            )
+          : await RideBackend.createDeliveryRide(
+              tibusUserId: tibusUser.id,
+              tibusEmail: tibusUser.email!,
+              pickupAddress: pickupAddress,
+              pickupLat: _pickupPos!.latitude,
+              pickupLng: _pickupPos!.longitude,
+              dropoffAddress: _dropoffAddressCtrl.text.trim(),
+              dropoffLat: _dropoffPos!.latitude,
+              dropoffLng: _dropoffPos!.longitude,
+              vehicle: _vehicle,
+              packageType: _packageType,
+              urgent: _urgent,
+              insulatedBag: _insulatedBag,
+              colisCode: widget.colis?.id,
+              passengerPhone: passengerPhone,
+            );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => DeliveryStatusScreen(rideId: ride.id)),
@@ -252,12 +280,29 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Commander une livraison')),
+      appBar: AppBar(title: Text(_isRideMode ? 'Commander une course' : 'Commander une livraison')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (widget.colis != null) ...[
             Text('Colis ${widget.colis!.id.substring(0, 8).toUpperCase()}', style: const TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+          ] else ...[
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('Livraison'), icon: Icon(Icons.local_shipping_outlined)),
+                ButtonSegment(value: true, label: Text('Course VTC'), icon: Icon(Icons.directions_car_outlined)),
+              ],
+              selected: {_isRideMode},
+              onSelectionChanged: (s) {
+                setState(() {
+                  _isRideMode = s.first;
+                  _estimate = null;
+                  _error = null;
+                });
+                _refreshEstimate();
+              },
+            ),
             const SizedBox(height: 16),
           ],
           TextField(
@@ -293,52 +338,66 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<DeliveryVehicle>(
-            value: _vehicle,
-            decoration: const InputDecoration(labelText: 'Véhicule livreur'),
-            items: DeliveryVehicle.values
-                .map((v) => DropdownMenuItem(value: v, child: Text(v.label)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) {
-                setState(() => _vehicle = v);
+          if (_isRideMode) ...[
+            DropdownButtonFormField<String>(
+              value: _rideCategory,
+              decoration: const InputDecoration(labelText: 'Catégorie'),
+              items: rideCategoryLabel.entries
+                  .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
+              onChanged: (v) {
+                setState(() => _rideCategory = v ?? _rideCategory);
                 _refreshEstimate();
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _packageType,
-            decoration: const InputDecoration(labelText: 'Type de colis'),
-            items: _packageTypes.entries
-                .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                .toList(),
-            onChanged: (v) {
-              setState(() => _packageType = v ?? _packageType);
-              _refreshEstimate();
-            },
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _urgent,
-            title: const Text('Livraison urgente'),
-            subtitle: const Text('Priorité + supplément (+800 FCFA, +25%)', style: TextStyle(fontSize: 12)),
-            onChanged: (v) {
-              setState(() => _urgent = v);
-              _refreshEstimate();
-            },
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _insulatedBag,
-            title: const Text('Sac isotherme'),
-            subtitle: const Text('Pour repas/produits sensibles (+350 FCFA)', style: TextStyle(fontSize: 12)),
-            onChanged: (v) {
-              setState(() => _insulatedBag = v);
-              _refreshEstimate();
-            },
-          ),
+              },
+            ),
+          ] else ...[
+            DropdownButtonFormField<DeliveryVehicle>(
+              value: _vehicle,
+              decoration: const InputDecoration(labelText: 'Véhicule livreur'),
+              items: DeliveryVehicle.values
+                  .map((v) => DropdownMenuItem(value: v, child: Text(v.label)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _vehicle = v);
+                  _refreshEstimate();
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _packageType,
+              decoration: const InputDecoration(labelText: 'Type de colis'),
+              items: _packageTypes.entries
+                  .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
+              onChanged: (v) {
+                setState(() => _packageType = v ?? _packageType);
+                _refreshEstimate();
+              },
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _urgent,
+              title: const Text('Livraison urgente'),
+              subtitle: const Text('Priorité + supplément (+800 FCFA, +25%)', style: TextStyle(fontSize: 12)),
+              onChanged: (v) {
+                setState(() => _urgent = v);
+                _refreshEstimate();
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _insulatedBag,
+              title: const Text('Sac isotherme'),
+              subtitle: const Text('Pour repas/produits sensibles (+350 FCFA)', style: TextStyle(fontSize: 12)),
+              onChanged: (v) {
+                setState(() => _insulatedBag = v);
+                _refreshEstimate();
+              },
+            ),
+          ],
           const SizedBox(height: 12),
           if (_pickupPos != null && _dropoffPos != null)
             OutlinedButton(onPressed: _refreshEstimate, child: const Text('Estimer le prix')),
@@ -359,7 +418,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             onPressed: _loading ? null : _submit,
             child: _loading
                 ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Commander la livraison'),
+                : Text(_isRideMode ? 'Commander la course' : 'Commander la livraison'),
           ),
         ],
       ),

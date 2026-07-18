@@ -6,12 +6,28 @@ import '../../../core/widgets/kpi_card.dart';
 import '../../../core/widgets/colis_card.dart';
 import '../../../data/services/stats_service.dart';
 import '../../../data/models/colis.dart';
+import '../../../data/models/app_role.dart';
 import '../colis/colis_list_screen.dart';
 import '../colis/colis_scan_screen.dart';
 import '../colis/colis_manifest_screen.dart';
 import '../colis/bordereau_screen.dart';
+import '../colis/bordereau_chargeur_screen.dart';
+import '../colis/bordereau_distributeur_screen.dart';
 import '../colis/pending_colis_screen.dart';
 import '../caisse/station_cash_screen.dart';
+
+/// Rôles "manager" qui gardent un accès de secours à toutes les étapes du
+/// cycle colis (encadrement/dépannage) — même logique que _assert_lot_access
+/// côté serveur (migration 182).
+const _kLotManagerRoles = ['owner', 'comptable_compagnie', 'gerant_gare', 'gestionnaire_gare', 'super_admin'];
+
+/// Vrai si l'utilisateur tient le rôle [roleName] (ou un rôle manager) pour
+/// AU MOINS une compagnie — la portée gare précise est vérifiée côté serveur
+/// à chaque action (has_gare_role), ceci ne sert qu'à l'affichage du menu :
+/// chaque rôle est distinct, l'emballeur ne doit pas voir "Chargement", etc.
+bool _hasLotRole(List<AppRole> roles, String roleName) {
+  return roles.any((r) => r.name == roleName || _kLotManagerRoles.contains(r.name));
+}
 
 /// Écran d'accueil agent — réplique la maquette 1 :
 /// salutation, 2 cartes KPI (aujourd'hui / montant du jour),
@@ -95,6 +111,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
   @override
   Widget build(BuildContext context) {
     final companyId = widget.companyId;
+    final roles = ref.watch(myRolesProvider).valueOrNull ?? const <AppRole>[];
 
     return RefreshIndicator(
       onRefresh: _refresh,
@@ -183,18 +200,54 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.assignment_outlined, color: AppColors.primaryGreen),
-              title: const Text('Bordereau de livraison'),
-              subtitle: const Text('Créer un BL et scanner les colis embarqués dans le bus'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => BordereauListScreen(companyId: companyId)),
+          // Trois écrans DISTINCTS, un par rôle du cycle colis — l'emballeur
+          // n'emballe QUE (pas de "Chargement"/"Réception"), et inversement
+          // (demande explicite : chaque rôle fait son métier, pas celui de
+          // l'autre). Visibilité basée sur les rôles gare de l'utilisateur ;
+          // l'application du rôle exact (quelle gare) reste vérifiée côté
+          // serveur à chaque action (has_gare_role).
+          if (_hasLotRole(roles, 'emballeur_gare')) ...[
+            const SizedBox(height: 10),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.assignment_outlined, color: AppColors.primaryGreen),
+                title: const Text('Emballage — Lots par destination'),
+                subtitle: const Text('Regrouper les colis par destination et imprimer l\'étiquette du lot'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BordereauListScreen(companyId: companyId)),
+                ),
               ),
             ),
-          ),
+          ],
+          if (_hasLotRole(roles, 'chargeur_gare')) ...[
+            const SizedBox(height: 10),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.local_shipping_outlined, color: AppColors.primaryGreen),
+                title: const Text('Chargement des lots'),
+                subtitle: const Text('Scanner un lot pour confirmer son chargement'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BordereauChargeurScreen(companyId: companyId)),
+                ),
+              ),
+            ),
+          ],
+          if (_hasLotRole(roles, 'distributeur_gare')) ...[
+            const SizedBox(height: 10),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.inbox_outlined, color: AppColors.primaryGreen),
+                title: const Text('Réception des lots'),
+                subtitle: const Text('Scanner un lot arrivé et notifier les clients'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BordereauDistributeurScreen(companyId: companyId)),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           const Text('Mon activité', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),

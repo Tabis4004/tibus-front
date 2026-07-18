@@ -31,7 +31,14 @@ class OpenDeliveryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              if (d.deliveryUrgent)
+              if (d.isRide && d.category != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.primaryGreenLight, borderRadius: BorderRadius.circular(20)),
+                  child: Text(rideCategoryLabel[d.category] ?? d.category!, style: const TextStyle(fontSize: 11, color: AppColors.primaryGreenDark)),
+                ),
+              if (!d.isRide && d.deliveryUrgent)
                 Container(
                   margin: const EdgeInsets.only(right: 6),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

@@ -27,9 +27,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<ActiveRide> _activeRides = [];
   List<OpenDelivery> _openDeliveries = [];
+  List<OpenDelivery> _openRides = [];
   PendingOffer? _pendingOffer;
   bool _loading = true;
   String? _error;
+
+  bool get _vtcApproved => widget.profile.passengerRidesStatus == 'approved' && widget.profile.assignedRideCategory != null;
 
   int? _walletBalance;
   int? _totalEarnings;
@@ -78,17 +81,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final active = await DriverBackend.fetchActiveRides();
       List<OpenDelivery> open = [];
+      List<OpenDelivery> openRides = [];
       PendingOffer? offer;
       if (_isOnline && active.isEmpty) {
         offer = await DriverBackend.fetchPendingOffer();
         if (offer == null) {
           open = await DriverBackend.fetchOpenDeliveries(city: widget.profile.city);
+          if (_vtcApproved) {
+            openRides = await DriverBackend.fetchOpenRideRequests(city: widget.profile.city, category: widget.profile.assignedRideCategory!);
+          }
         }
       }
       if (!mounted) return;
       setState(() {
         _activeRides = active;
         _openDeliveries = open;
+        _openRides = openRides;
         _pendingOffer = offer;
         _error = null;
       });
@@ -117,7 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final ok = await DriverBackend.acceptOpenRide(d.id);
       if (!mounted) return;
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Livraison acceptée !')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d.isRide ? 'Course acceptée !' : 'Livraison acceptée !')));
         await _refreshAll();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Trop tard — déjà prise par un autre livreur.')));
@@ -132,7 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       await DriverBackend.acceptOffer(offer.rideId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Livraison acceptée !')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(offer.isRide ? 'Course acceptée !' : 'Livraison acceptée !')));
       await _refreshAll();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur : $e')));
@@ -190,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _WalletBanner(balance: _walletBalance),
           const SizedBox(height: 20),
           if (_activeRides.isNotEmpty) ...[
-            const Text('Livraison en cours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(_activeRides.first.isRide ? 'Course en cours' : 'Livraison en cours', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             ..._activeRides.map((r) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -212,13 +220,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onDecline: () => _declineOffer(_pendingOffer!),
               onExpired: _refreshAll,
             ),
-          ] else if (_openDeliveries.isNotEmpty) ...[
-            const Text('Livraisons disponibles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            ..._openDeliveries.map((d) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: OpenDeliveryCard(delivery: d, onAccept: () => _acceptOpen(d)),
-                )),
+          ] else if (_openDeliveries.isNotEmpty || _openRides.isNotEmpty) ...[
+            if (_openDeliveries.isNotEmpty) ...[
+              const Text('Livraisons disponibles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              ..._openDeliveries.map((d) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: OpenDeliveryCard(delivery: d, onAccept: () => _acceptOpen(d)),
+                  )),
+            ],
+            if (_openRides.isNotEmpty) ...[
+              if (_openDeliveries.isNotEmpty) const SizedBox(height: 8),
+              const Text('Courses disponibles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              ..._openRides.map((d) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: OpenDeliveryCard(delivery: d, onAccept: () => _acceptOpen(d)),
+                  )),
+            ],
           ] else ...[
             const _EmptyBlock(text: 'Aucune livraison en attente. Restez prêt !'),
           ],
@@ -340,10 +359,10 @@ class _ActiveRideSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(ride.status.label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark)),
+          Text(ride.statusLabel, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark)),
           const SizedBox(height: 8),
-          Text('Retrait : ${ride.pickupAddress}', maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text('Livraison : ${ride.dropoffAddress}', maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text('${ride.isRide ? 'Prise en charge' : 'Retrait'} : ${ride.pickupAddress}', maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text('${ride.isRide ? 'Destination' : 'Livraison'} : ${ride.dropoffAddress}', maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
           const Align(alignment: Alignment.centerRight, child: Text('Voir détails →', style: TextStyle(color: AppColors.primaryGreenDark))),
         ],

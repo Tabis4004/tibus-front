@@ -20,6 +20,11 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': 'Bordereau de livraison', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
+    // Numéro de lot entier (étiquette à coller sur le lot) — voir migration
+    // 182 (bordereau_lot_numerotation). Affiché en gros, avant la référence
+    // technique BL-XXXXXXXX.
+    if (d.numeroLot != null)
+      {'text': 'LOT N°  ${d.numeroLot}', 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': d.reference, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},
     {'text': trajet, 'bold': true},

@@ -161,6 +161,60 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
     }
   }
 
+  /// Impression du journal de caisse du jour — l'ensemble des mouvements de
+  /// la session en cours avec le TOTAL (solde final) en bas, demande
+  /// explicite du promoteur. P3 intégrée en priorité, sinon Xprinter/
+  /// WisePrinter (desktop) si détecté.
+  Future<void> _printJournal() async {
+    final cash = _cash;
+    if (cash == null || !cash.open) return;
+    final printer = ref.read(printerServiceProvider);
+    if (!printer.hasNativeP3 && !printer.hasWisePrinterBridge) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune imprimante détectée sur cet appareil.')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      String companyName = '';
+      if (_companyId != null) {
+        try {
+          final info = await ref.read(referenceCacheServiceProvider).loadCompanyInfo(_companyId!);
+          companyName = info.name;
+        } catch (_) {
+          // Best-effort — le nom de compagnie n'est pas bloquant à l'impression.
+        }
+      }
+      if (printer.hasNativeP3) {
+        await printer.printCaisseJournal(
+          companyName: companyName,
+          sessionLabel: cash.sessionLabel ?? cash.gareName ?? 'Session caisse',
+          movements: _movements,
+          openingFloat: cash.openingFloat ?? 0,
+          currentBalance: cash.balance ?? 0,
+        );
+      } else {
+        await printer.printCaisseJournalViaWisePrinter(
+          companyName: companyName,
+          sessionLabel: cash.sessionLabel ?? cash.gareName ?? 'Session caisse',
+          movements: _movements,
+          openingFloat: cash.openingFloat ?? 0,
+          currentBalance: cash.balance ?? 0,
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Journal de caisse imprimé.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Impression impossible : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   /// Clôture explicite de la session — indépendante de toute soumission ou
   /// validation de reversement (voir docstring de closeStationCash).
   Future<void> _closeCash() async {
@@ -244,6 +298,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               saving: _saving,
               onSubmitReversal: _submitReversal,
               onCloseCash: _closeCash,
+              onPrintJournal: _printJournal,
               dateFmt: _dateFmt,
             ),
           const SizedBox(height: 20),
@@ -330,6 +385,7 @@ class _OpenCashDetails extends StatelessWidget {
   final bool saving;
   final VoidCallback onSubmitReversal;
   final VoidCallback onCloseCash;
+  final VoidCallback onPrintJournal;
   final DateFormat dateFmt;
 
   const _OpenCashDetails({
@@ -338,6 +394,7 @@ class _OpenCashDetails extends StatelessWidget {
     required this.saving,
     required this.onSubmitReversal,
     required this.onCloseCash,
+    required this.onPrintJournal,
     required this.dateFmt,
   });
 
@@ -375,6 +432,30 @@ class _OpenCashDetails extends StatelessWidget {
                   ],
                 ),
                 const Chip(label: Text('Caisse ouverte')),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
+                  'remises) avec le total (solde final) en bas.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: saving ? null : onPrintJournal,
+                  icon: const Icon(Icons.print_outlined),
+                  label: Text(saving ? '…' : 'Imprimer le journal'),
+                ),
               ],
             ),
           ),

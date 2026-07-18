@@ -42,7 +42,14 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
           pw.Container(
             padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
             decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
-            child: pw.Text(d.reference, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                if (d.numeroLot != null)
+                  pw.Text('LOT N°  ${d.numeroLot}', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.Text(d.reference, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
           ),
           pw.SizedBox(height: 8),
           pw.Text(trajet, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),

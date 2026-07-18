@@ -61,7 +61,7 @@ class _PendingOfferCardState extends State<PendingOfferCard> {
   @override
   Widget build(BuildContext context) {
     final o = widget.offer;
-    final emoji = _packageEmoji[o.packageType] ?? '📦';
+    final emoji = o.isRide ? '🚗' : (_packageEmoji[o.packageType] ?? '📦');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -77,8 +77,8 @@ class _PendingOfferCardState extends State<PendingOfferCard> {
             children: [
               Text(emoji, style: const TextStyle(fontSize: 24)),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Nouvelle livraison !', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Expanded(
+                child: Text(o.isRide ? 'Nouvelle course !' : 'Nouvelle livraison !', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
               Text('${_secondsLeft}s', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accentOrange)),
             ],
@@ -86,6 +86,7 @@ class _PendingOfferCardState extends State<PendingOfferCard> {
           const SizedBox(height: 8),
           Text(
             [
+              if (o.isRide && o.category != null) rideCategoryLabel[o.category] ?? o.category!,
               if (o.rideCity != null) o.rideCity!,
               if (o.distanceKm != null) '${o.distanceKm!.toStringAsFixed(1)} km du point de retrait',
             ].join(' · '),

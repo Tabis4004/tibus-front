@@ -26,6 +26,7 @@ import OwnerConsoleModules, {
   OwnerCompanyBanner,
   OwnerProfileCard,
 } from "./_components/OwnerConsoleModules.tsx";
+import RevenueByGarePanel from "./_components/RevenueByGarePanel.tsx";
 import ConsoleGridTile from "@/components/console/ConsoleGridTile.tsx";
 import { resolvePrimaryGareStaffDashboardPath } from "@/lib/gare-role-routing.ts";
 import { isGareStaffOnlyConsoleUser } from "@/lib/owner-team-roles.ts";
@@ -208,6 +209,8 @@ export default function SupabaseOwnerOverview() {
           ))}
         </div>
       </div>
+
+      {companyId ? <RevenueByGarePanel companyId={companyId} /> : null}
 
       <OwnerProfileCard company={company} />
       <OwnerConsoleModules company={company} />

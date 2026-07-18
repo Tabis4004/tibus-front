@@ -107,14 +107,14 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   Widget build(BuildContext context) {
     final r = _ride;
     return Scaffold(
-      appBar: AppBar(title: const Text('Livraison en cours')),
+      appBar: AppBar(title: Text(r.isRide ? 'Course en cours' : 'Livraison en cours')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.primaryGreenLight, borderRadius: BorderRadius.circular(16)),
-            child: Text(r.status.label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark, fontSize: 16)),
+            child: Text(r.statusLabel, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark, fontSize: 16)),
           ),
           const SizedBox(height: 16),
           DeliveryMap(
@@ -123,14 +123,15 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
             driver: _driverPos,
           ),
           const SizedBox(height: 16),
-          _AddressRow(icon: Icons.circle, color: AppColors.primaryGreen, label: 'Retrait', address: r.pickupAddress),
+          _AddressRow(icon: Icons.circle, color: AppColors.primaryGreen, label: r.isRide ? 'Prise en charge' : 'Retrait', address: r.pickupAddress),
           const SizedBox(height: 8),
-          _AddressRow(icon: Icons.location_on, color: AppColors.accentRed, label: 'Livraison', address: r.dropoffAddress),
+          _AddressRow(icon: Icons.location_on, color: AppColors.accentRed, label: r.isRide ? 'Destination' : 'Livraison', address: r.dropoffAddress),
           const SizedBox(height: 16),
           Wrap(spacing: 8, runSpacing: 8, children: [
-            if (r.packageType != null) _Chip(text: r.packageType!),
-            if (r.deliveryUrgent) const _Chip(text: 'Urgent', color: AppColors.accentOrangeLight),
-            if (r.deliveryInsulatedBag) const _Chip(text: 'Sac isotherme'),
+            if (r.isRide && r.category != null) _Chip(text: rideCategoryLabel[r.category] ?? r.category!, color: AppColors.primaryGreenLight),
+            if (!r.isRide && r.packageType != null) _Chip(text: r.packageType!),
+            if (!r.isRide && r.deliveryUrgent) const _Chip(text: 'Urgent', color: AppColors.accentOrangeLight),
+            if (!r.isRide && r.deliveryInsulatedBag) const _Chip(text: 'Sac isotherme'),
           ]),
           const SizedBox(height: 16),
           Container(
@@ -162,7 +163,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
               onPressed: _updating ? null : _advanceStatus,
               child: _updating
                   ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(r.status.nextActionLabel),
+                  : Text(r.nextActionLabel),
             ),
         ],
       ),

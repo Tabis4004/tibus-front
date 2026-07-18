@@ -23,6 +23,7 @@ class _DeliveryStatusScreenState extends State<DeliveryStatusScreen> {
   DeliveryRide? _ride;
   StreamSubscription? _sub;
   bool _rated = false;
+  bool _cancelling = false;
   DriverPublicInfo? _driver;
   String? _driverFetchedForId;
 
@@ -66,6 +67,31 @@ class _DeliveryStatusScreenState extends State<DeliveryStatusScreen> {
     if (mounted) setState(() => _rated = true);
   }
 
+  /// Annulation — visible tant qu'aucun chauffeur/livreur n'a démarré la
+  /// course (requested/accepted uniquement, même règle que côté web).
+  Future<void> _cancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Annuler ?'),
+        content: Text(_ride!.isRide ? 'Annuler cette course ?' : 'Annuler cette livraison ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Non')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Oui, annuler')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _cancelling = true);
+    try {
+      await RideBackend.cancelRide(widget.rideId);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
   @override
   void dispose() {
     _sub?.cancel();
@@ -76,7 +102,7 @@ class _DeliveryStatusScreenState extends State<DeliveryStatusScreen> {
   Widget build(BuildContext context) {
     final ride = _ride;
     return Scaffold(
-      appBar: AppBar(title: const Text('Suivi de la livraison')),
+      appBar: AppBar(title: Text(ride?.isRide == true ? 'Suivi de la course' : 'Suivi de la livraison')),
       body: ride == null
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -103,19 +129,23 @@ class _DeliveryStatusScreenState extends State<DeliveryStatusScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            ride.status.label,
+                            ride.statusLabel,
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark),
                           ),
+                          if (ride.isRide && ride.category != null) ...[
+                            const SizedBox(height: 4),
+                            Text(rideCategoryLabel[ride.category] ?? ride.category!, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                          ],
                           const SizedBox(height: 8),
                           Text('De ${ride.pickupAddress}'),
                           Text('Vers ${ride.dropoffAddress}'),
                           const Divider(height: 24),
                           Text('Prix estimé : ${ride.priceXof} FCFA'),
                           if (ride.etaSeconds != null)
-                            Text('Arrivée estimée du livreur : ~${(ride.etaSeconds! / 60).ceil()} min'),
+                            Text('Arrivée estimée du ${ride.isRide ? 'chauffeur' : 'livreur'} : ~${(ride.etaSeconds! / 60).ceil()} min'),
                           if (ride.driverLat != null && ride.driverLng != null)
                             Text(
-                              'Position livreur : ${ride.driverLat!.toStringAsFixed(4)}, ${ride.driverLng!.toStringAsFixed(4)}',
+                              'Position ${ride.isRide ? 'chauffeur' : 'livreur'} : ${ride.driverLat!.toStringAsFixed(4)}, ${ride.driverLng!.toStringAsFixed(4)}',
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                             ),
                         ],
@@ -126,9 +156,20 @@ class _DeliveryStatusScreenState extends State<DeliveryStatusScreen> {
                     const SizedBox(height: 16),
                     _DriverCard(driver: _driver!, onCall: _callDriver),
                   ],
+                  if (ride.status == RideStatus.requested || ride.status == RideStatus.accepted) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _cancelling ? null : _cancel,
+                      icon: _cancelling
+                          ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.close),
+                      label: Text(_cancelling ? 'Annulation…' : 'Annuler'),
+                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.accentRed),
+                    ),
+                  ],
                   if (ride.status == RideStatus.completed && !_rated) ...[
                     const SizedBox(height: 24),
-                    const Text('Notez votre livreur', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(ride.isRide ? 'Notez votre chauffeur' : 'Notez votre livreur', style: const TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,

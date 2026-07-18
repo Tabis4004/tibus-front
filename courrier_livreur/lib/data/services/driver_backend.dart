@@ -148,6 +148,23 @@ class DriverBackend {
     return (rows as List).map((r) => OpenDelivery.fromMap(r as Map<String, dynamic>)).toList();
   }
 
+  /// Courses passagers ouvertes (mode self_assign), tâche #28 phase 2 —
+  /// restreint à la catégorie approuvée du livreur (contrairement à
+  /// [fetchOpenDeliveries], qui ne filtre pas par catégorie : pour le VTC la
+  /// catégorie conditionne l'expérience passager attendue, donc on ne montre
+  /// que ce que ce livreur est habilité à servir).
+  static Future<List<OpenDelivery>> fetchOpenRideRequests({String? city, required String category}) async {
+    var q = client
+        .from('rides')
+        .select()
+        .eq('status', 'requested')
+        .neq('service_type', 'delivery')
+        .eq('category', category);
+    if (city != null && city.isNotEmpty) q = q.eq('city', city);
+    final rows = await q.order('requested_at', ascending: true).limit(30);
+    return (rows as List).map((r) => OpenDelivery.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
   /// Renvoie `true` si la course a bien été prise (verrou optimiste : le
   /// `.eq('status','requested')` échoue silencieusement — 0 ligne, pas
   /// d'erreur — si un autre livreur l'a déjà acceptée entre-temps).
@@ -183,7 +200,7 @@ class DriverBackend {
 
     final ride = await client
         .from('rides')
-        .select('id, service_type, delivery_vehicle, city, duration_min, package_type')
+        .select('id, service_type, delivery_vehicle, city, duration_min, package_type, category')
         .eq('id', offer['ride_id'] as String)
         .maybeSingle();
 

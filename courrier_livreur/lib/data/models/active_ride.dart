@@ -1,3 +1,12 @@
+/// Catégories VTC — libellés partagés (offres, course active, dashboard).
+const rideCategoryLabel = {
+  'taxi': 'Taxi',
+  'eco': 'Éco',
+  'confort': 'Confort',
+  'confort_plus': 'Confort+',
+  'vip': 'VIP',
+};
+
 enum RideStatus { requested, accepted, arriving, inProgress, completed, cancelled }
 
 extension RideStatusX on RideStatus {
@@ -20,6 +29,7 @@ extension RideStatusX on RideStatus {
         RideStatus.cancelled => 'cancelled',
       };
 
+  /// Libellés "livraison" (comportement historique, conservé tel quel).
   String get label => switch (this) {
         RideStatus.requested => 'En attente',
         RideStatus.accepted => 'Acceptée — direction le point de retrait',
@@ -43,11 +53,32 @@ extension RideStatusX on RideStatus {
         RideStatus.inProgress => 'Livraison terminée',
         _ => '',
       };
+
+  /// Libellés "course passager" (VTC, tâche #28 phase 2) — même statuts DB,
+  /// texte adapté.
+  String get labelRide => switch (this) {
+        RideStatus.requested => 'En attente',
+        RideStatus.accepted => 'Acceptée — direction le passager',
+        RideStatus.arriving => "J'arrive au point de prise en charge",
+        RideStatus.inProgress => 'Course en cours',
+        RideStatus.completed => 'Terminée',
+        RideStatus.cancelled => 'Annulée',
+      };
+
+  String get nextActionLabelRide => switch (this) {
+        RideStatus.accepted => "J'arrive au point de prise en charge",
+        RideStatus.arriving => 'Passager à bord — démarrer',
+        RideStatus.inProgress => 'Course terminée',
+        _ => '',
+      };
 }
 
-/// Reflet minimal de `rides` (service_type = 'delivery') utile côté livreur.
+/// Reflet minimal de `rides` utile côté livreur — service_type 'delivery'
+/// (historique) ou 'ride' (transport de passagers, tâche #28 phase 2).
 class ActiveRide {
   final String id;
+  final String serviceType; // 'delivery' | 'ride'
+  final String? category; // catégorie VTC (taxi/eco/confort/confort_plus/vip), null si delivery
   final RideStatus status;
   final String pickupAddress;
   final double? pickupLat;
@@ -69,6 +100,8 @@ class ActiveRide {
 
   ActiveRide({
     required this.id,
+    this.serviceType = 'delivery',
+    this.category,
     required this.status,
     required this.pickupAddress,
     this.pickupLat,
@@ -89,8 +122,15 @@ class ActiveRide {
     this.notes,
   });
 
+  bool get isRide => serviceType != 'delivery';
+
+  String get statusLabel => isRide ? status.labelRide : status.label;
+  String get nextActionLabel => isRide ? status.nextActionLabelRide : status.nextActionLabel;
+
   factory ActiveRide.fromMap(Map<String, dynamic> m) => ActiveRide(
         id: m['id'] as String,
+        serviceType: (m['service_type'] as String?) ?? 'delivery',
+        category: m['category'] as String?,
         status: RideStatusX.fromDb(m['status'] as String? ?? 'requested'),
         pickupAddress: (m['pickup_address'] as String?) ?? '',
         pickupLat: (m['pickup_lat'] as num?)?.toDouble(),
@@ -115,8 +155,12 @@ class ActiveRide {
 /// Ligne ouverte (mode self_assign) — vue complète, pas de restriction de
 /// colonnes puisqu'aucune offre exclusive n'a encore été faite (à la
 /// différence de [PendingOffer], voir dispatch.functions.ts côté web).
+/// Sert aussi bien aux livraisons qu'aux courses passagers ouvertes
+/// (tâche #28 phase 2, voir `serviceType`/`category`).
 class OpenDelivery {
   final String id;
+  final String serviceType;
+  final String? category;
   final String pickupAddress;
   final String dropoffAddress;
   final String? city;
@@ -131,6 +175,8 @@ class OpenDelivery {
 
   OpenDelivery({
     required this.id,
+    this.serviceType = 'delivery',
+    this.category,
     required this.pickupAddress,
     required this.dropoffAddress,
     this.city,
@@ -144,8 +190,12 @@ class OpenDelivery {
     required this.deliveryInsulatedBag,
   });
 
+  bool get isRide => serviceType != 'delivery';
+
   factory OpenDelivery.fromMap(Map<String, dynamic> m) => OpenDelivery(
         id: m['id'] as String,
+        serviceType: (m['service_type'] as String?) ?? 'delivery',
+        category: m['category'] as String?,
         pickupAddress: (m['pickup_address'] as String?) ?? '',
         dropoffAddress: (m['dropoff_address'] as String?) ?? '',
         city: m['city'] as String?,
@@ -174,6 +224,8 @@ class PendingOffer {
   final int? rideDurationMin;
   final String? packageType;
   final String? deliveryVehicle;
+  final String serviceType;
+  final String? category;
 
   PendingOffer({
     required this.id,
@@ -184,7 +236,11 @@ class PendingOffer {
     this.rideDurationMin,
     this.packageType,
     this.deliveryVehicle,
+    this.serviceType = 'delivery',
+    this.category,
   });
+
+  bool get isRide => serviceType != 'delivery';
 
   int get secondsLeft => expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 999);
 
@@ -197,5 +253,7 @@ class PendingOffer {
         rideDurationMin: (ride?['duration_min'] as num?)?.toInt(),
         packageType: ride?['package_type'] as String?,
         deliveryVehicle: ride?['delivery_vehicle'] as String?,
+        serviceType: (ride?['service_type'] as String?) ?? 'delivery',
+        category: ride?['category'] as String?,
       );
 }

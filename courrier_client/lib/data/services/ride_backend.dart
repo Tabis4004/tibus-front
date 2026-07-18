@@ -200,6 +200,119 @@ class RideBackend {
     return max(rounded, minFare);
   }
 
+  /// Estimation de prix pour une course passager (VTC, tâche #28 phase 2) —
+  /// même schéma que [estimatePriceXof] mais lit `pricing_settings`
+  /// (catégorie VTC) au lieu de `delivery_pricing_settings`, sans
+  /// multiplicateur colis ni options urgent/sac isotherme.
+  static Future<int> estimateRidePriceXof({
+    required String category,
+    required double distanceKm,
+    String? country,
+  }) async {
+    final pricingRows = await client
+        .from('pricing_settings')
+        .select('base_fare_xof, per_km_xof, per_min_xof, min_fare_xof, country')
+        .eq('category', category)
+        .eq('active', true);
+    Map<String, dynamic>? pricing;
+    Map<String, dynamic>? globalFallback;
+    for (final row in (pricingRows as List).cast<Map<String, dynamic>>()) {
+      if (country != null && row['country'] == country) {
+        pricing = row;
+        break;
+      }
+      if (row['country'] == null) globalFallback = row;
+    }
+    pricing ??= globalFallback;
+
+    final base = (pricing?['base_fare_xof'] as num?)?.toInt() ?? 500;
+    final perKm = (pricing?['per_km_xof'] as num?)?.toInt() ?? 200;
+    final perMin = (pricing?['per_min_xof'] as num?)?.toInt() ?? 10;
+    final minFare = (pricing?['min_fare_xof'] as num?)?.toInt() ?? 1000;
+
+    final durationMin = (distanceKm / 25 * 60).ceil();
+
+    double multiplier = 1.0;
+    int roundingIncrement = 50;
+    try {
+      final dyn = await client.rpc('resolve_dynamic_pricing_settings', params: {'_program_id': null});
+      if (dyn is Map) {
+        roundingIncrement = (dyn['rounding_increment_xof'] as num?)?.toInt() ?? 50;
+      }
+    } catch (_) {
+      // best-effort
+    }
+
+    final raw = (base + (perKm * distanceKm) + (perMin * durationMin)) * multiplier;
+    final rounded = (raw / roundingIncrement).round() * roundingIncrement;
+    return max(rounded, minFare);
+  }
+
+  /// Crée une demande de course passager (VTC) — même mécanique que
+  /// [createDeliveryRide] (dispatch entièrement côté base), sans les champs
+  /// spécifiques livraison (véhicule/colis/urgent/sac isotherme).
+  static Future<DeliveryRide> createRideRequest({
+    required String tibusUserId,
+    required String tibusEmail,
+    required String pickupAddress,
+    required double pickupLat,
+    required double pickupLng,
+    required String dropoffAddress,
+    required double dropoffLat,
+    required double dropoffLng,
+    required String category,
+    String? city,
+    String? passengerPhone,
+  }) async {
+    await ensureMirroredSession(tibusUserId: tibusUserId, tibusEmail: tibusEmail);
+    final distanceKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+
+    final nearest = nearestServiceCity(pickupLat, pickupLng);
+    final country = nearest.country;
+    final resolvedCity = (city != null && city.isNotEmpty) ? city : nearest.city;
+
+    final priceXof = await estimateRidePriceXof(
+      category: category,
+      distanceKm: distanceKm,
+      country: country,
+    );
+
+    final row = await client
+        .from('rides')
+        .insert({
+          'passenger_id': client.auth.currentUser!.id,
+          'pickup_address': pickupAddress,
+          'pickup_lat': pickupLat,
+          'pickup_lng': pickupLng,
+          'dropoff_address': dropoffAddress,
+          'dropoff_lat': dropoffLat,
+          'dropoff_lng': dropoffLng,
+          'city': resolvedCity,
+          'country': country,
+          'category': category,
+          'service_type': 'ride',
+          'distance_km': distanceKm,
+          'price_xof': priceXof,
+          'payment_method': 'cash',
+          'passenger_phone': passengerPhone,
+        })
+        .select()
+        .single();
+
+    return DeliveryRide.fromMap(row);
+  }
+
+  /// Annulation par le passager — uniquement tant qu'aucun chauffeur n'a
+  /// démarré la course (statuts requested/accepted), même règle que
+  /// CurrentRideBanner côté web. Fonctionne pour livraison et course
+  /// passager (aucune spécificité de service_type ici).
+  static Future<void> cancelRide(String rideId) async {
+    await client.from('rides').update({
+      'status': 'cancelled',
+      'cancelled_at': DateTime.now().toIso8601String(),
+    }).eq('id', rideId);
+  }
+
   /// Crée une demande de livraison. Le dispatch (proposer au livreur le plus
   /// proche) est entièrement géré côté base (trigger dispatch_on_ride_insert)
   /// — rien à faire ici après l'insertion.

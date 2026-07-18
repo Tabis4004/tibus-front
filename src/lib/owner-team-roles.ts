@@ -8,11 +8,19 @@ export const OWNER_ASSIGNABLE_TEAM_ROLES = [
 
 export type OwnerAssignableTeamRole = (typeof OWNER_ASSIGNABLE_TEAM_ROLES)[number];
 
-/** Rôles rattachés à une gare (UserRoles.gareId obligatoire). */
+/** Rôles rattachés à une gare (UserRoles.gareId obligatoire).
+ *  emballeur_gare / chargeur_gare / distributeur_gare : cycle colis en lots
+ *  (regroupement par destination, chargement, réception) — chaque rôle est
+ *  DISTINCT et réservé à son étape (voir migration 182,
+ *  _assert_lot_access) : le caissier enregistre, l'emballeur emballe, le
+ *  chargeur charge, le distributeur reçoit — pas de chevauchement. */
 export const GARE_TEAM_ASSIGNABLE_ROLES = [
   "vendeur_gare",
   "controleur_gare",
   "comptable_gare",
+  "emballeur_gare",
+  "chargeur_gare",
+  "distributeur_gare",
 ] as const;
 
 export type GareTeamAssignableRole = (typeof GARE_TEAM_ASSIGNABLE_ROLES)[number];
