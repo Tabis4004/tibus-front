@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/colis_ref.dart';
+import '../../../core/utils/error_message.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/bordereau_service.dart';
 import 'bordereau_print_sheet.dart';
@@ -363,7 +364,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       await _finalizeAddColis(colisId);
       _manualCtrl.clear();
     } catch (e) {
-      _toast('Ajout impossible : ${e.toString().replaceFirst("Exception: ", "")}');
+      _toast('Ajout impossible : ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _busy = false);
       Future.delayed(const Duration(milliseconds: 2500), () => _lastScan = '');
@@ -378,7 +379,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     try {
       await _finalizeAddColis(colisId);
     } catch (e) {
-      _toast('Ajout impossible : ${e.toString().replaceFirst("Exception: ", "")}');
+      _toast('Ajout impossible : ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _addingId = null);
     }
@@ -391,7 +392,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       await ref.read(bordereauServiceProvider).removeColis(detail.id, colisId);
       await _load();
     } catch (e) {
-      _toast('Retrait impossible : $e');
+      _toast('Retrait impossible : ${friendlyError(e)}');
     }
   }
 
@@ -424,7 +425,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       if (mounted) setState(() => _detail = closed);
       _toast('Lot ${closed.reference} emballé — prêt à charger.');
     } catch (e) {
-      _toast('Action impossible : $e');
+      _toast('Action impossible : ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -448,14 +449,29 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
             icon: const Icon(Icons.print_outlined),
             tooltip: 'Imprimer l\'étiquette du lot',
           ),
-          if (isOpen)
-            TextButton.icon(
-              onPressed: _busy || detail.colis.isEmpty ? null : _close,
-              icon: const Icon(Icons.inventory_2_outlined, size: 18),
-              label: const Text('Emballé'),
-            ),
         ],
       ),
+      // Bouton de clôture toujours visible en bas de l'écran (pas seulement
+      // dans l'AppBar) — demande explicite : impossible à manquer, y compris
+      // quand la liste des colis a été scrollée.
+      bottomNavigationBar: isOpen
+          ? SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _busy || detail.colis.isEmpty ? null : _close,
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: Text(
+                    detail.colis.isEmpty
+                        ? 'Scannez au moins un colis pour clôturer'
+                        : 'Clôturer l\'emballage (${detail.colis.length} colis)',
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
