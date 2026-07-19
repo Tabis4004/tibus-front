@@ -170,10 +170,13 @@ class ColisService {
         .toList();
   }
 
-  /// Gares de la compagnie accessibles à l'agent pour un envoi — même RPC
-  /// que le sélecteur web (list_company_station_gares).
+  /// Gares de la compagnie, pour le filtre "par gare" de la page Stats —
+  /// RPC dédiée (list_company_gares_for_stats, migration 184) : distincte de
+  /// list_company_station_gares (réservée aux rôles qui opèrent une caisse),
+  /// qui levait une exception pour un owner/comptable_compagnie et cassait
+  /// silencieusement le chargement des filtres (voir _loadFilterOptions).
   Future<List<GareOption>> listGares(String companyId) async {
-    final data = await _client.rpc('list_company_station_gares', params: {'p_company_id': companyId});
+    final data = await _client.rpc('list_company_gares_for_stats', params: {'p_company_id': companyId});
     return (data as List)
         .whereType<Map<String, dynamic>>()
         .map(GareOption.fromMap)

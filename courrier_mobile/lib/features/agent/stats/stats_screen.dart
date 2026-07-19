@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/kpi_card.dart';
@@ -19,7 +20,7 @@ class StatsScreen extends ConsumerStatefulWidget {
   ConsumerState<StatsScreen> createState() => _StatsScreenState();
 }
 
-enum _PeriodPreset { all, today, last7, last30, thisMonth }
+enum _PeriodPreset { all, today, last7, last30, thisMonth, custom }
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   String? _vendeurId;
@@ -27,6 +28,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   String? _gareId;
   String? _gareName;
   _PeriodPreset _period = _PeriodPreset.all;
+  DateTime? _customFrom;
+  DateTime? _customTo;
 
   List<ColisVendeur>? _vendeurs;
   List<GareOption>? _gares;
@@ -49,7 +52,18 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         return DateTime(now.year, now.month, now.day).subtract(const Duration(days: 29));
       case _PeriodPreset.thisMonth:
         return DateTime(now.year, now.month, 1);
+      case _PeriodPreset.custom:
+        return _customFrom;
     }
+  }
+
+  /// Borne haute EXCLUSIVE (get_colis_autonome_stats filtre sur
+  /// `created_at < p_date_to`) : on ajoute un jour à la date "au" choisie
+  /// pour inclure toute sa journée.
+  DateTime? get _dateToExclusive {
+    if (_period != _PeriodPreset.custom || _customTo == null) return null;
+    final d = _customTo!;
+    return DateTime(d.year, d.month, d.day).add(const Duration(days: 1));
   }
 
   String get _periodLabel {
@@ -64,25 +78,33 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         return '30 derniers jours';
       case _PeriodPreset.thisMonth:
         return 'Ce mois';
+      case _PeriodPreset.custom:
+        if (_customFrom == null || _customTo == null) return 'Période personnalisée';
+        final fmt = DateFormat('dd/MM/yy');
+        return 'Du ${fmt.format(_customFrom!)} au ${fmt.format(_customTo!)}';
     }
   }
 
   Future<void> _loadFilterOptions(String companyId) async {
     if (_vendeurs != null && _gares != null) return;
+    // Chargées indépendamment (pas de Future.wait groupé) : un échec sur
+    // l'une des deux listes ne doit pas faire disparaître l'autre — bug
+    // observé pour un owner (list_company_station_gares refusait l'accès
+    // gares caisse, ce qui faisait échouer tout le Future.wait et masquait
+    // aussi le filtre Agent, pourtant chargé avec succès).
     try {
-      final results = await Future.wait([
-        ref.read(colisServiceProvider).listVendeurs(companyId),
-        ref.read(colisServiceProvider).listGares(companyId),
-      ]);
+      final vendeurs = await ref.read(colisServiceProvider).listVendeurs(companyId);
       if (!mounted) return;
-      setState(() {
-        _vendeurs = results[0] as List<ColisVendeur>;
-        _gares = results[1] as List<GareOption>;
-      });
+      setState(() => _vendeurs = vendeurs);
     } catch (_) {
-      // Best-effort : si les listes de filtres échouent à charger, les
-      // chips restent simplement absentes — les KPI globaux s'affichent
-      // quand même.
+      if (mounted) setState(() => _vendeurs = const []);
+    }
+    try {
+      final gares = await ref.read(colisServiceProvider).listGares(companyId);
+      if (!mounted) return;
+      setState(() => _gares = gares);
+    } catch (_) {
+      if (mounted) setState(() => _gares = const []);
     }
   }
 
@@ -95,6 +117,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               vendeurId: _vendeurId,
               gareDepartId: _gareId,
               dateFrom: _dateFrom,
+              dateTo: _dateToExclusive,
             ),
           );
     });
@@ -107,8 +130,90 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       _gareId = null;
       _gareName = null;
       _period = _PeriodPreset.all;
+      _customFrom = null;
+      _customTo = null;
     });
     if (_companyId != null) _reload(_companyId!);
+  }
+
+  /// Sélecteur de période personnalisable (du / au) — remplace les presets
+  /// fixes quand l'utilisateur veut une plage de dates précise. Deux
+  /// `showDatePicker` séquentiels dans un dialogue, même pattern que
+  /// colis_manifest_screen.dart, validés ensemble via "Appliquer" pour éviter
+  /// de recharger les stats après le seul choix de la date de début.
+  Future<void> _pickCustomRange(String companyId) async {
+    final now = DateTime.now();
+    DateTime? from = _customFrom ?? now.subtract(const Duration(days: 6));
+    DateTime? to = _customTo ?? now;
+
+    final applied = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final fmt = DateFormat('dd/MM/yyyy');
+            return AlertDialog(
+              title: const Text('Période personnalisée'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today_outlined),
+                    title: const Text('Du'),
+                    subtitle: Text(from != null ? fmt.format(from!) : 'Choisir une date'),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: from ?? now,
+                        firstDate: DateTime(now.year - 2),
+                        lastDate: now.add(const Duration(days: 1)),
+                      );
+                      if (picked != null) setDialogState(() => from = picked);
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today_outlined),
+                    title: const Text('Au'),
+                    subtitle: Text(to != null ? fmt.format(to!) : 'Choisir une date'),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: to ?? now,
+                        firstDate: DateTime(now.year - 2),
+                        lastDate: now.add(const Duration(days: 1)),
+                      );
+                      if (picked != null) setDialogState(() => to = picked);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton(
+                  onPressed: (from != null && to != null && !to!.isBefore(from!))
+                      ? () => Navigator.of(dialogContext).pop(true)
+                      : null,
+                  child: const Text('Appliquer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (applied != true || from == null || to == null || !mounted) return;
+    setState(() {
+      _period = _PeriodPreset.custom;
+      _customFrom = DateTime(from!.year, from!.month, from!.day);
+      _customTo = DateTime(to!.year, to!.month, to!.day);
+    });
+    _reload(companyId);
   }
 
   @override
@@ -294,6 +399,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               label: _periodLabel,
               icon: Icons.calendar_month_outlined,
               onSelected: (p) {
+                if (p == _PeriodPreset.custom) {
+                  _pickCustomRange(companyId);
+                  return;
+                }
                 setState(() => _period = p);
                 _reload(companyId);
               },
@@ -303,6 +412,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 PopupMenuItem(value: _PeriodPreset.last7, child: Text('7 derniers jours')),
                 PopupMenuItem(value: _PeriodPreset.last30, child: Text('30 derniers jours')),
                 PopupMenuItem(value: _PeriodPreset.thisMonth, child: Text('Ce mois')),
+                PopupMenuItem(value: _PeriodPreset.custom, child: Text('Période personnalisée (du / au)…')),
               ],
             ),
           ],
