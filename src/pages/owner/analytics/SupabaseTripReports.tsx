@@ -17,6 +17,17 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import { useSupabaseAuth } from "@/components/providers/supabase-auth";
 import { useOwnerCompany, OWNER_COMPANY_REFRESH_EVENT } from "@/hooks/use-owner-company.tsx";
 import { errorMessage } from "@/lib/utils";
@@ -31,6 +42,7 @@ import {
 } from "@/lib/trip-manifest-export";
 import {
   listColisAutonomesSupabase,
+  cancelColisAutonomeSupabase,
   COLIS_STATUT_LABELS,
   type ColisAutonomeRow,
   type ColisStatut,
@@ -40,7 +52,7 @@ import {
   exportColisManifestPDF,
 } from "@/lib/colis-manifest-export";
 
-const COLIS_STATUTS: ColisStatut[] = ["enregistre", "charge", "arrive", "livre"];
+const COLIS_STATUTS: ColisStatut[] = ["enregistre", "charge", "arrive", "livre", "annule"];
 
 export default function SupabaseTripReports() {
   const { t } = useTranslation("analytics");
@@ -56,6 +68,9 @@ export default function SupabaseTripReports() {
   const [colisBusFilter, setColisBusFilter] = useState<string>("all");
   const [colisDateFrom, setColisDateFrom] = useState<string>("");
   const [colisDateTo, setColisDateTo] = useState<string>("");
+  const [cancelTarget, setCancelTarget] = useState<ColisAutonomeRow | null>(null);
+  const [cancelMotif, setCancelMotif] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   // Ouverture directe de l'onglet colis via /owner/analytics/trips?tab=colis
   // (lien depuis la page Colis autonomes).
   const [searchParams] = useSearchParams();
@@ -194,6 +209,26 @@ export default function SupabaseTripReports() {
     };
     if (kind === "pdf") exportColisManifestPDF(filteredColis, meta);
     else exportColisManifestExcel(filteredColis, meta);
+  };
+
+  const handleCancelColis = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      const result = await cancelColisAutonomeSupabase(cancelTarget.id, cancelMotif);
+      toast.success(
+        result.cashReversed
+          ? "Colis annulé — encaissement contre-passé en caisse"
+          : "Colis annulé",
+      );
+      setCancelTarget(null);
+      setCancelMotif("");
+      loadColis();
+    } catch (err) {
+      toast.error(errorMessage(err, "Annulation impossible"));
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -476,11 +511,15 @@ export default function SupabaseTripReports() {
                         <th className="pb-2 px-2">Pièces</th>
                         <th className="pb-2 px-2">Montant</th>
                         <th className="pb-2 px-2">Statut</th>
+                        <th className="pb-2 px-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredColis.map((row) => (
-                        <tr key={row.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <tr
+                          key={row.id}
+                          className={`border-b last:border-0 hover:bg-muted/30 ${row.statutColis === "annule" ? "opacity-50" : ""}`}
+                        >
                           <td className="py-2 px-2 whitespace-nowrap">
                             {format(new Date(row.createdAt), "dd/MM/yy HH:mm")}
                           </td>
@@ -501,9 +540,29 @@ export default function SupabaseTripReports() {
                           <td className="py-2 px-2">{row.nombrePieces}</td>
                           <td className="py-2 px-2 font-medium">{row.montantFret.toLocaleString()}</td>
                           <td className="py-2 px-2">
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge
+                              variant={row.statutColis === "annule" ? "destructive" : "secondary"}
+                              className="text-[10px]"
+                            >
                               {COLIS_STATUT_LABELS[row.statutColis]}
                             </Badge>
+                          </td>
+                          <td className="py-2 px-2">
+                            {row.statutColis !== "annule" && row.statutColis !== "livre" ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-[11px] text-destructive hover:text-destructive cursor-pointer"
+                                onClick={() => {
+                                  setCancelTarget(row);
+                                  setCancelMotif("");
+                                }}
+                              >
+                                Annuler
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -515,6 +574,43 @@ export default function SupabaseTripReports() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={Boolean(cancelTarget)} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler ce colis ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget
+                ? `${cancelTarget.nomExpediteur} → ${cancelTarget.nomDestinataire} · ${cancelTarget.gareDepart} → ${cancelTarget.gareDestination} · ${cancelTarget.montantFret.toLocaleString()} XOF. Cette action est réservée au promoteur et ne peut pas être annulée.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5 px-1">
+            <label className="text-xs text-muted-foreground" htmlFor="cancel-motif">
+              Motif (optionnel)
+            </label>
+            <Input
+              id="cancel-motif"
+              value={cancelMotif}
+              onChange={(e) => setCancelMotif(e.target.value)}
+              placeholder="Ex : erreur de saisie, doublon, test formation…"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Retour</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelling}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleCancelColis();
+              }}
+            >
+              {cancelling ? "…" : "Confirmer l'annulation"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { throwSupabaseError } from "@/lib/supabase/errors.ts";
 
-export type ColisStatut = "enregistre" | "charge" | "arrive" | "livre";
+export type ColisStatut = "enregistre" | "charge" | "arrive" | "livre" | "annule";
 
 export type ColisNature = {
   id: string;
@@ -536,6 +536,7 @@ export const COLIS_STATUT_LABELS: Record<ColisStatut, string> = {
   charge: "Chargé",
   arrive: "Arrivé",
   livre: "Livré",
+  annule: "Annulé",
 };
 
 export const COLIS_NEXT_STATUT: Partial<Record<ColisStatut, ColisStatut>> = {
@@ -543,3 +544,26 @@ export const COLIS_NEXT_STATUT: Partial<Record<ColisStatut, ColisStatut>> = {
   charge: "arrive",
   arrive: "livre",
 };
+
+/**
+ * Annule un enregistrement de colis (« annuler une vente ») — réservé au
+ * owner / comptable_compagnie / super_admin (voir migration 183). Retire le
+ * colis de tout lot (bordereau) et contre-passe l'encaissement guichet si la
+ * caisse concernée est encore ouverte.
+ */
+export async function cancelColisAutonomeSupabase(
+  colisId: string,
+  motif?: string,
+): Promise<{ id: string; statutColis: ColisStatut; cashReversed: boolean }> {
+  const { data, error } = await supabase.rpc("cancel_colis_autonome", {
+    p_colis_id: colisId,
+    p_motif: motif?.trim() || null,
+  });
+  if (error) throwSupabaseError(error, "Annulation impossible");
+  const row = (data ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id ?? colisId),
+    statutColis: (String(row.statutColis ?? "annule") as ColisStatut),
+    cashReversed: Boolean(row.cashReversed),
+  };
+}
