@@ -569,7 +569,9 @@ export default function SupabaseSellersManager() {
                   </div>
                 </div>
                 <Badge variant="secondary" className="text-[10px] shrink-0">
-                  {t(ROLE_I18N_KEYS[seller.roleName])}
+                  {t(ROLE_LABELS[seller.roleName].key, {
+                    defaultValue: ROLE_LABELS[seller.roleName].def,
+                  })}
                 </Badge>
                 {canManageTeam ? (
                   <Button
