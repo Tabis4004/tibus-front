@@ -120,3 +120,38 @@ export async function adminDeleteCompanySupabase(
   });
   if (error) throw error;
 }
+
+export type WipeCompanyOperationsResult = {
+  deletedColis: number;
+  deletedReservations: number;
+  deletedReservationBus: number;
+  deletedBordereaux: number;
+  deletedMouvementsCaisse: number;
+  deletedReversements: number;
+  resetCaisses: number;
+};
+
+// Remet une compagnie à zéro (ventes tickets, colis, bordereaux/manifests,
+// historique de caisse) SANS supprimer la compagnie — super admin
+// uniquement, nom exact requis en confirmation (migration 185). Action
+// irréversible mais réutilisable (contrairement à adminDeleteCompanySupabase).
+export async function wipeCompanyOperationsSupabase(
+  companyId: string,
+  confirmName: string,
+): Promise<WipeCompanyOperationsResult> {
+  const { data, error } = await supabase.rpc("wipe_company_operations", {
+    p_company_id: companyId,
+    p_confirm_name: confirmName,
+  });
+  if (error) throw error;
+  const row = (data ?? {}) as Record<string, unknown>;
+  return {
+    deletedColis: Number(row.deletedColis ?? 0),
+    deletedReservations: Number(row.deletedReservations ?? 0),
+    deletedReservationBus: Number(row.deletedReservationBus ?? 0),
+    deletedBordereaux: Number(row.deletedBordereaux ?? 0),
+    deletedMouvementsCaisse: Number(row.deletedMouvementsCaisse ?? 0),
+    deletedReversements: Number(row.deletedReversements ?? 0),
+    resetCaisses: Number(row.resetCaisses ?? 0),
+  };
+}

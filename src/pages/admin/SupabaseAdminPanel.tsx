@@ -17,6 +17,7 @@ import {
   ShieldIcon,
   SettingsIcon,
   TrashIcon,
+  EraserIcon,
   UsersIcon,
   GiftIcon,
   FileTextIcon,
@@ -105,6 +106,7 @@ import {
 import {
   adminDeleteCompanySupabase,
   setCompanyActiveAdminSupabase,
+  wipeCompanyOperationsSupabase,
 } from "@/lib/supabase/company-owner-contract.ts";
 import { errorMessage } from "@/lib/utils.ts";
 import {
@@ -198,6 +200,8 @@ export default function SupabaseAdminPanel() {
   const [togglingCompanyId, setTogglingCompanyId] = useState<string | null>(null);
   const [deleteCompanyTarget, setDeleteCompanyTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingCompany, setDeletingCompany] = useState(false);
+  const [wipeCompanyTarget, setWipeCompanyTarget] = useState<{ id: string; name: string } | null>(null);
+  const [wipingCompany, setWipingCompany] = useState(false);
   const [commissionAccordionSections, setCommissionAccordionSections] = useState<string[]>([]);
   const canAccessAdminPanel = canAccessPlatformAdminPanel(appUser.roles, appUser.isSuperAdmin);
 
@@ -316,6 +320,25 @@ export default function SupabaseAdminPanel() {
       toast.error(errorMessage(err, tc("errors.generic", { defaultValue: "Suppression impossible." })));
     } finally {
       setDeletingCompany(false);
+    }
+  };
+
+  const handleWipeCompanyOperations = async () => {
+    if (!wipeCompanyTarget) return;
+    setWipingCompany(true);
+    try {
+      const result = await wipeCompanyOperationsSupabase(wipeCompanyTarget.id, wipeCompanyTarget.name);
+      toast.success(
+        t("companies.wipe_done", {
+          defaultValue: `${wipeCompanyTarget.name} vidée : ${result.deletedReservations} billets, ${result.deletedColis} colis, ${result.deletedBordereaux} bordereaux, ${result.deletedMouvementsCaisse} mouvements de caisse supprimés · ${result.resetCaisses} caisse(s) remise(s) à zéro.`,
+        }),
+      );
+      setWipeCompanyTarget(null);
+      reloadCurrentTab();
+    } catch (err) {
+      toast.error(errorMessage(err, tc("errors.generic", { defaultValue: "Opération impossible." })));
+    } finally {
+      setWipingCompany(false);
     }
   };
 
@@ -696,6 +719,23 @@ export default function SupabaseAdminPanel() {
                           {company.isActive ? tc("status.active") : tc("status.inactive")}
                         </Badge>
                       </div>
+                      {appUser.isSuperAdmin ? (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                          title={t("companies.wipe_hint", {
+                            defaultValue:
+                              "Vider les opérations (ventes tickets, colis, bordereaux, caisses) — garde la compagnie",
+                          })}
+                          onClick={() =>
+                            setWipeCompanyTarget({ id: company.id, name: company.name })
+                          }
+                        >
+                          <EraserIcon className="w-3.5 h-3.5" />
+                        </Button>
+                      ) : null}
                       {appUser.isSuperAdmin ? (
                         <Button
                           type="button"
@@ -1116,6 +1156,43 @@ export default function SupabaseAdminPanel() {
               {deletingCompany
                 ? tc("buttons.saving", { defaultValue: "Suppression…" })
                 : t("companies.delete_confirm_btn", { defaultValue: "Supprimer définitivement" })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={!!wipeCompanyTarget}
+        onOpenChange={(open) => !open && !wipingCompany && setWipeCompanyTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("companies.wipe_confirm_title", {
+                defaultValue: `Vider les opérations de « ${wipeCompanyTarget?.name ?? ""} » ?`,
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("companies.wipe_confirm_desc", {
+                defaultValue:
+                  "⚠️ Action IRRÉVERSIBLE. Seront supprimés : billets vendus (guichet), colis autonomes, bordereaux/manifests, historique de caisse (mouvements et reversements). Les caisses seront remises à zéro et clôturées. La compagnie, ses gares, bus, itinéraires, rôles et paramètres restent intacts.",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={wipingCompany}>
+              {tc("buttons.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={wipingCompany}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleWipeCompanyOperations();
+              }}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {wipingCompany
+                ? tc("buttons.saving", { defaultValue: "Vidage…" })
+                : t("companies.wipe_confirm_btn", { defaultValue: "Vider les opérations" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
