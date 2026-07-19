@@ -47,6 +47,7 @@ import {
   type ColisAutonomeRow,
   type ColisStatut,
 } from "@/lib/supabase/colis-autonomes";
+import { triggerStaffPushSupabase } from "@/lib/supabase/staff-notifications";
 import {
   exportColisManifestExcel,
   exportColisManifestPDF,
@@ -221,6 +222,15 @@ export default function SupabaseTripReports() {
           ? "Colis annulé — encaissement contre-passé en caisse"
           : "Colis annulé",
       );
+      if (companyId && result.notifyRecipients.length && result.notifyTitle && result.notifyMessage) {
+        void triggerStaffPushSupabase({
+          companyId,
+          userIds: result.notifyRecipients,
+          title: result.notifyTitle,
+          message: result.notifyMessage,
+          data: { colisId: cancelTarget.id, type: "colis_annule" },
+        });
+      }
       setCancelTarget(null);
       setCancelMotif("");
       loadColis();

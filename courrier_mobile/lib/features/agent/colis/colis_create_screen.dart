@@ -317,6 +317,10 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         final result = await ref.read(colisServiceProvider).registerColis(input).timeout(const Duration(seconds: 15));
         if (!mounted) return;
         final colisId = result['id'] as String;
+        unawaited(ref.read(staffNotificationsServiceProvider).notifyFromRpcResult(
+              result,
+              companyId: companyId,
+            ));
         String? photoPath;
         if (_photoBytes != null) {
           // Best-effort : un échec d'upload de la photo ne doit jamais bloquer

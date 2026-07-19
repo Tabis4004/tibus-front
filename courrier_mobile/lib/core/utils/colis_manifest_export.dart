@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../data/models/colis.dart';
+import 'colis_receipt_lines.dart';
 import 'colis_ref.dart';
 
 /// Export CSV du manifeste colis — même contenu/colonnes que
@@ -36,7 +37,8 @@ Future<void> shareColisManifestCsv({
   for (final r in rows) {
     buffer.writeln(csvRow([
       dateFmt.format(r.createdAt),
-      colisPublicReference(r.id),
+      // Même numéro que le reçu (GARE000001) — repli CL.
+      colisReceiptNumber(r),
       r.gareDepart,
       r.gareDestination,
       r.nomExpediteur,

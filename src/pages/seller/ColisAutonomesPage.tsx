@@ -249,7 +249,14 @@ export default function ColisAutonomesPage({
       ) {
         return false;
       }
-      if (refQ && !norm(r.id).includes(refQ)) return false;
+      if (
+        refQ &&
+        !norm(r.id).includes(refQ) &&
+        // Numéro de reçu séquentiel (GARE000001, migration 180).
+        !norm(r.numeroRecu ?? "").includes(refQ)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [rows, filterStatut, filterGareDepart, filterGareDest, filterBus, filterExpediteur, filterDestinataire, filterReference]);
@@ -908,7 +915,7 @@ export default function ColisAutonomesPage({
             <Input
               value={filterReference}
               onChange={(e) => setFilterReference(e.target.value)}
-              placeholder={t("colis.filter_reference", { defaultValue: "N° de colis (CL-… ou id)" })}
+              placeholder={t("colis.filter_reference", { defaultValue: "N° de colis (GARE000001, CL-… ou id)" })}
             />
           </div>
           {(filterStatut !== "all" || filterGareDepart !== "all" || filterGareDest !== "all" || filterBus !== "all" || filterExpediteur || filterDestinataire || filterReference) ? (

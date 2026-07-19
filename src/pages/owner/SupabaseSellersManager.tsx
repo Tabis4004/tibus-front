@@ -59,7 +59,12 @@ import {
   type SupabaseOwnerSeller,
   type OwnerTeamRoleName,
 } from "@/lib/supabase/owner-operations";
-import { provisionOwnerTeamMemberSupabase } from "@/lib/supabase/user-management.ts";
+import {
+  provisionOwnerTeamMemberSupabase,
+  provisionUserSupabase,
+} from "@/lib/supabase/user-management.ts";
+import { assignGareTeamRoleByEmailSupabase } from "@/lib/supabase/gare-team.ts";
+import { supabase } from "@/lib/supabase";
 import { OWNER_ASSIGNABLE_TEAM_ROLES } from "@/lib/owner-team-roles.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
@@ -75,31 +80,44 @@ function resolveErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-const ROLE_I18N_KEYS: Record<OwnerTeamRoleName, string> = {
-  vendeur: "sellers.role_vendeur",
-  chauffeur: "sellers.role_chauffeur",
-  controleur: "sellers.role_controleur",
-  comptable_compagnie: "sellers.role_comptable",
+/** Rôles opérationnels de gare (cycle colis en lots, migration 182) —
+ * assignables aussi depuis ce panneau owner, avec choix de la gare. */
+const GARE_OPS_ROLES = ["emballeur_gare", "chargeur_gare", "distributeur_gare"] as const;
+type GareOpsRole = (typeof GARE_OPS_ROLES)[number];
+type DialogRole = OwnerTeamRoleName | GareOpsRole;
+
+function isGareOpsRole(role: string): role is GareOpsRole {
+  return (GARE_OPS_ROLES as readonly string[]).includes(role);
+}
+
+const ROLE_LABELS: Record<DialogRole, { key: string; def: string }> = {
+  vendeur: { key: "sellers.role_vendeur", def: "Vendeur" },
+  chauffeur: { key: "sellers.role_chauffeur", def: "Chauffeur" },
+  controleur: { key: "sellers.role_controleur", def: "Contrôleur" },
+  comptable_compagnie: { key: "sellers.role_comptable", def: "Comptable" },
+  emballeur_gare: { key: "sellers.role_emballeur_gare", def: "Emballeur (gare)" },
+  chargeur_gare: { key: "sellers.role_chargeur_gare", def: "Chargeur (gare)" },
+  distributeur_gare: { key: "sellers.role_distributeur_gare", def: "Distributeur (gare)" },
 };
 
 function RoleSelect({
   value,
   onChange,
 }: {
-  value: OwnerTeamRoleName;
-  onChange: (role: OwnerTeamRoleName) => void;
+  value: DialogRole;
+  onChange: (role: DialogRole) => void;
 }) {
   const { t } = useTranslation("owner");
 
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as OwnerTeamRoleName)}>
+    <Select value={value} onValueChange={(v) => onChange(v as DialogRole)}>
       <SelectTrigger>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {OWNER_ASSIGNABLE_TEAM_ROLES.map((role) => (
+        {[...OWNER_ASSIGNABLE_TEAM_ROLES, ...GARE_OPS_ROLES].map((role) => (
           <SelectItem key={role} value={role}>
-            {t(ROLE_I18N_KEYS[role])}
+            {t(ROLE_LABELS[role].key, { defaultValue: ROLE_LABELS[role].def })}
           </SelectItem>
         ))}
       </SelectContent>
@@ -119,7 +137,10 @@ function AddTeamMemberDialog({
   const { t } = useTranslation("owner");
   const [mode, setMode] = useState<"create" | "assign">("create");
   const [emailInput, setEmailInput] = useState("");
-  const [roleName, setRoleName] = useState<OwnerTeamRoleName>("vendeur");
+  const [roleName, setRoleName] = useState<DialogRole>("vendeur");
+  // Rôles opérationnels de gare : la gare est obligatoire (UserRoles.gareId).
+  const [gareId, setGareId] = useState("");
+  const [gares, setGares] = useState<{ id: string; name: string }[] | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -149,11 +170,40 @@ function AddTeamMemberDialog({
     };
   }, [companyId, debouncedEmail]);
 
+  // Liste des gares de la compagnie, chargée dès qu'un rôle de gare est
+  // sélectionné (RPC ouverte à tout rôle compagnie, migration 184 parallèle).
+  useEffect(() => {
+    if (!isGareOpsRole(roleName) || gares !== null) return;
+    void supabase
+      .rpc("list_company_gares_for_stats", { p_company_id: companyId })
+      .then(({ data, error }) => {
+        if (error) {
+          toast.error(resolveErrorMessage(error, "Chargement des gares impossible"));
+          setGares([]);
+          return;
+        }
+        setGares(
+          ((data ?? []) as { id: string; name: string }[]).map((g) => ({
+            id: String(g.id),
+            name: String(g.name),
+          })),
+        );
+      });
+  }, [companyId, gares, roleName]);
+
   const handleAssign = async () => {
     if (!found) return;
+    if (isGareOpsRole(roleName) && !gareId) {
+      toast.error(t("sellers.gare_required", { defaultValue: "Choisissez la gare du rôle." }));
+      return;
+    }
     setSaving(true);
     try {
-      await assignCompanySellerByEmailSupabase({ email: emailInput, roleName, companyId });
+      if (isGareOpsRole(roleName)) {
+        await assignGareTeamRoleByEmailSupabase({ gareId, email: emailInput, roleName });
+      } else {
+        await assignCompanySellerByEmailSupabase({ email: emailInput, roleName, companyId });
+      }
       toast.success(t("sellers.assigned", { name: found.name ?? found.email }));
       await onSaved();
       onClose();
@@ -166,24 +216,57 @@ function AddTeamMemberDialog({
 
   const handleCreate = async () => {
     if (!firstName.trim() || !lastName.trim() || !emailInput.trim() || password.length < 6) return;
+    if (isGareOpsRole(roleName) && !gareId) {
+      toast.error(t("sellers.gare_required", { defaultValue: "Choisissez la gare du rôle." }));
+      return;
+    }
     setSaving(true);
     try {
       await syncOwnerTeamCompanyContext(companyId);
-      const result = await provisionOwnerTeamMemberSupabase({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: emailInput.trim(),
-        phone: phone.trim() || undefined,
-        password,
-        roles: [roleName],
-        roleName,
-        companyId,
-      });
-      toast.success(
-        t("sellers.created", {
-          name: `${result.user.firstName} ${result.user.lastName}`.trim(),
-        }),
-      );
+      if (isGareOpsRole(roleName)) {
+        // Rôle de gare : le compte est créé avec le rôle voyageur de base
+        // (l'Edge Function ne gère pas UserRoles.gareId), puis le rôle de
+        // gare est attribué par la RPC dédiée. Si l'email existe déjà, on
+        // passe directement à l'attribution.
+        try {
+          await provisionUserSupabase({
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            email: emailInput.trim(),
+            phone: phone.trim() || undefined,
+            password,
+            roles: ["traveler"],
+            companyId,
+          });
+        } catch (createErr) {
+          const message = createErr instanceof Error ? createErr.message : "";
+          if (!/existe déjà|already|exists|registered|409/i.test(message)) throw createErr;
+        }
+        await assignGareTeamRoleByEmailSupabase({
+          gareId,
+          email: emailInput.trim(),
+          roleName,
+        });
+        toast.success(
+          t("sellers.created", { name: `${firstName.trim()} ${lastName.trim()}`.trim() }),
+        );
+      } else {
+        const result = await provisionOwnerTeamMemberSupabase({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: emailInput.trim(),
+          phone: phone.trim() || undefined,
+          password,
+          roles: [roleName],
+          roleName,
+          companyId,
+        });
+        toast.success(
+          t("sellers.created", {
+            name: `${result.user.firstName} ${result.user.lastName}`.trim(),
+          }),
+        );
+      }
       await onSaved();
       onClose();
     } catch (err) {
@@ -197,7 +280,8 @@ function AddTeamMemberDialog({
     firstName.trim().length >= 2
     && lastName.trim().length >= 2
     && emailInput.trim().length >= 5
-    && password.length >= 6;
+    && password.length >= 6
+    && (!isGareOpsRole(roleName) || Boolean(gareId));
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -248,6 +332,33 @@ function AddTeamMemberDialog({
               <RoleSelect value={roleName} onChange={setRoleName} />
               <p className="text-xs text-muted-foreground">{t("sellers.roles_hint")}</p>
             </div>
+            {isGareOpsRole(roleName) ? (
+              <div className="space-y-1.5">
+                <Label>{t("sellers.gare", { defaultValue: "Gare" })}</Label>
+                <Select value={gareId} onValueChange={setGareId}>
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={t("sellers.gare_placeholder", {
+                        defaultValue: "Choisir la gare…",
+                      })}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(gares ?? []).map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t("sellers.gare_ops_hint", {
+                    defaultValue:
+                      "Rôle rattaché à une gare : emballe les lots, les charge ou les réceptionne.",
+                  })}
+                </p>
+              </div>
+            ) : null}
           </TabsContent>
           <TabsContent value="assign" className="space-y-3 pt-2">
             <div className="space-y-1.5">
@@ -267,6 +378,33 @@ function AddTeamMemberDialog({
               <RoleSelect value={roleName} onChange={setRoleName} />
               <p className="text-xs text-muted-foreground">{t("sellers.roles_hint")}</p>
             </div>
+            {isGareOpsRole(roleName) ? (
+              <div className="space-y-1.5">
+                <Label>{t("sellers.gare", { defaultValue: "Gare" })}</Label>
+                <Select value={gareId} onValueChange={setGareId}>
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={t("sellers.gare_placeholder", {
+                        defaultValue: "Choisir la gare…",
+                      })}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(gares ?? []).map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t("sellers.gare_ops_hint", {
+                    defaultValue:
+                      "Rôle rattaché à une gare : emballe les lots, les charge ou les réceptionne.",
+                  })}
+                </p>
+              </div>
+            ) : null}
             {debouncedEmail.length >= 3 && (
               <div>
                 {found === undefined ? (

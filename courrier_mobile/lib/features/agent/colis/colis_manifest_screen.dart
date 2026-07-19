@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/kpi_card.dart';
 import '../../../core/widgets/colis_card.dart';
 import '../../../core/utils/colis_manifest_export.dart';
+import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/models/app_role.dart';
 import 'colis_detail_screen.dart';
@@ -282,7 +283,8 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: ColisCard(
                             colis: c,
-                            reference: c.id.substring(0, 8).toUpperCase(),
+                            // Même numéro que le reçu (GARE000001) — repli CL.
+                            reference: colisReceiptNumber(c),
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => ColisDetailScreen(colisId: c.id)),
                             ),

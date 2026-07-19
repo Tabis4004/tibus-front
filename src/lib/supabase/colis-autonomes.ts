@@ -554,7 +554,14 @@ export const COLIS_NEXT_STATUT: Partial<Record<ColisStatut, ColisStatut>> = {
 export async function cancelColisAutonomeSupabase(
   colisId: string,
   motif?: string,
-): Promise<{ id: string; statutColis: ColisStatut; cashReversed: boolean }> {
+): Promise<{
+  id: string;
+  statutColis: ColisStatut;
+  cashReversed: boolean;
+  notifyRecipients: string[];
+  notifyTitle: string | null;
+  notifyMessage: string | null;
+}> {
   const { data, error } = await supabase.rpc("cancel_colis_autonome", {
     p_colis_id: colisId,
     p_motif: motif?.trim() || null,
@@ -565,5 +572,10 @@ export async function cancelColisAutonomeSupabase(
     id: String(row.id ?? colisId),
     statutColis: (String(row.statutColis ?? "annule") as ColisStatut),
     cashReversed: Boolean(row.cashReversed),
+    notifyRecipients: Array.isArray(row.notifyRecipients)
+      ? (row.notifyRecipients as string[])
+      : [],
+    notifyTitle: (row.notifyTitle as string | null) ?? null,
+    notifyMessage: (row.notifyMessage as string | null) ?? null,
   };
 }

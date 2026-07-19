@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../core/widgets/kpi_card.dart';
 import '../../../core/widgets/colis_card.dart';
 import '../../../data/services/stats_service.dart';
@@ -296,7 +297,9 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
                 children: items
                     .map((c) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: ColisCard(colis: c, reference: c.id.substring(0, 8).toUpperCase()),
+                          // Même numéro que le reçu imprimé (GARE000001) —
+                          // repli CL pour un colis non synchronisé.
+                          child: ColisCard(colis: c, reference: colisReceiptNumber(c)),
                         ))
                     .toList(),
               );

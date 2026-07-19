@@ -29,7 +29,8 @@ const COLIS_HEADERS = [
 ] as const;
 
 function colisRef(row: ColisAutonomeRow): string {
-  return `CL-${row.id.slice(0, 8).toUpperCase()}`;
+  // Même numéro que le reçu (GARE000001, migration 180) — repli CL.
+  return row.numeroRecu?.trim() || `CL-${row.id.slice(0, 8).toUpperCase()}`;
 }
 
 function colisRows(rows: ColisAutonomeRow[]) {

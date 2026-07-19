@@ -17,8 +17,16 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { usePushNotifications } from "@/hooks/use-push-notifications.ts";
 import { toast } from "sonner";
 import { isSupabaseAuth } from "@/lib/auth/config";
-import { useAppUser } from "@/hooks/use-app-user.ts";
+import { useAppUser, hasAnyRole } from "@/hooks/use-app-user.ts";
 import SupabaseSuperAdminNotificationCenter from "./SupabaseSuperAdminNotificationCenter.tsx";
+import SupabaseStaffNotificationCenter from "./SupabaseStaffNotificationCenter.tsx";
+
+const STAFF_NOTIFICATION_ROLES = [
+  "owner",
+  "comptable_compagnie",
+  "gerant_gare",
+  "gestionnaire_gare",
+] as const;
 
 const NOTIFICATION_ICONS: Record<string, typeof BellIcon> = {
   booking_confirmed: TicketIcon,
@@ -40,8 +48,12 @@ export default function NotificationCenter() {
   const appUser = useAppUser();
 
   if (isSupabaseAuth()) {
-    if (appUser.isReady && appUser.isSuperAdmin) {
+    if (!appUser.isReady) return null;
+    if (appUser.isSuperAdmin) {
       return <SupabaseSuperAdminNotificationCenter />;
+    }
+    if (hasAnyRole(appUser.roles, STAFF_NOTIFICATION_ROLES)) {
+      return <SupabaseStaffNotificationCenter />;
     }
     return null;
   }
