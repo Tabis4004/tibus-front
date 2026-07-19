@@ -268,7 +268,7 @@ export default function BordereauPanel({
             <Badge variant={isOpen ? "default" : "secondary"}>
               {isOpen
                 ? t("colis.bordereau_open", { defaultValue: "En cours" })
-                : t("colis.bordereau_closed", { defaultValue: "Clôturé" })}
+                : t("colis.bordereau_closed", { defaultValue: "Emballé" })}
             </Badge>
             <Button
               size="sm"
@@ -495,7 +495,7 @@ export default function BordereauPanel({
               <Badge variant={row.statut === "ouvert" ? "default" : "secondary"}>
                 {row.statut === "ouvert"
                   ? t("colis.bordereau_open", { defaultValue: "En cours" })
-                  : t("colis.bordereau_closed", { defaultValue: "Clôturé" })}
+                  : t("colis.bordereau_closed", { defaultValue: "Emballé" })}
               </Badge>
             </CardContent>
           </Card>

@@ -114,6 +114,7 @@ import {
 } from "@/components/ui/accordion.tsx";
 import { cn } from "@/lib/utils.ts";
 import AdminCollapsibleSection from "./_components/AdminCollapsibleSection.tsx";
+import ArchivePanel from "./_components/ArchivePanel.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminTabAuditHub from "./_components/AdminTabAuditHub.tsx";
 import RolesPermissionsManager from "./_components/RolesPermissionsManager.tsx";
@@ -772,6 +773,12 @@ export default function SupabaseAdminPanel() {
       )}
 
       {tab === "companies" && <AdminTabAuditHub tab="companies" />}
+
+      {tab === "companies" && appUser.isSuperAdmin && (
+        <div className="mt-4">
+          <ArchivePanel companies={data.companies} />
+        </div>
+      )}
 
       {tab === "subscriptions" && (
         <>

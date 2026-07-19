@@ -153,7 +153,7 @@ export function exportBordereauPDF(bordereau: BordereauDetail) {
   );
   doc.text(
     `Bus : ${bordereau.busPlateNumber ?? "—"} · Créé le ${format(new Date(bordereau.createdAt), "dd/MM/yyyy HH:mm")}${
-      bordereau.closedAt ? ` · Clôturé le ${format(new Date(bordereau.closedAt), "dd/MM/yyyy HH:mm")}` : " · EN COURS"
+      bordereau.closedAt ? ` · Emballé le ${format(new Date(bordereau.closedAt), "dd/MM/yyyy HH:mm")}` : " · EN COURS"
     }`,
     14,
     36,

@@ -95,7 +95,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                 const SizedBox(height: 4),
                 const Text(
                   'Un lot regroupe les colis d\'UNE SEULE destination : scannez ensuite chaque colis '
-                  'à emballer, puis clôturez pour imprimer l\'étiquette du lot.',
+                  'à emballer, puis marquez le lot « Emballé » pour imprimer son étiquette.',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
@@ -254,12 +254,13 @@ String _fmtDate(DateTime d) {
   return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
 }
 
-/// Libellé du statut de lot — ouvert (emballage), clos (prêt à charger),
-/// charge (parti), arrive (reçu à destination) — voir migration 182.
+/// Libellé du statut de lot — ouvert (emballage), clos (= « Emballé »,
+/// demande promoteur), charge (parti), arrive (reçu à destination) —
+/// voir migration 182.
 String _lotStatutLabel(String statut) => switch (statut) {
       'ouvert' => 'Emballage en cours',
-      'clos' => 'Prêt à charger',
-      'charge' => 'Parti (chargé)',
+      'clos' => 'Emballé',
+      'charge' => 'Chargé',
       'arrive' => 'Arrivé',
       _ => statut,
     };
@@ -400,9 +401,9 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Clôturer le bordereau ?'),
+        title: const Text('Marquer le lot « Emballé » ?'),
         content: Text(
-          '${detail.colis.length} colis scanné(s). Après clôture, plus aucun ajout possible.',
+          '${detail.colis.length} colis scanné(s). Une fois emballé, plus aucun ajout possible — le lot sera prêt à être chargé.',
         ),
         actions: [
           TextButton(
@@ -411,7 +412,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Clôturer'),
+            child: const Text('Emballé'),
           ),
         ],
       ),
@@ -421,9 +422,9 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     try {
       final closed = await ref.read(bordereauServiceProvider).close(detail.id);
       if (mounted) setState(() => _detail = closed);
-      _toast('Bordereau ${closed.reference} clôturé.');
+      _toast('Lot ${closed.reference} emballé — prêt à charger.');
     } catch (e) {
-      _toast('Clôture impossible : $e');
+      _toast('Action impossible : $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -450,8 +451,8 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
           if (isOpen)
             TextButton.icon(
               onPressed: _busy || detail.colis.isEmpty ? null : _close,
-              icon: const Icon(Icons.lock_outline, size: 18),
-              label: const Text('Clôturer'),
+              icon: const Icon(Icons.inventory_2_outlined, size: 18),
+              label: const Text('Emballé'),
             ),
         ],
       ),

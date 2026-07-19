@@ -109,7 +109,7 @@ class _BordereauChargeurScreenState extends ConsumerState<BordereauChargeurScree
                         child: Text(
                           _error != null
                               ? 'Erreur : $_error'
-                              : 'Aucun lot prêt à charger pour le moment.',
+                              : 'Aucun lot emballé à charger pour le moment.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.grey),
                         ),
