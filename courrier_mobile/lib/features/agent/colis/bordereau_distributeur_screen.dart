@@ -57,7 +57,8 @@ class _BordereauDistributeurScreenState extends ConsumerState<BordereauDistribut
     setState(() => _busy = true);
     try {
       final service = ref.read(_bordereauDistributeurServiceProvider);
-      final detail = await service.markArrive(bordereauId);
+      final result = await service.markArrive(bordereauId);
+      final detail = result.detail;
       // Notifie chaque client (best-effort, une notification par colis déjà
       // envoyée — voir push_service.dart / send-colis-push) : réutilise
       // l'app de suivi existante plutôt que d'ajouter un canal de plus.
@@ -69,6 +70,13 @@ class _BordereauDistributeurScreenState extends ConsumerState<BordereauDistribut
           message: 'Votre colis (${c.reference}) est arrivé à ${detail.gareDestination ?? "destination"}.',
         ));
       }
+      // Notification staff (owner/comptable/gérant de gare) — une seule
+      // pour tout le lot, voir notifyRecipients/notifyTitle/notifyMessage
+      // (migration 190).
+      unawaited(ref.read(staffNotificationsServiceProvider).notifyFromRpcResult(
+            result.rpcResult,
+            companyId: widget.companyId,
+          ));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${label ?? 'Lot'} marqué arrivé — clients notifiés.')),

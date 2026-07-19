@@ -55,7 +55,11 @@ class _BordereauChargeurScreenState extends ConsumerState<BordereauChargeurScree
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await ref.read(_bordereauChargeurServiceProvider).markCharge(bordereauId);
+      final result = await ref.read(_bordereauChargeurServiceProvider).markCharge(bordereauId);
+      unawaited(ref.read(staffNotificationsServiceProvider).notifyFromRpcResult(
+            result.rpcResult,
+            companyId: widget.companyId,
+          ));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${label ?? 'Lot'} marqué chargé — parti.')),

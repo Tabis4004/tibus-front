@@ -124,7 +124,16 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
       if (action.next == ColisStatut.livre) {
         await service.deliverColis(colisPublicReference(colis.id));
       } else {
-        await service.updateStatut(colis.id, action.next, busId: _selectedBusId);
+        final result = await service.updateStatut(colis.id, action.next, busId: _selectedBusId);
+        // Notification staff (owner/comptable/gérant de gare) — voir
+        // notifyRecipients/notifyTitle/notifyMessage (migration 190).
+        final companyId = _detail?['companyId'] as String?;
+        if (companyId != null) {
+          unawaited(ref.read(staffNotificationsServiceProvider).notifyFromRpcResult(
+                result,
+                companyId: companyId,
+              ));
+        }
       }
       unawaited(service.notifyColisStatusChange(
         colisId: colis.id,

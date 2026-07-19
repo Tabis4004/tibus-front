@@ -112,7 +112,7 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
     try {
       final service = ref.read(colisServiceProvider);
       final busId = next == ColisStatut.charge ? _selectedBusId : null;
-      await service.updateStatut(widget.colisId, next, busId: busId);
+      final result = await service.updateStatut(widget.colisId, next, busId: busId);
       // SMS déjà géré par la RPC update_colis_autonome_statut côté base
       // (voir colis-sms-notify). On ajoute ici le push app, en plus,
       // best-effort — voir notifyColisStatusChange.
@@ -121,6 +121,15 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
         title: 'Mise à jour de votre colis',
         message: 'Nouveau statut : ${next.label}',
       ));
+      // Notification staff (owner/comptable/gérant de gare) — même RPC,
+      // voir notifyRecipients/notifyTitle/notifyMessage (migration 190).
+      final companyId = _detail?['companyId'] as String?;
+      if (companyId != null) {
+        unawaited(ref.read(staffNotificationsServiceProvider).notifyFromRpcResult(
+              result,
+              companyId: companyId,
+            ));
+      }
       await _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur : $e')));

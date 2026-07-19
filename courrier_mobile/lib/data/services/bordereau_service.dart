@@ -42,19 +42,33 @@ class BordereauService {
 
   /// Chargeur : scanne le LOT (pas chaque colis) pour confirmer le
   /// chargement dans le véhicule — bascule tous ses colis enregistré ->
-  /// chargé côté serveur.
-  Future<BordereauDetail> markCharge(String bordereauId) async {
-    await _client.rpc('mark_bordereau_charge', params: {'p_bordereau_id': bordereauId});
-    return get(bordereauId);
+  /// chargé côté serveur. Renvoie aussi la réponse jsonb brute du RPC
+  /// (notifyRecipients/notifyTitle/notifyMessage, migration 190) pour que
+  /// l'appelant puisse déclencher le push staff via
+  /// StaffNotificationsService.notifyFromRpcResult.
+  Future<({BordereauDetail detail, Map<String, dynamic> rpcResult})> markCharge(
+    String bordereauId,
+  ) async {
+    final rpcResult =
+        await _client.rpc('mark_bordereau_charge', params: {'p_bordereau_id': bordereauId})
+            as Map<String, dynamic>;
+    final detail = await get(bordereauId);
+    return (detail: detail, rpcResult: rpcResult);
   }
 
   /// Distributeur : scanne le LOT à l'arrivée pour confirmer la réception —
   /// bascule tous ses colis chargé -> arrivé et prépare la notification
   /// client (voir colis_scan_screen / send-colis-push, appelé par l'écran
-  /// distributeur pour chaque colis concerné).
-  Future<BordereauDetail> markArrive(String bordereauId) async {
-    await _client.rpc('mark_bordereau_arrive', params: {'p_bordereau_id': bordereauId});
-    return get(bordereauId);
+  /// distributeur pour chaque colis concerné). Renvoie aussi la réponse
+  /// jsonb brute du RPC pour le push staff (voir markCharge ci-dessus).
+  Future<({BordereauDetail detail, Map<String, dynamic> rpcResult})> markArrive(
+    String bordereauId,
+  ) async {
+    final rpcResult =
+        await _client.rpc('mark_bordereau_arrive', params: {'p_bordereau_id': bordereauId})
+            as Map<String, dynamic>;
+    final detail = await get(bordereauId);
+    return (detail: detail, rpcResult: rpcResult);
   }
 
   Future<BordereauDetail> get(String bordereauId) async {

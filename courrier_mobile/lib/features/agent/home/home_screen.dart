@@ -16,6 +16,7 @@ import '../colis/bordereau_chargeur_screen.dart';
 import '../colis/bordereau_distributeur_screen.dart';
 import '../colis/pending_colis_screen.dart';
 import '../caisse/station_cash_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 /// Rôles "manager" qui gardent un accès de secours à toutes les étapes du
 /// cycle colis (encadrement/dépannage) — même logique que _assert_lot_access
@@ -132,6 +133,8 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
                   ],
                 ),
               ),
+              const NotificationsBellButton(),
+              const SizedBox(width: 4),
               const CircleAvatar(backgroundColor: AppColors.primaryGreen, child: Text('C', style: TextStyle(color: Colors.white))),
             ],
           ),
