@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../core/widgets/colis_card.dart';
 import '../../../data/models/colis.dart';
 import 'colis_create_screen.dart';
@@ -22,6 +23,7 @@ class ColisListScreen extends ConsumerStatefulWidget {
 class _ColisListScreenState extends ConsumerState<ColisListScreen> {
   final _searchCtrl = TextEditingController();
   ColisStatut? _statutFilter;
+  DateTime? _dateFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +71,14 @@ class _ColisListScreenState extends ConsumerState<ColisListScreen> {
         error: (e, _) => Center(child: Text('Erreur : $e')),
         data: (companyId) {
           if (companyId == null) return const Center(child: Text('Aucun rôle actif.'));
-          return _ListBody(companyId: companyId, search: _searchCtrl, statutFilter: _statutFilter, onStatutChanged: (s) => setState(() => _statutFilter = s));
+          return _ListBody(
+            companyId: companyId,
+            search: _searchCtrl,
+            statutFilter: _statutFilter,
+            onStatutChanged: (s) => setState(() => _statutFilter = s),
+            dateFilter: _dateFilter,
+            onDateChanged: (d) => setState(() => _dateFilter = d),
+          );
         },
       ),
     );
@@ -81,12 +90,16 @@ class _ListBody extends ConsumerStatefulWidget {
   final TextEditingController search;
   final ColisStatut? statutFilter;
   final ValueChanged<ColisStatut?> onStatutChanged;
+  final DateTime? dateFilter;
+  final ValueChanged<DateTime?> onDateChanged;
 
   const _ListBody({
     required this.companyId,
     required this.search,
     required this.statutFilter,
     required this.onStatutChanged,
+    required this.dateFilter,
+    required this.onDateChanged,
   });
 
   @override
@@ -139,9 +152,21 @@ class _ListBodyState extends ConsumerState<_ListBody> {
             children: [
               TextField(
                 controller: widget.search,
-                decoration: const InputDecoration(
-                  hintText: 'Rechercher un colis...',
-                  prefixIcon: Icon(Icons.search),
+                // Sans onChanged, la saisie ne déclenchait AUCUN rebuild :
+                // le champ de recherche était inopérant (rapport terrain).
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'N°, nom, téléphone…',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: widget.search.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            widget.search.clear();
+                            setState(() {});
+                          },
+                        ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -149,9 +174,32 @@ class _ListBodyState extends ConsumerState<_ListBody> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                      label: const Text('Date'),
+                      // Filtre par jour (createdAt) — le bouton était un
+                      // placeholder vide (onPressed: () {}), rapport terrain.
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: widget.dateFilter ?? DateTime.now(),
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
+                          helpText: 'Filtrer par jour (appui long sur le bouton pour effacer)',
+                        );
+                        if (picked != null) widget.onDateChanged(picked);
+                      },
+                      onLongPress: widget.dateFilter == null
+                          ? null
+                          : () => widget.onDateChanged(null),
+                      icon: Icon(
+                        widget.dateFilter == null
+                            ? Icons.calendar_today_outlined
+                            : Icons.event_available,
+                        size: 16,
+                      ),
+                      label: Text(
+                        widget.dateFilter == null
+                            ? 'Date'
+                            : '${widget.dateFilter!.day.toString().padLeft(2, '0')}/${widget.dateFilter!.month.toString().padLeft(2, '0')}/${widget.dateFilter!.year % 100}',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -184,9 +232,27 @@ class _ListBodyState extends ConsumerState<_ListBody> {
                 var items = snapshot.data!;
                 final query = widget.search.text.trim().toLowerCase();
                 if (query.isNotEmpty) {
-                  items = items
-                      .where((c) => c.nomDestinataire.toLowerCase().contains(query) || c.id.toLowerCase().contains(query))
-                      .toList();
+                  // Recherche sur numéro de reçu (GESC000048), référence
+                  // CL-XXXXXXXX/id, noms et téléphones expéditeur/destinataire.
+                  items = items.where((c) {
+                    final haystack = [
+                      c.numeroRecu ?? '',
+                      c.id,
+                      colisReceiptNumber(c),
+                      c.nomDestinataire,
+                      c.nomExpediteur,
+                      c.telephoneDestinataire,
+                      c.telephoneExpediteur,
+                    ].join(' ').toLowerCase();
+                    return haystack.contains(query);
+                  }).toList();
+                }
+                final date = widget.dateFilter;
+                if (date != null) {
+                  items = items.where((c) {
+                    final d = c.createdAt.toLocal();
+                    return d.year == date.year && d.month == date.month && d.day == date.day;
+                  }).toList();
                 }
                 if (items.isEmpty) {
                   return ListView(
@@ -206,7 +272,9 @@ class _ListBodyState extends ConsumerState<_ListBody> {
                     final c = items[i];
                     return ColisCard(
                       colis: c,
-                      reference: c.id.substring(0, 8).toUpperCase(),
+                      // Numéro de reçu séquentiel (GESC000048) — repli sur
+                      // la référence CL pour les colis non synchronisés.
+                      reference: colisReceiptNumber(c),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => ColisDetailScreen(colisId: c.id)),
                       ),

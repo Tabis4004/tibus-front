@@ -107,10 +107,12 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
           ],
         ),
         pw.SizedBox(height: 12),
+        // Pas de total (montant) sur le bordereau d'emballage — on ne garde
+        // que le nombre de colis du lot (demande promoteur).
         pw.Align(
           alignment: pw.Alignment.centerRight,
           child: pw.Text(
-            'Total : ${d.colis.length} colis · ${d.totalFret.toStringAsFixed(0)} FCFA',
+            '${d.colis.length} colis',
             style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
           ),
         ),

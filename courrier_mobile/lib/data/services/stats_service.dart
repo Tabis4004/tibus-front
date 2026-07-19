@@ -25,6 +25,11 @@ class ColisStats {
   /// force toutes les stats sur la propre activité de l'utilisateur
   /// (migration 182) — l'UI masque alors le filtre agent.
   final bool fullAccess;
+  /// Vrai pour un gérant de gare (gerant_gare) sans accès complet : les
+  /// stats couvrent alors TOUTE l'activité de sa (ses) gare(s), tous
+  /// vendeurs confondus, avec filtre par agent dans ce périmètre
+  /// (migration 183).
+  final bool gareScope;
 
   const ColisStats({
     required this.total,
@@ -38,6 +43,7 @@ class ColisStats {
     required this.mineTotal,
     required this.mineMontantTotal,
     this.fullAccess = false,
+    this.gareScope = false,
   });
 
   factory ColisStats.fromMap(Map<String, dynamic> map) => ColisStats(
@@ -52,6 +58,7 @@ class ColisStats {
         mineTotal: (map['mineTotal'] as num?)?.toInt() ?? 0,
         mineMontantTotal: (map['mineMontantTotal'] as num?)?.toDouble() ?? 0,
         fullAccess: map['fullAccess'] == true,
+        gareScope: map['gareScope'] == true,
       );
 }
 

@@ -311,7 +311,7 @@ class PrinterService {
             '${i + 1}. ${d.colis[i].reference}',
             '${d.colis[i].nomDestinataire} · ${d.colis[i].montantFret.toStringAsFixed(0)} FCFA',
           ],
-        ['Total fret', '${d.totalFret.toStringAsFixed(0)} FCFA'],
+        // Pas de total sur le bordereau d'emballage (demande promoteur).
       ],
       qr: d.id,
       footer: 'Powered by www.tibus.app',

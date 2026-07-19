@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/models/colis.dart';
 import 'colis_receipt_preview_sheet.dart';
@@ -141,7 +142,9 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Colis ${colis.id.substring(0, 8).toUpperCase()}'),
+        // Numéro de reçu séquentiel (GESC000048) — repli CL-XXXXXXXX pour
+        // un colis pas encore synchronisé.
+        title: Text('Colis ${colisReceiptNumber(colis)}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.print_outlined),

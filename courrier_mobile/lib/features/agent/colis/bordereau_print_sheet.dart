@@ -20,7 +20,7 @@ String _bordereauShareMessage(BordereauDetail d) {
     'TIBUS COURRIER — Bordereau ${d.reference}',
     'Trajet : ${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}',
     if (d.busPlateNumber != null) 'Bus : ${d.busPlateNumber}',
-    '${d.colis.length} colis · Total fret ${d.totalFret.toStringAsFixed(0)} FCFA',
+    '${d.colis.length} colis',
     if (d.createdAt != null) 'Créé le : ${formatBordereauDate(d.createdAt!)}',
   ].join('\n');
 }
@@ -381,8 +381,7 @@ class _BordereauBox extends StatelessWidget {
                 );
               }),
               const Divider(height: 16),
-              Text('Total fret : ${detail.totalFret.toStringAsFixed(0)} FCFA',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              // Pas de total sur le bordereau d'emballage (demande promoteur).
               const SizedBox(height: 8),
               Center(child: QrImageView(data: detail.id, size: 80)),
             ],

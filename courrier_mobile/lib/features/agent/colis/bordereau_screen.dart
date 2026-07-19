@@ -470,7 +470,9 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${detail.colis.length} colis · Total fret ${detail.totalFret.toStringAsFixed(0)} XOF'
+                    // Pas de total (montant) : le bordereau d'emballage
+                    // regroupe les colis par lot/destination, sans valorisation.
+                    '${detail.colis.length} colis'
                     '${detail.busPlateNumber != null ? " · Bus ${detail.busPlateNumber}" : ""}'
                     '${isOpen ? "" : " · ${_lotStatutLabel(detail.statut)}"}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),

@@ -250,10 +250,12 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   _buildMesVentes(s),
                   const SizedBox(height: 24),
                   Text(
-                    // Rôle non privilégié : le serveur force les stats sur
-                    // sa propre activité (migration 182) — libellé honnête.
+                    // Libellé honnête selon le périmètre serveur :
+                    // - gérant de gare → activité de sa gare (migration 183)
+                    // - autre rôle non privilégié → sa propre activité (182)
+                    // - owner/comptable/super_admin → toute la compagnie.
                     !s.fullAccess
-                        ? 'Mon activité uniquement'
+                        ? (s.gareScope ? 'Activité de ma gare' : 'Mon activité uniquement')
                         : _hasFilters
                             ? 'Vue filtrée'
                             : "Vue d'ensemble (toute la compagnie)",

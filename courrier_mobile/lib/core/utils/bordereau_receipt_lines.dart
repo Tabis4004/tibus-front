@@ -43,9 +43,10 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
     lines.add({'text': '   ${c.montantFret.toStringAsFixed(0)} FCFA', 'size': 'small'});
   }
 
+  // Pas de total sur le bordereau d'emballage (demande promoteur) :
+  // l'objectif est de regrouper les colis par lot et destination, pas de
+  // valoriser le chargement.
   lines.addAll([
-    {'text': '--------------------------------'},
-    {'text': 'Total fret : ${d.totalFret.toStringAsFixed(0)} FCFA', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},
     {'text': 'Powered by www.tibus.app', 'align': 'center', 'size': 'small'},
   ]);
