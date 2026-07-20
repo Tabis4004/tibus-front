@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/colis.dart';
+import '../stats/colis_sales_journal_print_sheet.dart';
 
 /// Caisse physique guichet — réplique StationCashPanel.tsx (web) :
 /// ouverture (gare + fond de roulement), solde + journal de mouvements
@@ -215,6 +216,45 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
     }
   }
 
+  /// Journal de VENTE du jour (colis vendus par cet agent — scoping serveur,
+  /// get_colis_sales_journal) : même impression que Stats → « Mon rapport
+  /// d'activité », en raccourci depuis la caisse pour la fin de session.
+  Future<void> _printSalesJournal() async {
+    final companyId = _companyId;
+    if (companyId == null || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final now = DateTime.now();
+      final from = DateTime(now.year, now.month, now.day);
+      final journal = await ref.read(colisServiceProvider).getColisSalesJournal(
+            companyId: companyId,
+            dateFrom: from,
+            dateTo: from.add(const Duration(days: 1)),
+          );
+      String companyName = 'Tibus';
+      try {
+        final info = await ref.read(referenceCacheServiceProvider).loadCompanyInfo(companyId);
+        if (info.name.isNotEmpty) companyName = info.name;
+      } catch (_) {
+        // Best-effort — le nom de compagnie n'est pas bloquant à l'impression.
+      }
+      if (!mounted) return;
+      await showColisSalesJournalPrintSheet(
+        context,
+        journal: journal,
+        companyName: companyName,
+        periodLabel: "Aujourd'hui",
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Chargement du journal de vente impossible : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   /// Clôture explicite de la session — indépendante de toute soumission ou
   /// validation de reversement (voir docstring de closeStationCash).
   Future<void> _closeCash() async {
@@ -299,6 +339,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               onSubmitReversal: _submitReversal,
               onCloseCash: _closeCash,
               onPrintJournal: _printJournal,
+              onPrintSalesJournal: _printSalesJournal,
               dateFmt: _dateFmt,
             ),
           const SizedBox(height: 20),
@@ -386,6 +427,7 @@ class _OpenCashDetails extends StatelessWidget {
   final VoidCallback onSubmitReversal;
   final VoidCallback onCloseCash;
   final VoidCallback onPrintJournal;
+  final VoidCallback onPrintSalesJournal;
   final DateFormat dateFmt;
 
   const _OpenCashDetails({
@@ -395,6 +437,7 @@ class _OpenCashDetails extends StatelessWidget {
     required this.onSubmitReversal,
     required this.onCloseCash,
     required this.onPrintJournal,
+    required this.onPrintSalesJournal,
     required this.dateFmt,
   });
 
@@ -455,6 +498,34 @@ class _OpenCashDetails extends StatelessWidget {
                   onPressed: saving ? null : onPrintJournal,
                   icon: const Icon(Icons.print_outlined),
                   label: Text(saving ? '…' : 'Imprimer le journal'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
+        // agent, scoping serveur — get_colis_sales_journal) : document
+        // distinct du journal de caisse ci-dessus (mouvements d'espèces).
+        // Même impression que Stats → « Mon rapport d'activité ».
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
+                  'à remettre avec la caisse en fin de session.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: saving ? null : onPrintSalesJournal,
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: Text(saving ? '…' : 'Imprimer le journal de vente'),
                 ),
               ],
             ),
