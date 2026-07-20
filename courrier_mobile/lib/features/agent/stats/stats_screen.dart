@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/kpi_card.dart';
+import '../../../data/models/app_role.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/stats_service.dart';
+import 'colis_sales_journal_print_sheet.dart';
 
 /// Écran Stats — vue compagnie (owner/gérant) filtrable par agent, gare de
 /// départ et période, avec une carte "Mes ventes" toujours visible et
@@ -216,6 +218,60 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     _reload(companyId);
   }
 
+  bool _printingJournal = false;
+
+  /// "Mon rapport d'activité" — récupère le journal de vente (colis vendus,
+  /// groupés par agent + total général) pour les MÊMES filtres que la vue
+  /// stats courante (agent/période — pas de filtre gare côté RPC, voir
+  /// get_colis_sales_journal migration 192), puis ouvre le choix
+  /// d'imprimante (3 ponts + fallback 80mm, voir colis_sales_journal_print_sheet.dart).
+  /// "Toute période" (pas de filtre) : on imprime depuis une date très
+  /// ancienne plutôt que de laisser `p_date_from` null, ce paramètre étant
+  /// obligatoire côté RPC (contrairement à get_colis_autonome_stats).
+  Future<void> _printJournal(String companyId) async {
+    if (_printingJournal) return;
+    setState(() => _printingJournal = true);
+    try {
+      final journal = await ref.read(colisServiceProvider).getColisSalesJournal(
+            companyId: companyId,
+            dateFrom: _dateFrom ?? DateTime(2000, 1, 1),
+            dateTo: _dateToExclusive,
+            vendeurId: _vendeurId,
+          );
+      if (!mounted) return;
+      final roles = await ref.read(myRolesProvider.future);
+      final companyName = roles
+              .firstWhere(
+                (r) => r.companyId == companyId,
+                orElse: () => AppRole(
+                  id: '',
+                  name: '',
+                  scope: '',
+                  level: 0,
+                  droits: const [],
+                  companyId: null,
+                  companyName: null,
+                ),
+              )
+              .companyName ??
+          'Tibus';
+      if (!mounted) return;
+      await showColisSalesJournalPrintSheet(
+        context,
+        journal: journal,
+        companyName: companyName,
+        periodLabel: _periodLabel,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Chargement du journal impossible : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _printingJournal = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final companyIdAsync = ref.watch(activeCompanyIdProvider);
@@ -263,8 +319,14 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.description_outlined),
+                    onPressed: _printingJournal ? null : () => _printJournal(companyId),
+                    icon: _printingJournal
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.description_outlined),
                     label: const Text("Mon rapport d'activité"),
                   ),
                   const SizedBox(height: 16),
