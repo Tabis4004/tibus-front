@@ -244,6 +244,8 @@ export default function ColisSalesJournalPanel({
               JOURNAL DE VENTE
             </div>
             <div style={{ fontSize: "10px" }}>{periodLabel}</div>
+            {/* Date d'impression du jour — demande client. */}
+            <div style={{ fontSize: "9px" }}>Imprimé le {fmtDateTime(new Date().toISOString())}</div>
           </div>
 
           {journal.groups.map((g) => (
@@ -259,19 +261,20 @@ export default function ColisSalesJournalPanel({
               >
                 Agent: {g.vendeurUsername ?? g.vendeurName}
               </div>
+              {/* Format demandé par le client : heure - code colis - prix -
+                  destination - valeur (plus d'expéditeur/destinataire). */}
               {g.colis.map((c) => (
-                <div key={c.id} style={{ fontSize: "10px", marginBottom: "1.5mm" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>{c.numeroRecu ?? "—"}</span>
-                    <span>{fmtDateTime(c.createdAt)}</span>
+                <div key={c.id} style={{ fontSize: "10px", marginBottom: "1mm" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                    <span>
+                      {format(parseISO(c.createdAt), "HH:mm")} {c.numeroRecu ?? "—"}
+                    </span>
+                    <span>{c.montantFret.toLocaleString()} F</span>
                   </div>
-                  <div>Exp: {c.nomExpediteur}</div>
-                  <div>Dest: {c.nomDestinataire}</div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Frais: {c.montantFret.toLocaleString()}</span>
-                    <span>Valeur: {(c.valeurMarchandise ?? 0).toLocaleString()}</span>
+                    <span>→ {c.gareDestination}</span>
+                    <span>Valeur {(c.valeurMarchandise ?? 0).toLocaleString()}</span>
                   </div>
-                  <div>Destination: {c.gareDestination}</div>
                 </div>
               ))}
               <div

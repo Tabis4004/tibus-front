@@ -300,21 +300,26 @@ class PrinterService {
     required String periodLabel,
     int paperWidthMm = 58,
   }) {
-    final rows = <List<String>>[];
+    // Format demandé par le client : heure - code colis - prix -
+    // destination - valeur, groupé par agent, avec la date d'impression
+    // du jour en en-tête (plus d'expéditeur/destinataire).
+    final rows = <List<String>>[
+      // Le module P3 ne rend que company + sous-titre en en-tête : période
+      // et date d'impression (demande client) passent donc dans le corps.
+      ['Période', periodLabel],
+      ['Imprimé le', formatSalesJournalDate(DateTime.now())],
+    ];
     for (final group in journal.groups) {
       rows.add(['Agent: ${group.vendeurUsername ?? group.vendeurName}', '']);
       for (final c in group.colis) {
         rows.add([
-          '${c.numeroRecu ?? "—"}  ${formatSalesJournalDate(c.createdAt)}',
-          '',
+          '${formatSalesJournalHour(c.createdAt)}  ${c.numeroRecu ?? "—"}',
+          '${c.montantFret.toStringAsFixed(0)}F',
         ]);
-        rows.add(['  Exp: ${c.nomExpediteur}', '']);
-        rows.add(['  Dest: ${c.nomDestinataire}', '']);
         rows.add([
-          '  Frais: ${c.montantFret.toStringAsFixed(0)}',
-          'Valeur: ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}',
+          '  -> ${c.gareDestination}',
+          'Val ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}',
         ]);
-        rows.add(['  Destination: ${c.gareDestination}', '']);
       }
       rows.add([
         'Total ${group.vendeurUsername ?? group.vendeurName} (${group.count})',

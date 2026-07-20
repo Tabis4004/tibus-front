@@ -3,6 +3,10 @@ import '../../data/models/colis.dart';
 
 String formatSalesJournalDate(DateTime dt) => DateFormat('dd/MM/yy HH:mm').format(dt.toLocal());
 
+/// Heure seule (HH:mm) — format demandé par le client pour chaque ligne du
+/// journal : « heure - code colis - prix - destination - valeur ».
+String formatSalesJournalHour(DateTime dt) => DateFormat('HH:mm').format(dt.toLocal());
+
 String _amount(num? v) => (v ?? 0).toStringAsFixed(0);
 
 /// Lignes du journal de vente au format {text, align, bold, size} — partagées
@@ -24,6 +28,8 @@ List<Map<String, dynamic>> colisSalesJournalLines(
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': 'JOURNAL DE VENTE', 'align': 'center', 'bold': true},
     {'text': periodLabel, 'align': 'center', 'size': 'small'},
+    // Date d'impression du jour — demande client.
+    {'text': 'Imprimé le ${formatSalesJournalDate(DateTime.now())}', 'align': 'center', 'size': 'small'},
     {'text': '================================', 'align': 'center'},
   ];
 
@@ -31,15 +37,18 @@ List<Map<String, dynamic>> colisSalesJournalLines(
     lines.add({'text': 'Agent: ${group.vendeurUsername ?? group.vendeurName}', 'bold': true});
     lines.add({'text': '--------------------------------'});
     for (final c in group.colis) {
-      lines.add({'text': '${c.numeroRecu ?? "—"}   ${formatSalesJournalDate(c.createdAt)}', 'size': 'small'});
-      lines.add({'text': 'Exp: ${c.nomExpediteur}', 'size': 'small'});
-      lines.add({'text': 'Dest: ${c.nomDestinataire}', 'size': 'small'});
+      // Format demandé par le client : heure - code colis - prix -
+      // destination - valeur (2 lignes compactes, plus d'expéditeur/
+      // destinataire).
       lines.add({
-        'text': 'Frais: ${_amount(c.montantFret)}   Valeur: ${_amount(c.valeurMarchandise)}',
+        'text': '${formatSalesJournalHour(c.createdAt)}  ${c.numeroRecu ?? "—"}  ${_amount(c.montantFret)}F',
+        'bold': true,
         'size': 'small',
       });
-      lines.add({'text': 'Destination: ${c.gareDestination}', 'size': 'small'});
-      lines.add({'text': ''});
+      lines.add({
+        'text': '   -> ${c.gareDestination} · Valeur ${_amount(c.valeurMarchandise)}',
+        'size': 'small',
+      });
     }
     lines.add({
       'text': 'Total ${group.vendeurUsername ?? group.vendeurName} (${group.count})',
