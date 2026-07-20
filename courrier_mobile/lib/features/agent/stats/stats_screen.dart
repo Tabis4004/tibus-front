@@ -245,7 +245,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _buildFilters(companyId),
+                  _buildFilters(companyId, showAgentFilter: s.fullAccess || s.gareScope),
                   const SizedBox(height: 20),
                   _buildMesVentes(s),
                   const SizedBox(height: 24),
@@ -341,7 +341,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     );
   }
 
-  Widget _buildFilters(String companyId) {
+  Widget _buildFilters(String companyId, {required bool showAgentFilter}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -358,11 +358,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            // Filtre "par agent" réservé aux rôles privilégiés : pour les
-            // autres, list_company_colis_vendeurs renvoie [] (migration 182)
-            // et le serveur force de toute façon les stats sur leur propre
-            // activité — le chip est donc masqué.
-            if (_vendeurs != null && _vendeurs!.isNotEmpty)
+            // Filtre "par agent" visible selon le PRIVILÈGE renvoyé par le
+            // serveur (fullAccess owner/comptable, gareScope gérant —
+            // migrations 182/183), pas selon le contenu de la liste : une
+            // compagnie sans aucun colis a une liste d'agents vide, mais le
+            // owner doit quand même voir le filtre. Les rôles simples ne le
+            // voient pas (le serveur force de toute façon leur périmètre).
+            if (showAgentFilter)
               _FilterChipDropdown<String?>(
                 label: _vendeurName ?? 'Agent : tous',
                 icon: Icons.person_outline,
