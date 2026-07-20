@@ -63,7 +63,10 @@ import {
   provisionOwnerTeamMemberSupabase,
   provisionUserSupabase,
 } from "@/lib/supabase/user-management.ts";
-import { assignGareTeamRoleByEmailSupabase } from "@/lib/supabase/gare-team.ts";
+import {
+  assignGareTeamRoleByEmailSupabase,
+  removeGareTeamRoleSupabase,
+} from "@/lib/supabase/gare-team.ts";
 import { supabase } from "@/lib/supabase";
 import { OWNER_ASSIGNABLE_TEAM_ROLES } from "@/lib/owner-team-roles.ts";
 import { Label } from "@/components/ui/label.tsx";
@@ -488,12 +491,21 @@ export default function SupabaseSellersManager() {
   const handleRemove = async () => {
     if (!removeTarget || !appUserId) return;
     try {
-      await removeCompanySellerSupabase(
-        appUserId,
-        removeTarget.id,
-        removeTarget.roleName,
-        companyId,
-      );
+      if (isGareOpsRole(removeTarget.roleName) && removeTarget.gareId) {
+        // Rôle rattaché à une gare : suppression via la RPC gare dédiée.
+        await removeGareTeamRoleSupabase({
+          gareId: removeTarget.gareId,
+          userId: removeTarget.id,
+          roleName: removeTarget.roleName,
+        });
+      } else {
+        await removeCompanySellerSupabase(
+          appUserId,
+          removeTarget.id,
+          removeTarget.roleName as OwnerTeamRoleName,
+          companyId,
+        );
+      }
       toast.success(t("sellers.removed"));
       void loadData({ silent: true });
     } catch (err) {
@@ -572,6 +584,7 @@ export default function SupabaseSellersManager() {
                   {t(ROLE_LABELS[seller.roleName].key, {
                     defaultValue: ROLE_LABELS[seller.roleName].def,
                   })}
+                  {seller.gareName ? ` · ${seller.gareName}` : ""}
                 </Badge>
                 {canManageTeam ? (
                   <Button

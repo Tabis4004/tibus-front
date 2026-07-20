@@ -3,6 +3,7 @@ import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platfor
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/bordereau_receipt_lines.dart';
 import '../../core/utils/colis_receipt_lines.dart';
+import '../../core/utils/colis_sales_journal_lines.dart';
 import '../models/colis.dart';
 import 'bordereau_service.dart';
 
@@ -148,6 +149,30 @@ class EscPosPrinterService {
     final bytes = _renderLines(generator, bordereauReceiptLines(d));
     bytes.addAll(generator.feed(1));
     bytes.addAll(generator.qrcode(d.id));
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  /// Journal de vente colis imprimé sur le pont [type] (USB ou Bluetooth) —
+  /// seul pont qui n'avait AUCUN support d'impression de journal avant cet
+  /// ajout (contrairement au P3 natif et à WisePrinter). Mêmes lignes que le
+  /// pont WisePrinter (colisSalesJournalLines()) : par agent, colis par
+  /// colis, sous-total encadré, puis total général.
+  Future<void> printColisSalesJournal(
+    ColisSalesJournal journal, {
+    required PrinterType type,
+    required String companyName,
+    required String periodLabel,
+    PaperSize paperSize = PaperSize.mm80,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = _renderLines(
+      generator,
+      colisSalesJournalLines(journal, companyName: companyName, periodLabel: periodLabel),
+    );
     bytes.addAll(generator.feed(3));
     bytes.addAll(generator.cut());
 

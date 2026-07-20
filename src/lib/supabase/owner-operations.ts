@@ -362,6 +362,8 @@ type TeamRow = {
   lastName: string | null;
   email: string | null;
   role_name: string;
+  gare_id?: string | null;
+  gare_name?: string | null;
 };
 
 function joinedRoleName(
@@ -392,7 +394,7 @@ function mapTeamRows(rows: TeamRow[]): SupabaseOwnerSeller[] {
   return rows
     .map((row) => {
       const roleName = row.role_name;
-      if (!isOwnerAssignableTeamRole(roleName)) return null;
+      if (!isOwnerAssignableTeamRole(roleName) && !isGareOpsTeamRole(roleName)) return null;
 
       const user = {
         firstName: row.firstName as string | null,
@@ -404,7 +406,9 @@ function mapTeamRows(rows: TeamRow[]): SupabaseOwnerSeller[] {
         id: row.user_id as string,
         name: fullName(user),
         email: user.email ?? null,
-        roleName: roleName as OwnerTeamRoleName,
+        roleName: roleName as OwnerTeamListRole,
+        gareId: row.gare_id ?? null,
+        gareName: row.gare_name ?? null,
       };
     })
     .filter((seller): seller is SupabaseOwnerSeller => Boolean(seller))
@@ -449,7 +453,10 @@ async function listOwnerTeamDirectSupabase(companyId: string): Promise<SupabaseO
   const { data: roleRows, error: roleError } = await supabase
     .from("Role")
     .select("id, name")
-    .in("name", [...OWNER_ASSIGNABLE_TEAM_ROLES]);
+    // Rôles compagnie + rôles opérationnels de gare (emballeur/chargeur/
+    // distributeur) : un membre ajouté avec un rôle de gare depuis ce
+    // panneau doit apparaître dans cette même liste.
+    .in("name", [...OWNER_ASSIGNABLE_TEAM_ROLES, ...GARE_OPS_TEAM_ROLES]);
 
   if (roleError) throw roleError;
 
@@ -458,7 +465,7 @@ async function listOwnerTeamDirectSupabase(companyId: string): Promise<SupabaseO
 
   const { data, error } = await supabase
     .from("UserRoles")
-    .select("userId, Role(name), Users(id, firstName, lastName, email)")
+    .select("userId, gareId, Role(name), Users(id, firstName, lastName, email), Gares(name)")
     .eq("companyId", companyId)
     .in("roleId", roleIds);
 
@@ -486,12 +493,16 @@ async function listOwnerTeamDirectSupabase(companyId: string): Promise<SupabaseO
         | null,
     );
     if (!roleName || !user) continue;
+    const gareJoin = entry.Gares as { name: string } | { name: string }[] | null;
+    const gareName = Array.isArray(gareJoin) ? gareJoin[0]?.name ?? null : gareJoin?.name ?? null;
     rows.push({
       user_id: user.id,
       firstName: user.firstName ?? "",
       lastName: user.lastName ?? "",
       email: user.email,
       role_name: roleName,
+      gare_id: (entry.gareId as string | null) ?? null,
+      gare_name: gareName,
     });
   }
 
