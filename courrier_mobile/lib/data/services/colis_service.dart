@@ -170,6 +170,27 @@ class ColisService {
         .toList();
   }
 
+  /// Journal de vente colis — liste détaillée groupée par agent avec
+  /// sous-total, + total général, sur une plage de dates (get_colis_sales_journal,
+  /// migration 192). Même scoping par rôle que getColisStats : un agent
+  /// simple ne reçoit que sa propre activité quel que soit [vendeurId]
+  /// demandé (forcé côté serveur) — c'est le cas d'usage principal ici :
+  /// l'agent imprime son propre journal en fin de session.
+  Future<ColisSalesJournal> getColisSalesJournal({
+    required String companyId,
+    required DateTime dateFrom,
+    DateTime? dateTo,
+    String? vendeurId,
+  }) async {
+    final data = await _client.rpc('get_colis_sales_journal', params: {
+      'p_company_id': companyId,
+      'p_date_from': dateFrom.toIso8601String(),
+      'p_date_to': dateTo?.toIso8601String(),
+      'p_vendeur_id': vendeurId,
+    });
+    return ColisSalesJournal.fromMap((data ?? {}) as Map<String, dynamic>);
+  }
+
   /// Gares de la compagnie, pour le filtre "par gare" de la page Stats —
   /// RPC dédiée (list_company_gares_for_stats, migration 184) : distincte de
   /// list_company_station_gares (réservée aux rôles qui opèrent une caisse),

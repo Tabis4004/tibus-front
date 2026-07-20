@@ -219,6 +219,111 @@ class ColisVendeur {
       );
 }
 
+/// Une ligne du journal de vente — un colis (référence, date, expéditeur/
+/// destinataire, frais/valeur, destination). Voir get_colis_sales_journal
+/// (migration 192) et ColisSalesJournalPanel.tsx côté web pour le même
+/// format imprimé.
+class ColisSalesJournalLine {
+  final String id;
+  final String? numeroRecu;
+  final DateTime createdAt;
+  final String nomExpediteur;
+  final String nomDestinataire;
+  final double montantFret;
+  final double? valeurMarchandise;
+  final String gareDestination;
+
+  const ColisSalesJournalLine({
+    required this.id,
+    required this.numeroRecu,
+    required this.createdAt,
+    required this.nomExpediteur,
+    required this.nomDestinataire,
+    required this.montantFret,
+    required this.valeurMarchandise,
+    required this.gareDestination,
+  });
+
+  factory ColisSalesJournalLine.fromMap(Map<String, dynamic> map) => ColisSalesJournalLine(
+        id: map['id'] as String? ?? '',
+        numeroRecu: map['numeroRecu'] as String?,
+        createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
+        nomExpediteur: map['nomExpediteur'] as String? ?? '',
+        nomDestinataire: map['nomDestinataire'] as String? ?? '',
+        montantFret: (map['montantFret'] as num?)?.toDouble() ?? 0,
+        valeurMarchandise: (map['valeurMarchandise'] as num?)?.toDouble(),
+        gareDestination: map['gareDestination'] as String? ?? '',
+      );
+}
+
+/// Regroupement par agent (vendeur) du journal de vente, avec sous-total.
+class ColisSalesJournalGroup {
+  final String? vendeurId;
+  final String vendeurName;
+  final String? vendeurUsername;
+  final List<ColisSalesJournalLine> colis;
+  final int count;
+  final double totalFrais;
+  final double totalValeur;
+
+  const ColisSalesJournalGroup({
+    required this.vendeurId,
+    required this.vendeurName,
+    required this.vendeurUsername,
+    required this.colis,
+    required this.count,
+    required this.totalFrais,
+    required this.totalValeur,
+  });
+
+  factory ColisSalesJournalGroup.fromMap(Map<String, dynamic> map) => ColisSalesJournalGroup(
+        vendeurId: map['vendeurId'] as String?,
+        vendeurName: map['vendeurName'] as String? ?? 'Agent inconnu',
+        vendeurUsername: map['vendeurUsername'] as String?,
+        colis: (map['colis'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(ColisSalesJournalLine.fromMap)
+            .toList(),
+        count: (map['count'] as num?)?.toInt() ?? 0,
+        totalFrais: (map['totalFrais'] as num?)?.toDouble() ?? 0,
+        totalValeur: (map['totalValeur'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+/// Journal de vente complet — colis vendus sur une période, groupés par
+/// agent avec sous-total, + total général (get_colis_sales_journal,
+/// migration 192). [fullAccess]/[gareScope] : même sémantique que
+/// ColisStats, pour piloter l'affichage du filtre "par agent" côté écran.
+class ColisSalesJournal {
+  final List<ColisSalesJournalGroup> groups;
+  final int grandCount;
+  final double grandTotalFrais;
+  final double grandTotalValeur;
+  final bool fullAccess;
+  final bool gareScope;
+
+  const ColisSalesJournal({
+    required this.groups,
+    required this.grandCount,
+    required this.grandTotalFrais,
+    required this.grandTotalValeur,
+    required this.fullAccess,
+    required this.gareScope,
+  });
+
+  factory ColisSalesJournal.fromMap(Map<String, dynamic> map) => ColisSalesJournal(
+        groups: (map['groups'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(ColisSalesJournalGroup.fromMap)
+            .toList(),
+        grandCount: (map['grandCount'] as num?)?.toInt() ?? 0,
+        grandTotalFrais: (map['grandTotalFrais'] as num?)?.toDouble() ?? 0,
+        grandTotalValeur: (map['grandTotalValeur'] as num?)?.toDouble() ?? 0,
+        fullAccess: map['fullAccess'] == true,
+        gareScope: map['gareScope'] == true,
+      );
+}
+
 /// Statut d'une session de caisse — même valeurs que la colonne
 /// caisses_gares.statut côté base.
 enum StationCashStatus { ouverte, enReversement, cloturee, unknown }

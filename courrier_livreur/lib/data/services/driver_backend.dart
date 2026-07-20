@@ -1251,20 +1251,24 @@ class DriverBackend {
   // ---------------------------------------------------------------------
 
   static Future<Map<String, dynamic>> fetchAdminMetrics() async {
-    final totalRidesRes = await client.from('rides').count();
-    final completedRes = await client.from('rides').select().eq('status', 'completed').count();
+    // .count() renvoie directement un int (requête HEAD côté supabase_flutter),
+    // pas un objet avec une propriété .count — contrairement à un
+    // .select().count(CountOption.exact) qui, lui, renvoie un
+    // PostgrestResponse avec .count. Ici on utilise le raccourci direct.
+    final totalRides = await client.from('rides').count();
+    final completed = await client.from('rides').select().eq('status', 'completed').count();
     final revRows = await client.from('rides').select('price_xof').eq('status', 'completed');
-    final driversRes = await client.from('driver_profiles').select().eq('status', 'approved').count();
+    final drivers = await client.from('driver_profiles').select().eq('status', 'approved').count();
 
     final total = (revRows as List).fold<int>(0, (s, r) => s + ((r['price_xof'] as num?)?.toInt() ?? 0));
     final commission = (total * 0.15).round();
 
     return {
-      'totalRides': totalRidesRes.count,
-      'completed': completedRes.count,
+      'totalRides': totalRides,
+      'completed': completed,
       'total': total,
       'commission': commission,
-      'drivers': driversRes.count,
+      'drivers': drivers,
     };
   }
 

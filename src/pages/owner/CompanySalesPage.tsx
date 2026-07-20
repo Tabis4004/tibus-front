@@ -5,6 +5,7 @@ import { useCompanyTicketReprint } from "@/hooks/use-company-ticket-reprint.tsx"
 import { canReprintCounterTickets } from "@/lib/owner-console-modules.tsx";
 import type { OwnerCompanyOption } from "@/lib/supabase/owner-company";
 import CompanySalesLedger from "./_components/CompanySalesLedger.tsx";
+import ColisSalesJournalPanel from "./_components/ColisSalesJournalPanel.tsx";
 
 function CompanySalesPageContent({ company }: { company: OwnerCompanyOption }) {
   const appUser = useAppUser();
@@ -16,7 +17,7 @@ function CompanySalesPageContent({ company }: { company: OwnerCompanyOption }) {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <CompanySalesLedger
         key={company.id}
         companyId={company.id}
@@ -24,6 +25,7 @@ function CompanySalesPageContent({ company }: { company: OwnerCompanyOption }) {
         canReprint={canReprint}
         onReprint={canReprint ? onReprint : undefined}
       />
+      <ColisSalesJournalPanel key={`${company.id}-journal`} companyId={company.id} companyName={company.name} />
     </div>
   );
 }

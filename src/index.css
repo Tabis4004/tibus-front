@@ -184,8 +184,10 @@
   /* Show only the receipt area */
   #printable-receipt,
   #printable-colis-receipt,
+  #printable-sales-journal,
   #printable-receipt *,
-  #printable-colis-receipt * {
+  #printable-colis-receipt *,
+  #printable-sales-journal * {
     visibility: visible;
   }
 
@@ -205,6 +207,23 @@
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
+  }
+
+  /* Journal de vente — impression sur imprimante bureau (A4) ou thermique.
+   * Contrairement au reçu colis, ce document est multi-page et n'est pas
+   * contraint à 76mm : il s'étale sur toute la largeur de la page. */
+  #printable-sales-journal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 4mm;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   /* 56mm paper: narrower width */

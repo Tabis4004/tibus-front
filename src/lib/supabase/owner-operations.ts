@@ -42,18 +42,36 @@ import {
 
 export type OwnerTeamRoleName = OwnerAssignableTeamRole;
 
+/** Rôles opérationnels de gare (migration 182) — affichés aussi dans la
+ * liste Équipe du owner (sinon un membre ajouté avec un de ces rôles
+ * n'apparaissait nulle part côté owner). */
+export const GARE_OPS_TEAM_ROLES = [
+  "emballeur_gare",
+  "chargeur_gare",
+  "distributeur_gare",
+] as const;
+export type GareOpsTeamRole = (typeof GARE_OPS_TEAM_ROLES)[number];
+export type OwnerTeamListRole = OwnerTeamRoleName | GareOpsTeamRole;
+
+export function isGareOpsTeamRole(role: string): role is GareOpsTeamRole {
+  return (GARE_OPS_TEAM_ROLES as readonly string[]).includes(role);
+}
+
 export type SupabaseOwnerSeller = {
   id: string;
   name: string;
   email: string | null;
-  roleName: OwnerTeamRoleName;
+  roleName: OwnerTeamListRole;
+  /** Gare de rattachement — uniquement pour les rôles de gare. */
+  gareId?: string | null;
+  gareName?: string | null;
 };
 
 export type SupabaseOwnerTeamMember = {
   id: string;
   name: string;
   email: string | null;
-  roles: OwnerTeamRoleName[];
+  roles: OwnerTeamListRole[];
 };
 
 export type SupabaseAssignableUser = {

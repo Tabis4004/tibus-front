@@ -67,7 +67,7 @@ class _SupportScreenState extends State<SupportScreen> {
   Color _statusColor(String status) => switch (status) {
         'resolved' => AppColors.primaryGreenDark,
         'closed' => AppColors.textSecondary,
-        'pending' => AppColors.accentOrange,
+        'pending' => AppColors.statusPending,
         _ => Colors.blue,
       };
 

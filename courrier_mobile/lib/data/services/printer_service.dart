@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/bordereau_receipt_lines.dart';
 import '../../core/utils/colis_receipt_lines.dart';
+import '../../core/utils/colis_sales_journal_lines.dart';
 import '../models/colis.dart';
 import 'bordereau_service.dart';
 import 'esc_pos_printer_service.dart';
@@ -283,6 +284,78 @@ class PrinterService {
     final local = dt.toLocal();
     String two(int n) => n.toString().padLeft(2, '0');
     return '${two(local.hour)}:${two(local.minute)}';
+  }
+
+  /// Journal de vente colis (par agent, avec sous-total + total général) —
+  /// imprimante P3 intégrée. Distinct de printCaisseJournal (mouvements de
+  /// caisse) : ici chaque LIGNE est un colis vendu (référence, expéditeur,
+  /// destinataire, frais/valeur, destination), voir get_colis_sales_journal
+  /// (migration 192) et ColisSalesJournalPanel.tsx côté web pour le même
+  /// format. Cas d'usage principal : l'agent imprime son propre journal en
+  /// fin de session (companyId/vendeurId gérés côté service RPC, voir
+  /// ColisService.getColisSalesJournal).
+  Future<void> printColisSalesJournal(
+    ColisSalesJournal journal, {
+    required String companyName,
+    required String periodLabel,
+    int paperWidthMm = 58,
+  }) {
+    final rows = <List<String>>[];
+    for (final group in journal.groups) {
+      rows.add(['Agent: ${group.vendeurUsername ?? group.vendeurName}', '']);
+      for (final c in group.colis) {
+        rows.add([
+          '${c.numeroRecu ?? "—"}  ${formatSalesJournalDate(c.createdAt)}',
+          '',
+        ]);
+        rows.add(['  Exp: ${c.nomExpediteur}', '']);
+        rows.add(['  Dest: ${c.nomDestinataire}', '']);
+        rows.add([
+          '  Frais: ${c.montantFret.toStringAsFixed(0)}',
+          'Valeur: ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}',
+        ]);
+        rows.add(['  Destination: ${c.gareDestination}', '']);
+      }
+      rows.add([
+        'Total ${group.vendeurUsername ?? group.vendeurName} (${group.count})',
+        'F ${group.totalFrais.toStringAsFixed(0)} / V ${group.totalValeur.toStringAsFixed(0)}',
+      ]);
+      rows.add(['--------------------------------', '']);
+    }
+    return printReceipt(
+      header: [
+        companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+        'Journal de vente',
+        periodLabel,
+      ],
+      reference: 'TOTAL  ${journal.grandCount} colis',
+      rows: rows,
+      qr: '',
+      footer: 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)} '
+          '- Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
+      paperWidthMm: paperWidthMm,
+    );
+  }
+
+  /// Idem, pont Xprinter/WisePrinter (desktop) — lignes partagées avec le
+  /// pont ESC/POS (voir EscPosPrinterService.printColisSalesJournal et
+  /// colisSalesJournalLines()).
+  Future<void> printColisSalesJournalViaWisePrinter(
+    ColisSalesJournal journal, {
+    required String companyName,
+    required String periodLabel,
+  }) {
+    if (!hasWisePrinterBridge) {
+      throw StateError('Xprinter indisponible sur cet appareil.');
+    }
+    return _bridge.printViaWisePrinter(
+      header: companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+      lines: colisSalesJournalLines(journal, companyName: companyName, periodLabel: periodLabel),
+      qr: '',
+      qrSize: 0,
+      feedLines: 3,
+      cut: true,
+    );
   }
 
   /// Bordereau de livraison — pont P3 natif. Une ligne rows par colis
