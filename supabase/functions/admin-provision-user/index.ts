@@ -8,6 +8,14 @@ const OWNER_ROLES = [
   "comptable_compagnie",
   "controleur",
   "gerant_gare",
+  // "traveler" : rôle de base attribué lors de la 1ère étape de création
+  // d'un compte emballeur_gare/chargeur_gare/distributeur_gare (voir
+  // SupabaseSellersManager.tsx#handleCreate) — cette Edge Function ne gère
+  // pas UserRoles.gareId, donc le compte est d'abord créé avec "traveler"
+  // seul, puis le rôle de gare est attribué séparément par la RPC
+  // assign_gare_team_role_by_email (migration 182). Sans "traveler" ici,
+  // cette 1ère étape était rejetée par rolesAreOwnerTeamOnly ci-dessous.
+  "traveler",
 ] as const;
 
 type ProvisionBody = {
