@@ -392,7 +392,7 @@ function joinedUser(
 
 function mapTeamRows(rows: TeamRow[]): SupabaseOwnerSeller[] {
   return rows
-    .map((row) => {
+    .map((row): SupabaseOwnerSeller | null => {
       const roleName = row.role_name;
       if (!isOwnerAssignableTeamRole(roleName) && !isGareOpsTeamRole(roleName)) return null;
 
@@ -411,7 +411,7 @@ function mapTeamRows(rows: TeamRow[]): SupabaseOwnerSeller[] {
         gareName: row.gare_name ?? null,
       };
     })
-    .filter((seller): seller is SupabaseOwnerSeller => Boolean(seller))
+    .filter((seller): seller is SupabaseOwnerSeller => seller !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
