@@ -208,6 +208,7 @@ class BordereauSummary {
 
 class BordereauColisRow {
   final String id;
+  final String? numeroRecu;
   final String statutColis;
   final String nomExpediteur;
   final String telephoneExpediteur;
@@ -222,6 +223,7 @@ class BordereauColisRow {
 
   const BordereauColisRow({
     required this.id,
+    this.numeroRecu,
     required this.statutColis,
     required this.nomExpediteur,
     required this.telephoneExpediteur,
@@ -235,10 +237,22 @@ class BordereauColisRow {
     required this.montantFret,
   });
 
-  String get reference => 'CL-${id.substring(0, 8).toUpperCase()}';
+  // Numéro séquentiel par gare (ex. GESC000024) — même référence que celle
+  // imprimée sur le reçu du client (colisReceiptNumber) ; repli sur
+  // CL-XXXXXXXX uniquement si le colis n'a exceptionnellement pas encore de
+  // numero_recu. AVANT ce correctif, cette référence était TOUJOURS
+  // fabriquée depuis l'UUID (CL-XXXXXXXX), sans rapport avec le numéro
+  // réel — d'où l'impression que « le code change » entre le dépôt et la
+  // destination alors qu'il s'agissait d'un simple bug d'affichage.
+  String get reference {
+    final numero = numeroRecu;
+    if (numero != null && numero.isNotEmpty) return numero;
+    return 'CL-${id.substring(0, 8).toUpperCase()}';
+  }
 
   factory BordereauColisRow.fromMap(Map<String, dynamic> map) => BordereauColisRow(
         id: map['id'] as String,
+        numeroRecu: map['numeroRecu'] as String?,
         statutColis: (map['statutColis'] ?? 'enregistre') as String,
         nomExpediteur: (map['nomExpediteur'] ?? '') as String,
         telephoneExpediteur: (map['telephoneExpediteur'] ?? '') as String,

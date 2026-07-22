@@ -1,26 +1,30 @@
-/** Rôles compagnie que le propriétaire peut créer ou attribuer (hors gérant — voir Gares). */
+/** Rôles compagnie que le propriétaire peut créer ou attribuer (hors gérant — voir Gares).
+ *  emballeur_gare / chargeur_gare / distributeur_gare : rôles GLOBAUX à la
+ *  compagnie depuis la migration 193 (plus rattachés à une seule gare) —
+ *  emballeur et chargeur font le même travail terrain (emballage +
+ *  impression du bordereau, puis scan du bordereau pour confirmer le
+ *  chargement) et peuvent tous deux faire les deux actions ; le
+ *  distributeur reçoit les lots à l'arrivée, sur n'importe quelle gare de
+ *  la compagnie. Les trois ont accès à la liste générale des colis (voir
+ *  list_colis_autonomes). */
 export const OWNER_ASSIGNABLE_TEAM_ROLES = [
   "vendeur",
   "chauffeur",
   "controleur",
   "comptable_compagnie",
+  "emballeur_gare",
+  "chargeur_gare",
+  "distributeur_gare",
 ] as const;
 
 export type OwnerAssignableTeamRole = (typeof OWNER_ASSIGNABLE_TEAM_ROLES)[number];
 
-/** Rôles rattachés à une gare (UserRoles.gareId obligatoire).
- *  emballeur_gare / chargeur_gare / distributeur_gare : cycle colis en lots
- *  (regroupement par destination, chargement, réception) — chaque rôle est
- *  DISTINCT et réservé à son étape (voir migration 182,
- *  _assert_lot_access) : le caissier enregistre, l'emballeur emballe, le
- *  chargeur charge, le distributeur reçoit — pas de chevauchement. */
+/** Rôles rattachés à une gare précise (UserRoles.gareId obligatoire),
+ *  assignables depuis l'onglet "Équipe" de la page Gares. */
 export const GARE_TEAM_ASSIGNABLE_ROLES = [
   "vendeur_gare",
   "controleur_gare",
   "comptable_gare",
-  "emballeur_gare",
-  "chargeur_gare",
-  "distributeur_gare",
 ] as const;
 
 export type GareTeamAssignableRole = (typeof GARE_TEAM_ASSIGNABLE_ROLES)[number];

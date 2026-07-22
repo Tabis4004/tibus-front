@@ -12,7 +12,10 @@ import '../models/colis.dart';
 class ColisService {
   final SupabaseClient _client = SupabaseService.client;
 
-  Future<List<Colis>> listColis({required String companyId, ColisStatut? statut, int limit = 100}) async {
+  // Limite relevée (100 -> 2000, plafond serveur 5000 — migration 193) :
+  // l'écran "Liste des colis" ne doit plus tronquer silencieusement les
+  // colis les plus anciens d'une compagnie active (rapport terrain).
+  Future<List<Colis>> listColis({required String companyId, ColisStatut? statut, int limit = 2000}) async {
     final data = await _client.rpc('list_colis_autonomes', params: {
       'p_company_id': companyId,
       'p_statut': statut?.dbValue,

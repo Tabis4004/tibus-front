@@ -8,13 +8,17 @@ const OWNER_ROLES = [
   "comptable_compagnie",
   "controleur",
   "gerant_gare",
-  // "traveler" : rôle de base attribué lors de la 1ère étape de création
-  // d'un compte emballeur_gare/chargeur_gare/distributeur_gare (voir
-  // SupabaseSellersManager.tsx#handleCreate) — cette Edge Function ne gère
-  // pas UserRoles.gareId, donc le compte est d'abord créé avec "traveler"
-  // seul, puis le rôle de gare est attribué séparément par la RPC
-  // assign_gare_team_role_by_email (migration 182). Sans "traveler" ici,
-  // cette 1ère étape était rejetée par rolesAreOwnerTeamOnly ci-dessous.
+  // emballeur_gare / chargeur_gare / distributeur_gare : depuis la
+  // migration 193, rôles GLOBAUX à la compagnie (scope='company' en base,
+  // UserRoles.gareId non renseigné) — créés directement ici comme
+  // vendeur/chauffeur/contrôleur/comptable_compagnie, sans étape
+  // intermédiaire "traveler" + assign_gare_team_role_by_email.
+  "emballeur_gare",
+  "chargeur_gare",
+  "distributeur_gare",
+  // "traveler" : conservé pour compat avec d'éventuels comptes déjà créés
+  // via l'ancien flux en 2 étapes (rôle de gare précis, assigné après
+  // coup par assign_gare_team_role_by_email).
   "traveler",
 ] as const;
 
@@ -228,7 +232,16 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Droits insuffisants" }, 403);
     } else if (superAdmin) {
       const needsCompany = roles.some((r) =>
-        ["owner", "vendeur", "chauffeur", "controleur", "comptable_compagnie"].includes(r)
+        [
+          "owner",
+          "vendeur",
+          "chauffeur",
+          "controleur",
+          "comptable_compagnie",
+          "emballeur_gare",
+          "chargeur_gare",
+          "distributeur_gare",
+        ].includes(r)
       );
       if (needsCompany && !companyId) {
         return jsonResponse({ error: "Compagnie requise pour les rôles compagnie" }, 400);
@@ -363,7 +376,17 @@ Deno.serve(async (req) => {
     }
 
     const requiredCompanyRoles = roles.filter((r) =>
-      ["vendeur", "chauffeur", "comptable_compagnie", "controleur", "gerant_gare", "owner"].includes(r)
+      [
+        "vendeur",
+        "chauffeur",
+        "comptable_compagnie",
+        "controleur",
+        "gerant_gare",
+        "owner",
+        "emballeur_gare",
+        "chargeur_gare",
+        "distributeur_gare",
+      ].includes(r)
     );
     const missingRequired = requiredCompanyRoles.filter((r) => !assignedRoles.includes(r));
     if (missingRequired.length > 0) {
