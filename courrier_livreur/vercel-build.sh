@@ -27,5 +27,12 @@ flutter doctor -v || true
 # on le reconstitue avant le build. Non destructif pour lib/ existant.
 flutter create . --platforms=web --project-name courrier_livreur
 
+# `flutter create` écrase favicon/manifest par les défauts Flutter à chaque
+# build : on réapplique par-dessus le branding Tibus (seule copie versionnée,
+# web/ n'étant pas commité — voir branding/webassets/).
+cp branding/webassets/favicon.svg web/favicon.svg
+cp branding/webassets/favicon.png web/favicon.png
+cp branding/webassets/manifest.json web/manifest.json
+
 flutter pub get
 flutter build web --release
