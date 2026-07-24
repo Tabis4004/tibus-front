@@ -40,6 +40,10 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
 
+
+  flutter:
+    sdk: flutter
+  xprinter_sdk: ^0.0.3
   # Dérivation déterministe du mot de passe du compte miroir Tibus Ride
   # (voir RideBackend.ensureMirroredSession) — jamais le vrai mot de passe
   # de l'utilisateur, un hash stable dérivé de son identifiant Tibus.

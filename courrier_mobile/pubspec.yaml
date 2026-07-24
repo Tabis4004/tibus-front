@@ -10,6 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  flutter:
+    sdk: flutter
+  xprinter_sdk: ^0.0.3
   # Backend
   supabase_flutter: ^2.6.0
 
