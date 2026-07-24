@@ -21,7 +21,10 @@ Future<void> main() async {
   }
 
   await SupabaseService.init();
+supabaseUrl = String.fromEnvironment('RIDE_SUPABASE_URL', defaultValue: 'https://bjtklpjdsmqmzhncfflu.supabase.co');
+supabaseAnonKey = String.fromEnvironment('RIDE_SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ');
 
+if [ ! -d "$HOME/flutter" ]; then);
   // Firebase est optionnel tant que `flutterfire configure` n'a pas été
   // exécuté (voir README, section FCM) : si l'initialisation échoue,
   // Courrier continue de fonctionner avec le suivi temps réel Supabase
