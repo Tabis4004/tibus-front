@@ -66,14 +66,13 @@ class AuthService {
 
   Future<String> _ensureUserProfile(User authUser, {String? fallbackPhone}) async {
     final existing = await _client
-        .rest
-        .from('Users')
+        .from('users')
         .select('id')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
     if (existing != null) return existing['id'] as String;
 
-    final countries = await _client.rest.from('Countries').select('id').limit(1);
+    final countries = await _client.from('Countries').select('id').limit(1);
     if ((countries as List).isEmpty) {
       throw Exception(
         "Aucun pays en base. Impossible de créer le profil (voir table Countries).",
@@ -95,8 +94,7 @@ class AuthService {
         !(firstName == 'Utilisateur' && lastName == 'Tibus');
 
     final profile = await _client
-        .rest
-        .from('Users')
+        .from('users')
         .insert({
           'auth_user_id': authUser.id,
           'firstName': firstName,
@@ -110,9 +108,9 @@ class AuthService {
         .select('id')
         .single();
 
-    final travelerRole = await _client.rest.from('Role').select('id').eq('name', 'traveler').single();
+    final travelerRole = await _client.from('Role').select('id').eq('name', 'traveler').single();
 
-    await _client.rest.from('UserRoles').insert({
+    await _client.from('UserRoles').insert({
       'userId': profile['id'],
       'roleId': travelerRole['id'],
       'companyId': null,
@@ -126,8 +124,7 @@ class AuthService {
     final authUser = currentSession?.user;
     if (authUser == null) return (email: null, phone: null);
     final row = await _client
-        .rest
-        .from('Users')
+        .from('users')
         .select('email, phone')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -145,8 +142,7 @@ class AuthService {
     if (authUserId == null) return [];
 
     final appUser = await _client
-        .rest
-        .from('Users')
+        .from('users')
         .select('id')
         .eq('auth_user_id', authUserId)
         .maybeSingle();
@@ -154,7 +150,6 @@ class AuthService {
     if (appUserId == null) return [];
 
     final rows = await _client
-        .rest
         .from('UserRoles')
         .select('roleId, companyId, Role(name, scope, level, droits), Companies(name)')
         .eq('userId', appUserId);
