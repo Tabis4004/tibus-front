@@ -25,7 +25,11 @@ flutter doctor -v || true
 
 # web/ est gitignored (régénérable, comme android/ios/macos/linux/windows) :
 # on le reconstitue avant le build. Non destructif pour lib/ existant.
-flutter create . --platforms=web --project-name courrier_client
+if [ ! -d "web" ]; then
+  flutter create . --platforms=web --project-name courrier_client --org com.tibus
+else
+  flutter pub upgrade
+fi
 
 # `flutter create` écrase favicon/manifest par les défauts Flutter à chaque
 # build : on réapplique par-dessus le branding Tibus (seule copie versionnée,
