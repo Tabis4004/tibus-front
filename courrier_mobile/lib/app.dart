@@ -23,7 +23,18 @@ class _CourrierAppState extends State<CourrierApp> {
       home: StreamBuilder<AuthState>(
         stream: Supabase.instance.client.auth.onAuthStateChange,
         builder: (context, snapshot) {
-          final session = Supabase.instance.client.auth.currentSession;
+          // Pendant que le stream s'initialise, on affiche un écran de chargement propre au lieu de planter
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          
+          // On récupère la session de manière sécurisée depuis le snapshot ou le client
+          final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
+          
           return session != null ? const AgentShell() : const LoginScreen();
         },
       ),
