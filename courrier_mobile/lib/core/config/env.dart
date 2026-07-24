@@ -2,16 +2,33 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Configuration d'environnement.
 ///
-/// IMPORTANT : Courrier se connecte au MEME projet Supabase que Tibus
-/// (choix produit : adapter l'existant plutôt que dupliquer la base,
-/// sans risque de perte de données ni de comptes utilisateurs).
-/// Un jour, si une base séparée devient nécessaire, seules ces deux
-/// valeurs changent — aucun autre fichier ne dépend de l'URL en dur.
+/// Vercel injecte ces valeurs au build Flutter via --dart-define.
+/// Les noms SUPABASE_* sont prioritaires, avec compatibilité RIDE_SUPABASE_*
+/// pour les projets courrier déjà configurés ainsi.
 class Env {
   Env._();
 
-  static String get supabaseUrl =>
-      dotenv.env['SUPABASE_URL'] ?? 'https://kqudaqtydimjclwaihqr.supabase.co/';
+  static const _compiledSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const _compiledRideSupabaseUrl =
+      String.fromEnvironment('RIDE_SUPABASE_URL');
+  static const _compiledSupabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const _compiledRideSupabaseAnonKey =
+      String.fromEnvironment('RIDE_SUPABASE_ANON_KEY');
 
-  static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  static String get supabaseUrl {
+    if (_compiledSupabaseUrl.isNotEmpty) return _compiledSupabaseUrl;
+    if (_compiledRideSupabaseUrl.isNotEmpty) return _compiledRideSupabaseUrl;
+    return dotenv.env['SUPABASE_URL'] ??
+        dotenv.env['RIDE_SUPABASE_URL'] ??
+        'https://bjtklpjdsmqmzhncfflu.supabase.co';
+  }
+
+  static String get supabaseAnonKey {
+    if (_compiledSupabaseAnonKey.isNotEmpty) return _compiledSupabaseAnonKey;
+    if (_compiledRideSupabaseAnonKey.isNotEmpty) return _compiledRideSupabaseAnonKey;
+    return dotenv.env['SUPABASE_ANON_KEY'] ??
+        dotenv.env['RIDE_SUPABASE_ANON_KEY'] ??
+        '';
+  }
 }
