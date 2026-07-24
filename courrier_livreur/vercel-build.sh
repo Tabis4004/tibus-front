@@ -34,5 +34,9 @@ cp branding/webassets/favicon.svg web/favicon.svg
 cp branding/webassets/favicon.png web/favicon.png
 cp branding/webassets/manifest.json web/manifest.json
 
+# Injection automatique de la balise favicon dans index.html si elle n'y est pas
+if ! grep -q "favicon.png" web/index.html; then
+  sed -i '' 's|<base href="\$FLUTTER_BASE_HREF">|<base href="$FLUTTER_BASE_HREF">\n  <link rel="icon" type="image/png" href="favicon.png"/>|g' web/index.html
+fi
 flutter pub get
 flutter build web --release
