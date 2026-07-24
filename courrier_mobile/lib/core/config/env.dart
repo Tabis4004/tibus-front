@@ -21,7 +21,7 @@ class Env {
     if (_compiledRideSupabaseUrl.isNotEmpty) return _compiledRideSupabaseUrl;
     return dotenv.env['SUPABASE_URL'] ??
         dotenv.env['RIDE_SUPABASE_URL'] ??
-        'https://bjtklpjdsmqmzhncfflu.supabase.co';
+        'https://kqudaqtydimjclwaihqr.supabase.co';
   }
 
   static String get supabaseAnonKey {

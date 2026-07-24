@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SUPABASE_URL_VALUE="${SUPABASE_URL:-${RIDE_SUPABASE_URL:-https://bjtklpjdsmqmzhncfflu.supabase.co}}"
+SUPABASE_URL_VALUE="${SUPABASE_URL:-${RIDE_SUPABASE_URL:-https://kqudaqtydimjclwaihqr.supabase.co}}"
 SUPABASE_ANON_KEY_VALUE="${SUPABASE_ANON_KEY:-${RIDE_SUPABASE_ANON_KEY:-}}"
 
 cat > .env <<EOF
