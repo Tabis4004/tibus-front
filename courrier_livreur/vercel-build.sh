@@ -26,23 +26,28 @@ flutter doctor -v || true
 # web/ est gitignored (régénérable, comme android/ios/macos/linux/windows) :
 # on le reconstitue avant le build. Non destructif pour lib/ existant.
 # 1. Génération de l'environnement web par Flutter
-flutter create . --platforms=web --project-name courrier_client
+#!/bin/bash
+set -e
 
-# 2. Copie immédiate par-dessus pour forcer vos icônes personnalisées
+if [ ! -d "$HOME/flutter" ]; then
+  git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$HOME/flutter"
+fi
+export PATH="$PATH:$HOME/flutter/bin"
+
+flutter config --enable-web --no-analytics
+flutter doctor -v || true
+
+# Génération propre sans écraser si web existe déjà
+if [ ! -d "web" ]; then
+  flutter create . --platforms=web --project-name courrier_livreur --org com.tibus --template app
+fi
+
+# Copie forcée des assets de branding par-dessus le dossier web
 if [ -d "branding/webassets" ]; then
-  cp -f branding/webassets/favicon.png web/favicon.png
-  cp -f branding/webassets/favicon.svg web/favicon.svg
-  cp -f branding/webassets/manifest.json web/manifest.json
+  cp -f branding/webassets/favicon.png web/favicon.png 2>/dev/null || true
+  cp -f branding/webassets/favicon.svg web/favicon.svg 2>/dev/null || true
+  cp -f branding/webassets/manifest.json web/manifest.json 2>/dev/null || true
 fi
 
-# `flutter create` écrase favicon/manifest par les défauts Flutter à chaque
-# build : on réapplique par-dessus le branding Tibus (seule copie versionnée,
-# web/ n'étant pas commité — voir branding/webassets/).
-
-
-# Injection automatique de la balise favicon dans index.html si elle n'y est pas
-if ! grep -q "favicon.png" web/index.html; then
-  sed -i '' 's|<base href="\$FLUTTER_BASE_HREF">|<base href="$FLUTTER_BASE_HREF">\n  <link rel="icon" type="image/png" href="favicon.png"/>|g' web/index.html
-fi
 flutter pub get
-flutter build web --release
+flutter build web --release 
