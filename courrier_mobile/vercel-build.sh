@@ -34,9 +34,14 @@ fi
 # `flutter create` écrase favicon/manifest par les défauts Flutter à chaque
 # build : on réapplique par-dessus le branding Tibus (seule copie versionnée,
 # web/ n'étant pas commité — voir branding/webassets/).
-cp branding/webassets/favicon.svg web/favicon.svg
-cp branding/webassets/favicon.png web/favicon.png
-cp branding/webassets/manifest.json web/manifest.json
+# 1. Génération de l'environnement web par Flutter
+
+# 2. Copie immédiate par-dessus pour forcer vos icônes personnalisées
+if [ -d "branding/webassets" ]; then
+  cp -f branding/webassets/favicon.png web/favicon.png
+  cp -f branding/webassets/favicon.svg web/favicon.svg
+  cp -f branding/webassets/manifest.json web/manifest.json
+fi
 
 # Injection automatique de la balise favicon dans index.html si elle n'y est pas
 if ! grep -q "favicon.png" web/index.html; then
