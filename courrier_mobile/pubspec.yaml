@@ -10,67 +10,26 @@ dependencies:
   flutter:
     sdk: flutter
 
-  flutter:
-    sdk: flutter
-  xprinter_sdk: ^0.0.3
-  # Backend
   supabase_flutter: ^2.6.0
-
-  # State management & routing
   flutter_riverpod: ^2.5.1
   go_router: ^14.2.0
-
-  # UI
   cupertino_icons: ^1.0.6
   intl: ^0.19.0
   qr_flutter: ^4.1.0
-  # 7.x (au lieu de 5.2.3) : le changelog 7.0.0-beta.1 mentionne
-  # explicitement un correctif pour "issues regarding initialization of the
-  # MobileScannerController, which could result in a black screen without
-  # error message" — symptôme identique au bug caméra Android observé (NPE
-  # générique "getClass() on a null object reference" au démarrage,
-  # reproductible sur plusieurs appareils). Nécessite Flutter >= 3.29.0.
   mobile_scanner: ^7.2.0
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
-  # Photo du colis à l'enregistrement (voir colis_create_screen.dart) —
-  # consultable sur le détail, jamais imprimée sur le reçu. Fonctionne aussi
-  # sur Flutter Web (input file caché), donc compatible avec le déploiement
-  # Vercel de courrier-agent.
   image_picker: ^1.1.2
-  # Ouverture de liens externes (wa.me pour les notifications WhatsApp colis)
   url_launcher: ^6.3.0
-  # Export/partage du manifeste colis (CSV) — voir colis_manifest_screen.dart
   share_plus: ^10.1.2
-
-  # Notifications
   flutter_local_notifications: ^17.2.2
-  # FCM — actif dès que `flutterfire configure` a généré firebase_options.dart
-  # (voir README section "Notifications push natives (FCM)").
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3
-
-  # Local storage / env
   shared_preferences: ^2.2.3
   flutter_dotenv: ^5.1.0
-  # Détection de connectivité — enregistrement de colis hors-ligne + file
-  # d'attente de synchronisation (voir data/services/sync_service.dart,
-  # data/services/offline_queue_service.dart). Déclenche la resynchronisation
-  # automatique dès que le réseau revient (AgentShell).
   connectivity_plus: ^6.0.5
-
-  # Impression USB / Bluetooth ESC/POS — imprimantes physiques du guichet
-  # (Xprinter XP-Q200 en USB, Mini Printer MPT-II en Bluetooth), en plus des
-  # ponts P3 natif et WisePrinter desktop existants (printer_service.dart).
-  # image_3 = fork maintenu de flutter_pos_printer_platform (discontinued),
-  # utilise le package `image_v3` pour ne pas entrer en conflit avec la
-  # dépendance `image: ^4.x` d'esc_pos_utils_plus.
   flutter_pos_printer_platform_image_3: ^1.2.4
   esc_pos_utils_plus: ^2.0.4
-
-  # Export bordereau en PDF A4 (impression classique / enregistrement) — en
-  # plus des tickets thermiques 56/80mm ci-dessus. `printing` ouvre le
-  # dialogue natif impression/enregistrer-en-PDF sur toutes les plateformes.
   pdf: ^3.12.0
   printing: ^5.14.3
   barcode: ^2.2.7
