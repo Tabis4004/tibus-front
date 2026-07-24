@@ -11,7 +11,7 @@ class Env {
   Env._();
 
   static String get supabaseUrl =>
-      dotenv.env['SUPABASE_URL'] ?? 'https://kqudaqtydimjclwaihqr.supabase.co';
+      dotenv.env['SUPABASE_URL'] ?? 'https://kqudaqtydimjclwaihqr.supabase.co/';
 
   static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 }
