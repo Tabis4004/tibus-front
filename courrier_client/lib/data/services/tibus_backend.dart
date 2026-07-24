@@ -82,7 +82,7 @@ class TibusBackend {
   /// la ligne Users + rôle "traveler" si elle n'existe pas encore pour ce
   /// compte Auth. Idempotent.
   static Future<void> _ensureUserProfile(User authUser, {String? fallbackPhone}) async {
-    final existing = await client.from('Users').select('id').eq('auth_user_id', authUser.id).maybeSingle();
+    final existing = await client.from('users').select('id').eq('auth_user_id', authUser.id).maybeSingle();
     if (existing != null) return;
 
     final countries = await client.from('Countries').select('id').limit(1);
@@ -105,7 +105,7 @@ class TibusBackend {
         !(firstName == 'Utilisateur' && lastName == 'Tibus');
 
     final profile = await client
-        .from('Users')
+        .from('users')
         .insert({
           'auth_user_id': authUser.id,
           'firstName': firstName,
@@ -121,7 +121,7 @@ class TibusBackend {
 
     final travelerRole = await client.from('Role').select('id').eq('name', 'traveler').single();
 
-    await client.from('UserRoles').insert({
+    await client.from('user_roles').insert({
       'userId': profile['id'],
       'roleId': travelerRole['id'],
       'companyId': null,
