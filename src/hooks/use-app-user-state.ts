@@ -145,7 +145,7 @@ export function useAppUserState() {
 
     void (async () => {
       const { data: userRow, error: userError } = await supabase
-        .from("Users")
+        .from("users")
         .select(
           "id, firstName, lastName, email, username, phone, countryId, profileCompleted, onboardingCompleted",
         )
@@ -256,7 +256,7 @@ export function useAppUserState() {
         shouldBackfillProfileCompleted(profileRow, roleNames)
       ) {
         const { error: backfillError } = await supabase
-          .from("Users")
+          .from("users")
           .update({ profileCompleted: true })
           .eq("id", appUserId);
 

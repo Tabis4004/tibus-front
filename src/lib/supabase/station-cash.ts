@@ -233,7 +233,7 @@ export async function listCompanyOpenStationCashSupabase(
 
   if (cashierIds.length) {
     const { data: users, error: usersError } = await supabase
-      .from("Users")
+      .from("users")
       .select("id, firstName, lastName, email")
       .in("id", cashierIds);
     if (!usersError && users) {

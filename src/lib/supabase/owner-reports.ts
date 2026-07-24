@@ -282,7 +282,7 @@ async function loadIssuedBookingsForDepartures(departures: OwnerDeparture[]) {
   const userIds = [...new Set(bookings.map((booking) => booking.createdBy).filter(Boolean))] as string[];
   const { data: users, error: userError } = userIds.length
     ? await supabase
-        .from("Users")
+        .from("users")
         .select("id, firstName, lastName, email, phone")
         .in("id", userIds)
     : { data: [], error: null };
@@ -452,7 +452,7 @@ async function loadManifestBookingsForTrip(reservationId: string) {
   const userIds = [...new Set(bookings.map((booking) => booking.createdBy).filter(Boolean))] as string[];
   const { data: users, error: userError } = userIds.length
     ? await supabase
-        .from("Users")
+        .from("users")
         .select("id, firstName, lastName, email, phone")
         .in("id", userIds)
     : { data: [], error: null };

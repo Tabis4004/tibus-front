@@ -177,11 +177,11 @@ export async function loadAdminStats(
         .catch(async (err) => {
           const message = err instanceof Error ? err.message : String(err);
           if (isAdminUsersRpcMissingError(message)) {
-            return supabase.from("Users").select("id", { count: "exact", head: true });
+            return supabase.from("users").select("id", { count: "exact", head: true });
           }
           return { count: 0, error: err };
         })
-    : supabase.from("Users").select("id", { count: "exact", head: true });
+    : supabase.from("users").select("id", { count: "exact", head: true });
 
   const [usersRes, companiesRes, subsRes, citiesRes] = await Promise.all([
     usersCountPromise,
@@ -211,7 +211,7 @@ function extractErrorMessage(err: unknown) {
 
 async function loadUsersDirect(): Promise<Pick<AdminDataSlice, "users" | "rolesByUser">> {
   const { data: rows, error } = await supabase
-    .from("Users")
+    .from("users")
     .select("id, email, firstName, lastName, username")
     .order("createdAt", { ascending: false })
     .limit(200);

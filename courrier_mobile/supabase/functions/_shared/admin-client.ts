@@ -15,7 +15,7 @@ export async function resolveAppUserId(
   authUserId: string,
 ): Promise<string | null> {
   const { data, error } = await admin
-    .from("Users")
+    .from("users")
     .select("id")
     .eq("auth_user_id", authUserId)
     .maybeSingle();

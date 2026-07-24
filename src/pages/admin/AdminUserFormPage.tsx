@@ -119,7 +119,7 @@ export default function AdminUserFormPage() {
 
         if (isEdit && userId) {
           const { data: userRow, error: userError } = await supabase
-            .from("Users")
+            .from("users")
             .select("id, firstName, lastName, email, phone")
             .eq("id", userId)
             .maybeSingle();

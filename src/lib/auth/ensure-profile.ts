@@ -16,7 +16,7 @@ function buildUsername(email: string, userId: string) {
 
 export async function ensureUserProfile(authUser: User) {
   const { data: existing, error: existingError } = await supabase
-    .from("Users")
+    .from("users")
     .select("id")
     .eq("auth_user_id", authUser.id)
     .maybeSingle();
@@ -49,7 +49,7 @@ export async function ensureUserProfile(authUser: User) {
     !(firstName === "Utilisateur" && lastName === "Tibus");
 
   const { data: profile, error: profileError } = await supabase
-    .from("Users")
+    .from("users")
     .insert({
       auth_user_id: authUser.id,
       firstName,

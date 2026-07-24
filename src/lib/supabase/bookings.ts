@@ -185,7 +185,7 @@ export async function listMyBookingsSupabase(
   );
 
   const { data: profile, error: profileError } = await supabase
-    .from("Users")
+    .from("uÒsers")
     .select("firstName, lastName, phone")
     .eq("id", appUserId)
     .maybeSingle();
@@ -248,7 +248,7 @@ export async function getTravelerBookingSupabase(
   }
 
   const { data: profile, error: profileError } = await supabase
-    .from("Users")
+    .from("uÒsers")
     .select("firstName, lastName, phone")
     .eq("id", appUserId)
     .maybeSingle();

@@ -5,7 +5,7 @@ export async function markOnboardingCompleted(userId: string) {
   markOnboardingDismissedLocal(userId);
 
   const { data, error } = await supabase
-    .from("Users")
+    .from("users")
     .update({ onboardingCompleted: true })
     .eq("id", userId)
     .select("id")

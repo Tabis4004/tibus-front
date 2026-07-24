@@ -3,7 +3,7 @@ import 'supabase_service.dart';
 import '../models/app_role.dart';
 
 class SignUpOutcome {
-  final User? user;
+  final dynamic user;
   final Session? session;
   final String? appUserId;
   final bool requiresConfirmation;
