@@ -79,15 +79,15 @@ class AuthService {
       );
     }
 
-    final meta = authuser.userMetadata ?? {};
+    final meta = authUser.userMetadata ?? {};
     final fullName = (meta['full_name'] as String?) ?? (meta['name'] as String?) ?? '';
     final parts = fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     final firstName = parts.isNotEmpty ? parts.first : 'Utilisateur';
     final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : 'Tibus';
 
-    final email = authuser.email ?? '';
+    final email = authUser.email ?? '';
     final base = email.split('@').first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-    final username = '${base.isEmpty ? 'user' : base}_${authuser.id.substring(0, 6)}'.toLowerCase();
+    final username = '${base.isEmpty ? 'user' : base}_${authUser.id.substring(0, 6)}'.toLowerCase();
 
     final phone = ((meta['phone'] as String?) ?? authUser.phone ?? fallbackPhone ?? '').trim();
     final profileCompleted = phone.replaceAll(RegExp(r'\D'), '').length >= 9 &&
