@@ -19,12 +19,7 @@ class SignUpOutcome {
 }
 
 /// Authentification + résolution des rôles — s'appuie sur les tables
-/// Users / UserRoles / Role existantes, inchangées. La logique
-/// d'inscription (signUpWithPassword + ensureUserProfile) est reprise
-/// à l'identique de src/lib/auth/ensure-profile.ts et
-/// src/components/providers/supabase-auth.tsx côté web, pour que les
-/// comptes créés depuis Courrier soient strictement compatibles avec
-/// Tibus (même table Users, même rôle "traveler").
+/// Users / UserRoles / Role existantes, inchangées.
 class AuthService {
   final SupabaseClient _client = SupabaseService.client;
 
@@ -32,11 +27,8 @@ class AuthService {
   bool get isLoggedIn => currentSession != null;
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
 
-  /// Lève une [AuthException] avec un message exploitable en cas
-  /// d'identifiants invalides — ne jamais avaler l'erreur ici, l'appelant
-  /// (écran de connexion) décide comment l'afficher.
   Future<AuthResponse> signInWithPassword({
-    required String identifier, // email ou téléphone selon config Tibus
+    required String identifier,
     required String password,
   }) {
     return _client.auth.signInWithPassword(email: identifier, password: password);
@@ -48,10 +40,6 @@ class AuthService {
     return _client.auth.resetPasswordForEmail(email.trim());
   }
 
-  /// Inscription "client" (expéditeur/destinataire qui veut suivre ses
-  /// colis + notifications). Crée le compte Supabase Auth, puis — si une
-  /// session est immédiatement disponible (pas de confirmation email
-  /// requise) — la ligne Users correspondante avec le rôle "traveler".
   Future<SignUpOutcome> signUpWithPassword({
     required String email,
     required String password,
@@ -80,12 +68,9 @@ class AuthService {
     );
   }
 
-  /// Miroir de ensureUserProfile (web) : crée la ligne Users + rôle
-  /// "traveler" si elle n'existe pas encore pour cet utilisateur Auth.
-  /// Idempotent — peut être rappelée sans risque (ex: à chaque connexion).
   Future<String> _ensureUserProfile(User authUser, {String? fallbackPhone}) async {
     final existing = await _client
-        .from('Users')
+        .from('"Users"')
         .select('id')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -113,7 +98,7 @@ class AuthService {
         !(firstName == 'Utilisateur' && lastName == 'Tibus');
 
     final profile = await _client
-        .from('Users')
+        .from('"Users"')
         .insert({
           'auth_user_id': authUser.id,
           'firstName': firstName,
@@ -139,15 +124,11 @@ class AuthService {
     return profile['id'] as String;
   }
 
-  /// Email + téléphone du compte connecté, pour affichage sur l'écran
-  /// Profil. Users.email/phone sont la source d'affichage (peuvent avoir été
-  /// mis à jour manuellement en base) ; on retombe sur authUser.email si la
-  /// ligne Users n'a pas d'email renseigné.
   Future<({String? email, String? phone})> fetchMyContact() async {
     final authUser = currentSession?.user;
     if (authUser == null) return (email: null, phone: null);
     final row = await _client
-        .from('Users')
+        .from('"Users"')
         .select('email, phone')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -156,29 +137,16 @@ class AuthService {
     return (email: email, phone: phone);
   }
 
-  /// Change le mot de passe du compte Supabase Auth connecté. L'écran Profil
-  /// n'étant accessible qu'après connexion, une session active est garantie.
   Future<void> updatePassword(String newPassword) {
     return _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 
-  /// Rôles de l'utilisateur courant, toutes compagnies confondues.
-  /// Reprend UserRoles -> Role -> Companies (jointure applicative simple,
-  /// à remplacer par une RPC dédiée `list_my_roles` si le volume le justifie).
-  ///
-  /// Important : UserRoles.userId référence Users.id (le profil applicatif),
-  /// PAS l'id Supabase Auth (currentSession.user.id) — voir _ensureUserProfile
-  /// et son miroir web src/lib/auth/ensure-profile.ts, qui insèrent
-  /// `userId: profile.id` (Users.id). Il faut donc résoudre Users.id via
-  /// auth_user_id avant d'interroger UserRoles (comme le fait le web dans
-  /// use-app-user-state.ts), sous peine de ne jamais trouver de rôle pour
-  /// des comptes créés côté web (Tibus) ou plus anciens.
   Future<List<AppRole>> fetchMyRoles() async {
     final authUserId = currentSession?.user.id;
     if (authUserId == null) return [];
 
     final appUser = await _client
-        .from('Users')
+        .from('"Users"')
         .select('id')
         .eq('auth_user_id', authUserId)
         .maybeSingle();
