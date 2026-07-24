@@ -66,7 +66,7 @@ class AuthService {
 
   Future<String> _ensureUserProfile(User authUser, {String? fallbackPhone}) async {
     final existing = await _client
-        .from('users')
+        .from('Users')
         .select('id')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -94,7 +94,7 @@ class AuthService {
         !(firstName == 'Utilisateur' && lastName == 'Tibus');
 
     final profile = await _client
-        .from('users')
+        .from('Users')
         .insert({
           'auth_user_id': authUser.id,
           'firstName': firstName,
@@ -124,7 +124,7 @@ class AuthService {
     final authUser = currentSession?.user;
     if (authUser == null) return (email: null, phone: null);
     final row = await _client
-        .from('users')
+        .from('Users')
         .select('email, phone')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -142,7 +142,7 @@ class AuthService {
     if (authUserId == null) return [];
 
     final appUser = await _client
-        .from('users')
+        .from('Users')
         .select('id')
         .eq('auth_user_id', authUserId)
         .maybeSingle();
