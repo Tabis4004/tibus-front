@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/config/env.dart';
-import 'data/services/driver_backend.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // <--- L'import manquant est ici
 import 'app.dart';
+import 'data/services/supabase_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   try {
     await dotenv.load(fileName: '.env');
-  } catch (_) {
-    // .env absent (ex. build CI sans secrets réels) — Env retombe sur les
-    // valeurs par défaut (URL publique, clé vide). Voir README.
-  }
-  // Client Supabase Tibus Ride initialisé au premier accès (SupabaseClient
-  // direct, pas Supabase.initialize/singleton — cette app n'a qu'un seul
-  // backend, pas besoin de la couche Supabase.instance).
-  DriverBackend.client;
-  Env.rideSupabaseUrl; // force la résolution de l'env avant le premier écran
+  } catch (_) {}
 
-  runApp(const ProviderScope(child: CourrierLivreurApp()));
+  // Initialisation directe de Supabase
+  await Supabase.initialize(
+    url: 'https://bjtklpjdsmqmzhncfflu.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ',
+  );
+
+  runApp(const ProviderScope(child: CourrierApp()));
 }
