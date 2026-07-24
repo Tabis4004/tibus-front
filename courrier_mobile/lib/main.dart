@@ -13,7 +13,7 @@ Future<void> main() async {
   } catch (_) {}
 
   // Initialisation directe de Supabase
-  await Supabase.initialize(
+ await Supabase.initialize(
     url: 'https://kqudaqtydimclwaihqr.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxdWRhcXR5ZGltamNsd2FpaHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDY1NTMsImV4cCI6MjA5NjE4MjU1M30.7bbUqLqqTDTRG4HIUFVzJdYW0NpJZWyoneUYje2JQVI',
   );
