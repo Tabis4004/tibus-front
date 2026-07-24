@@ -2,8 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import '../models/app_role.dart';
 
-/// Résultat d'une inscription — miroir de SignUpResult côté web
-/// (src/components/providers/supabase-auth.tsx).
 class SignUpOutcome {
   final User? user;
   final Session? session;
@@ -18,8 +16,6 @@ class SignUpOutcome {
   });
 }
 
-/// Authentification + résolution des rôles — s'appuie sur les tables
-/// Users / UserRoles / Role existantes, inchangées.
 class AuthService {
   final SupabaseClient _client = SupabaseService.client;
 
@@ -70,7 +66,7 @@ class AuthService {
 
   Future<String> _ensureUserProfile(User authUser, {String? fallbackPhone}) async {
     final existing = await _client
-        .from('"Users"')
+        .from('users')
         .select('id')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -98,7 +94,7 @@ class AuthService {
         !(firstName == 'Utilisateur' && lastName == 'Tibus');
 
     final profile = await _client
-        .from('"Users"')
+        .from('users')
         .insert({
           'auth_user_id': authUser.id,
           'firstName': firstName,
@@ -128,7 +124,7 @@ class AuthService {
     final authUser = currentSession?.user;
     if (authUser == null) return (email: null, phone: null);
     final row = await _client
-        .from('"Users"')
+        .from('users')
         .select('email, phone')
         .eq('auth_user_id', authUser.id)
         .maybeSingle();
@@ -146,7 +142,7 @@ class AuthService {
     if (authUserId == null) return [];
 
     final appUser = await _client
-        .from('"Users"')
+        .from('users')
         .select('id')
         .eq('auth_user_id', authUserId)
         .maybeSingle();
