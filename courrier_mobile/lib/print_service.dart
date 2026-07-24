@@ -1,37 +1,29 @@
-{\rtf1\ansi\ansicpg1252\cocoartf2822
-\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
-{\colortbl;\red255\green255\blue255;}
-{\*\expandedcolortbl;;}
-\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+import 'package:flutter/foundation.dart';
+import 'package:web/web.dart' as web; // Nécessite package:web dans le pubspec.yaml
 
-\f0\fs24 \cf0 import 'package:flutter/material.dart';\
-import 'package:flutter/foundation.dart' show kIsWeb;\
-\
-class PrintPage extends StatelessWidget \{\
-  const PrintPage(\{Key? key\}) : super(key: key);\
-\
-  // Votre fonction d'impression plac\'e9e ici\
-  void printReceipt() \{\
-    if (kIsWeb) \{\
-      // Code alternatif pour le Web\
-      print("Impression web directe non support\'e9e par ce plugin natif.");\
-    \} else \{\
-      // Code natif mobile (Android/iOS) avec le SDK Xprinter\
-      // XprinterSdk.print(...);\
-    \}\
-  \}\
-\
-  @override\
-  Widget build(BuildContext context) \{\
-    return Scaffold(\
-      appBar: AppBar(title: Text("Impression")),\
-      body: Center(\
-        child: ElevatedButton(\
-          onPressed: printReceipt, // Appel de la fonction au clic\
-          child: Text("Imprimer le re\'e7u"),\
-        ),\
-      ),\
-    );\
-  \}\
-\}}
+Future<void> printDirectWeb() async {
+  if (kIsWeb) {
+    try {
+      // Demande l'accès au port série USB du navigateur (Chrome/Edge)
+      // L'utilisateur doit sélectionner son imprimante dans la fenêtre pop-up du navigateur
+      final port = await web.window.navigator.serial.requestPort().toDart;
+      await port.open(baudRate: 9600);
+
+      final writer = port.writable.getWriter();
+      
+      // Commandes ESC/POS de base (Exemple : initialisation + texte + saut de ligne)
+      // Vous pouvez encoder vos octets (bytes) ici pour l'imprimante thermique
+      final data = Uint8List.fromList([0x1B, 0x40, ...'Hello Tibus\n'.codeUnits]);
+      
+      await writer.write(data.toJS).toDart;
+      writer.releaseLock();
+      await port.close().toDart;
+      
+      print("Impression web réussie !");
+    } catch (e) {
+      print("Erreur d'impression web : $e");
+    }
+  } else {
+    // Code mobile natif habituel
+  }
+}
