@@ -38,10 +38,23 @@ if [ ! -d "$HOME/flutter" ]; then);
   // Chrome reste possible, simplement sans notifications push.
   if (!kIsWeb) {
     try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // Pas de .env fourni — valeurs par défaut utilisées.
+  }
+
+  await SupabaseService.init();
+  
+  // Configuration propre des variables d'environnement via dart-define ou fallback
+  final supabaseUrl = String.fromEnvironment('RIDE_SUPABASE_URL', defaultValue: 'https://bjtklpjdsmqmzhncfflu.supabase.co');
+  final supabaseAnonKey = String.fromEnvironment('RIDE_SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ');
+
+  if (!kIsWeb) {
+    try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     } catch (_) {
-      // Pas encore configuré — comportement dégradé attendu, voir README.
+      // Pas encore configuré — comportement dégradé attendu.
     }
   }
 
