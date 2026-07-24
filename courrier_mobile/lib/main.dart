@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,10 +13,8 @@ Future<void> main() async {
     // Pas de .env fourni — valeurs par défaut utilisées.
   }
 
+  // Initialisation propre de Supabase
   await SupabaseService.init();
-  
-  final supabaseUrl = String.fromEnvironment('RIDE_SUPABASE_URL', defaultValue: 'https://bjtklpjdsmqmzhncfflu.supabase.co');
-  final supabaseAnonKey = String.fromEnvironment('RIDE_SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ');
 
   runApp(const ProviderScope(child: CourrierApp()));
 }
