@@ -1,19 +1,21 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
-  static const String _supabaseUrl = String.fromEnvironment('RIDE_SUPABASE_URL');
-  static const String _supabaseAnonKey = String.fromEnvironment('RIDE_SUPABASE_ANON_KEY');
+  static const String _rideSupabaseUrl =
+      String.fromEnvironment('RIDE_SUPABASE_URL');
+  static const String _rideSupabaseAnonKey =
+      String.fromEnvironment('RIDE_SUPABASE_ANON_KEY');
+  static const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String _supabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY');
 
   static SupabaseClient get client => Supabase.instance.client;
 
   static Future<void> initialize() async {
-    final url = _supabaseUrl.isNotEmpty
-        ? _supabaseUrl
-        : dotenv.env['RIDE_SUPABASE_URL'] ?? '';
-    final anonKey = _supabaseAnonKey.isNotEmpty
-        ? _supabaseAnonKey
-        : dotenv.env['RIDE_SUPABASE_ANON_KEY'] ?? '';
+    final url = _rideSupabaseUrl.isNotEmpty ? _rideSupabaseUrl : _supabaseUrl;
+    final anonKey = _rideSupabaseAnonKey.isNotEmpty
+        ? _rideSupabaseAnonKey
+        : _supabaseAnonKey;
 
     if (url.isEmpty || anonKey.isEmpty) {
       throw StateError(
