@@ -296,6 +296,29 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           return FutureBuilder<ColisStats>(
             future: _statsFuture,
             builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                        const SizedBox(height: 8),
+                        Text('Erreur : ${snapshot.error}', textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => _reload(companyId),
+                          child: const Text('Réessayer'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
               final s = snapshot.data!;
               return ListView(
