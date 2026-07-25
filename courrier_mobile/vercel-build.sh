@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+RIDE_SUPABASE_URL="${RIDE_SUPABASE_URL:-${SUPABASE_URL:-}}"
+RIDE_SUPABASE_ANON_KEY="${RIDE_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-}}"
+
+: "${RIDE_SUPABASE_URL:?Set RIDE_SUPABASE_URL or SUPABASE_URL in Vercel Environment Variables}"
+: "${RIDE_SUPABASE_ANON_KEY:?Set RIDE_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY in Vercel Environment Variables}"
+
 cat > .env <<EOF
-RIDE_SUPABASE_URL=${RIDE_SUPABASE_URL:-https://bjtklpjdsmqmzhncfflu.supabase.co}
-RIDE_SUPABASE_ANON_KEY=${RIDE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ}
+RIDE_SUPABASE_URL=${RIDE_SUPABASE_URL}
+RIDE_SUPABASE_ANON_KEY=${RIDE_SUPABASE_ANON_KEY}
 EOF
 
 if [ ! -d "$HOME/flutter" ]; then
@@ -20,7 +26,6 @@ fi
 
 flutter pub get
 
-# Le build web avec les dart-define à la fin
 flutter build web --release \
-  --dart-define=RIDE_SUPABASE_URL=https://bjtklpjdsmqmzhncfflu.supabase.co \
-  --dart-define=RIDE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ
+  --dart-define=RIDE_SUPABASE_URL="$RIDE_SUPABASE_URL" \
+  --dart-define=RIDE_SUPABASE_ANON_KEY="$RIDE_SUPABASE_ANON_KEY"
