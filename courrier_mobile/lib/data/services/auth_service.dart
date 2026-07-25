@@ -150,7 +150,7 @@ class AuthService {
     if (appUserId == null) return [];
 
     final rows = await _client
-        .from('user_roles')
+        .from('UserRoles')
         .select('roleId, companyId, Role(name, scope, level, droits), Companies(name)')
         .eq('userId', appUserId);
 
