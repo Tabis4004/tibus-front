@@ -203,6 +203,31 @@ class GareOption {
       );
 }
 
+/// Montant du JOUR pour une agence (gare) — une ligne de la ventilation
+/// affichée dans le bouton "Détail" de l'accueil agent, voir
+/// get_colis_today_by_gare (migration add_get_colis_today_by_gare) et
+/// ColisService.getColisTodayByGare.
+class GareMontantJour {
+  final String gareId;
+  final String gareName;
+  final int count;
+  final double montant;
+
+  const GareMontantJour({
+    required this.gareId,
+    required this.gareName,
+    required this.count,
+    required this.montant,
+  });
+
+  factory GareMontantJour.fromMap(Map<String, dynamic> map) => GareMontantJour(
+        gareId: map['gareId'] as String? ?? '',
+        gareName: map['gareName'] as String? ?? '',
+        count: (map['count'] as num?)?.toInt() ?? 0,
+        montant: (map['montant'] as num?)?.toDouble() ?? 0,
+      );
+}
+
 /// Agent (vendeur) ayant enregistré au moins un colis pour la compagnie —
 /// alimente le filtre "par agent" de la page Stats (voir
 /// list_company_colis_vendeurs, stats_screen.dart). Inclut le owner s'il

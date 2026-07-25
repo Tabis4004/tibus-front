@@ -7,6 +7,7 @@ import '../../../core/widgets/kpi_card.dart';
 import '../../../core/widgets/colis_card.dart';
 import '../../../data/services/stats_service.dart';
 import '../../../data/models/colis.dart';
+import '../stats/today_by_gare_sheet.dart';
 import '../../../data/models/app_role.dart';
 import '../colis/colis_list_screen.dart';
 import '../colis/colis_scan_screen.dart';
@@ -157,11 +158,9 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: KpiCard(
-                      icon: Icons.payments_outlined,
+                    child: _MontantDuJourCard(
                       value: stats == null ? '—' : '${stats.montantToday.toStringAsFixed(0)} F...',
-                      label: 'Montant du jour',
-                      background: AppColors.primaryGreen,
+                      onDetail: () => showTodayByGareSheet(context, companyId: companyId),
                     ),
                   ),
                 ],
@@ -350,6 +349,53 @@ class _PendingSyncBanner extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Carte "Montant du jour" — même carte KPI que les autres, avec un bouton
+/// "Détail" ajouté au coin bas-droit (demande explicite) : ouvre la
+/// ventilation par agence du jour (voir today_by_gare_sheet.dart), sans
+/// modifier KpiCard (widget partagé par d'autres écrans).
+class _MontantDuJourCard extends StatelessWidget {
+  final String value;
+  final VoidCallback onDetail;
+  const _MontantDuJourCard({required this.value, required this.onDetail});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        KpiCard(
+          icon: Icons.payments_outlined,
+          value: value,
+          label: 'Montant du jour',
+          background: AppColors.primaryGreen,
+        ),
+        Positioned(
+          right: 6,
+          bottom: 6,
+          child: Material(
+            color: Colors.white.withOpacity(0.22),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: onDetail,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Détail', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                    SizedBox(width: 2),
+                    Icon(Icons.chevron_right, color: Colors.white, size: 14),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

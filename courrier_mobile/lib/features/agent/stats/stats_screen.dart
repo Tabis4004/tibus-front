@@ -29,7 +29,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   String? _vendeurName;
   String? _gareId;
   String? _gareName;
-  _PeriodPreset _period = _PeriodPreset.all;
+  // Par défaut, on affiche les ventes du JOUR (demande explicite), pas le
+  // total de toute période — l'agent voit d'abord son activité du jour, et
+  // peut élargir via le filtre "Période" s'il le souhaite.
+  _PeriodPreset _period = _PeriodPreset.today;
   DateTime? _customFrom;
   DateTime? _customTo;
 
@@ -39,7 +42,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   String? _companyId;
   Future<ColisStats>? _statsFuture;
 
-  bool get _hasFilters => _vendeurId != null || _gareId != null || _period != _PeriodPreset.all;
+  // "Aujourd'hui" est désormais la période PAR DÉFAUT (voir _period
+  // ci-dessus) : ce n'est donc plus un filtre "actif" à signaler (pas de
+  // bouton Réinitialiser, pas de badge "Vue filtrée" tant que l'agent n'a
+  // rien changé d'autre).
+  bool get _hasFilters => _vendeurId != null || _gareId != null || _period != _PeriodPreset.today;
 
   DateTime? get _dateFrom {
     final now = DateTime.now();
@@ -131,7 +138,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       _vendeurName = null;
       _gareId = null;
       _gareName = null;
-      _period = _PeriodPreset.all;
+      _period = _PeriodPreset.today;
       _customFrom = null;
       _customTo = null;
     });
@@ -314,7 +321,12 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         ? (s.gareScope ? 'Activité de ma gare' : 'Mon activité uniquement')
                         : _hasFilters
                             ? 'Vue filtrée'
-                            : "Vue d'ensemble (toute la compagnie)",
+                            // "Aujourd'hui" est la période par défaut (plus
+                            // "Toute période") : le libellé doit le refléter,
+                            // sinon "toute la compagnie" laisserait croire à
+                            // tort que le total affiché couvre tout
+                            // l'historique alors qu'il ne couvre que le jour.
+                            : "Vue d'ensemble (toute la compagnie) — $_periodLabel",
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),

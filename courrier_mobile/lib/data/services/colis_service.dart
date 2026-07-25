@@ -161,6 +161,21 @@ class ColisService {
     return (data ?? {}) as Map<String, dynamic>;
   }
 
+  /// Ventilation du montant du JOUR par agence (get_colis_today_by_gare) —
+  /// alimente le bouton "Détail" à côté de la carte "Montant du jour" sur
+  /// l'accueil agent (voir home_screen.dart). Même scoping serveur que
+  /// getColisStats (owner/comptable : toutes les agences ; gérant de gare :
+  /// ses gares uniquement ; rôle simple : sa propre activité).
+  Future<List<GareMontantJour>> getColisTodayByGare(String companyId) async {
+    final data = await _client.rpc('get_colis_today_by_gare', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(GareMontantJour.fromMap)
+        .toList();
+  }
+
   /// Agents ayant enregistré au moins un colis pour cette compagnie — pour
   /// le filtre "par agent" de la page Stats.
   Future<List<ColisVendeur>> listVendeurs(String companyId) async {

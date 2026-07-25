@@ -61,14 +61,15 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
-    // Téléphone du SIÈGE (compagnie) sous le nom de la compagnie, et
-    // téléphone de la gare de DESTINATION juste en dessous. Le téléphone de
-    // la gare de DÉPART est lui affiché plus bas, dans le bloc EXPÉDITEUR
-    // (voir "Tél. agence" ci-dessous, à côté du champ Agence).
-    if (colis.companyPhone.isNotEmpty)
-      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Téléphone de la gare de DESTINATION sous le nom de la compagnie, et
+    // téléphone du SIÈGE (compagnie) juste en dessous (ordre permuté, demande
+    // explicite). Le téléphone de la gare de DÉPART est lui affiché plus
+    // bas, dans le bloc EXPÉDITEUR (voir "Tél. agence" ci-dessous, à côté du
+    // champ Agence).
     if (colis.gareDestinationPhone.isNotEmpty)
       {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    if (colis.companyPhone.isNotEmpty)
+      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     // Colis enregistré hors connexion, pas encore confirmé par le serveur
     // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
@@ -120,25 +121,38 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
 /// petit. Imprimé à la suite du reçu (même envoi), pas à la place — voir
 /// PrinterService.printColisReceiptWithTalon() et équivalents WisePrinter /
 /// ESC-POS.
-List<Map<String, dynamic>> colisTalonLines(Colis colis) {
+/// Partie haute du talon (en-tête + référence encadrée) — s'arrête juste
+/// avant le QR, que les ponts d'impression (WisePrinter, ESC/POS) insèrent
+/// juste après (voir colisTalonBodyLines ci-dessous), pour reproduire
+/// exactement l'aperçu écran : QR en haut, à côté/sous la référence, PAS en
+/// bas du talon.
+List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
   final ref = colisReceiptNumber(colis);
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
-    // Même en-tête que le reçu (voir colisReceiptLines) : téléphone du
-    // siège (compagnie) ET de la gare de destination, puis sous-titre
-    // explicite. Le téléphone de la gare de DÉPART est lui dans le bloc
-    // expédition, plus bas (voir "Agence"/"Tél. agence" ci-dessous).
-    if (colis.companyPhone.isNotEmpty)
-      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Même en-tête que le reçu (voir colisReceiptLines) : téléphone de la
+    // gare de destination puis du siège (compagnie), ordre permuté (demande
+    // explicite, dest en haut). Le téléphone de la gare de DÉPART est lui
+    // dans le bloc expédition, plus bas (voir "Agence"/"Tél. agence" dans
+    // colisTalonBodyLines).
     if (colis.gareDestinationPhone.isNotEmpty)
       {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    if (colis.companyPhone.isNotEmpty)
+      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.isPendingSync)
       {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': '================================', 'align': 'center'},
     {'text': ref, 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '================================', 'align': 'center'},
+  ];
+}
+
+/// Partie basse du talon (destination, montant, destinataire, expéditeur,
+/// agence) — imprimée après le QR (voir colisTalonHeaderLines ci-dessus).
+List<Map<String, dynamic>> colisTalonBodyLines(Colis colis) {
+  return [
     {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true},
     {'text': ''},
@@ -148,9 +162,20 @@ List<Map<String, dynamic>> colisTalonLines(Colis colis) {
     {'text': 'Expéditeur : ${colis.nomExpediteur}', 'size': 'small'},
     {'text': colis.telephoneExpediteur, 'size': 'small'},
     // Bloc expédition : agence de départ + son téléphone (déplacé depuis
-    // l'en-tête, voir plus haut).
+    // l'en-tête, voir colisTalonHeaderLines).
     {'text': 'Agence : ${colis.gareDepart}', 'size': 'small'},
     if (colis.gareDepartPhone.isNotEmpty)
       {'text': 'Tél. agence : ${colis.gareDepartPhone}', 'size': 'small'},
   ];
 }
+
+/// Concaténation header+body SANS QR intercalé — conservée pour les appels
+/// qui ne savent pas insérer le QR entre les deux (ex. pont WisePrinter, où
+/// le QR est fourni à part et positionné par le wrapper natif externe, hors
+/// de ce dépôt). Les ponts qui peuvent contrôler la position (ESC/POS)
+/// utilisent directement colisTalonHeaderLines/colisTalonBodyLines pour
+/// intercaler le QR juste après la référence, en haut du talon.
+List<Map<String, dynamic>> colisTalonLines(Colis colis) => [
+      ...colisTalonHeaderLines(colis),
+      ...colisTalonBodyLines(colis),
+    ];

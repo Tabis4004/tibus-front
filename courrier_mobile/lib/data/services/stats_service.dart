@@ -1,3 +1,4 @@
+import '../models/colis.dart';
 import 'colis_service.dart';
 
 /// Statistiques colis — calculées côté base par get_colis_autonome_stats
@@ -89,5 +90,11 @@ class StatsService {
       dateTo: filter.dateTo,
     );
     return ColisStats.fromMap(data);
+  }
+
+  /// Ventilation du montant du jour par agence — voir bouton "Détail" sur
+  /// l'accueil agent (home_screen.dart).
+  Future<List<GareMontantJour>> todayByGare(String companyId) {
+    return _colisService.getColisTodayByGare(companyId);
   }
 }

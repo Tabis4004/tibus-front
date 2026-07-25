@@ -379,17 +379,17 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  // Téléphone du SIÈGE (compagnie) sous le nom de la
-                  // compagnie, et téléphone de la gare de destination juste
-                  // en dessous. Le téléphone de la gare de DÉPART est lui
-                  // affiché dans le bloc EXPÉDITEUR (voir _Field
-                  // 'Tél. agence' plus bas).
-                  if (colis.companyPhone.isNotEmpty)
-                    Text('Tél siège: ${colis.companyPhone}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  // Téléphone de la gare de DESTINATION sous le nom de la
+                  // compagnie, et téléphone du SIÈGE (compagnie) juste en
+                  // dessous (ordre permuté, demande explicite). Le téléphone
+                  // de la gare de DÉPART est lui affiché dans le bloc
+                  // EXPÉDITEUR (voir _Field 'Tél. agence' plus bas).
                   if (colis.gareDestinationPhone.isNotEmpty)
                     Text('Tél dest: ${colis.gareDestinationPhone}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  if (colis.companyPhone.isNotEmpty)
+                    Text('Tél siège: ${colis.companyPhone}',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
@@ -557,33 +557,43 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            // Même en-tête que le reçu (voir _ReceiptBox) : téléphone du
-            // siège (compagnie) et de la gare de destination, en gras, puis
-            // sous-titre explicite. Le téléphone de la gare de départ est
-            // lui affiché plus bas, dans le bloc expédition.
-            if (colis.companyPhone.isNotEmpty)
-              Text('Tél siège: ${colis.companyPhone}',
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+            // Même en-tête que le reçu (voir _ReceiptBox) : téléphone de la
+            // gare de destination et du siège (compagnie), en gras, ordre
+            // permuté (dest en haut, demande explicite), puis sous-titre
+            // explicite. Le téléphone de la gare de départ est lui affiché
+            // plus bas, dans le bloc expédition.
             if (colis.gareDestinationPhone.isNotEmpty)
               Text('Tél dest: ${colis.gareDestinationPhone}',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+            if (colis.companyPhone.isNotEmpty)
+              Text('Tél siège: ${colis.companyPhone}',
                   style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
             const Text('Reçu expédition colis', style: TextStyle(fontSize: 9)),
             if (colis.isPendingSync)
               const Text('*** PROVISOIRE ***',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
             const SizedBox(height: 6),
+            // Cadre du numéro réduit (flex 2, padding resserré) + QR agrandi
+            // (flex 3, 56 -> 76) — demande explicite. Reste en haut du talon,
+            // exactement comme sur cet aperçu (voir printer_service.dart /
+            // esc_pos_printer_service.dart / P3PrinterModule.kt pour le même
+            // agencement à l'impression réelle).
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
+                  flex: 2,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                     decoration: BoxDecoration(border: Border.all(color: Colors.black45), borderRadius: BorderRadius.circular(4)),
-                    child: Text(ref, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    child: Text(ref, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                 ),
                 const SizedBox(width: 10),
-                QrImageView(data: colis.id, size: 56),
+                Expanded(
+                  flex: 3,
+                  child: Center(child: QrImageView(data: colis.id, size: 76)),
+                ),
               ],
             ),
             const SizedBox(height: 8),

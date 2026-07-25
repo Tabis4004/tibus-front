@@ -80,7 +80,8 @@ class P3PrinterModule(private val ctx: Context) {
         renderUnified(
             normalizeStructured(header, reference, rows, qrContent, footer),
             paperWidth = 32,
-            qrSize = 220
+            // QR agrandi (demande explicite, talon colis) — 220 -> 260.
+            qrSize = 260
         )
     }
 
@@ -95,7 +96,8 @@ class P3PrinterModule(private val ctx: Context) {
         renderUnified(
             normalizeStructured(header, reference, rows, qrContent, footer),
             paperWidth = 48,
-            qrSize = 280
+            // QR agrandi (demande explicite, talon colis) — 280 -> 320.
+            qrSize = 320
         )
     }
 
@@ -166,13 +168,18 @@ class P3PrinterModule(private val ctx: Context) {
         // ---- Header
         printWrappedLine(p, t.company.ifBlank { "TIBUS" },
             PrintOptions(align = "center", size = "large", bold = true), paperWidth)
-        // Téléphones gare de départ + destination sous le nom de la
-        // compagnie, en GRAS (demande explicite).
-        if (t.companyPhone.isNotBlank())
-            printWrappedLine(p, "Tél siège: ${t.companyPhone}",
-                PrintOptions(align = "center", size = "small", bold = true), paperWidth)
+        // Téléphones gare de destination + siège sous le nom de la
+        // compagnie, en GRAS — ordre permuté (dest en haut, demande
+        // explicite). L'ordre réel imprimé est fixé ICI (ces deux blocs),
+        // PAS par l'ordre du header envoyé depuis Dart (voir
+        // normalizeStructured plus bas, qui reconstruit companyPhone/
+        // destinationPhone par reconnaissance de motif quel que soit l'ordre
+        // reçu).
         if (t.destinationPhone.isNotBlank())
             printWrappedLine(p, "Tél dest: ${t.destinationPhone}",
+                PrintOptions(align = "center", size = "small", bold = true), paperWidth)
+        if (t.companyPhone.isNotBlank())
+            printWrappedLine(p, "Tél siège: ${t.companyPhone}",
                 PrintOptions(align = "center", size = "small", bold = true), paperWidth)
         if (t.companyEmail.isNotBlank())
             printWrappedLine(p, t.companyEmail,
@@ -190,6 +197,17 @@ class P3PrinterModule(private val ctx: Context) {
         // reste alignée avec celle des bordures.
         if (t.reference.isNotBlank()) {
             printBoxedLine(p, "N°  ${t.reference}", paperWidth)
+        }
+
+        // ---- QR — juste après la référence, EN HAUT du ticket (pas en bas,
+        // demande explicite pour le talon colis) : reproduit exactement
+        // l'aperçu écran (_TalonBox, colis_receipt_preview_sheet.dart), où
+        // le QR est affiché à côté/juste sous le numéro encadré. Déplacé ici
+        // depuis l'ancien emplacement en fin de ticket (voir plus bas).
+        if (t.qr.isNotBlank()) {
+            blank(p, 8)
+            checkCode("printQRCode", p.printQRCode(t.qr, qrSize, Printer.Align.CENTER))
+            blank(p, 8)
         }
 
         // ---- Passenger block
@@ -252,12 +270,6 @@ class P3PrinterModule(private val ctx: Context) {
             printWrappedLine(p, t.total,
                 PrintOptions(bold = true, size = "large", align = "center"), paperWidth)
             separator(p, paperWidth)
-        }
-
-        // ---- QR
-        if (t.qr.isNotBlank()) {
-            blank(p)
-            checkCode("printQRCode", p.printQRCode(t.qr, qrSize, Printer.Align.CENTER))
         }
 
         // ---- Footer
@@ -1227,11 +1239,14 @@ class P3PrinterModule(private val ctx: Context) {
         printWrappedLine(p, "-".repeat(width.coerceIn(24, 56)), PrintOptions(), width)
     }
 
-    /** Cadre ASCII (+---+ / | texte | / +---+) autour d'une ligne, taille
-     * normale pour que le texte et les bordures restent alignés en largeur. */
+    /** Cadre ASCII (+---+ / | texte | / +---+) autour d'une ligne — resserré
+     * autour du TEXTE (pas toute la largeur du papier, demande explicite :
+     * "réduire le cadre du numéro de colis") plutôt que pleine largeur. Le
+     * texte reste centré sur `width` comme avant, seule la bordure rétrécit. */
     private fun printBoxedLine(p: Printer, text: String, width: Int) {
-        val w = width.coerceIn(24, 56)
-        val border = "+" + "-".repeat(w - 2) + "+"
+        val maxW = width.coerceIn(24, 56)
+        val boxWidth = (text.length + 4).coerceIn(12, maxW)
+        val border = "+" + "-".repeat(boxWidth - 2) + "+"
         printWrappedLine(p, border, PrintOptions(align = "center"), width)
         // Référence en "medium" (26 pts, +2 vs normal) — demande explicite ;
         // le texte est centré sans barres latérales, pas de désalignement.

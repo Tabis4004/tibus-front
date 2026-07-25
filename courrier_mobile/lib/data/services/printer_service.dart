@@ -121,12 +121,15 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        // Téléphone du SIÈGE (compagnie) sous le nom de la compagnie, et
-        // téléphone de la gare de DESTINATION juste en dessous — le
-        // téléphone de la gare de DÉPART est lui affiché dans le bloc
-        // EXPÉDITEUR ci-dessous (voir rows, ligne "Tél. agence").
-        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
+        // Téléphone de la gare de DESTINATION sous le nom de la compagnie,
+        // et téléphone du SIÈGE (compagnie) juste en dessous (ordre permuté,
+        // demande explicite) — le téléphone de la gare de DÉPART est lui
+        // affiché dans le bloc EXPÉDITEUR ci-dessous (voir rows, ligne
+        // "Tél. agence"). NB : l'ordre d'affichage réel sur le pont P3 natif
+        // est fixé côté Kotlin (renderUnified, P3PrinterModule.kt), pas par
+        // l'ordre de ce tableau — les deux ont été permutés ensemble.
         if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
+        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
         // Sous-titre EXPLICITE : sans lui, le module P3 natif retombe sur
         // « Ticket » par défaut (normalizeStructured, P3PrinterModule.kt).
         'Reçu expédition colis',
@@ -174,13 +177,14 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        // Même en-tête que le reçu (voir printColisReceipt) : téléphone du
-        // siège (compagnie) ET de la gare de destination, puis sous-titre
-        // explicite — sans lui, le module P3 natif retombe sur « Ticket ».
-        // Le téléphone de la gare de départ est lui dans le bloc expédition
-        // ci-dessous (ligne "Tél. agence").
-        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
+        // Même en-tête que le reçu (voir printColisReceipt) : téléphone de
+        // la gare de destination ET du siège (compagnie), ordre permuté
+        // (dest en haut, demande explicite), puis sous-titre explicite —
+        // sans lui, le module P3 natif retombe sur « Ticket ». Le téléphone
+        // de la gare de départ est lui dans le bloc expédition ci-dessous
+        // (ligne "Tél. agence").
         if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
+        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
         'Reçu expédition colis',
       ],
       reference: colisReceiptNumber(colis),
@@ -448,7 +452,10 @@ class PrinterService {
       header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
       lines: colisTalonLines(colis),
       qr: colis.id,
-      qrSize: 220,
+      // QR agrandi sur le talon (demande explicite) — la POSITION du QR sur
+      // ce pont est décidée par le wrapper natif externe (window.WisePrinter,
+      // hors de ce dépôt) : on ne peut agir ici que sur sa taille.
+      qrSize: 280,
       feedLines: 3,
       cut: true,
     );

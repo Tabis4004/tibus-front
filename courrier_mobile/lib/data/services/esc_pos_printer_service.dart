@@ -114,9 +114,15 @@ class EscPosPrinterService {
   }) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(paperSize, profile);
-    final bytes = _renderLines(generator, colisTalonLines(colis));
+    // QR juste après la référence encadrée — EN HAUT du talon, pas en bas
+    // (demande explicite) — même agencement que l'aperçu écran (_TalonBox,
+    // colis_receipt_preview_sheet.dart). Taille agrandie (size6 vs le size4
+    // par défaut) pour un scan plus rapide.
+    final bytes = _renderLines(generator, colisTalonHeaderLines(colis));
     bytes.addAll(generator.feed(1));
-    bytes.addAll(generator.qrcode(colis.id));
+    bytes.addAll(generator.qrcode(colis.id, size: QRSize.size6));
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(_renderLines(generator, colisTalonBodyLines(colis)));
     bytes.addAll(generator.feed(3));
     bytes.addAll(generator.cut());
 
