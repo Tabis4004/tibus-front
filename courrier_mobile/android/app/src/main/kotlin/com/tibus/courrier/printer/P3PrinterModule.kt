@@ -80,8 +80,10 @@ class P3PrinterModule(private val ctx: Context) {
         renderUnified(
             normalizeStructured(header, reference, rows, qrContent, footer),
             paperWidth = 32,
-            // QR agrandi (demande explicite, talon colis) — 220 -> 260.
-            qrSize = 260
+            // QR compact (demande explicite) — 260 -> 140 : un gros QR
+            // n'était pas le format voulu ; l'étiquette de référence a un
+            // petit QR à côté du numéro, pas un QR qui domine le talon.
+            qrSize = 140
         )
     }
 
@@ -96,8 +98,8 @@ class P3PrinterModule(private val ctx: Context) {
         renderUnified(
             normalizeStructured(header, reference, rows, qrContent, footer),
             paperWidth = 48,
-            // QR agrandi (demande explicite, talon colis) — 280 -> 320.
-            qrSize = 320
+            // QR compact (demande explicite) — 320 -> 180.
+            qrSize = 180
         )
     }
 

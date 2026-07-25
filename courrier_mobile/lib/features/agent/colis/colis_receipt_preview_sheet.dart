@@ -590,27 +590,26 @@ class _TalonBox extends StatelessWidget {
               const Text('*** PROVISOIRE ***',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
             const SizedBox(height: 6),
-            // Cadre du numéro réduit (flex 2, padding resserré) + QR agrandi
-            // (flex 3, 56 -> 76) — demande explicite. Reste en haut du talon,
-            // exactement comme sur cet aperçu (voir printer_service.dart /
-            // esc_pos_printer_service.dart / P3PrinterModule.kt pour le même
-            // agencement à l'impression réelle).
+            // Cadre du numéro (flex 3) + QR COMPACT (flex 1, taille fixe
+            // 44px) — demande explicite : un gros QR n'est pas le format
+            // voulu, l'étiquette de référence a un petit QR à côté du
+            // numéro. Reste en haut du talon, exactement comme sur cet
+            // aperçu (voir printer_service.dart / esc_pos_printer_service.dart
+            // / P3PrinterModule.kt / colis_receipt_pdf.dart pour le même
+            // agencement compact à l'impression réelle).
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                     decoration: BoxDecoration(border: Border.all(color: Colors.black45), borderRadius: BorderRadius.circular(4)),
                     child: Text(ref, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 3,
-                  child: Center(child: QrImageView(data: colis.id, size: 76)),
-                ),
+                const SizedBox(width: 8),
+                QrImageView(data: colis.id, size: 44),
               ],
             ),
             const SizedBox(height: 8),

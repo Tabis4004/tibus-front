@@ -33,19 +33,10 @@ Future<Uint8List> buildColisReceiptThermalPdf(
   }
 
   if (includeTalon) {
-    final lines = [
-      ...colisTalonHeaderLines(colis),
-      {'text': '', 'align': 'center'},
-      ...colisTalonBodyLines(colis),
-    ];
     doc.addPage(
       pw.Page(
-        pageFormat: _pageFormat(lines, hasQr: true),
-        build: (_) => _ticket(
-          title: 'TALON COLIS',
-          lines: lines,
-          qr: colis.id,
-        ),
+        pageFormat: _talonPageFormat(colis),
+        build: (_) => _talonTicket(colis),
       ),
     );
   }
@@ -53,13 +44,94 @@ Future<Uint8List> buildColisReceiptThermalPdf(
   return doc.save();
 }
 
-PdfPageFormat _pageFormat(List<Map<String, dynamic>> lines, {bool hasQr = false}) {
+/// Page du TALON — hauteur resserrée : un talon "encombré" gaspille du
+/// papier (demande explicite : le format doit tenir sur environ la moitié
+/// de ce qui était généré avant). Estimation basée sur le nombre de lignes
+/// réelles du talon (header + body), sans le forfait "+48mm QR" de l'ancien
+/// calcul générique — le QR est désormais petit et intégré à la ligne de la
+/// référence, il n'ajoute presque plus de hauteur.
+PdfPageFormat _talonPageFormat(Colis colis) {
+  final bodyLines = colisTalonBodyLines(colis).length;
+  final headerLines = colisTalonHeaderLines(colis).length;
+  final heightMm = 34 + (headerLines * 4.5) + (bodyLines * 4.5);
+  return PdfPageFormat(
+    80 * PdfPageFormat.mm,
+    heightMm.clamp(70, 200).toDouble() * PdfPageFormat.mm,
+    marginTop: 3 * PdfPageFormat.mm,
+    marginBottom: 3 * PdfPageFormat.mm,
+    marginLeft: 4 * PdfPageFormat.mm,
+    marginRight: 4 * PdfPageFormat.mm,
+  );
+}
+
+/// Talon compact — même agencement que l'étiquette de référence collée sur
+/// le colis (voir capture partagée) : en-tête, puis la RÉFÉRENCE et un petit
+/// QR côte à côte sur la même ligne (pas un gros QR séparé en fin de
+/// document), puis destination/montant/destinataire/expéditeur en dessous.
+pw.Widget _talonTicket(Colis colis) {
+  final ref = colisReceiptNumber(colis);
+  // La référence ET les séparateurs "====" qui l'encadraient sont retirés
+  // du header : la référence est réintégrée juste en dessous, à côté du QR
+  // (voir Row plus bas), pas en pleine largeur avec des séparateurs autour.
+  final headerLines = colisTalonHeaderLines(colis)
+      .where((l) => l['text'] != ref && l['text'] != '================================')
+      .toList();
+
+  return pw.Container(
+    width: double.infinity,
+    decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.8)),
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Text(
+          'TALON COLIS',
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 4),
+        pw.Divider(height: 8, thickness: 0.6),
+        for (final line in headerLines) _line(line),
+        pw.SizedBox(height: 3),
+        // Référence + QR compact, côte à côte — comme sur l'étiquette de
+        // référence (numéro à gauche dans un petit cadre, QR à droite).
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Expanded(
+              child: pw.Container(
+                padding: const pw.EdgeInsets.symmetric(vertical: 3, horizontal: 2),
+                decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.6)),
+                child: pw.Text(
+                  ref,
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+            ),
+            pw.SizedBox(width: 6),
+            pw.BarcodeWidget(
+              barcode: Barcode.qrCode(),
+              data: colis.id,
+              width: 18 * PdfPageFormat.mm,
+              height: 18 * PdfPageFormat.mm,
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 3),
+        for (final line in colisTalonBodyLines(colis)) _line(line),
+      ],
+    ),
+  );
+}
+
+PdfPageFormat _pageFormat(List<Map<String, dynamic>> lines) {
   final lineHeightMm = lines.fold<double>(0, (total, line) {
     final size = line['size'] as String?;
     if (((line['text'] as String?) ?? '').isEmpty) return total + 3;
     return total + (size == 'large' ? 8 : size == 'small' ? 4 : 5);
   });
-  final heightMm = 28 + lineHeightMm + (hasQr ? 48 : 0);
+  final heightMm = 28 + lineHeightMm;
   return PdfPageFormat(
     80 * PdfPageFormat.mm,
     heightMm.clamp(120, 500).toDouble() * PdfPageFormat.mm,
@@ -73,7 +145,6 @@ PdfPageFormat _pageFormat(List<Map<String, dynamic>> lines, {bool hasQr = false}
 pw.Widget _ticket({
   required String title,
   required List<Map<String, dynamic>> lines,
-  String? qr,
 }) {
   return pw.Container(
     width: double.infinity,
@@ -90,17 +161,6 @@ pw.Widget _ticket({
         pw.SizedBox(height: 4),
         pw.Divider(height: 8, thickness: 0.6),
         for (final line in lines) _line(line),
-        if (qr != null && qr.isNotEmpty) ...[
-          pw.SizedBox(height: 8),
-          pw.Center(
-            child: pw.BarcodeWidget(
-              barcode: Barcode.qrCode(),
-              data: qr,
-              width: 42 * PdfPageFormat.mm,
-              height: 42 * PdfPageFormat.mm,
-            ),
-          ),
-        ],
       ],
     ),
   );

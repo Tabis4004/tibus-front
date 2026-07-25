@@ -146,24 +146,27 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
             future: _statsFuture,
             builder: (context, snapshot) {
               final stats = snapshot.data;
-              return Row(
-                children: [
-                  Expanded(
-                    child: KpiCard(
-                      icon: Icons.local_shipping_outlined,
-                      value: '${stats?.today ?? '—'}',
-                      label: "Aujourd'hui",
-                      background: AppColors.accentRed,
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: KpiCard(
+                        icon: Icons.local_shipping_outlined,
+                        value: '${stats?.today ?? '—'}',
+                        label: "Aujourd'hui",
+                        background: AppColors.accentRed,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _MontantDuJourCard(
-                      value: stats == null ? '—' : '${stats.montantToday.toStringAsFixed(0)} F...',
-                      onDetail: () => showTodayByGareSheet(context, companyId: companyId),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _MontantDuJourCard(
+                        value: stats == null ? '—' : '${stats.montantToday.toStringAsFixed(0)} FCFA',
+                        onDetail: () => showTodayByGareSheet(context, companyId: companyId),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           ),
@@ -353,10 +356,11 @@ class _PendingSyncBanner extends ConsumerWidget {
   }
 }
 
-/// Carte "Montant du jour" — même carte KPI que les autres, avec un bouton
-/// "Détail" ajouté au coin bas-droit (demande explicite) : ouvre la
-/// ventilation par agence du jour (voir today_by_gare_sheet.dart), sans
-/// modifier KpiCard (widget partagé par d'autres écrans).
+/// Carte "Montant du jour" — même habillage que KpiCard (icône, valeur,
+/// libellé), mais avec un bouton "Détail" intégré EN BAS de la carte (dans
+/// le flux normal, pas en Positioned par-dessus, pour ne jamais chevaucher
+/// le libellé — c'est ce qui causait le rendu cassé sur le web) : ouvre la
+/// ventilation par agence du jour (voir today_by_gare_sheet.dart).
 class _MontantDuJourCard extends StatelessWidget {
   final String value;
   final VoidCallback onDetail;
@@ -364,38 +368,67 @@ class _MontantDuJourCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        KpiCard(
-          icon: Icons.payments_outlined,
-          value: value,
-          label: 'Montant du jour',
-          background: AppColors.primaryGreen,
-        ),
-        Positioned(
-          right: 6,
-          bottom: 6,
-          child: Material(
-            color: Colors.white.withOpacity(0.22),
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: AppColors.primaryGreen,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.payments_outlined, color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 16),
+          // FittedBox plutôt qu'un Text seul : la valeur RÉTRÉCIT si elle est
+          // trop longue pour tenir sur une ligne (montants à 6-7 chiffres),
+          // au lieu de déborder/se faire couper par le conteneur — ni sur
+          // mobile (carte étroite) ni sur web (carte souvent plus large).
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text('Montant du jour', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          // Bouton "Détail" dans le flux (pas en overlay) : la carte grandit
+          // pour lui faire de la place, il ne peut donc plus chevaucher le
+          // libellé au-dessus.
+          Align(
+            alignment: Alignment.centerRight,
+            child: Material(
+              color: Colors.white.withOpacity(0.18),
               borderRadius: BorderRadius.circular(8),
-              onTap: onDetail,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Détail', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                    SizedBox(width: 2),
-                    Icon(Icons.chevron_right, color: Colors.white, size: 14),
-                  ],
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onDetail,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Détail', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                      SizedBox(width: 2),
+                      Icon(Icons.chevron_right, color: Colors.white, size: 14),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
