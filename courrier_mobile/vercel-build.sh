@@ -16,12 +16,48 @@ if [ ! -d "$HOME/flutter" ]; then
 fi
 export PATH="$PATH:$HOME/flutter/bin"
 
+install_web_branding() {
+  local icon="assets/icons/ICONE-01.png"
+  local manifest="branding/webassets/manifest.json"
+  if [ ! -f "$icon" ]; then
+    echo "Missing web icon asset: $icon" >&2
+    return 1
+  fi
+  mkdir -p web/icons
+  cp "$icon" web/favicon.png
+  cp "$icon" web/icons/Icon-192.png
+  cp "$icon" web/icons/Icon-512.png
+  cp "$icon" web/icons/Icon-maskable-192.png
+  cp "$icon" web/icons/Icon-maskable-512.png
+  if [ -f "$manifest" ]; then
+    cp "$manifest" web/manifest.json
+  fi
+  python3 - <<'PY_BRANDING'
+from pathlib import Path
+path = Path('web/index.html')
+if not path.exists():
+    raise SystemExit(0)
+text = path.read_text()
+text = text.replace('<title>courrier_mobile</title>', '<title>Courrier</title>')
+text = text.replace('<meta name="theme-color" content="#0175C2">', '<meta name="theme-color" content="#2E7D32">')
+if 'rel="apple-touch-icon"' not in text and '<link rel="icon"' in text:
+    text = text.replace(
+        '<link rel="icon" type="image/png" href="favicon.png"/>',
+        '<link rel="icon" type="image/png" href="favicon.png"/>\n  <link rel="apple-touch-icon" href="icons/Icon-192.png"/>'
+    )
+path.write_text(text)
+PY_BRANDING
+}
+
+
 flutter config --enable-web --no-analytics
 flutter doctor -v || true
 
 if [ ! -d "web" ]; then
   flutter create . --platforms=web --project-name courrier_mobile --org com.tibus
 fi
+
+install_web_branding
 
 flutter pub get
 
