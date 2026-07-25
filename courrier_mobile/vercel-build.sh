@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cat > .env <<EOF
-RIDE_SUPABASE_URL=${RIDE_SUPABASE_URL:-https://bjtklpjdsmqmzhncfflu.supabase.co}
-RIDE_SUPABASE_ANON_KEY=${RIDE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ}
-EOF
+# NB : ce projet (courrier_mobile) initialise Supabase directement en dur
+# dans lib/main.dart (projet "courrier", kqudaqtydimjclwaihqr) — pas besoin
+# de fichier .env ni de --dart-define ici. Les anciennes variables
+# RIDE_SUPABASE_* (copiées par erreur depuis l'app VTC courrier_livreur/
+# courrier_client) ont été retirées : elles ne servaient à rien pour cette
+# app et ne faisaient qu'entretenir la confusion dans les logs de build.
 
 if [ ! -d "$HOME/flutter" ]; then
   git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$HOME/flutter"
@@ -20,7 +22,4 @@ fi
 
 flutter pub get
 
-# Le build web avec les dart-define à la fin
-flutter build web --release \
-  --dart-define=RIDE_SUPABASE_URL=https://bjtklpjdsmqmzhncfflu.supabase.co \
-  --dart-define=RIDE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ
+flutter build web --release
