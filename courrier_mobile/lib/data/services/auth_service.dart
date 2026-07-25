@@ -110,7 +110,7 @@ class AuthService {
 
     final travelerRole = await _client.from('Role').select('id').eq('name', 'traveler').single();
 
-    await _client.from('userRoles').insert({
+    await _client.from('UserRoles').insert({
       'userId': profile['id'],
       'roleId': travelerRole['id'],
       'companyId': null,
