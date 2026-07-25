@@ -44,9 +44,28 @@ fi
 
 # Copie forcée des assets de branding par-dessus le dossier web
 if [ -d "branding/webassets" ]; then
+  mkdir -p web/icons
   cp -f branding/webassets/favicon.png web/favicon.png 2>/dev/null || true
   cp -f branding/webassets/favicon.svg web/favicon.svg 2>/dev/null || true
   cp -f branding/webassets/manifest.json web/manifest.json 2>/dev/null || true
+  cp -f branding/webassets/favicon.png web/icons/Icon-192.png 2>/dev/null || true
+  cp -f branding/webassets/favicon.png web/icons/Icon-512.png 2>/dev/null || true
+  cp -f branding/webassets/favicon.png web/icons/Icon-maskable-192.png 2>/dev/null || true
+  cp -f branding/webassets/favicon.png web/icons/Icon-maskable-512.png 2>/dev/null || true
+  python3 - <<'PY_BRANDING'
+from pathlib import Path
+path = Path('web/index.html')
+if path.exists():
+    text = path.read_text()
+    text = text.replace('<title>courrier_livreur</title>', '<title>Tibus Livraison</title>')
+    text = text.replace('<title>courrier livreur</title>', '<title>Tibus Livraison</title>')
+    if 'rel="apple-touch-icon"' not in text and '<link rel="icon"' in text:
+        text = text.replace(
+            '<link rel="icon" type="image/png" href="favicon.png"/>',
+            '<link rel="icon" type="image/png" href="favicon.png"/>\n  <link rel="apple-touch-icon" href="icons/Icon-192.png"/>'
+        )
+    path.write_text(text)
+PY_BRANDING
 fi
 
 flutter pub get
