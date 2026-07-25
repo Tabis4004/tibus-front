@@ -34,10 +34,13 @@ if path.exists():
     text = path.read_text()
     text = text.replace('<title>courrier_client</title>', '<title>Courrier Client</title>')
     text = text.replace('<title>courrier client</title>', '<title>Courrier Client</title>')
+    text = text.replace('href="favicon.png"', 'href="favicon.png?v=courrier-client-v2"')
+    text = text.replace('href="manifest.json"', 'href="manifest.json?v=courrier-client-v2"')
+    text = text.replace('href="icons/Icon-192.png"', 'href="icons/Icon-192.png?v=courrier-client-v2"')
     if 'rel="apple-touch-icon"' not in text and '<link rel="icon"' in text:
         text = text.replace(
-            '<link rel="icon" type="image/png" href="favicon.png"/>',
-            '<link rel="icon" type="image/png" href="favicon.png"/>\n  <link rel="apple-touch-icon" href="icons/Icon-192.png"/>'
+            '<link rel="icon" type="image/png" href="favicon.png?v=courrier-client-v2"/>',
+            '<link rel="icon" type="image/png" href="favicon.png?v=courrier-client-v2"/>\n  <link rel="apple-touch-icon" href="icons/Icon-192.png?v=courrier-client-v2"/>'
         )
     path.write_text(text)
 PY_BRANDING
