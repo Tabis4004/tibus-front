@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/providers.dart';
+import '../../../core/config/colis_ui_config.dart';
 import '../../../core/utils/connectivity.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/models/pending_colis.dart';
@@ -37,6 +38,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   final _pourcentagePercu = TextEditingController();
   bool _submitting = false;
   bool _montantAuto = false;
+  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
 
   bool _loadingRefs = true;
   String? _refsError;
@@ -131,6 +133,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       final natures = results[1] as List<ColisNature>;
       final activeNatures = natures.where((n) => n.isActive).toList();
       final settings = results[2] as Map<String, dynamic>;
+      final uiConfig = ColisUiConfig.fromSettings(settings);
       final defaultPct = (settings['colisPourcentagePercuGeneral'] as num?)?.toDouble();
       // Alimente le cache hors-ligne pour la prochaine fois que le réseau
       // sera indisponible (voir ReferenceCacheService, branche catch
@@ -145,6 +148,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         _gares = gares;
         _natures = activeNatures;
         _openCash = openCash;
+        _uiConfig = uiConfig;
         _offline = false;
         if (defaultPct != null && _pourcentagePercu.text.isEmpty) {
           _pourcentagePercu.text = defaultPct.toString();
@@ -296,12 +300,16 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       telephoneExpediteur: _telExp.text.trim(),
       nomDestinataire: _nomDest.text.trim(),
       telephoneDestinataire: _telDest.text.trim(),
-      descriptionContenu: _description.text.trim().isEmpty ? null : _description.text.trim(),
-      poidsKg: double.tryParse(_poids.text),
-      nombrePieces: int.tryParse(_pieces.text) ?? 1,
+      descriptionContenu: _uiConfig.showFormField('description') && _description.text.trim().isNotEmpty
+          ? _description.text.trim()
+          : null,
+      poidsKg: _uiConfig.showFormField('poids') ? double.tryParse(_poids.text) : null,
+      nombrePieces: _uiConfig.showFormField('pieces') ? (int.tryParse(_pieces.text) ?? 1) : 1,
       montantFret: montant,
       valeurMarchandise: valeur,
-      pourcentagePercu: _montantAuto ? double.tryParse(_pourcentagePercu.text) : null,
+      pourcentagePercu: _uiConfig.showFormField('pourcentagePercu') && _montantAuto
+          ? double.tryParse(_pourcentagePercu.text)
+          : null,
       natureIds: [_selectedNatureId!],
     );
     setState(() => _submitting = true);
@@ -322,7 +330,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
               companyId: companyId,
             ));
         String? photoPath;
-        if (_photoBytes != null) {
+        if (_uiConfig.showFormField('photo') && _photoBytes != null) {
           // Best-effort : un échec d'upload de la photo ne doit jamais bloquer
           // l'enregistrement du colis (déjà créé et payé à ce stade) ni
           // empêcher l'aperçu/impression du reçu.
@@ -570,16 +578,22 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                   validator: (v) => v == null ? 'Champ requis' : null,
                 ),
                 const SizedBox(height: 10),
-                TextFormField(controller: _description, decoration: const InputDecoration(labelText: 'Description du contenu')),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextFormField(controller: _poids, decoration: const InputDecoration(labelText: 'Poids (kg)'), keyboardType: TextInputType.number)),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextFormField(controller: _pieces, decoration: const InputDecoration(labelText: 'Nombre de pièces'), keyboardType: TextInputType.number)),
-                  ],
-                ),
-                const SizedBox(height: 10),
+                if (_uiConfig.showFormField('description')) ...[
+                  TextFormField(controller: _description, decoration: const InputDecoration(labelText: 'Description du contenu')),
+                  const SizedBox(height: 10),
+                ],
+                if (_uiConfig.showFormField('poids') || _uiConfig.showFormField('pieces')) ...[
+                  Row(
+                    children: [
+                      if (_uiConfig.showFormField('poids'))
+                        Expanded(child: TextFormField(controller: _poids, decoration: const InputDecoration(labelText: 'Poids (kg)'), keyboardType: TextInputType.number)),
+                      if (_uiConfig.showFormField('poids') && _uiConfig.showFormField('pieces')) const SizedBox(width: 10),
+                      if (_uiConfig.showFormField('pieces'))
+                        Expanded(child: TextFormField(controller: _pieces, decoration: const InputDecoration(labelText: 'Nombre de pièces'), keyboardType: TextInputType.number)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 TextFormField(
                   controller: _valeurMarchandise,
                   decoration: const InputDecoration(
@@ -597,17 +611,18 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Calcul automatique du montant fret'),
-                          subtitle: const Text('Montant fret = pourcentage perçu × valeur marchandise'),
-                          value: _montantAuto,
-                          onChanged: (v) => setState(() {
-                            _montantAuto = v;
-                            _recomputeMontantIfAuto();
-                          }),
-                        ),
-                        if (_montantAuto) ...[
+                        if (_uiConfig.showFormField('pourcentagePercu'))
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Calcul automatique du montant fret'),
+                            subtitle: const Text('Montant fret = pourcentage perçu × valeur marchandise'),
+                            value: _montantAuto,
+                            onChanged: (v) => setState(() {
+                              _montantAuto = v;
+                              _recomputeMontantIfAuto();
+                            }),
+                          ),
+                        if (_uiConfig.showFormField('pourcentagePercu') && _montantAuto) ...[
                           TextFormField(
                             controller: _pourcentagePercu,
                             decoration: const InputDecoration(labelText: 'Pourcentage perçu (%)'),
@@ -634,46 +649,48 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text('Photo du colis (optionnel)', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text(
-                  'Consultable sur le détail du colis — non imprimée sur le reçu.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                if (_photoBytes != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(_photoBytes!, height: 160, fit: BoxFit.cover),
+                if (_uiConfig.showFormField('photo')) ...[
+                  const SizedBox(height: 20),
+                  const Text('Photo du colis (optionnel)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Consultable sur le détail du colis — non imprimée sur le reçu.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
-                ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _pickPhoto(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                        label: const Text('Prendre une photo'),
-                      ),
+                  if (_photoBytes != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(_photoBytes!, height: 160, fit: BoxFit.cover),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _pickPhoto(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library_outlined, size: 18),
-                        label: const Text('Galerie'),
-                      ),
-                    ),
-                    if (_photoBytes != null)
-                      IconButton(
-                        tooltip: 'Retirer la photo',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => setState(() => _photoBytes = null),
-                      ),
+                    const SizedBox(height: 8),
                   ],
-                ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _pickPhoto(ImageSource.camera),
+                          icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                          label: const Text('Prendre une photo'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _pickPhoto(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_outlined, size: 18),
+                          label: const Text('Galerie'),
+                        ),
+                      ),
+                      if (_photoBytes != null)
+                        IconButton(
+                          tooltip: 'Retirer la photo',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setState(() => _photoBytes = null),
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 24),
                 ElevatedButton(
                   // _companyId (dérivé de la caisse ouverte) prioritaire sur

@@ -4,13 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers.dart';
 import '../../../core/utils/colis_receipt_lines.dart';
+import '../../../core/utils/colis_receipt_pdf.dart';
 import '../../../core/utils/sms.dart';
 import '../../../data/models/colis.dart';
-import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
+import '../../../data/services/printer_service.dart' show EscPosPrinterService, PrinterDevice, PrinterType;
 
 /// Message texte de partage du reçu (SMS) — même contenu informatif que le
 /// reçu papier, pour envoi manuel à l'expéditeur ou au destinataire (voir
@@ -254,9 +256,14 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                     await printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName);
                     return;
                   }
-                  final ok = printer.printColisReceiptBrowser(wide: true);
-                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
-                }, successMessage: 'Impression envoyée (80 mm).'),
+                  await Printing.layoutPdf(
+                    onLayout: (_) => buildColisReceiptThermalPdf(
+                      colis,
+                      agentName: agentName,
+                    ),
+                    name: 'recu_${colisReceiptNumber(colis)}_80mm.pdf',
+                  );
+                }, successMessage: 'Document 80 mm prêt à imprimer.'),
               ),
               const SizedBox(height: 8),
               _PrinterButton(
@@ -628,9 +635,11 @@ class _TalonBox extends StatelessWidget {
 
 /// Sélecteur d'imprimante USB/Bluetooth réelle (Xprinter XP-Q200, Mini
 /// Printer MPT-II…) : scan, tap sur un appareil trouvé -> connexion +
-/// impression directe (reçu + talon). Pont dédié
+/// impression directe, avec choix explicite reçu + talon / reçu seul / talon seul. Pont dédié
 /// (esc_pos_printer_service.dart), distinct de la P3 intégrée et du pont
 /// desktop WisePrinter ci-dessus.
+enum _EscPosPrintJob { receiptAndTalon, receiptOnly, talonOnly }
+
 class _EscPosPrinterSheet extends ConsumerStatefulWidget {
   final Colis colis;
   final String? agentName;
@@ -649,6 +658,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
   bool _scanningBt = false;
   bool _busy = false;
   String? _error;
+  _EscPosPrintJob _job = _EscPosPrintJob.receiptAndTalon;
 
   @override
   void initState() {
@@ -684,11 +694,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
     final escPos = ref.read(printerServiceProvider).escPos;
     try {
       await escPos.connectNetwork(ip);
-      await escPos.printColisReceiptWithTalon(
-        widget.colis,
-        type: PrinterType.network,
-        agentName: widget.agentName,
-      );
+      await _printEscPos(escPos, PrinterType.network);
       await escPos.saveNetworkIp(ip);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -754,6 +760,25 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
     });
   }
 
+  Future<void> _printEscPos(EscPosPrinterService escPos, PrinterType type) {
+    switch (_job) {
+      case _EscPosPrintJob.receiptAndTalon:
+        return escPos.printColisReceiptWithTalon(
+          widget.colis,
+          type: type,
+          agentName: widget.agentName,
+        );
+      case _EscPosPrintJob.receiptOnly:
+        return escPos.printColisReceipt(
+          widget.colis,
+          type: type,
+          agentName: widget.agentName,
+        );
+      case _EscPosPrintJob.talonOnly:
+        return escPos.printColisTalon(widget.colis, type: type);
+    }
+  }
+
   Future<void> _printOn(PrinterDevice device, PrinterType type) async {
     if (_busy) return;
     setState(() {
@@ -767,7 +792,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
       } else {
         await escPos.connectBluetooth(device);
       }
-      await escPos.printColisReceiptWithTalon(widget.colis, type: type, agentName: widget.agentName);
+      await _printEscPos(escPos, type);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => _error = 'Impression impossible : $e');
@@ -824,6 +849,30 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
             ],
             const SizedBox(height: 8),
+            const Text('Document à imprimer', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            SegmentedButton<_EscPosPrintJob>(
+              segments: const [
+                ButtonSegment(
+                  value: _EscPosPrintJob.receiptAndTalon,
+                  label: Text('Reçu + talon'),
+                  icon: Icon(Icons.receipt_long, size: 16),
+                ),
+                ButtonSegment(
+                  value: _EscPosPrintJob.receiptOnly,
+                  label: Text('Reçu'),
+                  icon: Icon(Icons.receipt_long_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: _EscPosPrintJob.talonOnly,
+                  label: Text('Talon'),
+                  icon: Icon(Icons.label_outline, size: 16),
+                ),
+              ],
+              selected: {_job},
+              onSelectionChanged: _busy ? null : (values) => setState(() => _job = values.first),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 const Expanded(
@@ -888,7 +937,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
                       ? const SizedBox(
                           width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.wifi, size: 18),
-                  label: const Text('Imprimer'),
+                  label: Text(_job == _EscPosPrintJob.receiptOnly ? 'Reçu' : _job == _EscPosPrintJob.talonOnly ? 'Talon' : 'Imprimer'),
                 ),
               ],
             ),

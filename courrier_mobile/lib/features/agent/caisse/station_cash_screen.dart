@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/providers.dart';
+import '../../../core/config/colis_ui_config.dart';
 import '../../../data/models/colis.dart';
 import '../stats/colis_sales_journal_print_sheet.dart';
 
@@ -34,6 +35,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
   String? _selectedGareId;
   OpenStationCash? _cash;
   List<StationCashMovement> _movements = [];
+  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
 
   @override
   void initState() {
@@ -65,6 +67,10 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
       if (!mounted) return;
       final gares = results[0] as List<GareOption>;
       final cash = results[1] as OpenStationCash;
+      var uiConfig = ColisUiConfig.defaults;
+      try {
+        uiConfig = ColisUiConfig.fromSettings(await service.getCompanyColisSettings(companyId));
+      } catch (_) {}
       List<StationCashMovement> movements = [];
       if (cash.open && cash.id != null) {
         movements = await service.listStationCashMovements(cash.id!, limit: 80);
@@ -78,6 +84,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         if (gares.length == 1) _selectedGareId = gares.first.id;
         _cash = cash;
         _movements = movements;
+        _uiConfig = uiConfig;
         _loading = false;
       });
     } catch (e) {
@@ -340,6 +347,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               onCloseCash: _closeCash,
               onPrintJournal: _printJournal,
               onPrintSalesJournal: _printSalesJournal,
+              uiConfig: _uiConfig,
               dateFmt: _dateFmt,
             ),
           const SizedBox(height: 20),
@@ -428,6 +436,7 @@ class _OpenCashDetails extends StatelessWidget {
   final VoidCallback onCloseCash;
   final VoidCallback onPrintJournal;
   final VoidCallback onPrintSalesJournal;
+  final ColisUiConfig uiConfig;
   final DateFormat dateFmt;
 
   const _OpenCashDetails({
@@ -438,6 +447,7 @@ class _OpenCashDetails extends StatelessWidget {
     required this.onCloseCash,
     required this.onPrintJournal,
     required this.onPrintSalesJournal,
+    required this.uiConfig,
     required this.dateFmt,
   });
 
@@ -480,58 +490,62 @@ class _OpenCashDetails extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                const Text(
-                  'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
-                  'remises) avec le total (solde final) en bas.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: saving ? null : onPrintJournal,
-                  icon: const Icon(Icons.print_outlined),
-                  label: Text(saving ? '…' : 'Imprimer le journal'),
-                ),
-              ],
+        if (uiConfig.showReport('cashJournal')) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
+                    'remises) avec le total (solde final) en bas.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: saving ? null : onPrintJournal,
+                    icon: const Icon(Icons.print_outlined),
+                    label: Text(saving ? '…' : 'Imprimer le journal'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
-        // agent, scoping serveur — get_colis_sales_journal) : document
-        // distinct du journal de caisse ci-dessus (mouvements d'espèces).
-        // Même impression que Stats → « Mon rapport d'activité ».
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                const Text(
-                  'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
-                  'à remettre avec la caisse en fin de session.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: saving ? null : onPrintSalesJournal,
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  label: Text(saving ? '…' : 'Imprimer le journal de vente'),
-                ),
-              ],
+          const SizedBox(height: 16),
+        ],
+        if (uiConfig.showReport('salesJournal')) ...[
+          // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
+          // agent, scoping serveur — get_colis_sales_journal) : document
+          // distinct du journal de caisse ci-dessus (mouvements d'espèces).
+          // Même impression que Stats → « Mon rapport d'activité ».
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
+                    'à remettre avec la caisse en fin de session.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: saving ? null : onPrintSalesJournal,
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),

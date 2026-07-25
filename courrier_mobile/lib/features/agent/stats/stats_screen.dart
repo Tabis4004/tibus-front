@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/providers.dart';
+import '../../../core/config/colis_ui_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/kpi_card.dart';
 import '../../../data/models/app_role.dart';
@@ -41,6 +42,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
   String? _companyId;
   Future<ColisStats>? _statsFuture;
+  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
+  bool _loadedUiConfig = false;
 
   // "Aujourd'hui" est désormais la période PAR DÉFAUT (voir _period
   // ci-dessus) : ce n'est donc plus un filtre "actif" à signaler (pas de
@@ -95,7 +98,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   Future<void> _loadFilterOptions(String companyId) async {
-    if (_vendeurs != null && _gares != null) return;
+    if (_vendeurs != null && _gares != null && _loadedUiConfig) return;
     // Chargées indépendamment (pas de Future.wait groupé) : un échec sur
     // l'une des deux listes ne doit pas faire disparaître l'autre — bug
     // observé pour un owner (list_company_station_gares refusait l'accès
@@ -114,6 +117,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       setState(() => _gares = gares);
     } catch (_) {
       if (mounted) setState(() => _gares = const []);
+    }
+    try {
+      final settings = await ref.read(colisServiceProvider).getCompanyColisSettings(companyId);
+      if (!mounted) return;
+      setState(() {
+        _uiConfig = ColisUiConfig.fromSettings(settings);
+        _loadedUiConfig = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadedUiConfig = true);
     }
   }
 
@@ -330,18 +343,20 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _printingJournal ? null : () => _printJournal(companyId),
-                    icon: _printingJournal
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.description_outlined),
-                    label: const Text("Mon rapport d'activité"),
-                  ),
-                  const SizedBox(height: 16),
+                  if (_uiConfig.showReport('salesJournal')) ...[
+                    ElevatedButton.icon(
+                      onPressed: _printingJournal ? null : () => _printJournal(companyId),
+                      icon: _printingJournal
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.description_outlined),
+                      label: const Text("Mon rapport d'activité"),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
