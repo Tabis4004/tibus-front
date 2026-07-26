@@ -155,10 +155,8 @@ List<Map<String, dynamic>> colisTalonBodyLines(Colis colis) {
   return [
     {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true},
-    {'text': ''},
     {'text': colis.nomDestinataire, 'bold': true},
     {'text': colis.telephoneDestinataire},
-    {'text': ''},
     {'text': 'Expéditeur : ${colis.nomExpediteur}', 'size': 'small'},
     {'text': colis.telephoneExpediteur, 'size': 'small'},
     // Bloc expédition : agence de départ + son téléphone (déplacé depuis

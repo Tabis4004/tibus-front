@@ -1,5 +1,3 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 /// Configuration d'environnement.
 ///
 /// IMPORTANT : Courrier se connecte au MEME projet Supabase que Tibus
@@ -10,8 +8,18 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class Env {
   Env._();
 
-  static String get supabaseUrl =>
-      dotenv.env['SUPABASE_URL'] ?? 'https://kqudaqtydimjclwaihqr.supabase.co';
+  static const String _rideSupabaseUrl =
+      String.fromEnvironment('RIDE_SUPABASE_URL');
+  static const String _rideSupabaseAnonKey =
+      String.fromEnvironment('RIDE_SUPABASE_ANON_KEY');
+  static const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String _supabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  static String get supabaseUrl =>
+      _rideSupabaseUrl.isNotEmpty ? _rideSupabaseUrl : _supabaseUrl;
+
+  static String get supabaseAnonKey => _rideSupabaseAnonKey.isNotEmpty
+      ? _rideSupabaseAnonKey
+      : _supabaseAnonKey;
 }

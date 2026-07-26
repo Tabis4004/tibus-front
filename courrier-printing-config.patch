@@ -1,0 +1,834 @@
+From 457a8af871ce2ca71711c9b6f4826d8612a0709c Mon Sep 17 00:00:00 2001
+From: Vercel Agent <vercel-agent@vercel.com>
+Date: Sat, 25 Jul 2026 19:08:02 +0000
+Subject: [PATCH] Improve courrier printing and UI configuration
+
+---
+ .../lib/core/config/colis_ui_config.dart      |  54 +++++++
+ .../lib/core/utils/colis_receipt_pdf.dart     | 134 +++++++++++++++++
+ .../agent/caisse/station_cash_screen.dart     | 110 ++++++++------
+ .../agent/colis/colis_create_screen.dart      | 139 ++++++++++--------
+ .../colis/colis_receipt_preview_sheet.dart    |  73 +++++++--
+ .../features/agent/stats/stats_screen.dart    |  41 ++++--
+ 6 files changed, 417 insertions(+), 134 deletions(-)
+ create mode 100644 courrier_mobile/lib/core/config/colis_ui_config.dart
+ create mode 100644 courrier_mobile/lib/core/utils/colis_receipt_pdf.dart
+
+diff --git a/courrier_mobile/lib/core/config/colis_ui_config.dart b/courrier_mobile/lib/core/config/colis_ui_config.dart
+new file mode 100644
+index 0000000..81ef2ab
+--- /dev/null
++++ b/courrier_mobile/lib/core/config/colis_ui_config.dart
+@@ -0,0 +1,54 @@
++class ColisUiConfig {
++  final Set<String> hiddenFormFields;
++  final Set<String> hiddenReports;
++
++  const ColisUiConfig({
++    this.hiddenFormFields = const {},
++    this.hiddenReports = const {},
++  });
++
++  static const defaults = ColisUiConfig();
++
++  factory ColisUiConfig.fromSettings(Map<String, dynamic> settings) {
++    final source = _nestedMap(settings, 'courrierUi') ??
++        _nestedMap(settings, 'colisUi') ??
++        _nestedMap(settings, 'uiConfig') ??
++        settings;
++
++    return ColisUiConfig(
++      hiddenFormFields: {
++        ..._hiddenFromBoolMap(source['formFields']),
++        ..._hiddenFromBoolMap(source['colisFormFields']),
++        ..._stringSet(source['hiddenFormFields']),
++        ..._stringSet(source['colisFormHiddenFields']),
++      },
++      hiddenReports: {
++        ..._hiddenFromBoolMap(source['reports']),
++        ..._hiddenFromBoolMap(source['colisReports']),
++        ..._stringSet(source['hiddenReports']),
++        ..._stringSet(source['colisHiddenReports']),
++      },
++    );
++  }
++
++  bool showFormField(String key) => !hiddenFormFields.contains(key);
++  bool showReport(String key) => !hiddenReports.contains(key);
++
++  static Map<String, dynamic>? _nestedMap(Map<String, dynamic> map, String key) {
++    final value = map[key];
++    return value is Map ? value.cast<String, dynamic>() : null;
++  }
++
++  static Set<String> _hiddenFromBoolMap(Object? value) {
++    if (value is! Map) return const {};
++    return value.entries
++        .where((entry) => entry.value == false)
++        .map((entry) => entry.key.toString())
++        .toSet();
++  }
++
++  static Set<String> _stringSet(Object? value) {
++    if (value is Iterable) return value.map((item) => item.toString()).toSet();
++    return const {};
++  }
++}
+diff --git a/courrier_mobile/lib/core/utils/colis_receipt_pdf.dart b/courrier_mobile/lib/core/utils/colis_receipt_pdf.dart
+new file mode 100644
+index 0000000..032f64a
+--- /dev/null
++++ b/courrier_mobile/lib/core/utils/colis_receipt_pdf.dart
+@@ -0,0 +1,134 @@
++import 'dart:typed_data';
++
++import 'package:barcode/barcode.dart';
++import 'package:pdf/pdf.dart';
++import 'package:pdf/widgets.dart' as pw;
++
++import '../../data/models/colis.dart';
++import 'colis_receipt_lines.dart';
++
++/// PDF thermique 80 mm pour le fallback web.
++///
++/// Ne dépend pas de la page Flutter affichée : le dialogue navigateur reçoit
++/// un vrai document à imprimer/enregistrer, évitant la capture tronquée de
++/// l'écran courant quand `window.print()` imprime toute la page.
++Future<Uint8List> buildColisReceiptThermalPdf(
++  Colis colis, {
++  String? agentName,
++  bool includeReceipt = true,
++  bool includeTalon = true,
++}) async {
++  final doc = pw.Document();
++  if (includeReceipt) {
++    final lines = colisReceiptLines(colis, agentName: agentName);
++    doc.addPage(
++      pw.Page(
++        pageFormat: _pageFormat(lines),
++        build: (_) => _ticket(
++          title: 'REÇU CLIENT',
++          lines: lines,
++        ),
++      ),
++    );
++  }
++
++  if (includeTalon) {
++    final lines = [
++      ...colisTalonHeaderLines(colis),
++      {'text': '', 'align': 'center'},
++      ...colisTalonBodyLines(colis),
++    ];
++    doc.addPage(
++      pw.Page(
++        pageFormat: _pageFormat(lines, hasQr: true),
++        build: (_) => _ticket(
++          title: 'TALON COLIS',
++          lines: lines,
++          qr: colis.id,
++        ),
++      ),
++    );
++  }
++
++  return doc.save();
++}
++
++PdfPageFormat _pageFormat(List<Map<String, dynamic>> lines, {bool hasQr = false}) {
++  final lineHeightMm = lines.fold<double>(0, (total, line) {
++    final size = line['size'] as String?;
++    if (((line['text'] as String?) ?? '').isEmpty) return total + 3;
++    return total + (size == 'large' ? 8 : size == 'small' ? 4 : 5);
++  });
++  final heightMm = 28 + lineHeightMm + (hasQr ? 48 : 0);
++  return PdfPageFormat(
++    80 * PdfPageFormat.mm,
++    heightMm.clamp(120, 500).toDouble() * PdfPageFormat.mm,
++    marginTop: 4 * PdfPageFormat.mm,
++    marginBottom: 4 * PdfPageFormat.mm,
++    marginLeft: 4 * PdfPageFormat.mm,
++    marginRight: 4 * PdfPageFormat.mm,
++  );
++}
++
++pw.Widget _ticket({
++  required String title,
++  required List<Map<String, dynamic>> lines,
++  String? qr,
++}) {
++  return pw.Container(
++    width: double.infinity,
++    decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.8)),
++    padding: const pw.EdgeInsets.all(8),
++    child: pw.Column(
++      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
++      children: [
++        pw.Text(
++          title,
++          textAlign: pw.TextAlign.center,
++          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
++        ),
++        pw.SizedBox(height: 4),
++        pw.Divider(height: 8, thickness: 0.6),
++        for (final line in lines) _line(line),
++        if (qr != null && qr.isNotEmpty) ...[
++          pw.SizedBox(height: 8),
++          pw.Center(
++            child: pw.BarcodeWidget(
++              barcode: Barcode.qrCode(),
++              data: qr,
++              width: 42 * PdfPageFormat.mm,
++              height: 42 * PdfPageFormat.mm,
++            ),
++          ),
++        ],
++      ],
++    ),
++  );
++}
++
++pw.Widget _line(Map<String, dynamic> line) {
++  final text = (line['text'] as String?) ?? '';
++  if (text.isEmpty) return pw.SizedBox(height: 5);
++  final size = line['size'] as String?;
++  final align = line['align'] as String?;
++  final fontSize = size == 'large'
++      ? 14.0
++      : size == 'small'
++          ? 8.0
++          : 10.0;
++  return pw.Padding(
++    padding: const pw.EdgeInsets.only(bottom: 2),
++    child: pw.Text(
++      text,
++      textAlign: align == 'center'
++          ? pw.TextAlign.center
++          : align == 'right'
++              ? pw.TextAlign.right
++              : pw.TextAlign.left,
++      style: pw.TextStyle(
++        fontSize: fontSize,
++        fontWeight: line['bold'] == true ? pw.FontWeight.bold : pw.FontWeight.normal,
++      ),
++    ),
++  );
++}
+diff --git a/courrier_mobile/lib/features/agent/caisse/station_cash_screen.dart b/courrier_mobile/lib/features/agent/caisse/station_cash_screen.dart
+index 03a0f77..ca40d7b 100644
+--- a/courrier_mobile/lib/features/agent/caisse/station_cash_screen.dart
++++ b/courrier_mobile/lib/features/agent/caisse/station_cash_screen.dart
+@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:intl/intl.dart';
+ import '../../../core/providers.dart';
++import '../../../core/config/colis_ui_config.dart';
+ import '../../../data/models/colis.dart';
+ import '../stats/colis_sales_journal_print_sheet.dart';
+ 
+@@ -34,6 +35,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
+   String? _selectedGareId;
+   OpenStationCash? _cash;
+   List<StationCashMovement> _movements = [];
++  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
+ 
+   @override
+   void initState() {
+@@ -65,6 +67,10 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
+       if (!mounted) return;
+       final gares = results[0] as List<GareOption>;
+       final cash = results[1] as OpenStationCash;
++      var uiConfig = ColisUiConfig.defaults;
++      try {
++        uiConfig = ColisUiConfig.fromSettings(await service.getCompanyColisSettings(companyId));
++      } catch (_) {}
+       List<StationCashMovement> movements = [];
+       if (cash.open && cash.id != null) {
+         movements = await service.listStationCashMovements(cash.id!, limit: 80);
+@@ -78,6 +84,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
+         if (gares.length == 1) _selectedGareId = gares.first.id;
+         _cash = cash;
+         _movements = movements;
++        _uiConfig = uiConfig;
+         _loading = false;
+       });
+     } catch (e) {
+@@ -340,6 +347,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
+               onCloseCash: _closeCash,
+               onPrintJournal: _printJournal,
+               onPrintSalesJournal: _printSalesJournal,
++              uiConfig: _uiConfig,
+               dateFmt: _dateFmt,
+             ),
+           const SizedBox(height: 20),
+@@ -428,6 +436,7 @@ class _OpenCashDetails extends StatelessWidget {
+   final VoidCallback onCloseCash;
+   final VoidCallback onPrintJournal;
+   final VoidCallback onPrintSalesJournal;
++  final ColisUiConfig uiConfig;
+   final DateFormat dateFmt;
+ 
+   const _OpenCashDetails({
+@@ -438,6 +447,7 @@ class _OpenCashDetails extends StatelessWidget {
+     required this.onCloseCash,
+     required this.onPrintJournal,
+     required this.onPrintSalesJournal,
++    required this.uiConfig,
+     required this.dateFmt,
+   });
+ 
+@@ -480,58 +490,62 @@ class _OpenCashDetails extends StatelessWidget {
+           ),
+         ),
+         const SizedBox(height: 16),
+-        Card(
+-          child: Padding(
+-            padding: const EdgeInsets.all(16),
+-            child: Column(
+-              crossAxisAlignment: CrossAxisAlignment.start,
+-              children: [
+-                const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+-                const SizedBox(height: 6),
+-                const Text(
+-                  'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
+-                  'remises) avec le total (solde final) en bas.',
+-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+-                ),
+-                const SizedBox(height: 12),
+-                OutlinedButton.icon(
+-                  onPressed: saving ? null : onPrintJournal,
+-                  icon: const Icon(Icons.print_outlined),
+-                  label: Text(saving ? '…' : 'Imprimer le journal'),
+-                ),
+-              ],
++        if (uiConfig.showReport('cashJournal')) ...[
++          Card(
++            child: Padding(
++              padding: const EdgeInsets.all(16),
++              child: Column(
++                crossAxisAlignment: CrossAxisAlignment.start,
++                children: [
++                  const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
++                  const SizedBox(height: 6),
++                  const Text(
++                    'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
++                    'remises) avec le total (solde final) en bas.',
++                    style: TextStyle(color: Colors.grey, fontSize: 12),
++                  ),
++                  const SizedBox(height: 12),
++                  OutlinedButton.icon(
++                    onPressed: saving ? null : onPrintJournal,
++                    icon: const Icon(Icons.print_outlined),
++                    label: Text(saving ? '…' : 'Imprimer le journal'),
++                  ),
++                ],
++              ),
+             ),
+           ),
+-        ),
+-        const SizedBox(height: 16),
+-        // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
+-        // agent, scoping serveur — get_colis_sales_journal) : document
+-        // distinct du journal de caisse ci-dessus (mouvements d'espèces).
+-        // Même impression que Stats → « Mon rapport d'activité ».
+-        Card(
+-          child: Padding(
+-            padding: const EdgeInsets.all(16),
+-            child: Column(
+-              crossAxisAlignment: CrossAxisAlignment.start,
+-              children: [
+-                const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+-                const SizedBox(height: 6),
+-                const Text(
+-                  'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
+-                  'à remettre avec la caisse en fin de session.',
+-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+-                ),
+-                const SizedBox(height: 12),
+-                OutlinedButton.icon(
+-                  onPressed: saving ? null : onPrintSalesJournal,
+-                  icon: const Icon(Icons.receipt_long_outlined),
+-                  label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+-                ),
+-              ],
++          const SizedBox(height: 16),
++        ],
++        if (uiConfig.showReport('salesJournal')) ...[
++          // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
++          // agent, scoping serveur — get_colis_sales_journal) : document
++          // distinct du journal de caisse ci-dessus (mouvements d'espèces).
++          // Même impression que Stats → « Mon rapport d'activité ».
++          Card(
++            child: Padding(
++              padding: const EdgeInsets.all(16),
++              child: Column(
++                crossAxisAlignment: CrossAxisAlignment.start,
++                children: [
++                  const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
++                  const SizedBox(height: 6),
++                  const Text(
++                    'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
++                    'à remettre avec la caisse en fin de session.',
++                    style: TextStyle(color: Colors.grey, fontSize: 12),
++                  ),
++                  const SizedBox(height: 12),
++                  OutlinedButton.icon(
++                    onPressed: saving ? null : onPrintSalesJournal,
++                    icon: const Icon(Icons.receipt_long_outlined),
++                    label: Text(saving ? '…' : 'Imprimer le journal de vente'),
++                  ),
++                ],
++              ),
+             ),
+           ),
+-        ),
+-        const SizedBox(height: 16),
++          const SizedBox(height: 16),
++        ],
+         Card(
+           child: Padding(
+             padding: const EdgeInsets.all(16),
+diff --git a/courrier_mobile/lib/features/agent/colis/colis_create_screen.dart b/courrier_mobile/lib/features/agent/colis/colis_create_screen.dart
+index b5f92b0..d8fc3de 100644
+--- a/courrier_mobile/lib/features/agent/colis/colis_create_screen.dart
++++ b/courrier_mobile/lib/features/agent/colis/colis_create_screen.dart
+@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:image_picker/image_picker.dart';
+ import '../../../core/providers.dart';
++import '../../../core/config/colis_ui_config.dart';
+ import '../../../core/utils/connectivity.dart';
+ import '../../../data/models/colis.dart';
+ import '../../../data/models/pending_colis.dart';
+@@ -37,6 +38,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+   final _pourcentagePercu = TextEditingController();
+   bool _submitting = false;
+   bool _montantAuto = false;
++  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
+ 
+   bool _loadingRefs = true;
+   String? _refsError;
+@@ -131,6 +133,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+       final natures = results[1] as List<ColisNature>;
+       final activeNatures = natures.where((n) => n.isActive).toList();
+       final settings = results[2] as Map<String, dynamic>;
++      final uiConfig = ColisUiConfig.fromSettings(settings);
+       final defaultPct = (settings['colisPourcentagePercuGeneral'] as num?)?.toDouble();
+       // Alimente le cache hors-ligne pour la prochaine fois que le réseau
+       // sera indisponible (voir ReferenceCacheService, branche catch
+@@ -145,6 +148,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+         _gares = gares;
+         _natures = activeNatures;
+         _openCash = openCash;
++        _uiConfig = uiConfig;
+         _offline = false;
+         if (defaultPct != null && _pourcentagePercu.text.isEmpty) {
+           _pourcentagePercu.text = defaultPct.toString();
+@@ -296,12 +300,16 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+       telephoneExpediteur: _telExp.text.trim(),
+       nomDestinataire: _nomDest.text.trim(),
+       telephoneDestinataire: _telDest.text.trim(),
+-      descriptionContenu: _description.text.trim().isEmpty ? null : _description.text.trim(),
+-      poidsKg: double.tryParse(_poids.text),
+-      nombrePieces: int.tryParse(_pieces.text) ?? 1,
++      descriptionContenu: _uiConfig.showFormField('description') && _description.text.trim().isNotEmpty
++          ? _description.text.trim()
++          : null,
++      poidsKg: _uiConfig.showFormField('poids') ? double.tryParse(_poids.text) : null,
++      nombrePieces: _uiConfig.showFormField('pieces') ? (int.tryParse(_pieces.text) ?? 1) : 1,
+       montantFret: montant,
+       valeurMarchandise: valeur,
+-      pourcentagePercu: _montantAuto ? double.tryParse(_pourcentagePercu.text) : null,
++      pourcentagePercu: _uiConfig.showFormField('pourcentagePercu') && _montantAuto
++          ? double.tryParse(_pourcentagePercu.text)
++          : null,
+       natureIds: [_selectedNatureId!],
+     );
+     setState(() => _submitting = true);
+@@ -322,7 +330,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+               companyId: companyId,
+             ));
+         String? photoPath;
+-        if (_photoBytes != null) {
++        if (_uiConfig.showFormField('photo') && _photoBytes != null) {
+           // Best-effort : un échec d'upload de la photo ne doit jamais bloquer
+           // l'enregistrement du colis (déjà créé et payé à ce stade) ni
+           // empêcher l'aperçu/impression du reçu.
+@@ -570,16 +578,22 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+                   validator: (v) => v == null ? 'Champ requis' : null,
+                 ),
+                 const SizedBox(height: 10),
+-                TextFormField(controller: _description, decoration: const InputDecoration(labelText: 'Description du contenu')),
+-                const SizedBox(height: 10),
+-                Row(
+-                  children: [
+-                    Expanded(child: TextFormField(controller: _poids, decoration: const InputDecoration(labelText: 'Poids (kg)'), keyboardType: TextInputType.number)),
+-                    const SizedBox(width: 10),
+-                    Expanded(child: TextFormField(controller: _pieces, decoration: const InputDecoration(labelText: 'Nombre de pièces'), keyboardType: TextInputType.number)),
+-                  ],
+-                ),
+-                const SizedBox(height: 10),
++                if (_uiConfig.showFormField('description')) ...[
++                  TextFormField(controller: _description, decoration: const InputDecoration(labelText: 'Description du contenu')),
++                  const SizedBox(height: 10),
++                ],
++                if (_uiConfig.showFormField('poids') || _uiConfig.showFormField('pieces')) ...[
++                  Row(
++                    children: [
++                      if (_uiConfig.showFormField('poids'))
++                        Expanded(child: TextFormField(controller: _poids, decoration: const InputDecoration(labelText: 'Poids (kg)'), keyboardType: TextInputType.number)),
++                      if (_uiConfig.showFormField('poids') && _uiConfig.showFormField('pieces')) const SizedBox(width: 10),
++                      if (_uiConfig.showFormField('pieces'))
++                        Expanded(child: TextFormField(controller: _pieces, decoration: const InputDecoration(labelText: 'Nombre de pièces'), keyboardType: TextInputType.number)),
++                    ],
++                  ),
++                  const SizedBox(height: 10),
++                ],
+                 TextFormField(
+                   controller: _valeurMarchandise,
+                   decoration: const InputDecoration(
+@@ -597,17 +611,18 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+-                        SwitchListTile(
+-                          contentPadding: EdgeInsets.zero,
+-                          title: const Text('Calcul automatique du montant fret'),
+-                          subtitle: const Text('Montant fret = pourcentage perçu × valeur marchandise'),
+-                          value: _montantAuto,
+-                          onChanged: (v) => setState(() {
+-                            _montantAuto = v;
+-                            _recomputeMontantIfAuto();
+-                          }),
+-                        ),
+-                        if (_montantAuto) ...[
++                        if (_uiConfig.showFormField('pourcentagePercu'))
++                          SwitchListTile(
++                            contentPadding: EdgeInsets.zero,
++                            title: const Text('Calcul automatique du montant fret'),
++                            subtitle: const Text('Montant fret = pourcentage perçu × valeur marchandise'),
++                            value: _montantAuto,
++                            onChanged: (v) => setState(() {
++                              _montantAuto = v;
++                              _recomputeMontantIfAuto();
++                            }),
++                          ),
++                        if (_uiConfig.showFormField('pourcentagePercu') && _montantAuto) ...[
+                           TextFormField(
+                             controller: _pourcentagePercu,
+                             decoration: const InputDecoration(labelText: 'Pourcentage perçu (%)'),
+@@ -634,46 +649,48 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
+                     ),
+                   ),
+                 ),
+-                const SizedBox(height: 20),
+-                const Text('Photo du colis (optionnel)', style: TextStyle(fontWeight: FontWeight.bold)),
+-                const SizedBox(height: 4),
+-                const Text(
+-                  'Consultable sur le détail du colis — non imprimée sur le reçu.',
+-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+-                ),
+-                const SizedBox(height: 8),
+-                if (_photoBytes != null) ...[
+-                  ClipRRect(
+-                    borderRadius: BorderRadius.circular(8),
+-                    child: Image.memory(_photoBytes!, height: 160, fit: BoxFit.cover),
++                if (_uiConfig.showFormField('photo')) ...[
++                  const SizedBox(height: 20),
++                  const Text('Photo du colis (optionnel)', style: TextStyle(fontWeight: FontWeight.bold)),
++                  const SizedBox(height: 4),
++                  const Text(
++                    'Consultable sur le détail du colis — non imprimée sur le reçu.',
++                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                   ),
+                   const SizedBox(height: 8),
+-                ],
+-                Row(
+-                  children: [
+-                    Expanded(
+-                      child: OutlinedButton.icon(
+-                        onPressed: () => _pickPhoto(ImageSource.camera),
+-                        icon: const Icon(Icons.camera_alt_outlined, size: 18),
+-                        label: const Text('Prendre une photo'),
+-                      ),
++                  if (_photoBytes != null) ...[
++                    ClipRRect(
++                      borderRadius: BorderRadius.circular(8),
++                      child: Image.memory(_photoBytes!, height: 160, fit: BoxFit.cover),
+                     ),
+-                    const SizedBox(width: 10),
+-                    Expanded(
+-                      child: OutlinedButton.icon(
+-                        onPressed: () => _pickPhoto(ImageSource.gallery),
+-                        icon: const Icon(Icons.photo_library_outlined, size: 18),
+-                        label: const Text('Galerie'),
++                    const SizedBox(height: 8),
++                  ],
++                  Row(
++                    children: [
++                      Expanded(
++                        child: OutlinedButton.icon(
++                          onPressed: () => _pickPhoto(ImageSource.camera),
++                          icon: const Icon(Icons.camera_alt_outlined, size: 18),
++                          label: const Text('Prendre une photo'),
++                        ),
+                       ),
+-                    ),
+-                    if (_photoBytes != null)
+-                      IconButton(
+-                        tooltip: 'Retirer la photo',
+-                        icon: const Icon(Icons.close),
+-                        onPressed: () => setState(() => _photoBytes = null),
++                      const SizedBox(width: 10),
++                      Expanded(
++                        child: OutlinedButton.icon(
++                          onPressed: () => _pickPhoto(ImageSource.gallery),
++                          icon: const Icon(Icons.photo_library_outlined, size: 18),
++                          label: const Text('Galerie'),
++                        ),
+                       ),
+-                  ],
+-                ),
++                      if (_photoBytes != null)
++                        IconButton(
++                          tooltip: 'Retirer la photo',
++                          icon: const Icon(Icons.close),
++                          onPressed: () => setState(() => _photoBytes = null),
++                        ),
++                    ],
++                  ),
++                ],
+                 const SizedBox(height: 24),
+                 ElevatedButton(
+                   // _companyId (dérivé de la caisse ouverte) prioritaire sur
+diff --git a/courrier_mobile/lib/features/agent/colis/colis_receipt_preview_sheet.dart b/courrier_mobile/lib/features/agent/colis/colis_receipt_preview_sheet.dart
+index f0c3379..8c55d49 100644
+--- a/courrier_mobile/lib/features/agent/colis/colis_receipt_preview_sheet.dart
++++ b/courrier_mobile/lib/features/agent/colis/colis_receipt_preview_sheet.dart
+@@ -4,13 +4,15 @@ import 'package:flutter/material.dart';
+ import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:qr_flutter/qr_flutter.dart';
++import 'package:printing/printing.dart';
+ import 'package:share_plus/share_plus.dart';
+ import 'package:supabase_flutter/supabase_flutter.dart';
+ import '../../../core/providers.dart';
+ import '../../../core/utils/colis_receipt_lines.dart';
++import '../../../core/utils/colis_receipt_pdf.dart';
+ import '../../../core/utils/sms.dart';
+ import '../../../data/models/colis.dart';
+-import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
++import '../../../data/services/printer_service.dart' show EscPosPrinterService, PrinterDevice, PrinterType;
+ 
+ /// Message texte de partage du reçu (SMS) — même contenu informatif que le
+ /// reçu papier, pour envoi manuel à l'expéditeur ou au destinataire (voir
+@@ -254,9 +256,14 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
+                     await printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName);
+                     return;
+                   }
+-                  final ok = printer.printColisReceiptBrowser(wide: true);
+-                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
+-                }, successMessage: 'Impression envoyée (80 mm).'),
++                  await Printing.layoutPdf(
++                    onLayout: (_) => buildColisReceiptThermalPdf(
++                      colis,
++                      agentName: agentName,
++                    ),
++                    name: 'recu_${colisReceiptNumber(colis)}_80mm.pdf',
++                  );
++                }, successMessage: 'Document 80 mm prêt à imprimer.'),
+               ),
+               const SizedBox(height: 8),
+               _PrinterButton(
+@@ -628,9 +635,11 @@ class _TalonBox extends StatelessWidget {
+ 
+ /// Sélecteur d'imprimante USB/Bluetooth réelle (Xprinter XP-Q200, Mini
+ /// Printer MPT-II…) : scan, tap sur un appareil trouvé -> connexion +
+-/// impression directe (reçu + talon). Pont dédié
++/// impression directe, avec choix explicite reçu + talon / reçu seul / talon seul. Pont dédié
+ /// (esc_pos_printer_service.dart), distinct de la P3 intégrée et du pont
+ /// desktop WisePrinter ci-dessus.
++enum _EscPosPrintJob { receiptAndTalon, receiptOnly, talonOnly }
++
+ class _EscPosPrinterSheet extends ConsumerStatefulWidget {
+   final Colis colis;
+   final String? agentName;
+@@ -649,6 +658,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
+   bool _scanningBt = false;
+   bool _busy = false;
+   String? _error;
++  _EscPosPrintJob _job = _EscPosPrintJob.receiptAndTalon;
+ 
+   @override
+   void initState() {
+@@ -684,11 +694,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
+     final escPos = ref.read(printerServiceProvider).escPos;
+     try {
+       await escPos.connectNetwork(ip);
+-      await escPos.printColisReceiptWithTalon(
+-        widget.colis,
+-        type: PrinterType.network,
+-        agentName: widget.agentName,
+-      );
++      await _printEscPos(escPos, PrinterType.network);
+       await escPos.saveNetworkIp(ip);
+       if (mounted) Navigator.of(context).pop();
+     } catch (e) {
+@@ -754,6 +760,25 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
+     });
+   }
+ 
++  Future<void> _printEscPos(EscPosPrinterService escPos, PrinterType type) {
++    switch (_job) {
++      case _EscPosPrintJob.receiptAndTalon:
++        return escPos.printColisReceiptWithTalon(
++          widget.colis,
++          type: type,
++          agentName: widget.agentName,
++        );
++      case _EscPosPrintJob.receiptOnly:
++        return escPos.printColisReceipt(
++          widget.colis,
++          type: type,
++          agentName: widget.agentName,
++        );
++      case _EscPosPrintJob.talonOnly:
++        return escPos.printColisTalon(widget.colis, type: type);
++    }
++  }
++
+   Future<void> _printOn(PrinterDevice device, PrinterType type) async {
+     if (_busy) return;
+     setState(() {
+@@ -767,7 +792,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
+       } else {
+         await escPos.connectBluetooth(device);
+       }
+-      await escPos.printColisReceiptWithTalon(widget.colis, type: type, agentName: widget.agentName);
++      await _printEscPos(escPos, type);
+       if (mounted) Navigator.of(context).pop();
+     } catch (e) {
+       if (mounted) setState(() => _error = 'Impression impossible : $e');
+@@ -824,6 +849,30 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
+               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+             ],
+             const SizedBox(height: 8),
++            const Text('Document à imprimer', style: TextStyle(fontWeight: FontWeight.w600)),
++            const SizedBox(height: 6),
++            SegmentedButton<_EscPosPrintJob>(
++              segments: const [
++                ButtonSegment(
++                  value: _EscPosPrintJob.receiptAndTalon,
++                  label: Text('Reçu + talon'),
++                  icon: Icon(Icons.receipt_long, size: 16),
++                ),
++                ButtonSegment(
++                  value: _EscPosPrintJob.receiptOnly,
++                  label: Text('Reçu'),
++                  icon: Icon(Icons.receipt_long_outlined, size: 16),
++                ),
++                ButtonSegment(
++                  value: _EscPosPrintJob.talonOnly,
++                  label: Text('Talon'),
++                  icon: Icon(Icons.label_outline, size: 16),
++                ),
++              ],
++              selected: {_job},
++              onSelectionChanged: _busy ? null : (values) => setState(() => _job = values.first),
++            ),
++            const SizedBox(height: 12),
+             Row(
+               children: [
+                 const Expanded(
+@@ -888,7 +937,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
+                       ? const SizedBox(
+                           width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                       : const Icon(Icons.wifi, size: 18),
+-                  label: const Text('Imprimer'),
++                  label: Text(_job == _EscPosPrintJob.receiptOnly ? 'Reçu' : _job == _EscPosPrintJob.talonOnly ? 'Talon' : 'Imprimer'),
+                 ),
+               ],
+             ),
+diff --git a/courrier_mobile/lib/features/agent/stats/stats_screen.dart b/courrier_mobile/lib/features/agent/stats/stats_screen.dart
+index 371e81b..773c719 100644
+--- a/courrier_mobile/lib/features/agent/stats/stats_screen.dart
++++ b/courrier_mobile/lib/features/agent/stats/stats_screen.dart
+@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:intl/intl.dart';
+ import '../../../core/providers.dart';
++import '../../../core/config/colis_ui_config.dart';
+ import '../../../core/theme/app_colors.dart';
+ import '../../../core/widgets/kpi_card.dart';
+ import '../../../data/models/app_role.dart';
+@@ -41,6 +42,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
+ 
+   String? _companyId;
+   Future<ColisStats>? _statsFuture;
++  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
++  bool _loadedUiConfig = false;
+ 
+   // "Aujourd'hui" est désormais la période PAR DÉFAUT (voir _period
+   // ci-dessus) : ce n'est donc plus un filtre "actif" à signaler (pas de
+@@ -95,7 +98,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
+   }
+ 
+   Future<void> _loadFilterOptions(String companyId) async {
+-    if (_vendeurs != null && _gares != null) return;
++    if (_vendeurs != null && _gares != null && _loadedUiConfig) return;
+     // Chargées indépendamment (pas de Future.wait groupé) : un échec sur
+     // l'une des deux listes ne doit pas faire disparaître l'autre — bug
+     // observé pour un owner (list_company_station_gares refusait l'accès
+@@ -115,6 +118,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
+     } catch (_) {
+       if (mounted) setState(() => _gares = const []);
+     }
++    try {
++      final settings = await ref.read(colisServiceProvider).getCompanyColisSettings(companyId);
++      if (!mounted) return;
++      setState(() {
++        _uiConfig = ColisUiConfig.fromSettings(settings);
++        _loadedUiConfig = true;
++      });
++    } catch (_) {
++      if (mounted) setState(() => _loadedUiConfig = true);
++    }
+   }
+ 
+   void _reload(String companyId) {
+@@ -330,18 +343,20 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
+                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                   ),
+                   const SizedBox(height: 12),
+-                  ElevatedButton.icon(
+-                    onPressed: _printingJournal ? null : () => _printJournal(companyId),
+-                    icon: _printingJournal
+-                        ? const SizedBox(
+-                            width: 16,
+-                            height: 16,
+-                            child: CircularProgressIndicator(strokeWidth: 2),
+-                          )
+-                        : const Icon(Icons.description_outlined),
+-                    label: const Text("Mon rapport d'activité"),
+-                  ),
+-                  const SizedBox(height: 16),
++                  if (_uiConfig.showReport('salesJournal')) ...[
++                    ElevatedButton.icon(
++                      onPressed: _printingJournal ? null : () => _printJournal(companyId),
++                      icon: _printingJournal
++                          ? const SizedBox(
++                              width: 16,
++                              height: 16,
++                              child: CircularProgressIndicator(strokeWidth: 2),
++                            )
++                          : const Icon(Icons.description_outlined),
++                      label: const Text("Mon rapport d'activité"),
++                    ),
++                    const SizedBox(height: 16),
++                  ],
+                   GridView.count(
+                     crossAxisCount: 2,
+                     shrinkWrap: true,
+-- 
+2.49.0
+

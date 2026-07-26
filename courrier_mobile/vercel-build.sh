@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# NB : ce projet (courrier_mobile) initialise Supabase directement en dur
-# dans lib/main.dart (projet "courrier", kqudaqtydimjclwaihqr) — pas besoin
-# de fichier .env ni de --dart-define ici. Les anciennes variables
-# RIDE_SUPABASE_* (copiées par erreur depuis l'app VTC courrier_livreur/
-# courrier_client) ont été retirées : elles ne servaient à rien pour cette
-# app et ne faisaient qu'entretenir la confusion dans les logs de build.
+RIDE_SUPABASE_URL="${RIDE_SUPABASE_URL:-${SUPABASE_URL:-}}"
+RIDE_SUPABASE_ANON_KEY="${RIDE_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-}}"
+
+: "${RIDE_SUPABASE_URL:?Set RIDE_SUPABASE_URL or SUPABASE_URL in Vercel Environment Variables}"
+: "${RIDE_SUPABASE_ANON_KEY:?Set RIDE_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY in Vercel Environment Variables}"
+
+cat > .env <<EOF
+RIDE_SUPABASE_URL=${RIDE_SUPABASE_URL}
+RIDE_SUPABASE_ANON_KEY=${RIDE_SUPABASE_ANON_KEY}
+EOF
 
 if [ ! -d "$HOME/flutter" ]; then
   git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$HOME/flutter"
@@ -22,4 +26,6 @@ fi
 
 flutter pub get
 
-flutter build web --release
+flutter build web --release \
+  --dart-define=RIDE_SUPABASE_URL="$RIDE_SUPABASE_URL" \
+  --dart-define=RIDE_SUPABASE_ANON_KEY="$RIDE_SUPABASE_ANON_KEY"

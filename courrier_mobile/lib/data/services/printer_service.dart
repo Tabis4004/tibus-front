@@ -452,10 +452,11 @@ class PrinterService {
       header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
       lines: colisTalonLines(colis),
       qr: colis.id,
-      // QR agrandi sur le talon (demande explicite) — la POSITION du QR sur
-      // ce pont est décidée par le wrapper natif externe (window.WisePrinter,
-      // hors de ce dépôt) : on ne peut agir ici que sur sa taille.
-      qrSize: 280,
+      // QR compact sur le talon (demande explicite — un gros QR n'était pas
+      // le format voulu). La POSITION du QR sur ce pont est décidée par le
+      // wrapper natif externe (window.WisePrinter, hors de ce dépôt) : on ne
+      // peut agir ici que sur sa taille, pas son emplacement dans le talon.
+      qrSize: 140,
       feedLines: 3,
       cut: true,
     );

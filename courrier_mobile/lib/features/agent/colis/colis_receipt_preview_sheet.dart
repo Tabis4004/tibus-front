@@ -4,13 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers.dart';
 import '../../../core/utils/colis_receipt_lines.dart';
+import '../../../core/utils/colis_receipt_pdf.dart';
 import '../../../core/utils/sms.dart';
 import '../../../data/models/colis.dart';
-import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
+import '../../../data/services/printer_service.dart' show EscPosPrinterService, PrinterDevice, PrinterType;
 
 /// Message texte de partage du reçu (SMS) — même contenu informatif que le
 /// reçu papier, pour envoi manuel à l'expéditeur ou au destinataire (voir
@@ -130,6 +132,36 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
     }
   }
 
+
+  Future<void> _printThermal80(
+    Colis colis, {
+    String? agentName,
+    bool includeReceipt = true,
+    bool includeTalon = true,
+  }) async {
+    await Printing.layoutPdf(
+      onLayout: (_) => buildColisReceiptThermalPdf(
+        colis,
+        agentName: agentName,
+        includeReceipt: includeReceipt,
+        includeTalon: includeTalon,
+      ),
+      name: 'recu_${colisReceiptNumber(colis)}_80mm.pdf',
+    );
+  }
+
+  void _openEscPosSheet(Colis colis, String? agentName, _EscPosPrintJob initialJob) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EscPosPrinterSheet(
+        colis: colis,
+        agentName: agentName,
+        initialJob: initialJob,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final printer = ref.read(printerServiceProvider);
@@ -186,91 +218,76 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
               _TalonBox(colis: colis),
               const SizedBox(height: 16),
               Text(
-                'Choisir une imprimante (reçu + talon)',
+                'Choisir une imprimante',
                 style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary, fontSize: 12),
               ),
               const SizedBox(height: 8),
-              _PrinterButton(
+              _PrinterGroup(
+                title: 'Xprinter',
                 icon: Icons.print_outlined,
-                label: 'Xprinter',
                 enabled: !_printing && printer.hasWisePrinterBridge,
                 disabledHint: printer.hasWisePrinterBridge ? null : 'Xprinter non détecté sur cet appareil',
-                onPressed: () => _run(
+                onReceiptAndTalon: () => _run(
                   () => printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName),
                   successMessage: 'Reçu + talon envoyés (Xprinter).',
                 ),
-              ),
-              const SizedBox(height: 8),
-              // Parcours guichet à l'enregistrement : UNE action imprime le
-              // reçu (remis au client) PUIS le talon (collé sur le colis).
-              _PrinterButton(
-                icon: Icons.receipt_long,
-                label: 'Reçu + talon (56 mm P3)',
-                enabled: !_printing && printer.hasNativeP3,
-                disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
-                onPressed: () => _run(
-                  () => printer.printColisReceiptWithTalon(colis, paperWidthMm: 58, agentName: agentName),
-                  successMessage: 'Reçu (client) puis talon (à coller) envoyés — 56 mm.',
+                onReceiptOnly: () => _run(
+                  () => printer.printColisReceiptViaWisePrinter(colis, agentName: agentName),
+                  successMessage: 'Reçu envoyé (Xprinter).',
+                ),
+                onTalonOnly: () => _run(
+                  () => printer.printColisTalonViaWisePrinter(colis),
+                  successMessage: 'Talon envoyé (Xprinter).',
                 ),
               ),
               const SizedBox(height: 8),
-              // Réimpressions séparées ultérieures (depuis le détail du colis).
-              Row(
-                children: [
-                  Expanded(
-                    child: _PrinterButton(
-                      icon: Icons.receipt_long_outlined,
-                      label: 'Reçu seul (56 mm P3)',
-                      enabled: !_printing && printer.hasNativeP3,
-                      disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
-                      onPressed: () => _run(
-                        () => printer.printColisReceipt(colis, paperWidthMm: 58, agentName: agentName),
-                        successMessage: 'Reçu envoyé (imprimante intégrée, 56 mm).',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _PrinterButton(
-                      icon: Icons.label_outline,
-                      label: 'Talon seul (56 mm P3)',
-                      enabled: !_printing && printer.hasNativeP3,
-                      disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
-                      onPressed: () => _run(
-                        () => printer.printColisTalon(colis, paperWidthMm: 58),
-                        successMessage: 'Talon envoyé (56 mm) — à coller sur le colis.',
-                      ),
-                    ),
-                  ),
-                ],
+              _PrinterGroup(
+                title: '56 mm P3',
+                icon: Icons.receipt_long,
+                enabled: !_printing && printer.hasNativeP3,
+                disabledHint: printer.hasNativeP3 ? null : 'Imprimante intégrée non détectée (Android requis)',
+                onReceiptAndTalon: () => _run(
+                  () => printer.printColisReceiptWithTalon(colis, paperWidthMm: 58, agentName: agentName),
+                  successMessage: 'Reçu puis talon envoyés — 56 mm.',
+                ),
+                onReceiptOnly: () => _run(
+                  () => printer.printColisReceipt(colis, paperWidthMm: 58, agentName: agentName),
+                  successMessage: 'Reçu envoyé — 56 mm.',
+                ),
+                onTalonOnly: () => _run(
+                  () => printer.printColisTalon(colis, paperWidthMm: 58),
+                  successMessage: 'Talon envoyé — 56 mm.',
+                ),
               ),
               const SizedBox(height: 8),
-              _PrinterButton(
+              _PrinterGroup(
+                title: '80 mm Xprinter (toujours disponible)',
                 icon: Icons.local_print_shop_outlined,
-                label: '80 mm Xprinter (toujours disponible)',
                 enabled: !_printing,
-                onPressed: () => _run(() async {
-                  if (printer.hasWisePrinterBridge) {
-                    await printer.printColisReceiptWithTalonViaWisePrinter(colis, agentName: agentName);
-                    return;
-                  }
-                  final ok = printer.printColisReceiptBrowser(wide: true);
-                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
-                }, successMessage: 'Impression envoyée (80 mm).'),
+                onReceiptAndTalon: () => _run(
+                  () => _printThermal80(colis, agentName: agentName),
+                  successMessage: 'Document 80 mm prêt à imprimer.',
+                ),
+                onReceiptOnly: () => _run(
+                  () => _printThermal80(colis, agentName: agentName, includeTalon: false),
+                  successMessage: 'Reçu 80 mm prêt à imprimer.',
+                ),
+                onTalonOnly: () => _run(
+                  () => _printThermal80(colis, includeReceipt: false),
+                  successMessage: 'Talon 80 mm prêt à imprimer.',
+                ),
               ),
               const SizedBox(height: 8),
-              _PrinterButton(
+              _PrinterGroup(
+                title: 'USB / Bluetooth / Réseau',
                 icon: Icons.usb,
-                label: 'USB / Bluetooth / Réseau (Xprinter, YHD-8390…)',
                 enabled: !_printing && printer.hasEscPosSupport,
                 disabledHint: printer.hasEscPosSupport
                     ? null
                     : 'Disponible uniquement sur l\'app native (Android/iOS/Windows)',
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => _EscPosPrinterSheet(colis: colis, agentName: agentName),
-                ),
+                onReceiptAndTalon: () => _openEscPosSheet(colis, agentName, _EscPosPrintJob.receiptAndTalon),
+                onReceiptOnly: () => _openEscPosSheet(colis, agentName, _EscPosPrintJob.receiptOnly),
+                onTalonOnly: () => _openEscPosSheet(colis, agentName, _EscPosPrintJob.talonOnly),
               ),
               const SizedBox(height: 16),
               Text(
@@ -573,27 +590,26 @@ class _TalonBox extends StatelessWidget {
               const Text('*** PROVISOIRE ***',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
             const SizedBox(height: 6),
-            // Cadre du numéro réduit (flex 2, padding resserré) + QR agrandi
-            // (flex 3, 56 -> 76) — demande explicite. Reste en haut du talon,
-            // exactement comme sur cet aperçu (voir printer_service.dart /
-            // esc_pos_printer_service.dart / P3PrinterModule.kt pour le même
-            // agencement à l'impression réelle).
+            // Cadre du numéro (flex 3) + QR COMPACT (flex 1, taille fixe
+            // 44px) — demande explicite : un gros QR n'est pas le format
+            // voulu, l'étiquette de référence a un petit QR à côté du
+            // numéro. Reste en haut du talon, exactement comme sur cet
+            // aperçu (voir printer_service.dart / esc_pos_printer_service.dart
+            // / P3PrinterModule.kt / colis_receipt_pdf.dart pour le même
+            // agencement compact à l'impression réelle).
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                     decoration: BoxDecoration(border: Border.all(color: Colors.black45), borderRadius: BorderRadius.circular(4)),
                     child: Text(ref, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 3,
-                  child: Center(child: QrImageView(data: colis.id, size: 76)),
-                ),
+                const SizedBox(width: 8),
+                QrImageView(data: colis.id, size: 44),
               ],
             ),
             const SizedBox(height: 8),
@@ -628,13 +644,20 @@ class _TalonBox extends StatelessWidget {
 
 /// Sélecteur d'imprimante USB/Bluetooth réelle (Xprinter XP-Q200, Mini
 /// Printer MPT-II…) : scan, tap sur un appareil trouvé -> connexion +
-/// impression directe (reçu + talon). Pont dédié
+/// impression directe, avec choix explicite reçu + talon / reçu seul / talon seul. Pont dédié
 /// (esc_pos_printer_service.dart), distinct de la P3 intégrée et du pont
 /// desktop WisePrinter ci-dessus.
+enum _EscPosPrintJob { receiptAndTalon, receiptOnly, talonOnly }
+
 class _EscPosPrinterSheet extends ConsumerStatefulWidget {
   final Colis colis;
   final String? agentName;
-  const _EscPosPrinterSheet({required this.colis, this.agentName});
+  final _EscPosPrintJob initialJob;
+  const _EscPosPrinterSheet({
+    required this.colis,
+    this.agentName,
+    this.initialJob = _EscPosPrintJob.receiptAndTalon,
+  });
 
   @override
   ConsumerState<_EscPosPrinterSheet> createState() => _EscPosPrinterSheetState();
@@ -649,10 +672,12 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
   bool _scanningBt = false;
   bool _busy = false;
   String? _error;
+  late _EscPosPrintJob _job;
 
   @override
   void initState() {
     super.initState();
+    _job = widget.initialJob;
     // Pré-remplit avec la dernière IP réseau utilisée (YHD-8390, etc.).
     ref.read(printerServiceProvider).escPos.lastNetworkIp().then((ip) {
       if (mounted && ip != null && ip.isNotEmpty && _ipCtrl.text.isEmpty) {
@@ -684,11 +709,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
     final escPos = ref.read(printerServiceProvider).escPos;
     try {
       await escPos.connectNetwork(ip);
-      await escPos.printColisReceiptWithTalon(
-        widget.colis,
-        type: PrinterType.network,
-        agentName: widget.agentName,
-      );
+      await _printEscPos(escPos, PrinterType.network);
       await escPos.saveNetworkIp(ip);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -754,6 +775,25 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
     });
   }
 
+  Future<void> _printEscPos(EscPosPrinterService escPos, PrinterType type) {
+    switch (_job) {
+      case _EscPosPrintJob.receiptAndTalon:
+        return escPos.printColisReceiptWithTalon(
+          widget.colis,
+          type: type,
+          agentName: widget.agentName,
+        );
+      case _EscPosPrintJob.receiptOnly:
+        return escPos.printColisReceipt(
+          widget.colis,
+          type: type,
+          agentName: widget.agentName,
+        );
+      case _EscPosPrintJob.talonOnly:
+        return escPos.printColisTalon(widget.colis, type: type);
+    }
+  }
+
   Future<void> _printOn(PrinterDevice device, PrinterType type) async {
     if (_busy) return;
     setState(() {
@@ -767,7 +807,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
       } else {
         await escPos.connectBluetooth(device);
       }
-      await escPos.printColisReceiptWithTalon(widget.colis, type: type, agentName: widget.agentName);
+      await _printEscPos(escPos, type);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => _error = 'Impression impossible : $e');
@@ -824,6 +864,30 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
             ],
             const SizedBox(height: 8),
+            const Text('Document à imprimer', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            SegmentedButton<_EscPosPrintJob>(
+              segments: const [
+                ButtonSegment(
+                  value: _EscPosPrintJob.receiptAndTalon,
+                  label: Text('Reçu + talon'),
+                  icon: Icon(Icons.receipt_long, size: 16),
+                ),
+                ButtonSegment(
+                  value: _EscPosPrintJob.receiptOnly,
+                  label: Text('Reçu'),
+                  icon: Icon(Icons.receipt_long_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: _EscPosPrintJob.talonOnly,
+                  label: Text('Talon'),
+                  icon: Icon(Icons.label_outline, size: 16),
+                ),
+              ],
+              selected: {_job},
+              onSelectionChanged: _busy ? null : (values) => setState(() => _job = values.first),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 const Expanded(
@@ -888,13 +952,73 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
                       ? const SizedBox(
                           width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.wifi, size: 18),
-                  label: const Text('Imprimer'),
+                  label: Text(_job == _EscPosPrintJob.receiptOnly ? 'Reçu' : _job == _EscPosPrintJob.talonOnly ? 'Talon' : 'Imprimer'),
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PrinterGroup extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final bool enabled;
+  final String? disabledHint;
+  final VoidCallback onReceiptAndTalon;
+  final VoidCallback onReceiptOnly;
+  final VoidCallback onTalonOnly;
+
+  const _PrinterGroup({
+    required this.title,
+    required this.icon,
+    required this.enabled,
+    required this.onReceiptAndTalon,
+    required this.onReceiptOnly,
+    required this.onTalonOnly,
+    this.disabledHint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PrinterButton(
+          icon: icon,
+          label: '$title — reçu + talon',
+          enabled: enabled,
+          disabledHint: disabledHint,
+          onPressed: onReceiptAndTalon,
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: _PrinterButton(
+                icon: Icons.receipt_long_outlined,
+                label: 'Reçu seul',
+                enabled: enabled,
+                disabledHint: disabledHint,
+                onPressed: onReceiptOnly,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _PrinterButton(
+                icon: Icons.label_outline,
+                label: 'Talon seul',
+                enabled: enabled,
+                disabledHint: disabledHint,
+                onPressed: onTalonOnly,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,15 +1,31 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
-  static const String supabaseUrl = 'https://kqudaqtydimjclwaihqr.supabase.co';
-  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxdWRhcXR5ZGltamNsd2FpaHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDY1NTMsImV4cCI6MjA5NjE4MjU1M30.7bbUqLqqTDTRG4HIUFVzJdYW0NpJZWyoneUYje2JQVI';
+  static const String _rideSupabaseUrl =
+      String.fromEnvironment('RIDE_SUPABASE_URL');
+  static const String _rideSupabaseAnonKey =
+      String.fromEnvironment('RIDE_SUPABASE_ANON_KEY');
+  static const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String _supabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY');
 
   static SupabaseClient get client => Supabase.instance.client;
 
   static Future<void> initialize() async {
+    final url = _rideSupabaseUrl.isNotEmpty ? _rideSupabaseUrl : _supabaseUrl;
+    final anonKey = _rideSupabaseAnonKey.isNotEmpty
+        ? _rideSupabaseAnonKey
+        : _supabaseAnonKey;
+
+    if (url.isEmpty || anonKey.isEmpty) {
+      throw StateError(
+        'Missing RIDE_SUPABASE_URL or RIDE_SUPABASE_ANON_KEY configuration.',
+      );
+    }
+
     await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
+      url: url,
+      anonKey: anonKey,
     );
   }
 }
