@@ -8,6 +8,9 @@ class _StubPosBridge implements PosBridge {
   bool get hasWisePrinter => false;
 
   @override
+  bool get hasWebSerial => false;
+
+  @override
   Future<void> printViaWisePrinter({
     required String header,
     required List<Map<String, dynamic>> lines,
@@ -17,6 +20,18 @@ class _StubPosBridge implements PosBridge {
     bool cut = true,
   }) async {
     throw StateError('Xprinter indisponible sur cette plateforme.');
+  }
+
+  @override
+  Future<void> printViaWebSerial({
+    required String header,
+    required List<Map<String, dynamic>> lines,
+    required String qr,
+    int qrSize = 220,
+    int feedLines = 4,
+    bool cut = true,
+  }) async {
+    throw StateError('Web Serial indisponible sur cette plateforme.');
   }
 
   @override

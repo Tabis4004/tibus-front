@@ -40,6 +40,12 @@ class PrinterService {
   /// que window.WisePrinter côté Tibus web).
   bool get hasWisePrinterBridge => _bridge.hasWisePrinter;
 
+  /// API Web Serial (`navigator.serial`) détectée — Chrome/Edge desktop
+  /// uniquement, aucun wrapper ni logiciel tiers requis. C'est la voie
+  /// recommandée pour les postes Windows en prod (Xprinter branchée en USB,
+  /// sans wrapper Electron).
+  bool get hasWebSerialBridge => _bridge.hasWebSerial;
+
   /// Pont USB/Bluetooth ESC/POS (flutter_pos_printer_platform_image_3) —
   /// couvre les imprimantes physiques réelles du guichet (Xprinter XP-Q200
   /// en USB, Mini Printer MPT-II en Bluetooth) qui ne sont ni l'imprimante
@@ -466,6 +472,32 @@ class PrinterService {
   Future<void> printColisReceiptWithTalonViaWisePrinter(Colis colis, {String? agentName}) async {
     await printColisReceiptViaWisePrinter(colis, agentName: agentName);
     await printColisTalonViaWisePrinter(colis);
+  }
+
+  /// Reçu + talon colis via impression USB directe (Web Serial) — DOIT être
+  /// appelée depuis le onPressed d'un bouton (geste utilisateur requis par
+  /// la spec Web Serial, sinon la sélection du port est bloquée par le
+  /// navigateur).
+  Future<void> printColisReceiptWithTalonViaWebSerial(Colis colis, {String? agentName}) async {
+    if (!hasWebSerialBridge) {
+      throw StateError('Web Serial indisponible sur ce navigateur (Chrome/Edge desktop requis).');
+    }
+    await _bridge.printViaWebSerial(
+      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+      lines: colisReceiptLines(colis, agentName: agentName ?? _currentAgentName()),
+      qr: '',
+      qrSize: 220,
+      feedLines: 4,
+      cut: true,
+    );
+    await _bridge.printViaWebSerial(
+      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+      lines: colisTalonLines(colis),
+      qr: colis.id,
+      qrSize: 140,
+      feedLines: 3,
+      cut: true,
+    );
   }
 
   /// Fallback impression navigateur — toujours disponible, aucun pont natif
