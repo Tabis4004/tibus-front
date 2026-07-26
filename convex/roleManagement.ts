@@ -195,7 +195,7 @@ export const deleteRole = mutation({
 
     // Remove all user-role assignments for this role
     const assignments = await ctx.db
-      .query("UserRoles")
+      .query("userRoles")
       .withIndex("by_role", (q) => q.eq("roleId", args.roleId))
       .collect();
     for (const a of assignments) {
@@ -214,7 +214,7 @@ export const listUserRoles = query({
     await requireAdmin(ctx);
     if (args.userId) {
       const assignments = await ctx.db
-        .query("UserRoles")
+        .query("userRoles")
         .withIndex("by_user", (q) => q.eq("userId", args.userId!))
         .collect();
       return await Promise.all(
@@ -226,7 +226,7 @@ export const listUserRoles = query({
       );
     }
     // Return all assignments
-    const all = await ctx.db.query("UserRoles").collect();
+    const all = await ctx.db.query("userRoles").collect();
     return await Promise.all(
       all.map(async (a) => {
         const role = await ctx.db.get(a.roleId);
@@ -260,7 +260,7 @@ export const assignUserRole = mutation({
 
     // Check for duplicate assignment
     const existing = await ctx.db
-      .query("UserRoles")
+      .query("userRoles")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
     const dup = existing.find(
@@ -268,7 +268,7 @@ export const assignUserRole = mutation({
     );
     if (dup) throw new ConvexError({ message: "User already has this role", code: "CONFLICT" });
 
-    return await ctx.db.insert("UserRoles", {
+    return await ctx.db.insert("userRoles", {
       userId: args.userId,
       roleId: args.roleId,
       companyId: args.companyId,
@@ -277,7 +277,7 @@ export const assignUserRole = mutation({
 });
 
 export const removeUserRole = mutation({
-  args: { assignmentId: v.id("UserRoles") },
+  args: { assignmentId: v.id("userRoles") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     const assignment = await ctx.db.get(args.assignmentId);
