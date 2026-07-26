@@ -49,6 +49,7 @@ class ColisService {
       'p_valeur_marchandise': input.valeurMarchandise,
       'p_pourcentage_percu': input.pourcentagePercu,
       'p_bus_id': input.busId,
+      'p_custom_fields': input.customFields,
     });
     return data as Map<String, dynamic>;
   }

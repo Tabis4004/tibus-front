@@ -39,6 +39,13 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   bool _submitting = false;
   bool _montantAuto = false;
   ColisUiConfig _uiConfig = ColisUiConfig.defaults;
+  /// Contrôleurs pour les champs personnalisés de type texte/nombre (form
+  /// builder owner, voir ColisFormBuilderPanel.tsx) — créés à la volée dès
+  /// que la config est chargée (_loadReferences).
+  final Map<String, TextEditingController> _customFieldControllers = {};
+  /// Valeurs des champs personnalisés select/date/boolean (les types texte/
+  /// nombre passent par _customFieldControllers ci-dessus).
+  final Map<String, dynamic> _customFieldValues = {};
 
   bool _loadingRefs = true;
   String? _refsError;
@@ -79,7 +86,108 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
     _valeurMarchandise.removeListener(_recomputeMontantIfAuto);
     _pourcentagePercu.removeListener(_recomputeMontantIfAuto);
     _poids.removeListener(_refreshPrixMin);
+    for (final c in _customFieldControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  TextEditingController _customController(String key) =>
+      _customFieldControllers.putIfAbsent(key, () => TextEditingController());
+
+  /// Construit le widget de saisie d'un champ personnalisé selon son type
+  /// (form builder owner) — text/number partagent un TextFormField, select
+  /// un DropdownButtonFormField, date un sélecteur, boolean un switch.
+  Widget _buildCustomField(ColisCustomFieldDef field) {
+    final label = field.required ? '${field.label} *' : field.label;
+    switch (field.type) {
+      case 'number':
+        return TextFormField(
+          controller: _customController(field.key),
+          decoration: InputDecoration(labelText: label),
+          keyboardType: TextInputType.number,
+          validator: field.required ? _required : null,
+        );
+      case 'select':
+        return DropdownButtonFormField<String>(
+          value: _customFieldValues[field.key] as String?,
+          decoration: InputDecoration(labelText: label),
+          items: field.options
+              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+              .toList(),
+          onChanged: (v) => setState(() => _customFieldValues[field.key] = v),
+          validator: field.required ? (v) => v == null ? 'Champ requis' : null : null,
+        );
+      case 'date':
+        final selected = _customFieldValues[field.key] as DateTime?;
+        return InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: selected ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) setState(() => _customFieldValues[field.key] = picked);
+          },
+          child: InputDecorator(
+            decoration: InputDecoration(labelText: label),
+            child: Text(
+              selected != null
+                  ? '${selected.day.toString().padLeft(2, '0')}/${selected.month.toString().padLeft(2, '0')}/${selected.year}'
+                  : 'Sélectionner une date',
+              style: selected == null ? const TextStyle(color: Colors.grey) : null,
+            ),
+          ),
+        );
+      case 'boolean':
+        return SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(label),
+          value: _customFieldValues[field.key] == true,
+          onChanged: (v) => setState(() => _customFieldValues[field.key] = v),
+        );
+      case 'text':
+      default:
+        return TextFormField(
+          controller: _customController(field.key),
+          decoration: InputDecoration(labelText: label),
+          validator: field.required ? _required : null,
+        );
+    }
+  }
+
+  /// Valeurs saisies pour les champs personnalisés, prêtes pour
+  /// register_colis_autonome.p_custom_fields — null/vide omis.
+  Map<String, dynamic> _collectCustomFieldValues() {
+    final result = <String, dynamic>{};
+    for (final f in _uiConfig.customFields) {
+      switch (f.type) {
+        case 'number':
+          final raw = _customFieldControllers[f.key]?.text.trim();
+          if (raw != null && raw.isNotEmpty) {
+            final n = num.tryParse(raw);
+            if (n != null) result[f.key] = n;
+          }
+          break;
+        case 'boolean':
+          result[f.key] = _customFieldValues[f.key] == true;
+          break;
+        case 'date':
+          final d = _customFieldValues[f.key] as DateTime?;
+          if (d != null) result[f.key] = d.toIso8601String();
+          break;
+        case 'select':
+          final v = _customFieldValues[f.key] as String?;
+          if (v != null && v.isNotEmpty) result[f.key] = v;
+          break;
+        case 'text':
+        default:
+          final raw = _customFieldControllers[f.key]?.text.trim();
+          if (raw != null && raw.isNotEmpty) result[f.key] = raw;
+      }
+    }
+    return result;
   }
 
   Future<void> _loadReferences() async {
@@ -272,6 +380,16 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       ));
       return;
     }
+    // Champs personnalisés de type date : pas de validator Form intégré
+    // (InkWell n'est pas un FormField) — vérification manuelle ici.
+    for (final f in _uiConfig.customFields) {
+      if (f.required && f.type == 'date' && _customFieldValues[f.key] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Renseignez la date : ${f.label}.'),
+        ));
+        return;
+      }
+    }
     final valeur = double.tryParse(_valeurMarchandise.text) ?? 0;
     if (valeur <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -311,6 +429,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
           ? double.tryParse(_pourcentagePercu.text)
           : null,
       natureIds: [_selectedNatureId!],
+      customFields: _collectCustomFieldValues(),
     );
     setState(() => _submitting = true);
     try {
@@ -690,6 +809,15 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                         ),
                     ],
                   ),
+                ],
+                if (_uiConfig.customFields.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const Text('Informations complémentaires', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  for (final f in _uiConfig.customFields) ...[
+                    _buildCustomField(f),
+                    const SizedBox(height: 10),
+                  ],
                 ],
                 const SizedBox(height: 24),
                 ElevatedButton(

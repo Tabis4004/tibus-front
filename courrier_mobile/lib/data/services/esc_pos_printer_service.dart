@@ -173,12 +173,18 @@ class EscPosPrinterService {
     required String companyName,
     required String periodLabel,
     PaperSize paperSize = PaperSize.mm80,
+    ColisReportSetting reportSetting = const ColisReportSetting(),
   }) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(paperSize, profile);
     final bytes = _renderLines(
       generator,
-      colisSalesJournalLines(journal, companyName: companyName, periodLabel: periodLabel),
+      colisSalesJournalLines(
+        journal,
+        companyName: companyName,
+        periodLabel: periodLabel,
+        reportSetting: reportSetting,
+      ),
     );
     bytes.addAll(generator.feed(3));
     bytes.addAll(generator.cut());

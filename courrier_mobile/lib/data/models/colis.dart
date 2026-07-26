@@ -108,6 +108,10 @@ class Colis {
   /// (colisReceiptLines / _ReceiptBox) tant que l'ID n'est pas confirmé par
   /// le serveur.
   final bool isPendingSync;
+  /// Valeurs des champs personnalisés ajoutés par l'owner (form builder,
+  /// voir ColisFormBuilderPanel.tsx côté web) — clé -> valeur saisie par
+  /// l'agent. Vide si la compagnie n'a défini aucun champ personnalisé.
+  final Map<String, dynamic> customFields;
 
   const Colis({
     required this.id,
@@ -136,6 +140,7 @@ class Colis {
     this.companyPhone = '',
     this.photoPath,
     this.isPendingSync = false,
+    this.customFields = const {},
   });
 
   factory Colis.fromMap(Map<String, dynamic> map) {
@@ -165,6 +170,7 @@ class Colis {
       companyName: (map['companyName'] as String?)?.trim() ?? '',
       companyPhone: (map['companyPhone'] as String?)?.trim() ?? '',
       photoPath: map['photoPath'] as String?,
+      customFields: (map['customFields'] as Map?)?.cast<String, dynamic>() ?? const {},
     );
   }
 }
@@ -495,6 +501,8 @@ class RegisterColisInput {
   /// Bus qui effectue le convoi, si déjà connu à l'enregistrement (optionnel).
   final String? busId;
   final List<String> natureIds;
+  /// Valeurs saisies pour les champs personnalisés (form builder owner).
+  final Map<String, dynamic> customFields;
 
   const RegisterColisInput({
     required this.companyId,
@@ -512,5 +520,56 @@ class RegisterColisInput {
     required this.valeurMarchandise,
     this.pourcentagePercu,
     required this.natureIds,
+    this.customFields = const {},
   });
+}
+
+/// Définition d'un champ personnalisé ajouté par l'owner au formulaire
+/// d'enregistrement colis (form builder, ColisFormBuilderPanel.tsx côté
+/// web) — reflète colis_ui_config.customFields. [type] : 'text', 'number',
+/// 'select', 'date' ou 'boolean' ; [options] renseigné seulement si
+/// type == 'select'.
+class ColisCustomFieldDef {
+  final String key;
+  final String label;
+  final String type;
+  final List<String> options;
+  final bool required;
+
+  const ColisCustomFieldDef({
+    required this.key,
+    required this.label,
+    required this.type,
+    this.options = const [],
+    this.required = false,
+  });
+
+  factory ColisCustomFieldDef.fromMap(Map<String, dynamic> map) => ColisCustomFieldDef(
+        key: map['key'] as String? ?? '',
+        label: map['label'] as String? ?? (map['key'] as String? ?? ''),
+        type: map['type'] as String? ?? 'text',
+        options: (map['options'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+        required: map['required'] as bool? ?? false,
+      );
+}
+
+/// Réglage de visibilité d'un rapport (report entier + champs sensibles
+/// masqués) — reflète colis_ui_config.reports.<key>, voir
+/// ColisFormBuilderPanel.tsx et get_company_colis_settings.
+class ColisReportSetting {
+  final bool enabled;
+  final Set<String> hiddenFields;
+
+  const ColisReportSetting({this.enabled = true, this.hiddenFields = const {}});
+
+  factory ColisReportSetting.fromMap(Map<String, dynamic>? map) {
+    if (map == null) return const ColisReportSetting();
+    return ColisReportSetting(
+      enabled: map['enabled'] != false,
+      hiddenFields:
+          (map['hiddenFields'] as List?)?.map((e) => e.toString()).toSet() ?? const {},
+    );
+  }
+
+  bool showField(String key) => !hiddenFields.contains(key);
 }

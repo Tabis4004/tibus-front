@@ -22,6 +22,14 @@ import {
 } from "@/lib/supabase/colis-sales-journal.ts";
 import { getSellerCompanyReceiptInfoSupabase } from "@/lib/supabase/seller-counter.ts";
 import type { SellerCompanyReceiptInfo } from "@/lib/ticket-receipt-print.ts";
+import {
+  getCompanyColisSettingsSupabase,
+  type ColisReportConfig,
+} from "@/lib/supabase/colis-autonomes.ts";
+
+/** Réglage par défaut (rapport visible, aucun champ masqué) tant que la
+ * config owner n'est pas encore chargée — voir ColisFormBuilderPanel.tsx. */
+const DEFAULT_REPORT_CONFIG: ColisReportConfig = { enabled: true, hiddenFields: [] };
 
 function todayInputValue(): string {
   return format(new Date(), "yyyy-MM-dd");
@@ -50,12 +58,23 @@ export default function ColisSalesJournalPanel({
   const [loading, setLoading] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<SellerCompanyReceiptInfo | null>(null);
   const [showPrintView, setShowPrintView] = useState(false);
+  const [reportConfig, setReportConfig] = useState<ColisReportConfig | null>(null);
 
   useEffect(() => {
     void getSellerCompanyReceiptInfoSupabase(companyId)
       .then(setCompanyInfo)
       .catch(() => setCompanyInfo(null));
   }, [companyId]);
+
+  // Visibilité (report entier + champs sensibles) configurée par l'owner —
+  // voir ColisFormBuilderPanel.tsx / update_company_colis_ui_config.
+  useEffect(() => {
+    void getCompanyColisSettingsSupabase(companyId)
+      .then((settings) => setReportConfig(settings.uiConfig.reports.salesJournal))
+      .catch(() => setReportConfig(DEFAULT_REPORT_CONFIG));
+  }, [companyId]);
+
+  const hidden = (field: string) => (reportConfig ?? DEFAULT_REPORT_CONFIG).hiddenFields.includes(field);
 
   useEffect(() => {
     void listCompanyColisVendeursSupabase(companyId)
@@ -111,6 +130,9 @@ export default function ColisSalesJournalPanel({
     window.addEventListener("afterprint", onAfterPrint);
     return () => window.removeEventListener("afterprint", onAfterPrint);
   }, [showPrintView]);
+
+  // Rapport masqué entièrement pour cette compagnie (ColisFormBuilderPanel).
+  if (reportConfig && !reportConfig.enabled) return null;
 
   return (
     <Card>
@@ -174,8 +196,9 @@ export default function ColisSalesJournalPanel({
         ) : (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              {journal.grandCount} colis · Frais {journal.grandTotalFrais.toLocaleString()} · Valeur{" "}
-              {journal.grandTotalValeur.toLocaleString()}
+              {journal.grandCount} colis
+              {!hidden("montant") ? ` · Frais ${journal.grandTotalFrais.toLocaleString()}` : ""}
+              {!hidden("valeur") ? ` · Valeur ${journal.grandTotalValeur.toLocaleString()}` : ""}
             </p>
             <div className="space-y-3">
               {journal.groups.map((g) => (
@@ -183,8 +206,9 @@ export default function ColisSalesJournalPanel({
                   <div className="px-4 py-2 bg-muted/40 flex items-center justify-between">
                     <p className="font-semibold text-sm">{g.vendeurName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {g.count} colis · Frais {g.totalFrais.toLocaleString()} · Valeur{" "}
-                      {g.totalValeur.toLocaleString()}
+                      {g.count} colis
+                      {!hidden("montant") ? ` · Frais ${g.totalFrais.toLocaleString()}` : ""}
+                      {!hidden("valeur") ? ` · Valeur ${g.totalValeur.toLocaleString()}` : ""}
                     </p>
                   </div>
                   <div className="overflow-x-auto">
@@ -195,9 +219,9 @@ export default function ColisSalesJournalPanel({
                           <th className="py-1.5 px-3">Date</th>
                           <th className="py-1.5 px-3">Expéditeur</th>
                           <th className="py-1.5 px-3">Destinataire</th>
-                          <th className="py-1.5 px-3">Frais</th>
-                          <th className="py-1.5 px-3">Valeur</th>
-                          <th className="py-1.5 px-3">Destination</th>
+                          {!hidden("montant") && <th className="py-1.5 px-3">Frais</th>}
+                          {!hidden("valeur") && <th className="py-1.5 px-3">Valeur</th>}
+                          {!hidden("destination") && <th className="py-1.5 px-3">Destination</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -207,9 +231,11 @@ export default function ColisSalesJournalPanel({
                             <td className="py-1.5 px-3 whitespace-nowrap">{fmtDateTime(c.createdAt)}</td>
                             <td className="py-1.5 px-3">{c.nomExpediteur}</td>
                             <td className="py-1.5 px-3">{c.nomDestinataire}</td>
-                            <td className="py-1.5 px-3">{c.montantFret.toLocaleString()}</td>
-                            <td className="py-1.5 px-3">{(c.valeurMarchandise ?? 0).toLocaleString()}</td>
-                            <td className="py-1.5 px-3">{c.gareDestination}</td>
+                            {!hidden("montant") && <td className="py-1.5 px-3">{c.montantFret.toLocaleString()}</td>}
+                            {!hidden("valeur") && (
+                              <td className="py-1.5 px-3">{(c.valeurMarchandise ?? 0).toLocaleString()}</td>
+                            )}
+                            {!hidden("destination") && <td className="py-1.5 px-3">{c.gareDestination}</td>}
                           </tr>
                         ))}
                       </tbody>
@@ -269,12 +295,16 @@ export default function ColisSalesJournalPanel({
                     <span>
                       {format(parseISO(c.createdAt), "HH:mm")} {c.numeroRecu ?? "—"}
                     </span>
-                    <span>{c.montantFret.toLocaleString()} F</span>
+                    {!hidden("montant") && <span>{c.montantFret.toLocaleString()} F</span>}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>→ {c.gareDestination}</span>
-                    <span>Valeur {(c.valeurMarchandise ?? 0).toLocaleString()}</span>
-                  </div>
+                  {(!hidden("destination") || !hidden("valeur")) && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>{!hidden("destination") ? `→ ${c.gareDestination}` : ""}</span>
+                      {!hidden("valeur") && (
+                        <span>Valeur {(c.valeurMarchandise ?? 0).toLocaleString()}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               <div
@@ -290,7 +320,9 @@ export default function ColisSalesJournalPanel({
               >
                 <span>Total {g.vendeurUsername ?? g.vendeurName} ({g.count})</span>
                 <span>
-                  Frais {g.totalFrais.toLocaleString()} · Valeur {g.totalValeur.toLocaleString()}
+                  {!hidden("montant") ? `Frais ${g.totalFrais.toLocaleString()}` : ""}
+                  {!hidden("montant") && !hidden("valeur") ? " · " : ""}
+                  {!hidden("valeur") ? `Valeur ${g.totalValeur.toLocaleString()}` : ""}
                 </span>
               </div>
             </div>
@@ -307,8 +339,14 @@ export default function ColisSalesJournalPanel({
             }}
           >
             TOTAL GENERAL: {journal.grandCount} colis
-            <br />
-            Frais {journal.grandTotalFrais.toLocaleString()} · Valeur {journal.grandTotalValeur.toLocaleString()}
+            {(!hidden("montant") || !hidden("valeur")) && (
+              <>
+                <br />
+                {!hidden("montant") ? `Frais ${journal.grandTotalFrais.toLocaleString()}` : ""}
+                {!hidden("montant") && !hidden("valeur") ? " · " : ""}
+                {!hidden("valeur") ? `Valeur ${journal.grandTotalValeur.toLocaleString()}` : ""}
+              </>
+            )}
           </div>
         </div>
       )}

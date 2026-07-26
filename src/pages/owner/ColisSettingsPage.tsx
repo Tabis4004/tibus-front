@@ -4,6 +4,7 @@ import { useOwnerCompany } from "@/hooks/use-owner-company.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import ColisNaturesManager from "./_components/ColisNaturesManager.tsx";
+import ColisFormBuilderPanel from "./_components/ColisFormBuilderPanel.tsx";
 
 export default function ColisSettingsPage() {
   const { lng } = useParams<{ lng: string }>();
@@ -28,6 +29,7 @@ export default function ColisSettingsPage() {
         </Button>
       </div>
       <ColisNaturesManager key={selectedCompany.id} companyId={selectedCompany.id} />
+      <ColisFormBuilderPanel key={`${selectedCompany.id}-builder`} companyId={selectedCompany.id} />
     </div>
   );
 }

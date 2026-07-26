@@ -281,6 +281,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         journal: journal,
         companyName: companyName,
         periodLabel: _periodLabel,
+        reportSetting: _uiConfig.reports['salesJournal'] ?? const ColisReportSetting(),
       );
     } catch (e) {
       if (mounted) {

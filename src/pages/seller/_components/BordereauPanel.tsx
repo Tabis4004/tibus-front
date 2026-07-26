@@ -53,6 +53,7 @@ import {
   type BordereauListRow,
 } from "@/lib/supabase/bordereaux.ts";
 import { exportBordereauPDF } from "@/lib/colis-manifest-export.ts";
+import { getCompanyColisSettingsSupabase, type ColisReportConfig } from "@/lib/supabase/colis-autonomes.ts";
 
 type GareOption = { id: string; name: string };
 
@@ -96,6 +97,18 @@ export default function BordereauPanel({
   const [closing, setClosing] = useState(false);
   const [lastScan, setLastScan] = useState("");
   const [available, setAvailable] = useState<ColisAutonomeRow[] | undefined>(undefined);
+  // Visibilité rapport bordereau (report entier + champs sensibles, ex.
+  // montant global) configurée par l'owner — ColisFormBuilderPanel.tsx.
+  const [bordereauReportConfig, setBordereauReportConfig] = useState<ColisReportConfig>({
+    enabled: true,
+    hiddenFields: [],
+  });
+
+  useEffect(() => {
+    void getCompanyColisSettingsSupabase(companyId)
+      .then((settings) => setBordereauReportConfig(settings.uiConfig.reports.bordereau))
+      .catch(() => {});
+  }, [companyId]);
 
   const loadList = useCallback(() => {
     setList(undefined);
@@ -270,15 +283,17 @@ export default function BordereauPanel({
                 ? t("colis.bordereau_open", { defaultValue: "En cours" })
                 : t("colis.bordereau_closed", { defaultValue: "Emballé" })}
             </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              className="cursor-pointer gap-1"
-              onClick={() => exportBordereauPDF(detail)}
-            >
-              <PrinterIcon className="w-3.5 h-3.5" />
-              {t("colis.bordereau_print", { defaultValue: "Imprimer" })}
-            </Button>
+            {bordereauReportConfig.enabled ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer gap-1"
+                onClick={() => exportBordereauPDF(detail, { hiddenFields: bordereauReportConfig.hiddenFields })}
+              >
+                <PrinterIcon className="w-3.5 h-3.5" />
+                {t("colis.bordereau_print", { defaultValue: "Imprimer" })}
+              </Button>
+            ) : null}
             {isOpen ? (
               <Button
                 size="sm"

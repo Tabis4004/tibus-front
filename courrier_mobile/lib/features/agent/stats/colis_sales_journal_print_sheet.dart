@@ -16,6 +16,9 @@ Future<void> showColisSalesJournalPrintSheet(
   required ColisSalesJournal journal,
   required String companyName,
   required String periodLabel,
+  /// Champs sensibles masqués sur ce rapport (form builder owner) — voir
+  /// ColisFormBuilderPanel.tsx / get_company_colis_settings.
+  ColisReportSetting reportSetting = const ColisReportSetting(),
 }) {
   return showModalBottomSheet(
     context: context,
@@ -24,6 +27,7 @@ Future<void> showColisSalesJournalPrintSheet(
       journal: journal,
       companyName: companyName,
       periodLabel: periodLabel,
+      reportSetting: reportSetting,
     ),
   );
 }
@@ -32,11 +36,13 @@ class _ColisSalesJournalPrintSheet extends ConsumerStatefulWidget {
   final ColisSalesJournal journal;
   final String companyName;
   final String periodLabel;
+  final ColisReportSetting reportSetting;
 
   const _ColisSalesJournalPrintSheet({
     required this.journal,
     required this.companyName,
     required this.periodLabel,
+    this.reportSetting = const ColisReportSetting(),
   });
 
   @override
@@ -94,7 +100,12 @@ class _ColisSalesJournalPrintSheetState extends ConsumerState<_ColisSalesJournal
                 ],
               ),
               const SizedBox(height: 8),
-              _SalesJournalBox(journal: journal, companyName: widget.companyName, periodLabel: widget.periodLabel),
+              _SalesJournalBox(
+                journal: journal,
+                companyName: widget.companyName,
+                periodLabel: widget.periodLabel,
+                reportSetting: widget.reportSetting,
+              ),
               const SizedBox(height: 16),
               Text(
                 'Choisir une imprimante',
@@ -111,6 +122,7 @@ class _ColisSalesJournalPrintSheetState extends ConsumerState<_ColisSalesJournal
                     journal,
                     companyName: widget.companyName,
                     periodLabel: widget.periodLabel,
+                    reportSetting: widget.reportSetting,
                   ),
                   successMessage: 'Journal envoyé (Xprinter).',
                 ),
@@ -127,6 +139,7 @@ class _ColisSalesJournalPrintSheetState extends ConsumerState<_ColisSalesJournal
                     companyName: widget.companyName,
                     periodLabel: widget.periodLabel,
                     paperWidthMm: 58,
+                    reportSetting: widget.reportSetting,
                   ),
                   successMessage: 'Journal envoyé (imprimante intégrée, 56 mm).',
                 ),
@@ -142,6 +155,7 @@ class _ColisSalesJournalPrintSheetState extends ConsumerState<_ColisSalesJournal
                       journal,
                       companyName: widget.companyName,
                       periodLabel: widget.periodLabel,
+                      reportSetting: widget.reportSetting,
                     );
                     return;
                   }
@@ -164,6 +178,7 @@ class _ColisSalesJournalPrintSheetState extends ConsumerState<_ColisSalesJournal
                     journal: journal,
                     companyName: widget.companyName,
                     periodLabel: widget.periodLabel,
+                    reportSetting: widget.reportSetting,
                   ),
                 ),
               ),
@@ -183,11 +198,20 @@ class _SalesJournalBox extends StatelessWidget {
   final ColisSalesJournal journal;
   final String companyName;
   final String periodLabel;
+  final ColisReportSetting reportSetting;
 
-  const _SalesJournalBox({required this.journal, required this.companyName, required this.periodLabel});
+  const _SalesJournalBox({
+    required this.journal,
+    required this.companyName,
+    required this.periodLabel,
+    this.reportSetting = const ColisReportSetting(),
+  });
 
   @override
   Widget build(BuildContext context) {
+    final showMontant = reportSetting.showField('montant');
+    final showValeur = reportSetting.showField('valeur');
+    final showDestination = reportSetting.showField('destination');
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black87, width: 1.4),
@@ -231,14 +255,16 @@ class _SalesJournalBox extends StatelessWidget {
                         ),
                         Text('Exp: ${c.nomExpediteur}'),
                         Text('Dest: ${c.nomDestinataire}'),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Frais: ${c.montantFret.toStringAsFixed(0)}'),
-                            Text('Valeur: ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}'),
-                          ],
-                        ),
-                        Text('Destination: ${c.gareDestination}'),
+                        if (showMontant || showValeur)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              if (showMontant) Text('Frais: ${c.montantFret.toStringAsFixed(0)}'),
+                              if (showValeur)
+                                Text('Valeur: ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}'),
+                            ],
+                          ),
+                        if (showDestination) Text('Destination: ${c.gareDestination}'),
                       ],
                     ),
                   ),
@@ -249,7 +275,14 @@ class _SalesJournalBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(child: Text('Total ${g.vendeurUsername ?? g.vendeurName} (${g.count})', style: const TextStyle(fontWeight: FontWeight.bold))),
-                      Text('F ${g.totalFrais.toStringAsFixed(0)} / V ${g.totalValeur.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (showMontant || showValeur)
+                        Text(
+                          [
+                            if (showMontant) 'F ${g.totalFrais.toStringAsFixed(0)}',
+                            if (showValeur) 'V ${g.totalValeur.toStringAsFixed(0)}',
+                          ].join(' / '),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                     ],
                   ),
                 ),
@@ -260,11 +293,15 @@ class _SalesJournalBox extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
-              Text(
-                'Frais ${journal.grandTotalFrais.toStringAsFixed(0)} - Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              if (showMontant || showValeur)
+                Text(
+                  [
+                    if (showMontant) 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
+                    if (showValeur) 'Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
+                  ].join(' - '),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
             ],
           ),
         ),
@@ -281,11 +318,13 @@ class _SalesJournalEscPosPrinterSheet extends ConsumerStatefulWidget {
   final ColisSalesJournal journal;
   final String companyName;
   final String periodLabel;
+  final ColisReportSetting reportSetting;
 
   const _SalesJournalEscPosPrinterSheet({
     required this.journal,
     required this.companyName,
     required this.periodLabel,
+    this.reportSetting = const ColisReportSetting(),
   });
 
   @override
@@ -376,6 +415,7 @@ class _SalesJournalEscPosPrinterSheetState extends ConsumerState<_SalesJournalEs
         type: type,
         companyName: widget.companyName,
         periodLabel: widget.periodLabel,
+        reportSetting: widget.reportSetting,
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

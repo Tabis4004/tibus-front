@@ -251,6 +251,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         journal: journal,
         companyName: companyName,
         periodLabel: "Aujourd'hui",
+        reportSetting: _uiConfig.reports['salesJournal'] ?? const ColisReportSetting(),
       );
     } catch (e) {
       if (mounted) {

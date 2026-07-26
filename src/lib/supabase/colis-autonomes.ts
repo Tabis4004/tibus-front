@@ -14,10 +14,132 @@ export type ColisNature = {
   prixMinTaux?: number | null;
 };
 
+/** Un champ personnalisé ajouté par l'owner au formulaire d'enregistrement colis. */
+export type ColisCustomFieldType = "text" | "number" | "select" | "date" | "boolean";
+
+export type ColisCustomField = {
+  /** Clé stable (slug) — sert de clé dans colis_autonomes.custom_fields. */
+  key: string;
+  label: string;
+  type: ColisCustomFieldType;
+  /** Options de la liste déroulante, uniquement si type === "select". */
+  options?: string[];
+  required?: boolean;
+};
+
+/** Rapports dont l'owner peut piloter la visibilité globale + certains champs sensibles. */
+export const COLIS_REPORT_KEYS = ["salesJournal", "cashJournal", "bordereau", "stats"] as const;
+export type ColisReportKey = (typeof COLIS_REPORT_KEYS)[number];
+
+export type ColisReportConfig = {
+  enabled: boolean;
+  hiddenFields: string[];
+};
+
+/** Champs "sensibles" masquables par rapport, tout en gardant le rapport visible. */
+export const COLIS_REPORT_FIELD_REGISTRY: Record<ColisReportKey, { key: string; label: string }[]> = {
+  salesJournal: [
+    { key: "montant", label: "Prix / frais d'envoi" },
+    { key: "valeur", label: "Valeur marchandise" },
+    { key: "destination", label: "Destination" },
+  ],
+  cashJournal: [
+    { key: "totalEncaisse", label: "Total encaissé" },
+    { key: "totalDecaisse", label: "Total décaissé" },
+    { key: "solde", label: "Solde final" },
+  ],
+  bordereau: [
+    { key: "montantTotal", label: "Montant total (frais d'envoi)" },
+    { key: "valeurTotal", label: "Valeur totale des marchandises" },
+  ],
+  stats: [
+    { key: "montant", label: "Montants (XOF)" },
+  ],
+};
+
+export const COLIS_REPORT_LABELS: Record<ColisReportKey, string> = {
+  salesJournal: "Journal de vente",
+  cashJournal: "Journal de caisse",
+  bordereau: "Bordereau d'envoi (manifeste / emballage)",
+  stats: "Rapport d'activité (Stats)",
+};
+
+/** Champs natifs du formulaire d'enregistrement colis, masquables par l'owner. */
+export const COLIS_BUILTIN_FORM_FIELDS: { key: string; label: string }[] = [
+  { key: "description", label: "Description du contenu" },
+  { key: "poids", label: "Poids (kg)" },
+  { key: "pieces", label: "Nombre de pièces" },
+  { key: "pourcentagePercu", label: "Pourcentage perçu (calcul auto du montant)" },
+  { key: "photo", label: "Photo du colis" },
+];
+
+export type ColisUiConfig = {
+  /** Visibilité des champs natifs du formulaire (clé -> visible). Absent = visible. */
+  formFields: Record<string, boolean>;
+  /** Champs personnalisés ajoutés par l'owner. */
+  customFields: ColisCustomField[];
+  /** Visibilité + champs masqués par rapport. */
+  reports: Record<ColisReportKey, ColisReportConfig>;
+};
+
+function defaultReportConfig(): Record<ColisReportKey, ColisReportConfig> {
+  return {
+    salesJournal: { enabled: true, hiddenFields: [] },
+    cashJournal: { enabled: true, hiddenFields: [] },
+    bordereau: { enabled: true, hiddenFields: [] },
+    stats: { enabled: true, hiddenFields: [] },
+  };
+}
+
+export function mapUiConfig(raw: unknown): ColisUiConfig {
+  const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const formFieldsSrc = (source.formFields && typeof source.formFields === "object" ? source.formFields : {}) as Record<string, unknown>;
+  const formFields: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(formFieldsSrc)) formFields[k] = v !== false;
+
+  const customFieldsSrc = Array.isArray(source.customFields) ? source.customFields : [];
+  const customFields: ColisCustomField[] = customFieldsSrc
+    .filter((f): f is Record<string, unknown> => Boolean(f) && typeof f === "object")
+    .map((f) => ({
+      key: String(f.key ?? ""),
+      label: String(f.label ?? f.key ?? ""),
+      type: (["text", "number", "select", "date", "boolean"].includes(String(f.type))
+        ? f.type
+        : "text") as ColisCustomFieldType,
+      options: Array.isArray(f.options) ? f.options.map((o) => String(o)) : undefined,
+      required: Boolean(f.required),
+    }))
+    .filter((f) => f.key);
+
+  const reports = defaultReportConfig();
+  const reportsSrc = (source.reports && typeof source.reports === "object" ? source.reports : {}) as Record<string, unknown>;
+  for (const key of COLIS_REPORT_KEYS) {
+    const entry = reportsSrc[key];
+    if (entry && typeof entry === "object") {
+      const e = entry as Record<string, unknown>;
+      reports[key] = {
+        enabled: e.enabled !== false,
+        hiddenFields: Array.isArray(e.hiddenFields) ? e.hiddenFields.map((x) => String(x)) : [],
+      };
+    }
+  }
+
+  return { formFields, customFields, reports };
+}
+
+export function colisUiConfigToJson(config: ColisUiConfig): Record<string, unknown> {
+  return {
+    formFields: config.formFields,
+    customFields: config.customFields,
+    reports: config.reports,
+  };
+}
+
 export type CompanyColisSettings = {
   companyId: string;
   colisAutonomeEnabled: boolean;
   colisSmsConfigEnabled: boolean;
+  uiConfig: ColisUiConfig;
   /** Étapes incluses dans l'offre de la compagnie (décidées par la plateforme). */
   smsAllowedEnregistre: boolean;
   smsAllowedCharge: boolean;
@@ -74,6 +196,8 @@ export type ColisAutonomeRow = {
   gareDepartPhone?: string | null;
   gareDestination: string;
   natures: string[];
+  /** Valeurs des champs personnalisés définis par l'owner (form builder), clé -> valeur. */
+  customFields?: Record<string, unknown>;
 };
 
 export type ColisAutonomeDetail = ColisAutonomeRow & {
@@ -123,6 +247,7 @@ function mapSettings(data: Record<string, unknown>): CompanyColisSettings {
       data.colisPrixMinTauxGeneral != null ? Number(data.colisPrixMinTauxGeneral) : null,
     colisPourcentagePercuGeneral:
       data.colisPourcentagePercuGeneral != null ? Number(data.colisPourcentagePercuGeneral) : null,
+    uiConfig: mapUiConfig(data.uiConfig),
   };
 }
 
@@ -152,6 +277,9 @@ export function mapColisRow(row: Record<string, unknown>): ColisAutonomeRow {
     gareDepartPhone: row.gareDepartPhone ? String(row.gareDepartPhone) : null,
     gareDestination: String(row.gareDestination ?? ""),
     natures,
+    customFields: (row.customFields && typeof row.customFields === "object"
+      ? (row.customFields as Record<string, unknown>)
+      : {}),
   };
 }
 
@@ -178,6 +306,23 @@ export async function updateCompanyColisSmsSettingsSupabase(
     p_sms_on_charge: input.smsOnCharge,
     p_sms_on_arrive: input.smsOnArrive,
     p_sms_on_livre: input.smsOnLivre,
+  });
+  if (error) throw error;
+  return mapSettings((data ?? {}) as Record<string, unknown>);
+}
+
+/**
+ * Enregistre la configuration du formulaire colis (champs natifs + champs
+ * personnalisés) et de la visibilité des rapports (report entier +
+ * champs sensibles internes) — écran owner ColisFormBuilderPanel.
+ */
+export async function updateCompanyColisUiConfigSupabase(
+  companyId: string,
+  config: ColisUiConfig,
+): Promise<CompanyColisSettings> {
+  const { data, error } = await supabase.rpc("update_company_colis_ui_config", {
+    p_company_id: companyId,
+    p_ui_config: colisUiConfigToJson(config),
   });
   if (error) throw error;
   return mapSettings((data ?? {}) as Record<string, unknown>);
@@ -312,6 +457,8 @@ export type RegisterColisInput = {
   /** Bus qui effectue le convoi, si déjà connu à l'enregistrement (optionnel). */
   busId?: string | null;
   natureIds: string[];
+  /** Valeurs des champs personnalisés (form builder owner), clé -> valeur saisie. */
+  customFields?: Record<string, unknown>;
 };
 
 export async function registerColisAutonomeSupabase(
@@ -333,6 +480,7 @@ export async function registerColisAutonomeSupabase(
     p_valeur_marchandise: input.valeurMarchandise,
     p_pourcentage_percu: input.pourcentagePercu ?? null,
     p_bus_id: input.busId ?? null,
+    p_custom_fields: input.customFields ?? {},
   });
   if (error) throwSupabaseError(error, "Enregistrement colis impossible");
   const row = (data ?? {}) as Record<string, unknown>;

@@ -126,7 +126,11 @@ export function exportColisManifestPDF(rows: ColisAutonomeRow[], meta: ColisMani
 // accompagner le convoyage et être émargé à la gare de destination.
 import type { BordereauDetail } from "@/lib/supabase/bordereaux.ts";
 
-export function exportBordereauPDF(bordereau: BordereauDetail) {
+export function exportBordereauPDF(
+  bordereau: BordereauDetail,
+  opts?: { hiddenFields?: string[] },
+) {
+  const hideMontantTotal = opts?.hiddenFields?.includes("montantTotal") ?? false;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const totalFret = bordereau.colis.reduce((sum, row) => sum + row.montantFret, 0);
   const totalPieces = bordereau.colis.reduce((sum, row) => sum + row.nombrePieces, 0);
@@ -160,7 +164,8 @@ export function exportBordereauPDF(bordereau: BordereauDetail) {
     36,
   );
   doc.text(
-    `Colis : ${bordereau.colis.length} · Pièces : ${totalPieces} · Total fret : ${totalFret.toLocaleString()}`,
+    `Colis : ${bordereau.colis.length} · Pièces : ${totalPieces}` +
+      (hideMontantTotal ? "" : ` · Total fret : ${totalFret.toLocaleString()}`),
     14,
     42,
   );

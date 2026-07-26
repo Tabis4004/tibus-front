@@ -309,7 +309,13 @@ class PrinterService {
     required String companyName,
     required String periodLabel,
     int paperWidthMm = 58,
+    /// Champs sensibles masqués sur ce rapport, réglé par l'owner — voir
+    /// ColisFormBuilderPanel.tsx (web) / get_company_colis_settings.
+    ColisReportSetting reportSetting = const ColisReportSetting(),
   }) {
+    final showMontant = reportSetting.showField('montant');
+    final showValeur = reportSetting.showField('valeur');
+    final showDestination = reportSetting.showField('destination');
     // Format demandé par le client : heure - code colis - prix -
     // destination - valeur, groupé par agent, avec la date d'impression
     // du jour en en-tête (plus d'expéditeur/destinataire).
@@ -324,16 +330,21 @@ class PrinterService {
       for (final c in group.colis) {
         rows.add([
           '${formatSalesJournalHour(c.createdAt)}  ${c.numeroRecu ?? "—"}',
-          '${c.montantFret.toStringAsFixed(0)}F',
+          showMontant ? '${c.montantFret.toStringAsFixed(0)}F' : '',
         ]);
-        rows.add([
-          '  -> ${c.gareDestination}',
-          'Val ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}',
-        ]);
+        if (showDestination || showValeur) {
+          rows.add([
+            showDestination ? '  -> ${c.gareDestination}' : '',
+            showValeur ? 'Val ${(c.valeurMarchandise ?? 0).toStringAsFixed(0)}' : '',
+          ]);
+        }
       }
       rows.add([
         'Total ${group.vendeurUsername ?? group.vendeurName} (${group.count})',
-        'F ${group.totalFrais.toStringAsFixed(0)} / V ${group.totalValeur.toStringAsFixed(0)}',
+        [
+          if (showMontant) 'F ${group.totalFrais.toStringAsFixed(0)}',
+          if (showValeur) 'V ${group.totalValeur.toStringAsFixed(0)}',
+        ].join(' / '),
       ]);
       rows.add(['--------------------------------', '']);
     }
@@ -346,8 +357,10 @@ class PrinterService {
       reference: 'TOTAL  ${journal.grandCount} colis',
       rows: rows,
       qr: '',
-      footer: 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)} '
-          '- Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
+      footer: [
+        if (showMontant) 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
+        if (showValeur) 'Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
+      ].join(' - '),
       paperWidthMm: paperWidthMm,
     );
   }
@@ -359,13 +372,19 @@ class PrinterService {
     ColisSalesJournal journal, {
     required String companyName,
     required String periodLabel,
+    ColisReportSetting reportSetting = const ColisReportSetting(),
   }) {
     if (!hasWisePrinterBridge) {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
       header: companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
-      lines: colisSalesJournalLines(journal, companyName: companyName, periodLabel: periodLabel),
+      lines: colisSalesJournalLines(
+        journal,
+        companyName: companyName,
+        periodLabel: periodLabel,
+        reportSetting: reportSetting,
+      ),
       qr: '',
       qrSize: 0,
       feedLines: 3,
