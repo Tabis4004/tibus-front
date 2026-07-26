@@ -1,11 +1,11 @@
 {
-    "name": "Tibus Livraison",
-    "short_name": "Tibus Livraison",
+    "name": "Tibus Courrier",
+    "short_name": "Tibus Courrier",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
     "theme_color": "#16507A",
-    "description": "Espace chauffeur/livreur — livraisons et courses VTC.",
+    "description": "Suivi et gestion de colis Tibus — agents et clients.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

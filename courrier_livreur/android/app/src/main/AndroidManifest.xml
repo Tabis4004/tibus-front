@@ -1,22 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Absente par défaut du manifest release (seulement générée dans
          android/app/src/debug/) : sans elle, l'app release n'a aucun accès
-         réseau (login/Supabase impossibles). -->
+         réseau (login/API impossibles). -->
     <uses-permission android:name="android.permission.INTERNET"/>
-
-    <!-- Scan QR/référence colis (guichet, contrôle embarquement) — voir
-         features/agent/colis/colis_scan_screen.dart. -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-
-    <!-- Permissions Bluetooth pour l'imprimante thermique -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application
-        android:label="courrier"
+        android:label="Tibus Livraison"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

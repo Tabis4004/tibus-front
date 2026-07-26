@@ -24,30 +24,28 @@ flutter config --enable-web --no-analytics
 flutter doctor -v || true
 
 # web/ est gitignored (régénérable, comme android/ios/macos/linux/windows) :
-# on le reconstitue avant le build. Non destructif pour lib/ existant.
-# 1. Génération de l'environnement web par Flutter
-#!/bin/bash
-set -e
-
-if [ ! -d "$HOME/flutter" ]; then
-  git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$HOME/flutter"
-fi
-export PATH="$PATH:$HOME/flutter/bin"
-
-flutter config --enable-web --no-analytics
-flutter doctor -v || true
-
-# Génération propre sans écraser si web existe déjà
+# on le reconstitue avant le build si absent. Non destructif pour lib/ existant.
 if [ ! -d "web" ]; then
   flutter create . --platforms=web --project-name courrier_livreur --org com.tibus --template app
 fi
 
-# Copie forcée des assets de branding par-dessus le dossier web
+# Copie forcée des assets de branding par-dessus le dossier web (source de
+# vérité : branding/webassets/, suivi par git — voir CLAUDE.md).
 if [ -d "branding/webassets" ]; then
+  mkdir -p web/icons
   cp -f branding/webassets/favicon.png web/favicon.png 2>/dev/null || true
-  cp -f branding/webassets/favicon.svg web/favicon.svg 2>/dev/null || true
+  cp -f branding/webassets/favicon.ico web/favicon.ico 2>/dev/null || true
+  cp -f branding/webassets/favicon-16x16.png web/favicon-16x16.png 2>/dev/null || true
+  cp -f branding/webassets/favicon-32x32.png web/favicon-32x32.png 2>/dev/null || true
+  cp -f branding/webassets/favicon-48x48.png web/favicon-48x48.png 2>/dev/null || true
+  cp -f branding/webassets/apple-touch-icon.png web/apple-touch-icon.png 2>/dev/null || true
+  cp -f branding/webassets/icons/Icon-192.png web/icons/Icon-192.png 2>/dev/null || true
+  cp -f branding/webassets/icons/Icon-512.png web/icons/Icon-512.png 2>/dev/null || true
+  cp -f branding/webassets/icons/Icon-maskable-192.png web/icons/Icon-maskable-192.png 2>/dev/null || true
+  cp -f branding/webassets/icons/Icon-maskable-512.png web/icons/Icon-maskable-512.png 2>/dev/null || true
   cp -f branding/webassets/manifest.json web/manifest.json 2>/dev/null || true
+  cp -f branding/webassets/index.html web/index.html 2>/dev/null || true
 fi
 
 flutter pub get
-flutter build web --release 
+flutter build web --release

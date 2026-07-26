@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Remplace l'ancienne reconstitution vectorielle approximative par le
+     vrai logo (bitmap fourni par l'utilisateur, icons.zip 2026-07-26) —
+     un fichier par densité dans mipmap-*/ic_launcher_foreground_img.png. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/ic_launcher_foreground_img"
+    android:gravity="center" />
