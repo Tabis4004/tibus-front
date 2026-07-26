@@ -12,12 +12,17 @@ Future<void> main() async {
     await dotenv.load(fileName: '.env');
   } catch (_) {}
 
-  // Initialisation directe de Supabase — projet "Tibus Ride" (bjtklpjdsmqmzhncfflu),
-  // le même que tibusride-front et courrier_livreur. Voir CLAUDE.md : ne pas
-  // confondre avec kqudaqtydimjclwaihqr ("Tibus 1.0", base bus/Colis Autonome).
+  // CORRECTIF (v2) : ma première correction (session du 2026-07-26) avait mis
+  // l'URL Ride ici — c'était l'inverse de ce qu'il fallait. Ce singleton
+  // `Supabase.instance` est utilisé par TibusBackend ("compte Tibus
+  // principal", voir data/services/tibus_backend.dart) : il doit rester sur
+  // kqudaqtydimjclwaihqr ("Tibus 1.0"). RideBackend, lui, construit SA PROPRE
+  // instance SupabaseClient séparée (voir ride_backend.dart) — les deux
+  // backends coexistent, pas de conflit entre eux. Clé anon reprise de
+  // courrier_mobile/.env.example (même projet, ref vérifié = kqudaqtydimjclwaihqr).
   await Supabase.initialize(
-    url: 'https://bjtklpjdsmqmzhncfflu.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ',
+    url: 'https://kqudaqtydimjclwaihqr.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxdWRhcXR5ZGltamNsd2FpaHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDY1NTMsImV4cCI6MjA5NjE4MjU1M30.7bbUqLqqTDTRG4HIUFVzJdYW0NpJZWyoneUYje2JQVI',
   );
 
   runApp(const ProviderScope(child: CourrierApp()));
