@@ -213,7 +213,7 @@ export async function listOwnerStationsSupabase(
   const managerNameById = new Map<string, string>();
   if (managerIds.length) {
     const { data: managers } = await supabase
-      .from("users")
+      .from("Users")
       .select("id, firstName, lastName, email")
       .in("id", managerIds);
     for (const manager of managers ?? []) {
@@ -561,7 +561,7 @@ export async function findAssignableCompanyUserByEmailSupabase(
   if (!isRpcResultTypeMismatch(error)) throw error;
 
   const { data: userRow, error: directError } = await supabase
-    .from("users")
+    .from("Users")
     .select("id, firstName, lastName, email")
     .ilike("email", normalizedEmail)
     .maybeSingle();
@@ -635,7 +635,7 @@ export async function assignCompanySellerByEmailSupabase(input: {
 
   if (result.error && isRpcResultTypeMismatch(result.error)) {
     const { data: userRow, error: lookupError } = await supabase
-      .from("users")
+      .from("Users")
       .select("id, firstName, lastName, email")
       .ilike("email", email)
       .maybeSingle();

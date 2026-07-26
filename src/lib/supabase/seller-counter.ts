@@ -68,7 +68,7 @@ export async function getSellerProfileSupabase(
   preferredCompanyId?: string | null,
 ): Promise<SellerProfileSupabase | null> {
   const { data: user, error: userError } = await supabase
-    .from("users")
+    .from("Users")
     .select("id, firstName, lastName, email")
     .eq("id", appUserId)
     .maybeSingle();

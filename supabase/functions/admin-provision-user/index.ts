@@ -156,7 +156,7 @@ async function resolveCountryId(
   }
 
   const { data: user, error: userError } = await admin
-    .from("users")
+    .from("Users")
     .select("countryId")
     .eq("id", appUserId)
     .maybeSingle();
@@ -273,7 +273,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: existingUser } = await admin
-      .from("users")
+      .from("Users")
       .select("id")
       .eq("email", email)
       .maybeSingle();
@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
     const username = buildUsername(email, authData.user.id);
 
     const { data: profile, error: profileError } = await admin
-      .from("users")
+      .from("Users")
       .insert({
         auth_user_id: authData.user.id,
         firstName,
@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
       const role = roleMap.get(roleName);
       if (!role) {
         await admin.auth.admin.deleteUser(authData.user.id);
-        await admin.from("users").delete().eq("id", userId);
+        await admin.from("Users").delete().eq("id", userId);
         return jsonResponse(
           { error: `Rôle introuvable en base : ${roleName}. Vérifiez les migrations SQL (001_roles_model).` },
           500,
@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
       const scope = role.scope as string;
       if (scope === "company" && !companyId) {
         await admin.auth.admin.deleteUser(authData.user.id);
-        await admin.from("users").delete().eq("id", userId);
+        await admin.from("Users").delete().eq("id", userId);
         return jsonResponse({ error: `Compagnie requise pour le rôle ${roleName}` }, 400);
       }
 
@@ -368,7 +368,7 @@ Deno.serve(async (req) => {
       const { error: assignError } = await admin.from("UserRoles").insert(insert);
       if (assignError && !assignError.message.includes("duplicate")) {
         await admin.auth.admin.deleteUser(authData.user.id);
-        await admin.from("users").delete().eq("id", userId);
+        await admin.from("Users").delete().eq("id", userId);
         const status = assignError.message.includes("ADMIN_PAYS_COUNTRY_TAKEN") ? 409 : 500;
         return jsonResponse({ error: mapAssignErrorMessage(assignError.message) }, status);
       }
@@ -391,7 +391,7 @@ Deno.serve(async (req) => {
     const missingRequired = requiredCompanyRoles.filter((r) => !assignedRoles.includes(r));
     if (missingRequired.length > 0) {
       await admin.auth.admin.deleteUser(authData.user.id);
-      await admin.from("users").delete().eq("id", userId);
+      await admin.from("Users").delete().eq("id", userId);
       return jsonResponse(
         { error: `Échec attribution des rôles : ${missingRequired.join(", ")}` },
         500,

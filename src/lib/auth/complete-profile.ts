@@ -27,7 +27,7 @@ export async function completeUserProfile(input: CompleteProfileInput) {
   const { firstName, lastName } = splitName(input.fullName);
 
   const { data: existingUsername, error: usernameError } = await supabase
-    .from("users")
+    .from("Users")
     .select("id")
     .eq("username", username)
     .maybeSingle();
@@ -49,7 +49,7 @@ export async function completeUserProfile(input: CompleteProfileInput) {
   }
 
   const { error: updateError } = await supabase
-    .from("users")
+    .from("Users")
     .update({
       firstName,
       lastName,
@@ -86,7 +86,7 @@ export async function applySignupProfile(input: SignupProfileInput): Promise<voi
   const username = buildUsername(input.email, input.userId);
 
   const { error } = await supabase
-    .from("users")
+    .from("Users")
     .update({
       firstName,
       lastName,

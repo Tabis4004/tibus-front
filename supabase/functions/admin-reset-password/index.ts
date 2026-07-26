@@ -69,7 +69,7 @@ async function resolveAppUserId(
   authUserId: string,
 ): Promise<string | null> {
   const { data, error } = await admin
-    .from("users")
+    .from("Users")
     .select("id")
     .eq("auth_user_id", authUserId)
     .maybeSingle();
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: targetProfile, error: targetError } = await admin
-      .from("users")
+      .from("Users")
       .select("id, auth_user_id, firstName, lastName, email")
       .eq("id", targetUserId)
       .maybeSingle();

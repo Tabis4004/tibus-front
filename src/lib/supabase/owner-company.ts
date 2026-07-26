@@ -239,7 +239,7 @@ async function readStoredActiveOwnerCompanyId(
   appUserId: string,
 ): Promise<string | null> {
   const { data, error } = await supabase
-    .from("users")
+    .from("Users")
     .select("activeOwnerCompanyId")
     .eq("id", appUserId)
     .maybeSingle();
