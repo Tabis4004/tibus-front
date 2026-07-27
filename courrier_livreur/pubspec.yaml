@@ -1,7 +1,7 @@
 name: courrier_livreur
 description: "Courrier Livreur — app chauffeur VTC pour les livraisons de colis Tibus, sur le backend Tibus Ride."
 publish_to: 'none'
-version: 0.1.0
+version: 0.1.0+5
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

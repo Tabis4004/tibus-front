@@ -1,7 +1,7 @@
 name: courrier_mobile
 description: "Courrier — application mobile de gestion et de suivi de colis, dérivée du module Colis Autonome de Tibus."
 publish_to: 'none'
-version: 0.1.0
+version: 0.1.0+5
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

@@ -14,13 +14,8 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
-         // Ajouts requis pour xprinter_sdk
-        maven {
-            url "${project(':aar').projectDir}/build" // pour build.gradle
-            // url = uri(project(":xprinter_sdk").projectDir.resolve("mvn")) // (si build.gradle.kts)
-        }
-        maven { url 'https://jitpack.io' }
     }
+}
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
