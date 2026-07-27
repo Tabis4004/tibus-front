@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RIDE_SUPABASE_URL="${RIDE_SUPABASE_URL:-${SUPABASE_URL:-}}"
-RIDE_SUPABASE_ANON_KEY="${RIDE_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-}}"
+# Defaults = projet Supabase "Tibus 1.0" (kqudaqtydimjclwaihqr), la base de
+# courrier_mobile — voir CLAUDE.md. Ne PAS mettre ici les identifiants de
+# Tibus Ride (bjtklpjdsmqmzhncfflu), utilisés par courrier_client/livreur.
+RIDE_SUPABASE_URL="${RIDE_SUPABASE_URL:-${SUPABASE_URL:-https://kqudaqtydimjclwaihqr.supabase.co}}"
+RIDE_SUPABASE_ANON_KEY="${RIDE_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxdWRhcXR5ZGltamNsd2FpaHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDY1NTMsImV4cCI6MjA5NjE4MjU1M30.7bbUqLqqTDTRG4HIUFVzJdYW0NpJZWyoneUYje2JQVI}}"
 
 : "${RIDE_SUPABASE_URL:?Set RIDE_SUPABASE_URL or SUPABASE_URL in Vercel Environment Variables}"
 : "${RIDE_SUPABASE_ANON_KEY:?Set RIDE_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY in Vercel Environment Variables}"
