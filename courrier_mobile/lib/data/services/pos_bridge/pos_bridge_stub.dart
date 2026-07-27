@@ -18,6 +18,7 @@ class _StubPosBridge implements PosBridge {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   }) async {
     throw StateError('Xprinter indisponible sur cette plateforme.');
   }
@@ -30,6 +31,7 @@ class _StubPosBridge implements PosBridge {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   }) async {
     throw StateError('Web Serial indisponible sur cette plateforme.');
   }

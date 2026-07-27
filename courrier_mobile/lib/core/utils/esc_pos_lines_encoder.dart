@@ -18,6 +18,12 @@ class EscPosLinesEncoder {
   static const int _esc = 0x1B;
   static const int _gs = 0x1D;
 
+  /// [qrAfterLine] : index (exclusif) dans [lines] après lequel insérer le QR
+  /// au lieu de le rejeter en fin de ticket. Sert au TALON, où le QR doit
+  /// être EN HAUT, juste sous la référence encadrée — même agencement que le
+  /// pont ESC/POS USB/Bluetooth (EscPosPrinterService.printColisTalon) et que
+  /// l'aperçu écran (_TalonBox). `null` = comportement historique (QR en fin
+  /// de ticket), conservé pour le reçu client et les bordereaux.
   static Uint8List encode({
     required String header,
     required List<Map<String, dynamic>> lines,
@@ -25,6 +31,7 @@ class EscPosLinesEncoder {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   }) {
     final bytes = BytesBuilder();
 
@@ -37,7 +44,15 @@ class EscPosLinesEncoder {
       _feed(bytes, 1);
     }
 
-    for (final line in lines) {
+    final qrIndex = (qr.isNotEmpty && qrAfterLine != null)
+        ? qrAfterLine.clamp(0, lines.length)
+        : null;
+
+    for (var i = 0; i < lines.length; i++) {
+      if (qrIndex != null && i == qrIndex) {
+        _writeQrCode(bytes, qr, moduleSize: _moduleSize(qrSize));
+      }
+      final line = lines[i];
       final text = (line['text'] ?? '').toString();
       if (text.isEmpty) {
         _feed(bytes, 1);
@@ -51,11 +66,18 @@ class EscPosLinesEncoder {
         size: (line['size'] ?? 'normal').toString(),
       );
     }
+    if (qrIndex != null && qrIndex == lines.length) {
+      _writeQrCode(bytes, qr, moduleSize: _moduleSize(qrSize));
+    }
 
-    if (qr.isNotEmpty) {
+    if (qr.isNotEmpty && qrIndex == null) {
+      // Ancien placement : QR en fin de ticket. Une seule ligne d'écart avant
+      // le QR (deux auparavant : un _feed + une ligne vide parasite émise par
+      // _writeAligned avec un texte vide) — gain de longueur papier sans rien
+      // retirer du contenu.
       _feed(bytes, 1);
-      _writeAligned(bytes, '', align: 'center', bold: false, size: 'normal');
-      _writeQrCode(bytes, qr, moduleSize: (qrSize / 40).clamp(3, 8).round());
+      _setAlign(bytes, 'center');
+      _writeQrCode(bytes, qr, moduleSize: _moduleSize(qrSize));
     }
 
     _feed(bytes, feedLines);
@@ -68,6 +90,18 @@ class EscPosLinesEncoder {
     }
 
     return bytes.toBytes();
+  }
+
+  /// Taille de module QR (3 à 8) déduite de [qrSize] (px, contrat du pont
+  /// WisePrinter). 96 → 3 (QR compact du talon), 220 → 6 (reçus/bordereaux).
+  static int _moduleSize(int qrSize) => (qrSize / 40).clamp(3, 8).round();
+
+  /// ESC a n — alignement seul, sans écrire de texte ni de saut de ligne
+  /// (contrairement à _writeAligned, qui terminait par un 0x0A parasite).
+  static void _setAlign(BytesBuilder bytes, String align) {
+    bytes.addByte(_esc);
+    bytes.addByte(0x61);
+    bytes.addByte(align == 'center' ? 1 : (align == 'right' ? 2 : 0));
   }
 
   static void _feed(BytesBuilder bytes, int n) {
@@ -111,6 +145,7 @@ class EscPosLinesEncoder {
   }
 
   static void _writeQrCode(BytesBuilder bytes, String data, {int moduleSize = 5}) {
+    _setAlign(bytes, 'center');
     final payload = utf8.encode(data);
     final storeLen = payload.length + 3;
     final pL = storeLen % 256;

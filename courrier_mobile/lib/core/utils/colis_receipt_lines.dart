@@ -115,6 +115,20 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   ];
 }
 
+/// Taille du QR du TALON, exprimée en px (contrat des ponts WisePrinter /
+/// Web Serial ; EscPosLinesEncoder la convertit en taille de module ESC/POS,
+/// ici 96/40 → module 3, le plus petit encore scannable de façon fiable).
+/// Volontairement compact : sur le modèle papier de référence le QR est une
+/// vignette à côté du numéro, pas un pavé qui occupe le tiers du talon.
+/// Valeur précédente : 140 (→ module 4), responsable d'environ 4 mm de
+/// longueur papier en trop.
+const int colisTalonQrSize = 96;
+
+/// Avance papier en fin de TALON, avant la coupe. Réduite de 3 à 1 ligne :
+/// deux lignes vides de moins, soit ~7 mm de papier économisés par talon,
+/// sans rien retirer du contenu imprimé.
+const int colisTalonFeedLines = 1;
+
 /// Lignes du TALON (étiquette adhésive à coller sur le colis) — format
 /// compact repris du modèle papier de référence : référence en évidence +
 /// QR, destination et montant en gros, destinataire, puis expéditeur en

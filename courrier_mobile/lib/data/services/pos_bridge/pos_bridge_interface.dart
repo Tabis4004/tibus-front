@@ -17,6 +17,12 @@ abstract class PosBridge {
   /// Reçu structuré via le pont Xprinter/WisePrinter — même forme que
   /// printer.printReceipt({header, lines, qr, qrSize, feedLines, cut}) côté
   /// web (src/lib/printer.ts).
+  ///
+  /// [qrAfterLine] : index dans [lines] après lequel le QR doit être inséré
+  /// (talon = QR en haut, sous la référence). Transmis tel quel au wrapper
+  /// natif, qui reste libre de l'ignorer — le placement final dépend de lui
+  /// sur ce pont, contrairement à Web Serial/ESC-POS où nous encodons nous-
+  /// mêmes les octets. `null` = QR en fin de ticket.
   Future<void> printViaWisePrinter({
     required String header,
     required List<Map<String, dynamic>> lines,
@@ -24,6 +30,7 @@ abstract class PosBridge {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   });
 
   /// Reçu structuré imprimé en direct sur le port série (USB) via l'API Web
@@ -44,6 +51,7 @@ abstract class PosBridge {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   });
 
   /// Fallback impression navigateur — toujours disponible (aucun pont natif

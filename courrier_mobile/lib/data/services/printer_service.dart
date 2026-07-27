@@ -478,12 +478,15 @@ class PrinterService {
       lines: colisTalonLines(colis),
       qr: colis.id,
       // QR compact sur le talon (demande explicite — un gros QR n'était pas
-      // le format voulu). La POSITION du QR sur ce pont est décidée par le
-      // wrapper natif externe (window.WisePrinter, hors de ce dépôt) : on ne
-      // peut agir ici que sur sa taille, pas son emplacement dans le talon.
-      qrSize: 140,
-      feedLines: 3,
+      // le format voulu). La POSITION du QR sur ce pont reste décidée par le
+      // wrapper natif externe (window.WisePrinter, hors de ce dépôt) : on lui
+      // transmet l'emplacement souhaité via qrAfterLine (QR juste après
+      // l'en-tête + référence encadrée, comme sur les autres ponts), mais un
+      // wrapper qui ignore ce champ continuera de le placer en fin de talon.
+      qrSize: colisTalonQrSize,
+      feedLines: colisTalonFeedLines,
       cut: true,
+      qrAfterLine: colisTalonHeaderLines(colis).length,
     );
   }
 
@@ -513,9 +516,14 @@ class PrinterService {
       header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
       lines: colisTalonLines(colis),
       qr: colis.id,
-      qrSize: 140,
-      feedLines: 3,
+      // Même agencement compact que le pont ESC/POS USB/Bluetooth : QR
+      // vignette inséré juste après la référence encadrée, en haut du talon,
+      // et non en pavé au pied du ticket. Ici nous encodons nous-mêmes les
+      // octets ESC/POS, donc le placement est réellement garanti.
+      qrSize: colisTalonQrSize,
+      feedLines: colisTalonFeedLines,
       cut: true,
+      qrAfterLine: colisTalonHeaderLines(colis).length,
     );
   }
 

@@ -120,11 +120,12 @@ class EscPosPrinterService {
     // coller au format de référence (étiquette collée sur le colis) :
     // QR discret à côté du numéro, pas un gros QR qui domine le talon.
     final bytes = _renderLines(generator, colisTalonHeaderLines(colis));
-    bytes.addAll(generator.feed(1));
     bytes.addAll(generator.qrcode(colis.id, size: QRSize.size3));
-    bytes.addAll(generator.feed(1));
     bytes.addAll(_renderLines(generator, colisTalonBodyLines(colis)));
-    bytes.addAll(generator.feed(2));
+    // Avance papier minimale avant la coupe (voir colisTalonFeedLines) : les
+    // lignes vides autour du QR et les 2 lignes de pied ajoutaient ~1 cm de
+    // papier par talon sans rien apporter au contenu.
+    bytes.addAll(generator.feed(colisTalonFeedLines));
     bytes.addAll(generator.cut());
 
     await _manager.send(type: type, bytes: bytes);

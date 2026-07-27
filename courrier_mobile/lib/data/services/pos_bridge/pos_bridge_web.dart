@@ -61,6 +61,7 @@ class _WebPosBridge implements PosBridge {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   }) async {
     final wp = _wisePrinter();
     if (wp == null) {
@@ -73,6 +74,10 @@ class _WebPosBridge implements PosBridge {
       'qrSize': qrSize,
       'feedLines': feedLines,
       'cut': cut,
+      // Indice de placement du QR (talon = en haut, sous la référence). Les
+      // wrappers qui ne connaissent pas ce champ l'ignorent simplement et
+      // gardent leur placement par défaut — rétrocompatible.
+      if (qrAfterLine != null) 'qrAfterLine': qrAfterLine,
     });
     final result = js_util.callMethod(wp, 'printReceipt', [payload]);
     if (result != null && js_util.hasProperty(result, 'then')) {
@@ -88,6 +93,7 @@ class _WebPosBridge implements PosBridge {
     int qrSize = 220,
     int feedLines = 4,
     bool cut = true,
+    int? qrAfterLine,
   }) async {
     final serial = _navigatorSerial();
     if (serial == null) {
@@ -119,6 +125,7 @@ class _WebPosBridge implements PosBridge {
         qrSize: qrSize,
         feedLines: feedLines,
         cut: cut,
+        qrAfterLine: qrAfterLine,
       );
 
       final writable = js_util.getProperty(port, 'writable');
