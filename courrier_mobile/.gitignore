@@ -47,3 +47,7 @@ courrier_mobile.zip
 
 # Cache local de wrangler (identifiant de compte Cloudflare)
 .wrangler/
+
+# Cache Python des scripts tool/
+__pycache__/
+*.pyc

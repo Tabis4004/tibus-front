@@ -18,14 +18,16 @@ name: Build Courrier Mobile Windows
 on:
   workflow_dispatch:
     inputs:
+      # Saisie libre plutôt qu'une liste fermée : avec `type: choice` il
+      # faudrait éditer et pousser ce fichier à chaque nouveau client. La
+      # valeur est validée contre branding/<client>/brand.json à l'étape
+      # suivante, ce qui donne une erreur immédiate et lisible en cas de faute
+      # de frappe — plutôt qu'un build de 15 minutes portant la mauvaise marque.
       client:
-        description: "Client à builder"
+        description: "Client (nom du dossier dans courrier_mobile/branding, ex. sis)"
         required: true
         default: sis
-        type: choice
-        options:
-          - sis
-          - default
+        type: string
 
 jobs:
   build-windows:
@@ -45,6 +47,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Échouer en 5 secondes plutôt qu'après la compilation : une faute de
+      # frappe sur le nom du client produirait sinon un build complet avec la
+      # marque Tibus, sans le moindre avertissement.
+      - name: Vérifier que le client existe
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "branding/$env:CLIENT/brand.json")) {
+            $dispo = (Get-ChildItem branding -Directory |
+              Where-Object { Test-Path "$($_.FullName)/brand.json" } |
+              ForEach-Object { $_.Name }) -join ', '
+            throw "Client « $env:CLIENT » inconnu. Clients disponibles : $dispo"
+          }
+          Write-Host "Client « $env:CLIENT » : OK"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
