@@ -275,6 +275,8 @@
   "superadmin_notifications.threshold_sellers_message": "{{value}} active sellers (≥ 80% of max {{max}}).",
   "superadmin_notifications.threshold_avg_daily_title": "High booking volume",
   "superadmin_notifications.threshold_avg_daily_message": "Average {{value}} tickets/day — near max {{max}}.",
+  "superadmin_notifications.threshold_db_size_title": "Database size nearing Free plan limit",
+  "superadmin_notifications.threshold_db_size_message": "{{value}} MB used of {{max}} MB (Free plan) — beyond this, the database goes read-only.",
   "superadmin_notifications.threshold_connections_title": "High peak connections",
   "superadmin_notifications.threshold_connections_message": "~{{value}} estimated connections — near max {{max}}.",
   "guide.page_title": "User Guide",

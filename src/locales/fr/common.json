@@ -275,6 +275,8 @@
   "superadmin_notifications.threshold_sellers_message": "{{value}} vendeurs actifs (≥ 80 % du max {{max}}).",
   "superadmin_notifications.threshold_avg_daily_title": "Volume réservations élevé",
   "superadmin_notifications.threshold_avg_daily_message": "Moyenne {{value}} tickets/j — proche du max {{max}}.",
+  "superadmin_notifications.threshold_db_size_title": "Base de données proche de la limite Free",
+  "superadmin_notifications.threshold_db_size_message": "{{value}} Mo utilisés sur {{max}} Mo (plan Free) — au-delà, la base passe en lecture seule.",
   "superadmin_notifications.threshold_connections_title": "Connexions pic élevées",
   "superadmin_notifications.threshold_connections_message": "~{{value}} connexions estimées — proche du max {{max}}.",
   "guide.page_title": "Guide d'utilisation",
