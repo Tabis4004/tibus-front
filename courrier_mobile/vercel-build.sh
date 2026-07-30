@@ -30,10 +30,16 @@ fi
 # Copie forcée des assets de branding par-dessus le dossier web : `flutter
 # create` ci-dessus régénère web/ avec les favicons Flutter par défaut.
 #
-# La source dépend de la marque active (branding/.current, écrit par
-# tool/apply_brand.py) : un même code sert plusieurs sociétés, chacune sur son
-# domaine. Repli sur branding/webassets/ pour les déploiements historiques.
-BRAND="$(cat branding/.current 2>/dev/null || echo '')"
+# La marque vient EN PRIORITÉ de la variable d'environnement BRAND, réglable
+# par Worker dans Cloudflare (Settings → Variables). C'est indispensable : un
+# même dépôt alimente plusieurs Workers, et `branding/.current` est un fichier
+# versionné donc commun à tous. S'y fier seul brandait tous les clients avec la
+# marque du dernier `apply_brand.py` lancé sur un poste de dev.
+#
+# Repli, dans l'ordre : branding/.current (build local via tool/build_client.sh),
+# puis branding/webassets/ (déploiements historiques Tibus).
+BRAND="${BRAND:-$(cat branding/.current 2>/dev/null || echo '')}"
+echo "==> Marque : ${BRAND:-<aucune, repli historique>}"
 if [ -n "$BRAND" ] && [ -d "branding/$BRAND/webassets" ]; then
   BRAND_DIR="branding/$BRAND/webassets"
 else
