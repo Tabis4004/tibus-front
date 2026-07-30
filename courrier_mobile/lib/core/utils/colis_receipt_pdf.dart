@@ -5,7 +5,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../data/models/colis.dart';
+import '../../data/services/bordereau_service.dart';
+import 'bordereau_receipt_lines.dart';
 import 'colis_receipt_lines.dart';
+import 'colis_sales_journal_lines.dart';
 
 /// PDF thermique 80 mm pour le fallback web.
 ///
@@ -41,6 +44,55 @@ Future<Uint8List> buildColisReceiptThermalPdf(
     );
   }
 
+  return doc.save();
+}
+
+/// PDF thermique 80 mm du BORDEREAU.
+///
+/// Même raison que pour le journal : sur le web, `window.print()` capture
+/// l'écran au lieu du ticket. Les lignes viennent de `bordereauReceiptLines()`,
+/// donc identiques à l'aperçu et aux ponts natifs.
+Future<Uint8List> buildBordereauThermalPdf(BordereauDetail detail) async {
+  final lines = bordereauReceiptLines(detail);
+  final doc = pw.Document();
+  doc.addPage(
+    pw.Page(
+      pageFormat: _pageFormat(lines),
+      build: (_) => _ticket(title: 'BORDEREAU', lines: lines),
+    ),
+  );
+  return doc.save();
+}
+
+/// PDF thermique 80 mm du JOURNAL DE VENTE.
+///
+/// Construit à partir de `colisSalesJournalLines()` — la même source que
+/// l'aperçu à l'écran et que les ponts natifs. C'est ce qui garantit que
+/// l'aperçu et la sortie imprimée soient identiques.
+///
+/// Indispensable sur le web : la page Flutter est rendue dans un `<canvas>`,
+/// donc `window.print()` ne peut pas isoler le ticket en CSS et imprime une
+/// capture de tout l'écran. Ici, le navigateur reçoit un vrai document.
+Future<Uint8List> buildColisSalesJournalThermalPdf(
+  ColisSalesJournal journal, {
+  required String companyName,
+  required String periodLabel,
+  ColisReportSetting reportSetting = const ColisReportSetting(),
+}) async {
+  final lines = colisSalesJournalLines(
+    journal,
+    companyName: companyName,
+    periodLabel: periodLabel,
+    reportSetting: reportSetting,
+  );
+
+  final doc = pw.Document();
+  doc.addPage(
+    pw.Page(
+      pageFormat: _pageFormat(lines),
+      build: (_) => _ticket(title: 'JOURNAL DE VENTE', lines: lines),
+    ),
+  );
   return doc.save();
 }
 

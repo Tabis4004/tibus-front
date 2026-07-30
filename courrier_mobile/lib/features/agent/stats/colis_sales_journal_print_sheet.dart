@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/utils/colis_sales_journal_lines.dart';
 import '../../../data/models/colis.dart';
+import '../../../core/utils/colis_receipt_pdf.dart';
+import '../../../core/utils/colis_sales_journal_pdf.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
 
 /// Aperçu + sélection du pont imprimante pour le journal de vente — même
@@ -159,9 +162,37 @@ class _ColisSalesJournalPrintSheetState extends ConsumerState<_ColisSalesJournal
                     );
                     return;
                   }
-                  final ok = printer.printColisReceiptBrowser(wide: true);
-                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
-                }, successMessage: 'Impression envoyée (80 mm).'),
+                  // Pas de window.print() ici : la page Flutter est un
+                  // <canvas>, le navigateur imprimerait une capture de
+                  // l'écran entier. On lui donne un vrai PDF, construit
+                  // depuis les mêmes lignes que l'aperçu ci-dessus.
+                  await Printing.layoutPdf(
+                    onLayout: (_) => buildColisSalesJournalThermalPdf(
+                      journal,
+                      companyName: widget.companyName,
+                      periodLabel: widget.periodLabel,
+                      reportSetting: widget.reportSetting,
+                    ),
+                    name: 'journal_vente_80mm.pdf',
+                  );
+                }, successMessage: 'Journal 80 mm prêt à imprimer.'),
+              ),
+              const SizedBox(height: 8),
+              _PrinterButton(
+                icon: Icons.picture_as_pdf_outlined,
+                label: 'Exporter en PDF (A4)',
+                enabled: !_printing,
+                onPressed: () => _run(() async {
+                  await Printing.layoutPdf(
+                    onLayout: (_) => buildColisSalesJournalPdfA4(
+                      journal,
+                      companyName: widget.companyName,
+                      periodLabel: widget.periodLabel,
+                      reportSetting: widget.reportSetting,
+                    ),
+                    name: 'journal_vente_a4.pdf',
+                  );
+                }, successMessage: 'Journal A4 prêt à imprimer.'),
               ),
               const SizedBox(height: 8),
               _PrinterButton(

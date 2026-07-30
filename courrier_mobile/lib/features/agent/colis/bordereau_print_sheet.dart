@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/providers.dart';
 import '../../../core/utils/bordereau_pdf.dart';
+import '../../../core/utils/colis_receipt_pdf.dart';
 import '../../../core/utils/bordereau_receipt_lines.dart';
 import '../../../core/utils/mailto.dart';
 import '../../../core/utils/whatsapp.dart';
@@ -138,9 +139,14 @@ class _BordereauPrintSheetState extends ConsumerState<_BordereauPrintSheet> {
                     await printer.printBordereauViaWisePrinter(detail);
                     return;
                   }
-                  final ok = printer.printColisReceiptBrowser(wide: true);
-                  if (!ok) throw StateError('Impression navigateur indisponible sur cet appareil.');
-                }, successMessage: 'Impression envoyée (80 mm).'),
+                  // Pas de window.print() : la page Flutter est un <canvas>,
+                  // le navigateur imprimerait une capture de l'écran. On lui
+                  // donne le même ticket que les ponts natifs, en PDF.
+                  await Printing.layoutPdf(
+                    onLayout: (_) => buildBordereauThermalPdf(detail),
+                    name: '${detail.reference}_80mm.pdf',
+                  );
+                }, successMessage: 'Bordereau 80 mm prêt à imprimer.'),
               ),
               const SizedBox(height: 8),
               _PrinterButton(
