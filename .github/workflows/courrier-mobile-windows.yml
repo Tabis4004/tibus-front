@@ -109,7 +109,16 @@ jobs:
       - name: Dépendances
         run: flutter pub get
 
+      # Le SDK C++ Firebase (vendored via firebase_core/firebase_messaging)
+      # embarque un CMakeLists.txt avec `cmake_minimum_required(VERSION < 3.5)`.
+      # CMake ≥ 4.0 (présent sur windows-latest) a supprimé la compatibilité
+      # avec ces versions et fait échouer la configuration avec
+      # « Compatibility with CMake < 3.5 has been removed ». Cette variable
+      # d'environnement dit à CMake d'appliquer les politiques comme si le
+      # minimum demandé était 3.5, sans avoir à patcher le SDK vendored.
       - name: Build Windows (release)
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: flutter build windows --release
 
       - name: Localiser la sortie
