@@ -16,7 +16,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application
-        android:label="courrier"
+        android:label="SIS Courrier"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

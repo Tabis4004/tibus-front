@@ -1,0 +1,15 @@
+{
+  // Déploiement de la marque SIS — Worker distinct de `courrier-agent`.
+  // Sans ce fichier, `wrangler deploy` publierait le build SIS par-dessus
+  // le site Tibus : même code, même dossier, même config par défaut.
+  //
+  //   ./tool/build_client.sh sis deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "courrier-sis",
+  "compatibility_date": "2026-07-27",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./build/web",
+    "not_found_handling": "single-page-application"
+  }
+}

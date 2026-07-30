@@ -1,0 +1,13 @@
+{
+  "appName": "Tibus Courrier",
+  "shortName": "Tibus Courrier",
+  "description": "Tibus Courrier — suivi et gestion de colis.",
+  "themeColor": "#16507A",
+  "backgroundColor": "#FFFFFF",
+  "companyId": "com.tibus",
+  "logo": "logo.png",
+  "iconBackground": "#FFFFFF",
+  "iconPadding": 0.1,
+  "worker": "courrier-agent",
+  "publisher": "Tabis Technology"
+}

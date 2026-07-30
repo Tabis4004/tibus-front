@@ -1,0 +1,13 @@
+{
+  "appName": "SIS Courrier",
+  "shortName": "SIS Courrier",
+  "description": "SIS Courrier — suivi et gestion de colis.",
+  "themeColor": "#1E5A9C",
+  "backgroundColor": "#FFFFFF",
+  "companyId": "com.societe-sis",
+  "logo": "logo.jpeg",
+  "iconBackground": "#FFFFFF",
+  "iconPadding": 0.08,
+  "worker": "courrier-sis",
+  "publisher": "Société SIS"
+}

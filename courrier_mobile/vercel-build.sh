@@ -27,24 +27,34 @@ if [ ! -d "web" ]; then
   flutter create . --platforms=web --project-name courrier_mobile --org com.tibus
 fi
 
-# Copie forcée des assets de branding par-dessus le dossier web (source de
-# vérité : branding/webassets/, suivi par git — voir CLAUDE.md). Absente
-# jusqu'ici : le favicon web de courrier_mobile restait celui par défaut de
-# Flutter, jamais celui de la marque.
-if [ -d "branding/webassets" ]; then
+# Copie forcée des assets de branding par-dessus le dossier web : `flutter
+# create` ci-dessus régénère web/ avec les favicons Flutter par défaut.
+#
+# La source dépend de la marque active (branding/.current, écrit par
+# tool/apply_brand.py) : un même code sert plusieurs sociétés, chacune sur son
+# domaine. Repli sur branding/webassets/ pour les déploiements historiques.
+BRAND="$(cat branding/.current 2>/dev/null || echo '')"
+if [ -n "$BRAND" ] && [ -d "branding/$BRAND/webassets" ]; then
+  BRAND_DIR="branding/$BRAND/webassets"
+else
+  BRAND_DIR="branding/webassets"
+fi
+echo "==> Assets web : $BRAND_DIR"
+
+if [ -d "$BRAND_DIR" ]; then
   mkdir -p web/icons
-  cp -f branding/webassets/favicon.png web/favicon.png 2>/dev/null || true
-  cp -f branding/webassets/favicon.ico web/favicon.ico 2>/dev/null || true
-  cp -f branding/webassets/favicon-16x16.png web/favicon-16x16.png 2>/dev/null || true
-  cp -f branding/webassets/favicon-32x32.png web/favicon-32x32.png 2>/dev/null || true
-  cp -f branding/webassets/favicon-48x48.png web/favicon-48x48.png 2>/dev/null || true
-  cp -f branding/webassets/apple-touch-icon.png web/apple-touch-icon.png 2>/dev/null || true
-  cp -f branding/webassets/icons/Icon-192.png web/icons/Icon-192.png 2>/dev/null || true
-  cp -f branding/webassets/icons/Icon-512.png web/icons/Icon-512.png 2>/dev/null || true
-  cp -f branding/webassets/icons/Icon-maskable-192.png web/icons/Icon-maskable-192.png 2>/dev/null || true
-  cp -f branding/webassets/icons/Icon-maskable-512.png web/icons/Icon-maskable-512.png 2>/dev/null || true
-  cp -f branding/webassets/manifest.json web/manifest.json 2>/dev/null || true
-  cp -f branding/webassets/index.html web/index.html 2>/dev/null || true
+  cp -f "$BRAND_DIR"/favicon.png web/favicon.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/favicon.ico web/favicon.ico 2>/dev/null || true
+  cp -f "$BRAND_DIR"/favicon-16x16.png web/favicon-16x16.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/favicon-32x32.png web/favicon-32x32.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/favicon-48x48.png web/favicon-48x48.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/apple-touch-icon.png web/apple-touch-icon.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/icons/Icon-192.png web/icons/Icon-192.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/icons/Icon-512.png web/icons/Icon-512.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/icons/Icon-maskable-192.png web/icons/Icon-maskable-192.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/icons/Icon-maskable-512.png web/icons/Icon-maskable-512.png 2>/dev/null || true
+  cp -f "$BRAND_DIR"/manifest.json web/manifest.json 2>/dev/null || true
+  cp -f "$BRAND_DIR"/index.html web/index.html 2>/dev/null || true
 fi
 
 flutter pub get

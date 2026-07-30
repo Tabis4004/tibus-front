@@ -1,0 +1,182 @@
+name: Build Courrier Mobile Windows
+
+# Build d'un exécutable Windows + installateur pour un client donné.
+#
+# Impossible depuis macOS : Flutter exige la toolchain Windows (Visual Studio
+# + Desktop C++). Ce workflow s'en charge sur un runner windows-latest.
+#
+# Utilisation :
+#   GitHub → Actions → "Build Courrier Mobile Windows" → "Run workflow"
+#   Choisir le client, lancer, puis récupérer dans "Artifacts" :
+#     <client>-windows-portable   dossier Release zippé
+#     <client>-windows-installer  setup.exe à distribuer
+#
+# La marque est appliquée par tool/apply_brand.py AVANT la compilation :
+# icônes, nom de l'application, ProductName du binaire. Un build ne peut donc
+# pas sortir avec le logo d'un autre client.
+
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: "Client à builder"
+        required: true
+        default: sis
+        type: choice
+        options:
+          - sis
+          - default
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: courrier_mobile
+
+    # Signature de code (optionnelle) — GitHub → Settings → Secrets and
+    # variables → Actions. Sans ces secrets le build aboutit, mais Windows
+    # affichera un avertissement SmartScreen à l'installation.
+    env:
+      CERT_B64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+      CERT_PW: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      CLIENT: ${{ github.event.inputs.client }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Pillow (génération des icônes)
+        run: pip install pillow
+
+      - name: Appliquer la marque du client
+        run: python tool/apply_brand.py "$env:CLIENT"
+        shell: pwsh
+
+      - name: Préparer .env si le projet en attend un
+        shell: bash
+        run: |
+          if [ -f .env.example ] && [ ! -f .env ]; then
+            cp .env.example .env
+            echo ".env créé depuis .env.example"
+          fi
+
+      - name: Dépendances
+        run: flutter pub get
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      - name: Localiser la sortie
+        id: out
+        shell: pwsh
+        run: |
+          # Le chemin a changé selon les versions de Flutter : on teste les deux.
+          $src = "build/windows/x64/runner/Release"
+          if (-not (Test-Path $src)) { $src = "build/windows/runner/Release" }
+          if (-not (Test-Path $src)) { throw "Dossier Release introuvable" }
+          "release_dir=$src" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Get-ChildItem $src | Select-Object Name, Length
+
+      - name: Signer l'exécutable (si certificat fourni)
+        if: ${{ env.CERT_B64 != '' }}
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:CERT_B64))
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          & $signtool sign /f cert.pfx /p $env:CERT_PW /fd SHA256 `
+            /tr http://timestamp.sectigo.com /td SHA256 `
+            "${{ steps.out.outputs.release_dir }}\courrier.exe"
+
+      - name: Version portable (zip)
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "${{ steps.out.outputs.release_dir }}/*" `
+            -DestinationPath "$env:CLIENT-windows.zip" -Force
+
+      - name: Publier la version portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.client }}-windows-portable
+          path: courrier_mobile/${{ github.event.inputs.client }}-windows.zip
+          retention-days: 14
+
+      # ─── Installateur (Inno Setup) ────────────────────────────────────
+      - name: Installer Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Générer le script Inno Setup
+        shell: pwsh
+        run: |
+          # Nom affiché et éditeur viennent de la marque : l'installateur doit
+          # dire « SIS Courrier », pas « courrier ».
+          $brand = Get-Content "branding/$env:CLIENT/brand.json" -Raw | ConvertFrom-Json
+          $appName = $brand.appName
+          $publisher = if ($brand.publisher) { $brand.publisher } else { "Tabis Technology" }
+
+          $m = Select-String -Path "pubspec.yaml" -Pattern '^version:\s*([0-9.]+)'
+          $version = if ($m) { $m.Matches[0].Groups[1].Value } else { "1.0.0" }
+          $release = "${{ steps.out.outputs.release_dir }}".Replace('/', '\')
+
+          $iss = @"
+          [Setup]
+          AppName=$appName
+          AppVersion=$version
+          AppPublisher=$publisher
+          DefaultDirName={autopf}\$appName
+          DefaultGroupName=$appName
+          OutputDir=installer
+          OutputBaseFilename=$env:CLIENT-setup-$version
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64compatible
+          WizardStyle=modern
+          SetupIconFile=windows\runner\resources\app_icon.ico
+
+          [Files]
+          Source: "$release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\$appName"; Filename: "{app}\courrier.exe"
+          Name: "{autodesktop}\$appName"; Filename: "{app}\courrier.exe"
+
+          [Run]
+          Filename: "{app}\courrier.exe"; Description: "Lancer $appName"; Flags: nowait postinstall skipifsilent
+          "@
+          $iss | Out-File -FilePath "installer.iss" -Encoding UTF8
+          Get-Content installer.iss
+
+      - name: Compiler l'installateur
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Signer l'installateur (si certificat fourni)
+        if: ${{ env.CERT_B64 != '' }}
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          Get-ChildItem "installer\*.exe" | ForEach-Object {
+            & $signtool sign /f cert.pfx /p $env:CERT_PW /fd SHA256 `
+              /tr http://timestamp.sectigo.com /td SHA256 $_.FullName
+          }
+
+      - name: Publier l'installateur
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.client }}-windows-installer
+          path: courrier_mobile/installer/*.exe
+          retention-days: 14
