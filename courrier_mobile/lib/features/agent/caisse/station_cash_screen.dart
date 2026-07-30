@@ -330,7 +330,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         children: [
           if (cash.pendingReversal && !cash.open)
             _PendingReversalCard(balance: cash.balance ?? 0)
-          else if (!cash.open)
+          else if (!cash.open) ...[
             _OpenCashForm(
               gares: _gares,
               selectedGareId: _selectedGareId,
@@ -338,8 +338,18 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               openingFloatController: _openingFloat,
               saving: _saving,
               onOpen: _openCash,
-            )
-          else
+            ),
+            // Journal de vente indépendant de la session de caisse (données
+            // scopées par compagnie/période, pas par mouvement de caisse —
+            // get_colis_sales_journal) : un owner doit pouvoir le consulter
+            // sans avoir jamais ouvert de caisse lui-même, contrairement au
+            // journal de caisse / remise / clôture ci-dessous qui, eux,
+            // décrivent une session active et n'ont pas de sens sans elle.
+            if (_uiConfig.showReport('salesJournal')) ...[
+              const SizedBox(height: 16),
+              _SalesJournalCard(saving: _saving, onPrint: _printSalesJournal),
+            ],
+          ] else
             _OpenCashDetails(
               cash: cash,
               reversalController: _reversalAmount,
@@ -521,30 +531,11 @@ class _OpenCashDetails extends StatelessWidget {
           // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
           // agent, scoping serveur — get_colis_sales_journal) : document
           // distinct du journal de caisse ci-dessus (mouvements d'espèces).
-          // Même impression que Stats → « Mon rapport d'activité ».
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
-                    'à remettre avec la caisse en fin de session.',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: saving ? null : onPrintSalesJournal,
-                    icon: const Icon(Icons.receipt_long_outlined),
-                    label: Text(saving ? '…' : 'Imprimer le journal de vente'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Même impression que Stats → « Mon rapport d'activité ». Widget
+          // partagé avec l'état "caisse fermée" de _buildBody (voir
+          // _SalesJournalCard) — ce rapport n'a pas besoin d'une session
+          // ouverte, contrairement au journal de caisse ci-dessus.
+          _SalesJournalCard(saving: saving, onPrint: onPrintSalesJournal),
           const SizedBox(height: 16),
         ],
         Card(
@@ -599,6 +590,45 @@ class _OpenCashDetails extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Carte "Journal de vente" — réutilisée qu'une caisse soit ouverte
+/// (_OpenCashDetails) ou fermée (_buildBody) : les données viennent de
+/// get_colis_sales_journal, scopées compagnie/période, pas d'un mouvement de
+/// caisse précis. Un owner sans caisse personnelle ouverte doit pouvoir
+/// consulter ce rapport comme n'importe quel autre rôle privilégié.
+class _SalesJournalCard extends StatelessWidget {
+  final bool saving;
+  final VoidCallback onPrint;
+
+  const _SalesJournalCard({required this.saving, required this.onPrint});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            const Text(
+              'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
+              'à remettre avec la caisse en fin de session.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: saving ? null : onPrint,
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
