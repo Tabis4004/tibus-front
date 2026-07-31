@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/colis.dart';
+import '../models/app_role.dart';
 
 /// Cache local (shared_preferences) des données de référence nécessaires au
 /// formulaire de création de colis (gares, natures, réglages compagnie,
@@ -138,6 +139,46 @@ class ReferenceCacheService {
             : null,
         companyId: map['companyId'] as String?,
       );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static const _rolesKey = 'ref_cache_my_roles_v1';
+
+  /// Rôles de l'utilisateur (myRolesProvider) — c'est la première requête
+  /// réseau de tout écran qui dérive une compagnie active
+  /// (activeCompanyIdProvider), donc de toute la navigation staff. Sans
+  /// repli local, une session démarrée hors connexion échoue immédiatement
+  /// avec l'exception réseau brute (ClientException/SocketException) affichée
+  /// à l'agent — avant même d'atteindre le repli déjà en place dans
+  /// colis_create_screen.dart pour gares/natures/caisse. Alimenté à chaque
+  /// fetchMyRoles() réussi, relu s'il échoue.
+  Future<void> saveRoles(List<AppRole> roles) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _rolesKey,
+      jsonEncode(roles
+          .map((r) => {
+                'roleId': r.id,
+                'roleName': r.name,
+                'scope': r.scope,
+                'level': r.level,
+                'droits': r.droits,
+                'companyId': r.companyId,
+                'companyName': r.companyName,
+              })
+          .toList()),
+    );
+  }
+
+  Future<List<AppRole>?> loadRoles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_rolesKey);
+    if (raw == null) return null;
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.whereType<Map<String, dynamic>>().map(AppRole.fromMap).toList();
     } catch (_) {
       return null;
     }

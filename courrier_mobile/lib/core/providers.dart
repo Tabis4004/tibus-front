@@ -36,8 +36,29 @@ final syncServiceProvider = ChangeNotifierProvider(
 );
 
 /// Rôles de l'utilisateur connecté (une entrée par compagnie affectée).
+///
+/// C'est la première requête réseau de tout écran qui dérive une compagnie
+/// active (activeCompanyIdProvider en dépend directement en repli), donc de
+/// quasi toute la navigation staff — home, stats, colis, caisse, profil.
+/// Sans repli local, un démarrage hors connexion (pas seulement une perte de
+/// réseau en cours d'écran déjà chargé) faisait échouer cet appel avec
+/// l'exception réseau brute affichée telle quelle à l'agent
+/// (ClientException/SocketException), avant même d'atteindre le repli déjà
+/// en place dans colis_create_screen.dart pour gares/natures/caisse — voir
+/// captures agent SIS, RPC get_open_station_cash_for_user et table Users
+/// injoignables au démarrage. On retombe donc ici sur les rôles connus lors
+/// du dernier fetch réussi plutôt que de laisser planter tout le provider.
 final myRolesProvider = FutureProvider<List<AppRole>>((ref) async {
-  return ref.read(authServiceProvider).fetchMyRoles();
+  final cache = ref.read(referenceCacheServiceProvider);
+  try {
+    final roles = await ref.read(authServiceProvider).fetchMyRoles();
+    await cache.saveRoles(roles);
+    return roles;
+  } catch (e) {
+    final cached = await cache.loadRoles();
+    if (cached != null) return cached;
+    rethrow;
+  }
 });
 
 /// Email + téléphone du compte connecté — affichage sur l'écran Profil,
