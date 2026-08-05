@@ -229,12 +229,18 @@ class EscPosPrinterService {
           height: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
           width: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
           // Sans codeTable explicite, esc_pos_utils_plus laisse la table de
-          // caractères active sur son réglage d'usine — variable d'un
-          // modèle à l'autre. C'est ce qui faisait sortir "É" en "ø" sur une
-          // imprimante Bluetooth YHD-8390 tout en étant correct sur un
-          // Xprinter USB (défauts usine différents). westEur (CP850-like,
-          // accents français/latins) force la même table sur tout le monde.
-          codeTable: PosCodeTable.westEur,
+          // caractères active sur son réglage d'usine (CP437 par défaut,
+          // voir PosStyles.defaults) — variable d'un modèle à l'autre. C'est
+          // ce qui faisait sortir "É" en "ø" sur une imprimante Bluetooth
+          // YHD-8390 tout en étant correct sur un Xprinter USB (défauts
+          // usine différents). CP850 (Multilingual Latin-1, accents
+          // français) force la même table sur tout le monde.
+          //
+          // Note : `codeTable` est un simple String (voir dartdoc de
+          // PosStyles), pas un enum — un premier correctif avait utilisé à
+          // tort `PosCodeTable.westEur`, un identifiant qui n'existe pas
+          // dans cette version du package (2.0.4) et cassait la compilation.
+          codeTable: 'CP850',
         ),
       ));
     }
