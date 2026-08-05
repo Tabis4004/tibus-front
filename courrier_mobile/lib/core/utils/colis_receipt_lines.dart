@@ -163,23 +163,42 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
   ];
 }
 
+/// Destination, montant et destinataire — voir colisTalonBodyLines.
+/// Extrait à part pour permettre au pont ESC/POS de réordonner son talon
+/// (voir colisTalonExpediteurLines ci-dessous et printColisTalon,
+/// esc_pos_printer_service.dart) sans toucher à l'ordre des autres ponts
+/// (P3 natif, WisePrinter) qui utilisent colisTalonBodyLines tel quel.
+List<Map<String, dynamic>> colisTalonDestinataireLines(Colis colis) => [
+      {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true, 'size': 'large'},
+      {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true},
+      {'text': colis.nomDestinataire, 'bold': true},
+      {'text': colis.telephoneDestinataire},
+    ];
+
+/// Expéditeur + agence de départ — voir colisTalonDestinataireLines.
+/// Bloc que le scotch collant le talon sur le colis ne doit jamais effacer
+/// (retour terrain) : le pont ESC/POS le rapproche du QR plutôt que de le
+/// laisser en toute fin de talon, collé au bord coupé du bas.
+List<Map<String, dynamic>> colisTalonExpediteurLines(Colis colis) => [
+      {'text': 'Expéditeur : ${colis.nomExpediteur}', 'size': 'small'},
+      {'text': colis.telephoneExpediteur, 'size': 'small'},
+      // Bloc expédition : agence de départ + son téléphone (déplacé depuis
+      // l'en-tête, voir colisTalonHeaderLines).
+      {'text': 'Agence : ${colis.gareDepart}', 'size': 'small'},
+      if (colis.gareDepartPhone.isNotEmpty)
+        {'text': 'Tél. agence : ${colis.gareDepartPhone}', 'size': 'small'},
+    ];
+
 /// Partie basse du talon (destination, montant, destinataire, expéditeur,
 /// agence) — imprimée après le QR (voir colisTalonHeaderLines ci-dessus).
-List<Map<String, dynamic>> colisTalonBodyLines(Colis colis) {
-  return [
-    {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true, 'size': 'large'},
-    {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true},
-    {'text': colis.nomDestinataire, 'bold': true},
-    {'text': colis.telephoneDestinataire},
-    {'text': 'Expéditeur : ${colis.nomExpediteur}', 'size': 'small'},
-    {'text': colis.telephoneExpediteur, 'size': 'small'},
-    // Bloc expédition : agence de départ + son téléphone (déplacé depuis
-    // l'en-tête, voir colisTalonHeaderLines).
-    {'text': 'Agence : ${colis.gareDepart}', 'size': 'small'},
-    if (colis.gareDepartPhone.isNotEmpty)
-      {'text': 'Tél. agence : ${colis.gareDepartPhone}', 'size': 'small'},
-  ];
-}
+/// Ordre historique (destinataire puis expéditeur) conservé ici pour ne
+/// rien changer aux ponts P3 natif / WisePrinter / aperçu écran / PDF, qui
+/// utilisent cette fonction telle quelle — voir colisTalonExpediteurLines
+/// et colisTalonDestinataireLines pour le pont ESC/POS, qui réordonne.
+List<Map<String, dynamic>> colisTalonBodyLines(Colis colis) => [
+      ...colisTalonDestinataireLines(colis),
+      ...colisTalonExpediteurLines(colis),
+    ];
 
 /// Concaténation header+body SANS QR intercalé — conservée pour les appels
 /// qui ne savent pas insérer le QR entre les deux (ex. pont WisePrinter, où

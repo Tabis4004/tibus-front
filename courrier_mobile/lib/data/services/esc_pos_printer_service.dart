@@ -107,6 +107,14 @@ class EscPosPrinterService {
 
   /// Talon (étiquette adhésive) imprimé sur le pont [type] — voir
   /// PrinterService.printColisTalon pour le même contenu côté pont P3 natif.
+  ///
+  /// Marges + ordre spécifiques à CE pont (USB/Bluetooth réel) : retour
+  /// terrain avec une imprimante Bluetooth YHD-8390, où le scotch utilisé
+  /// pour coller le talon sur le colis mord sur les bords du papier coupé et
+  /// efface le texte qui s'y trouve. Le pont P3 natif et WisePrinter ne sont
+  /// pas concernés (étiquette autocollante native, pas de scotch) — on ne
+  /// touche donc ni à colisTalonFeedLines/colisTalonQrSize (partagés avec
+  /// eux) ni à l'ordre de colisTalonBodyLines, seulement au rendu ici.
   Future<void> printColisTalon(
     Colis colis, {
     required PrinterType type,
@@ -114,18 +122,29 @@ class EscPosPrinterService {
   }) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(paperSize, profile);
+    final bytes = <int>[];
+    // Marge haute : sans cette ligne vide, le scotch posé sur le bord
+    // supérieur du talon découpé mord directement sur le nom de la
+    // compagnie / téléphones.
+    bytes.addAll(generator.feed(1));
     // QR juste après la référence encadrée — EN HAUT du talon, pas en bas
     // (demande explicite) — même agencement que l'aperçu écran (_TalonBox,
     // colis_receipt_preview_sheet.dart). Taille compacte (size3), pour
     // coller au format de référence (étiquette collée sur le colis) :
     // QR discret à côté du numéro, pas un gros QR qui domine le talon.
-    final bytes = _renderLines(generator, colisTalonHeaderLines(colis));
+    bytes.addAll(_renderLines(generator, colisTalonHeaderLines(colis)));
     bytes.addAll(generator.qrcode(colis.id, size: QRSize.size3));
-    bytes.addAll(_renderLines(generator, colisTalonBodyLines(colis)));
-    // Avance papier minimale avant la coupe (voir colisTalonFeedLines) : les
-    // lignes vides autour du QR et les 2 lignes de pied ajoutaient ~1 cm de
-    // papier par talon sans rien apporter au contenu.
-    bytes.addAll(generator.feed(colisTalonFeedLines));
+    // Expéditeur juste après le QR — pas en toute fin de talon comme sur les
+    // autres ponts : c'est le bloc que le scotch ne doit surtout pas
+    // effacer, le rapprocher du QR (loin du bord coupé du bas) protège les
+    // deux à la fois. Destination/destinataire ensuite.
+    bytes.addAll(_renderLines(generator, colisTalonExpediteurLines(colis)));
+    bytes.addAll(_renderLines(generator, colisTalonDestinataireLines(colis)));
+    // Marge basse avant la coupe : relevée par rapport à colisTalonFeedLines
+    // (1 ligne, pensé pour économiser du papier sur les ponts sans scotch) —
+    // ici le scotch posé sur le bord inférieur mordait directement sur le
+    // dernier bloc imprimé.
+    bytes.addAll(generator.feed(3));
     bytes.addAll(generator.cut());
 
     await _manager.send(type: type, bytes: bytes);
@@ -209,6 +228,13 @@ class EscPosPrinterService {
           bold: line['bold'] == true,
           height: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
           width: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
+          // Sans codeTable explicite, esc_pos_utils_plus laisse la table de
+          // caractères active sur son réglage d'usine — variable d'un
+          // modèle à l'autre. C'est ce qui faisait sortir "É" en "ø" sur une
+          // imprimante Bluetooth YHD-8390 tout en étant correct sur un
+          // Xprinter USB (défauts usine différents). westEur (CP850-like,
+          // accents français/latins) force la même table sur tout le monde.
+          codeTable: PosCodeTable.westEur,
         ),
       ));
     }
