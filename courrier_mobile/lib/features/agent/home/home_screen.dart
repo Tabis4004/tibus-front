@@ -32,6 +32,17 @@ bool _hasLotRole(List<AppRole> roles, String roleName) {
   return roles.any((r) => r.name == roleName || _kLotManagerRoles.contains(r.name));
 }
 
+/// "Détail par agence" (bouton sur la carte Montant du jour) liste le nom de
+/// TOUTES les agences de la compagnie, même si les montants restent masqués
+/// pour un rôle non privilégié — une fuite d'information (présence/nombre
+/// d'agences) pour un simple vendeur. Restreint explicitement à owner et
+/// admins, demande du client (pas comptable_compagnie/controleur/gerant_gare
+/// malgré leur accès large ailleurs).
+bool _canSeeGareBreakdown(List<AppRole> roles) {
+  const allowed = ['owner', 'super_admin', 'admin_pays'];
+  return roles.any((r) => allowed.contains(r.name));
+}
+
 /// Écran d'accueil agent — réplique la maquette 1 :
 /// salutation, 2 cartes KPI (aujourd'hui / montant du jour),
 /// bloc "Mon activité", liste "Colis récents".
@@ -162,7 +173,9 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
                     Expanded(
                       child: _MontantDuJourCard(
                         value: stats == null ? '—' : '${stats.montantToday.toStringAsFixed(0)} FCFA',
-                        onDetail: () => showTodayByGareSheet(context, companyId: companyId),
+                        onDetail: _canSeeGareBreakdown(roles)
+                            ? () => showTodayByGareSheet(context, companyId: companyId)
+                            : null,
                       ),
                     ),
                   ],
@@ -363,7 +376,10 @@ class _PendingSyncBanner extends ConsumerWidget {
 /// ventilation par agence du jour (voir today_by_gare_sheet.dart).
 class _MontantDuJourCard extends StatelessWidget {
   final String value;
-  final VoidCallback onDetail;
+  // Nullable : null masque entièrement le bouton "Détail" (voir
+  // _canSeeGareBreakdown) plutôt que de l'afficher désactivé — un vendeur ne
+  // doit même pas savoir que cette ventilation par agence existe.
+  final VoidCallback? onDetail;
   const _MontantDuJourCard({required this.value, required this.onDetail});
 
   @override
@@ -405,28 +421,34 @@ class _MontantDuJourCard extends StatelessWidget {
           // Bouton "Détail" dans le flux (pas en overlay) : la carte grandit
           // pour lui faire de la place, il ne peut donc plus chevaucher le
           // libellé au-dessus.
-          Align(
-            alignment: Alignment.centerRight,
-            child: Material(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
+          //
+          // Rendu conditionnel (if collection, pas juste onTap: null) : un
+          // vendeur ne doit même pas savoir que cette ventilation par agence
+          // existe (voir _canSeeGareBreakdown) — un bouton visible mais
+          // désactivé aurait quand même laissé fuiter cette info.
+          if (onDetail != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Material(
+                color: Colors.white.withOpacity(0.18),
                 borderRadius: BorderRadius.circular(8),
-                onTap: onDetail,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Détail', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                      SizedBox(width: 2),
-                      Icon(Icons.chevron_right, color: Colors.white, size: 14),
-                    ],
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onDetail,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Détail', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                        SizedBox(width: 2),
+                        Icon(Icons.chevron_right, color: Colors.white, size: 14),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
