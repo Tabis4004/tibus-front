@@ -16,8 +16,7 @@
 --     operationnel de gare) : UNIQUEMENT ses propres colis (vendeur_id =
 --     lui-meme), jamais ceux des autres vendeurs -- demande explicite.
 --
--- NOTE : pas encore applique en base (acces MCP Supabase perdu en cours de
--- session -- a reconnecter cote utilisateur avant apply_migration).
+-- Applique en base le 2026-08-05 (kqudaqtydimjclwaihqr, projet "Tibus 1.0").
 
 CREATE OR REPLACE FUNCTION public.list_colis_autonomes(p_company_id uuid, p_statut text DEFAULT NULL::text, p_limit integer DEFAULT 50)
 RETURNS jsonb
