@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../client/loyalty/loyalty_screen.dart';
 import '../../client/promo/promo_screen.dart';
 import '../../client/referral/referral_screen.dart';
+import '../support/support_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -103,6 +104,14 @@ class ProfileScreen extends ConsumerWidget {
           _MenuTile(icon: Icons.card_giftcard, label: 'Programme fidélité', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoyaltyScreen()))),
           _MenuTile(icon: Icons.local_offer_outlined, label: 'Codes promo', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PromoScreen()))),
           _MenuTile(icon: Icons.share_outlined, label: 'Parrainage', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferralScreen()))),
+          const SizedBox(height: 16),
+          const Text('Aide & support', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _MenuTile(
+            icon: Icons.support_agent_outlined,
+            label: 'Support',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SupportScreen())),
+          ),
           const SizedBox(height: 16),
           _MenuTile(
             icon: Icons.logout,

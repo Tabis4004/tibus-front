@@ -11,6 +11,7 @@ import '../data/services/offline_queue_service.dart';
 import '../data/services/reference_cache_service.dart';
 import '../data/services/sync_service.dart';
 import '../data/services/staff_notifications_service.dart';
+import '../data/services/support_service.dart';
 import '../data/models/app_role.dart';
 
 final authServiceProvider = Provider((ref) => AuthService());
@@ -22,6 +23,7 @@ final referralServiceProvider = Provider((ref) => ReferralService());
 final pushServiceProvider = Provider((ref) => PushService());
 final printerServiceProvider = Provider((ref) => PrinterService());
 final staffNotificationsServiceProvider = Provider((ref) => StaffNotificationsService());
+final supportServiceProvider = Provider((ref) => SupportService());
 
 /// Enregistrement de colis hors-ligne + synchronisation (voir demande
 /// "enregistrement même sans connexion") — file d'attente persistée
