@@ -2,10 +2,38 @@ name: Build Courrier Mobile APK
 
 # Build de l'APK Android de courrier_mobile dans le cloud (GitHub Actions),
 # pour contourner l'absence de SDK Android / JDK 17 en local et le manque
-# d'espace disque constaté récemment. Déclenchable manuellement ou sur push
-# touchant courrier_mobile/.
+# d'espace disque constaté récemment.
+#
+# Signé avec le VRAI keystore de release (secrets ANDROID_*), pas la clé
+# debug par défaut : avant ce fix, chaque run générait sa propre clé debug
+# éphémère (ubuntu-latest repart de zéro à chaque fois), donc chaque
+# nouvel APK avait une signature différente du précédent -> Android
+# refusait la mise à jour en place et exigeait une désinstallation
+# complète (perte de la file de colis en attente de synchronisation, voir
+# PendingColis/OfflineQueueService). Le keystore utilisé ici DOIT être
+# exactement le même que celui utilisé pour les builds locaux
+# (tool/build_client.sh <client> apk, voir android/key.properties local —
+# jamais commité) : sinon on retombe dans le même problème dès qu'un build
+# CI et un build local coexistent sur le parc d'appareils.
+#
+# La marque (branding) est désormais appliquée AVANT compilation via
+# tool/build_client.sh <client> apk (voir apply_brand.py) : avant ce fix,
+# ce workflow appelait `flutter build apk` directement, donc produisait
+# toujours un APK "par défaut" (Tibus), jamais celui d'un client comme SIS.
+#
+# Secrets requis (Settings > Secrets and variables > Actions), à faire
+# correspondre exactement au android/key.properties local :
+#   ANDROID_KEYSTORE_BASE64  (base64 -i ~/tibus-mobile-release.jks)
+#   ANDROID_KEY_ALIAS
+#   ANDROID_KEY_PASSWORD
+#   ANDROID_STORE_PASSWORD
 on:
   workflow_dispatch:
+    inputs:
+      client:
+        description: 'Client à builder (nom de dossier sous branding/, ex. default, sis)'
+        required: true
+        default: 'default'
   push:
     branches: [main]
     paths:
@@ -34,17 +62,47 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Préparer .env (placeholder — remplacez par de vraies clés si besoin au runtime)
+      - name: Préparer .env
         run: cp .env.example .env
 
       - name: flutter pub get
         run: flutter pub get
 
-      - name: Build APK (debug, signé avec la clé debug par défaut)
-        run: flutter build apk --debug
+      # Reconstitue EXACTEMENT le même keystore que celui utilisé en local
+      # (~/tibus-mobile-release.jks + android/key.properties, jamais
+      # commités) à partir des secrets du repo. Échec explicite plutôt que
+      # de retomber silencieusement sur la clé debug si un secret manque.
+      - name: Reconstituer le keystore de release
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEY_ALIAS" ] || \
+             [ -z "$ANDROID_KEY_PASSWORD" ] || [ -z "$ANDROID_STORE_PASSWORD" ]; then
+            echo "::error::Un ou plusieurs secrets ANDROID_KEYSTORE_BASE64 / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD / ANDROID_STORE_PASSWORD sont manquants (Settings > Secrets and variables > Actions)." >&2
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=$GITHUB_WORKSPACE/courrier_mobile/android/app/release.jks
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Déterminer le client à builder
+        id: client
+        run: |
+          CLIENT="${{ github.event.inputs.client }}"
+          echo "name=${CLIENT:-default}" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK (release, marque appliquée + vraie clé de release)
+        run: ./tool/build_client.sh "${{ steps.client.outputs.name }}" apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: courrier-mobile-debug-apk
-          path: courrier_mobile/build/app/outputs/flutter-apk/app-debug.apk
+          name: courrier-mobile-${{ steps.client.outputs.name }}-release-apk
+          path: courrier_mobile/build/app/outputs/flutter-apk/app-release.apk
