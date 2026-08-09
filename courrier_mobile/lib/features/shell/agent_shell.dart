@@ -23,6 +23,7 @@ class _AgentShellState extends ConsumerState<AgentShell> {
   int _index = 0;
   StreamSubscription<bool>? _connectivitySub;
   bool? _wasOnline;
+  Timer? _periodicSyncTimer;
 
   static const _screens = [
     HomeScreen(),
@@ -52,11 +53,29 @@ class _AgentShellState extends ConsumerState<AgentShell> {
         ref.read(syncServiceProvider).syncAll();
       }
     });
+
+    // Filet de sécurité en plus de l'écoute connectivity_plus ci-dessus :
+    // connectivity_plus ne reflète que l'état de l'INTERFACE (wifi/données
+    // mobiles active), pas la joignabilité réelle de Supabase (voir
+    // core/utils/connectivity.dart). Une micro-coupure (mauvais signal,
+    // backend brièvement indisponible) qui n'entraîne PAS de vraie
+    // transition "interface coupée puis reconnectée" ne déclenche donc
+    // JAMAIS onConnectivityIsOnline — le colis reste alors coincé dans la
+    // file locale indéfiniment (jamais comptabilisé) jusqu'au prochain
+    // redémarrage de l'app. Symptôme vécu : synchronisation "sporadique"
+    // pile lors des petites pannes de connexion. Ce timer retente
+    // périodiquement, sans dépendre d'aucun événement de connectivité.
+    _periodicSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+      if (ref.read(syncServiceProvider).pendingCount > 0) {
+        ref.read(syncServiceProvider).syncAll();
+      }
+    });
   }
 
   @override
   void dispose() {
     _connectivitySub?.cancel();
+    _periodicSyncTimer?.cancel();
     super.dispose();
   }
 

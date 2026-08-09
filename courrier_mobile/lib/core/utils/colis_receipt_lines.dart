@@ -5,8 +5,27 @@ import '../../data/models/colis.dart';
 /// (colisPublicReference dans src/lib/colis-receipt.ts) et que
 /// colis_detail_screen.dart (_colisReference) : CL- + 8 premiers caractères
 /// de l'id, sans tirets.
-String colisShortRef(Colis colis) =>
-    'CL-${colis.id.replaceAll('-', '').toUpperCase().substring(0, 8)}';
+///
+/// Cas particulier colis hors-ligne (PendingColis.toColis, isPendingSync) :
+/// l'id est "local-<horodatage ms>-<suffixe hex aléatoire 8 car.>"
+/// (generateLocalId). Prendre les 8 PREMIERS caractères après suppression
+/// des tirets donnait "LOCAL" + les 3 premiers chiffres de l'horodatage —
+/// qui ne changent qu'environ tous les 11 jours (horodatage ms à 13
+/// chiffres). Résultat vécu en prod : tous les colis enregistrés hors
+/// connexion pendant la même fenêtre de ~11 jours, par n'importe quel agent
+/// de n'importe quelle compagnie, affichaient la MÊME référence provisoire
+/// ("CL-LOCAL178") — donc introuvable/ambiguë pour l'agent qui cherche SON
+/// ticket. Le suffixe hex (8 caractères, tiré aléatoirement à chaque appel
+/// de generateLocalId) est lui bien unique par colis : on l'utilise à la
+/// place pour ce cas précis.
+String colisShortRef(Colis colis) {
+  final id = colis.id;
+  if (id.startsWith('local-')) {
+    final suffix = id.split('-').last;
+    if (suffix.length >= 8) return 'CL-${suffix.toUpperCase().substring(0, 8)}';
+  }
+  return 'CL-${id.replaceAll('-', '').toUpperCase().substring(0, 8)}';
+}
 
 /// Numéro affiché sur le reçu/talon : numérotation séquentielle par gare de
 /// départ (ex. ABOI000001, migration 180) si disponible, sinon repli sur la
