@@ -1,6 +1,28 @@
 import 'package:intl/intl.dart';
 import '../../data/models/colis.dart';
 
+/// Reproduit public.colis_gare_prefix (migration 180) côté client : 4
+/// premiers caractères alphanumériques du nom de gare, majuscules, accents
+/// retirés (ex. "Aboisso" → "ABOI"). "GARE" si le nom ne donne rien
+/// d'exploitable. Sert uniquement à la référence PROVISOIRE d'un colis
+/// hors-ligne (voir colisShortRef) — le vrai numéro séquentiel
+/// (ABOI000042) n'existe qu'une fois inséré en base par le trigger
+/// assign_colis_numero_recu, impossible à reproduire fidèlement hors ligne
+/// (compteur atomique partagé entre tous les agents de la gare, inconnu
+/// tant qu'on n'a pas resynchronisé).
+String _garePrefixLocal(String gareName) {
+  const accented = 'ÀÂÄÁÃÉÈÊËÍÎÏÓÔÖÕÚÙÛÜÇÑàâäáãéèêëíîïóôöõúùûüçñ';
+  const plain = 'AAAAAEEEEIIIOOOOUUUUCNaaaaaeeeeiiioooouuuucn';
+  final buffer = StringBuffer();
+  for (final ch in gareName.split('')) {
+    final idx = accented.indexOf(ch);
+    buffer.write(idx >= 0 ? plain[idx] : ch);
+  }
+  final cleaned = buffer.toString().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  final prefix = cleaned.length >= 4 ? cleaned.substring(0, 4) : cleaned;
+  return prefix.isEmpty ? 'GARE' : prefix;
+}
+
 /// Référence publique courte — même format que côté web
 /// (colisPublicReference dans src/lib/colis-receipt.ts) et que
 /// colis_detail_screen.dart (_colisReference) : CL- + 8 premiers caractères
@@ -17,12 +39,19 @@ import '../../data/models/colis.dart';
 /// ("CL-LOCAL178") — donc introuvable/ambiguë pour l'agent qui cherche SON
 /// ticket. Le suffixe hex (8 caractères, tiré aléatoirement à chaque appel
 /// de generateLocalId) est lui bien unique par colis : on l'utilise à la
-/// place pour ce cas précis.
+/// place pour ce cas précis, préfixé par le code de la gare de départ
+/// (même esprit que la nomenclature en ligne "ABOI000042" — demande
+/// explicite de garder ce repère visuel même en attente de synchro) au lieu
+/// du générique "CL-" : ex. "ABOI-A1B2C3D4". Le "*** REÇU PROVISOIRE ***" /
+/// "En attente de connexion" affichés juste au-dessus (voir
+/// colisReceiptLines/colisTalonHeaderLines) restent la mention explicite
+/// que ce N° n'est pas encore le numéro séquentiel officiel.
 String colisShortRef(Colis colis) {
   final id = colis.id;
   if (id.startsWith('local-')) {
     final suffix = id.split('-').last;
-    if (suffix.length >= 8) return 'CL-${suffix.toUpperCase().substring(0, 8)}';
+    final tag = suffix.length >= 8 ? suffix.toUpperCase().substring(0, 8) : suffix.toUpperCase();
+    return '${_garePrefixLocal(colis.gareDepart)}-$tag';
   }
   return 'CL-${id.replaceAll('-', '').toUpperCase().substring(0, 8)}';
 }

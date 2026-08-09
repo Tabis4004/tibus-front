@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../models/colis.dart';
 import '../models/pending_colis.dart';
 import 'auth_service.dart';
 import 'colis_service.dart';
@@ -39,6 +40,24 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<List<PendingColis>> loadPending() => _queue.loadAll();
+
+  /// Reçus dont la synchronisation vient de réussir, avec leurs données
+  /// SERVEUR complètes (notamment le vrai numéro séquentiel "ABOI000042",
+  /// impossible à connaître avant l'insertion — voir colis_gare_prefix,
+  /// migration 180). Le reçu imprimé au moment de la création hors-ligne
+  /// n'affiche qu'une référence provisoire (voir colisShortRef) ; sans ce
+  /// mécanisme, l'agent n'apprenait jamais la référence officielle à
+  /// communiquer au client. Consommé (vidé) par l'UI après affichage — voir
+  /// consumeSyncedReceipts, AgentShell.
+  final List<Colis> _syncedReceiptsToNotify = [];
+
+  /// Vide la liste et retourne ce qu'elle contenait — à appeler juste après
+  /// avoir affiché/imprimé ces reçus, pour ne pas les notifier deux fois.
+  List<Colis> consumeSyncedReceipts() {
+    final items = List<Colis>.from(_syncedReceiptsToNotify);
+    _syncedReceiptsToNotify.clear();
+    return items;
+  }
 
   /// Un colis en attente est "à moi" s'il n'a pas d'agent créateur connu
   /// (entrée créée avant l'ajout de PendingColis.creatorUserId — voir sa
@@ -140,6 +159,16 @@ class SyncService extends ChangeNotifier {
         }
       }
       await _queue.remove(item.localId);
+      // Best-effort : va chercher le détail complet (numéro de reçu
+      // officiel notamment) pour pouvoir informer l'agent de la référence
+      // finale — un échec ici ne doit jamais faire "échouer" une
+      // synchronisation déjà validée côté serveur à ce stade.
+      if (colisId != null) {
+        try {
+          final detail = await _colisService.getColisDetail(colisId);
+          if (detail != null) _syncedReceiptsToNotify.add(Colis.fromMap(detail));
+        } catch (_) {}
+      }
       return true;
     } catch (e) {
       await _queue.update(item.copyWith(lastError: '$e', attempts: item.attempts + 1));

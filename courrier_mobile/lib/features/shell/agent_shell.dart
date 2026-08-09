@@ -6,8 +6,10 @@ import '../agent/colis/colis_list_screen.dart';
 import '../agent/colis/colis_create_screen.dart';
 import '../agent/stats/stats_screen.dart';
 import '../agent/profile/profile_screen.dart';
+import '../agent/colis/colis_receipt_preview_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers.dart';
+import '../../core/utils/colis_receipt_lines.dart';
 import '../../core/utils/connectivity.dart';
 
 /// Coquille de navigation "agent" — reproduit la barre basse à 5 entrées
@@ -95,8 +97,34 @@ class _AgentShellState extends ConsumerState<AgentShell> {
     setState(() => _index = index);
   }
 
+  /// Dès qu'une synchro (auto ou manuelle) fait réussir un ou plusieurs
+  /// colis, informe l'agent de leur référence OFFICIELLE (ex. "ABOI000042")
+  /// — le reçu imprimé au moment de la création hors-ligne n'affichait
+  /// qu'une référence provisoire (voir colisShortRef), ce numéro séquentiel
+  /// n'existant qu'une fois inséré en base. Un SnackBar par colis, avec un
+  /// raccourci pour revoir/réimprimer le reçu final — voir
+  /// SyncService.consumeSyncedReceipts.
+  void _notifyNewlySyncedReceipts(BuildContext context) {
+    final receipts = ref.read(syncServiceProvider).consumeSyncedReceipts();
+    for (final colis in receipts) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Colis synchronisé — référence officielle : ${colisReceiptNumber(colis)}'),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Voir le reçu',
+          onPressed: () => showColisReceiptPreview(context, colis),
+        ),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ref.listen (pas ref.watch) : effet de bord ponctuel (SnackBar) à
+    // chaque changement de SyncService, pas un rebuild de tout l'écran.
+    ref.listen(syncServiceProvider, (previous, next) {
+      _notifyNewlySyncedReceipts(context);
+    });
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: BottomNavigationBar(
