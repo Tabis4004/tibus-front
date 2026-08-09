@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/pending_colis.dart';
+import 'auth_service.dart';
 import 'colis_service.dart';
 import 'offline_queue_service.dart';
 
@@ -20,8 +21,9 @@ class SyncSummary {
 class SyncService extends ChangeNotifier {
   final ColisService _colisService;
   final OfflineQueueService _queue;
+  final AuthService _auth;
 
-  SyncService(this._colisService, this._queue) {
+  SyncService(this._colisService, this._queue, this._auth) {
     refreshCount();
   }
 
@@ -38,6 +40,17 @@ class SyncService extends ChangeNotifier {
 
   Future<List<PendingColis>> loadPending() => _queue.loadAll();
 
+  /// Un colis en attente est "à moi" s'il n'a pas d'agent créateur connu
+  /// (entrée créée avant l'ajout de PendingColis.creatorUserId — voir sa
+  /// doc) ou si son créateur est l'agent actuellement connecté. Sert à
+  /// restreindre la synchro AUTOMATIQUE (voir syncMine) : register_colis_autonome
+  /// attribue le colis à qui appelle la RPC, donc synchroniser le colis d'un
+  /// autre agent l'attribuerait à tort à l'agent connecté.
+  bool isMine(PendingColis item) {
+    final uid = _auth.currentAuthUserId;
+    return item.creatorUserId == null || item.creatorUserId == uid;
+  }
+
   /// Enregistre un nouveau colis hors-ligne dans la file d'attente.
   Future<void> enqueue(PendingColis item) async {
     await _queue.add(item);
@@ -50,7 +63,17 @@ class SyncService extends ChangeNotifier {
   /// mais reste dans la file avec le message d'erreur serveur pour revue
   /// par l'agent (montant insuffisant, gare invalide, caisse entre-temps
   /// fermée par un tiers...).
-  Future<SyncSummary> syncAll() async {
+  ///
+  /// [onlyMine] limite aux colis créés par l'agent actuellement connecté
+  /// (voir isMine) — utilisé par les déclencheurs AUTOMATIQUES (démarrage,
+  /// retour réseau, filet périodique dans AgentShell) pour ne jamais
+  /// synchroniser au nom de l'agent connecté un colis saisi par quelqu'un
+  /// d'autre (relève de guichet, appareil partagé). Le bouton "Tout
+  /// synchroniser maintenant" de pending_colis_screen.dart appelle
+  /// désormais aussi cette version restreinte (voir syncMine) ; seuls les
+  /// colis affichés dans la section "d'un autre agent" restent hors de sa
+  /// portée, volontairement.
+  Future<SyncSummary> syncAll({bool onlyMine = false}) async {
     if (_syncing) return const SyncSummary(synced: 0, failed: 0);
     _syncing = true;
     notifyListeners();
@@ -59,6 +82,7 @@ class SyncService extends ChangeNotifier {
     try {
       final items = await _queue.loadAll();
       for (final item in items) {
+        if (onlyMine && !isMine(item)) continue;
         final ok = await _syncOne(item);
         if (ok) {
           synced++;
@@ -72,6 +96,11 @@ class SyncService extends ChangeNotifier {
     }
     return SyncSummary(synced: synced, failed: failed);
   }
+
+  /// Voir doc de [syncAll] (onlyMine: true) — à utiliser pour tout
+  /// déclenchement automatique ou non explicitement demandé par l'agent sur
+  /// un colis précis.
+  Future<SyncSummary> syncMine() => syncAll(onlyMine: true);
 
   /// Resynchronise une seule entrée (bouton "Réessayer" par ligne dans
   /// pending_colis_screen.dart).

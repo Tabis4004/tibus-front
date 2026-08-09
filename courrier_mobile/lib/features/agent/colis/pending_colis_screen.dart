@@ -39,9 +39,15 @@ class _PendingColisScreenState extends ConsumerState<PendingColisScreen> {
     });
   }
 
+  // syncMine() (pas syncAll()) : n'agit que sur les colis de l'agent
+  // connecté (+ entrées héritées sans créateur connu) — voir
+  // SyncService.isMine. Les colis "d'un autre agent" (section séparée
+  // ci-dessous) ne sont volontairement pas synchronisables depuis cette
+  // session : register_colis_autonome attribuerait sinon la vente à l'agent
+  // actuellement connecté au lieu de celui qui l'a réellement enregistrée.
   Future<void> _syncAll() async {
     final sync = ref.read(syncServiceProvider);
-    final summary = await sync.syncAll();
+    final summary = await sync.syncMine();
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -88,6 +94,13 @@ class _PendingColisScreenState extends ConsumerState<PendingColisScreen> {
   @override
   Widget build(BuildContext context) {
     final sync = ref.watch(syncServiceProvider);
+    // Colis d'un autre agent (voir SyncService.isMine) : affichés pour que
+    // rien ne "disparaisse" (voir bug initial "on ne retrouve pas les
+    // tickets"), mais sans action de synchro/abandon — seul l'agent qui les
+    // a créés (reconnecté sur cet appareil) peut les synchroniser, sinon
+    // register_colis_autonome les attribuerait à tort à l'agent connecté.
+    final mine = _items.where(sync.isMine).toList();
+    final others = _items.where((i) => !sync.isMine(i)).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Colis en attente de synchronisation'),
@@ -121,21 +134,50 @@ class _PendingColisScreenState extends ConsumerState<PendingColisScreen> {
                         ),
                       ],
                     )
-                  : ListView.separated(
+                  : ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
-                      itemCount: _items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) => _PendingCard(
-                        item: _items[index],
-                        syncing: sync.syncing,
-                        onSyncOne: () => _syncOne(_items[index].localId),
-                        onDiscard: () => _discard(_items[index]),
-                        onReprint: () => showColisReceiptPreview(context, _items[index].toColis()),
-                      ),
+                      children: [
+                        for (final item in mine) ...[
+                          _PendingCard(
+                            item: item,
+                            syncing: sync.syncing,
+                            onSyncOne: () => _syncOne(item.localId),
+                            onDiscard: () => _discard(item),
+                            onReprint: () => showColisReceiptPreview(context, item.toColis()),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        if (others.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Colis d\'autres agents',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2, bottom: 10),
+                            child: Text(
+                              'Enregistrés hors connexion par un autre agent sur cet appareil — '
+                              'seul cet agent, reconnecté, peut les synchroniser (sinon la vente lui serait retirée).',
+                              style: TextStyle(fontSize: 12, color: Colors.black54),
+                            ),
+                          ),
+                          for (final item in others) ...[
+                            _PendingCard(
+                              item: item,
+                              syncing: sync.syncing,
+                              readOnly: true,
+                              onSyncOne: () {},
+                              onDiscard: () {},
+                              onReprint: () => showColisReceiptPreview(context, item.toColis()),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+                      ],
                     ),
             ),
-      bottomNavigationBar: _items.isEmpty
+      bottomNavigationBar: mine.isEmpty
           ? null
           : SafeArea(
               child: Padding(
@@ -145,7 +187,7 @@ class _PendingColisScreenState extends ConsumerState<PendingColisScreen> {
                   icon: sync.syncing
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.sync),
-                  label: Text(sync.syncing ? 'Synchronisation...' : 'Tout synchroniser maintenant'),
+                  label: Text(sync.syncing ? 'Synchronisation...' : 'Synchroniser mes colis maintenant'),
                 ),
               ),
             ),
@@ -159,6 +201,10 @@ class _PendingCard extends StatelessWidget {
   final VoidCallback onSyncOne;
   final VoidCallback onDiscard;
   final VoidCallback onReprint;
+  // Colis créé par un autre agent (voir SyncService.isMine) : ni synchro ni
+  // abandon possibles depuis cette session, seulement la réimpression du
+  // reçu provisoire (utile pour retrouver/redonner le ticket au client).
+  final bool readOnly;
 
   const _PendingCard({
     required this.item,
@@ -166,6 +212,7 @@ class _PendingCard extends StatelessWidget {
     required this.onSyncOne,
     required this.onDiscard,
     required this.onReprint,
+    this.readOnly = false,
   });
 
   @override
@@ -195,9 +242,10 @@ class _PendingCard extends StatelessWidget {
                     if (v == 'reprint') onReprint();
                     if (v == 'discard') onDiscard();
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'reprint', child: Text('Réimprimer le reçu provisoire')),
-                    PopupMenuItem(value: 'discard', child: Text('Abandonner (ne jamais envoyer)')),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'reprint', child: Text('Réimprimer le reçu provisoire')),
+                    if (!readOnly)
+                      const PopupMenuItem(value: 'discard', child: Text('Abandonner (ne jamais envoyer)')),
                   ],
                 ),
               ],
@@ -213,14 +261,23 @@ class _PendingCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 12, color: Colors.red)),
             ],
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: syncing ? null : onSyncOne,
-                icon: const Icon(Icons.sync, size: 16),
-                label: const Text('Réessayer'),
+            if (readOnly)
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Connectez-vous avec le compte de cet agent pour synchroniser',
+                  style: TextStyle(fontSize: 11, color: Colors.black45, fontStyle: FontStyle.italic),
+                ),
+              )
+            else
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: syncing ? null : onSyncOne,
+                  icon: const Icon(Icons.sync, size: 16),
+                  label: const Text('Réessayer'),
+                ),
               ),
-            ),
           ],
         ),
       ),

@@ -582,6 +582,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       companyPhone: companyInfo.phone,
       natureLabel: natureLabel,
       photoBase64: _photoBytes != null ? base64Encode(_photoBytes!) : null,
+      creatorUserId: ref.read(authServiceProvider).currentAuthUserId,
     );
     await ref.read(syncServiceProvider).enqueue(pending);
     if (!mounted) return;

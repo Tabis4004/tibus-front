@@ -23,6 +23,15 @@ class AuthService {
   bool get isLoggedIn => currentSession != null;
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
 
+  /// Id auth Supabase de la session active — utilisé uniquement pour du
+  /// bookkeeping LOCAL (voir PendingColis.creatorUserId, SyncService) : quel
+  /// agent est actuellement connecté sur cet appareil, afin de ne
+  /// synchroniser automatiquement que ses propres colis en attente. N'a pas
+  /// besoin de correspondre à "Users".id (ce que fait current_app_user_id()
+  /// côté serveur) — juste d'identifier de façon stable "la même personne"
+  /// d'une connexion à l'autre.
+  String? get currentAuthUserId => _client.auth.currentUser?.id;
+
   Future<AuthResponse> signInWithPassword({
     required String identifier,
     required String password,

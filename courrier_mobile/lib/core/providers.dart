@@ -34,7 +34,11 @@ final supportServiceProvider = Provider((ref) => SupportService());
 final offlineQueueServiceProvider = Provider((ref) => OfflineQueueService());
 final referenceCacheServiceProvider = Provider((ref) => ReferenceCacheService());
 final syncServiceProvider = ChangeNotifierProvider(
-  (ref) => SyncService(ref.read(colisServiceProvider), ref.read(offlineQueueServiceProvider)),
+  (ref) => SyncService(
+    ref.read(colisServiceProvider),
+    ref.read(offlineQueueServiceProvider),
+    ref.read(authServiceProvider),
+  ),
 );
 
 /// Rôles de l'utilisateur connecté (une entrée par compagnie affectée).

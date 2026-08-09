@@ -45,12 +45,18 @@ class _AgentShellState extends ConsumerState<AgentShell> {
     // (au cas où des colis seraient restés en attente d'une session
     // précédente, déjà reconnectée), puis à chaque fois que la connectivité
     // repasse de "hors-ligne" à "en ligne" pendant que l'app est ouverte.
-    Future.microtask(() => ref.read(syncServiceProvider).syncAll());
+    // syncMine() (pas syncAll()) : ne synchronise que les colis créés par
+    // l'agent actuellement connecté (+ les entrées héritées sans créateur
+    // connu) — voir SyncService.isMine. Évite qu'un déclenchement
+    // automatique attribue à tort à CET agent un colis saisi par un
+    // collègue sur le même appareil (relève de guichet, tablette partagée) :
+    // register_colis_autonome attribue le colis à qui appelle la RPC.
+    Future.microtask(() => ref.read(syncServiceProvider).syncMine());
     _connectivitySub = onConnectivityIsOnline().listen((online) {
       final wasOffline = _wasOnline == false;
       _wasOnline = online;
       if (online && wasOffline) {
-        ref.read(syncServiceProvider).syncAll();
+        ref.read(syncServiceProvider).syncMine();
       }
     });
 
@@ -67,7 +73,7 @@ class _AgentShellState extends ConsumerState<AgentShell> {
     // périodiquement, sans dépendre d'aucun événement de connectivité.
     _periodicSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       if (ref.read(syncServiceProvider).pendingCount > 0) {
-        ref.read(syncServiceProvider).syncAll();
+        ref.read(syncServiceProvider).syncMine();
       }
     });
   }

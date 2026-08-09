@@ -63,6 +63,20 @@ class PendingColis {
   final String? lastError;
   final int attempts;
 
+  /// Id auth Supabase (AuthService.currentAuthUserId) de l'agent connecté au
+  /// moment de la création — sert à restreindre la synchronisation
+  /// AUTOMATIQUE à cet agent (voir SyncService.syncMine), pour éviter qu'un
+  /// autre agent connecté ensuite sur le même appareil (relève de guichet,
+  /// tablette partagée) ne synchronise involontairement ce colis en son
+  /// propre nom : register_colis_autonome attribue le colis à qui APPELLE
+  /// la RPC, pas à qui l'a saisi. Nullable et volontairement permissif : un
+  /// colis existant AVANT cette protection (créé sans ce champ, donc null)
+  /// reste synchronisable par n'importe quel agent, exactement comme avant —
+  /// il n'y a pas d'info d'origine à retrouver rétroactivement pour ces
+  /// entrées-là, mieux vaut les laisser se synchroniser (et donc se
+  /// comptabiliser) que les bloquer indéfiniment.
+  final String? creatorUserId;
+
   const PendingColis({
     required this.localId,
     required this.createdAt,
@@ -91,6 +105,7 @@ class PendingColis {
     this.photoBase64,
     this.lastError,
     this.attempts = 0,
+    this.creatorUserId,
   });
 
   RegisterColisInput toInput() => RegisterColisInput(
@@ -170,6 +185,7 @@ class PendingColis {
         photoBase64: photoBase64,
         lastError: clearError ? null : (lastError ?? this.lastError),
         attempts: attempts ?? this.attempts,
+        creatorUserId: creatorUserId,
       );
 
   Map<String, dynamic> toJson() => {
@@ -200,6 +216,7 @@ class PendingColis {
         'photoBase64': photoBase64,
         'lastError': lastError,
         'attempts': attempts,
+        'creatorUserId': creatorUserId,
       };
 
   factory PendingColis.fromJson(Map<String, dynamic> map) => PendingColis(
@@ -230,6 +247,11 @@ class PendingColis {
         photoBase64: map['photoBase64'] as String?,
         lastError: map['lastError'] as String?,
         attempts: (map['attempts'] as num?)?.toInt() ?? 0,
+        // Absent pour toute entrée créée avant cette mise à jour (JSON déjà
+        // persisté) — `as String?` sur une clé manquante renvoie null
+        // naturellement, ce qui les rend synchronisables par n'importe quel
+        // agent (voir doc du champ ci-dessus), sans migration nécessaire.
+        creatorUserId: map['creatorUserId'] as String?,
       );
 
   static String encodeList(List<PendingColis> list) => jsonEncode(list.map((e) => e.toJson()).toList());
