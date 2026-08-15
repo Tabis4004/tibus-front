@@ -1,0 +1,4 @@
+-- PLACEHOLDER -- à remplacer par le résultat de
+-- ../pour_moi/01_generate_functions_and_triggers.sql (colonne "script"),
+-- exécuté par Tabis dans le SQL Editor de Tibus 1.0.
+-- Tant que ce fichier n'est pas remplacé, ne pas envoyer ce paquet.
