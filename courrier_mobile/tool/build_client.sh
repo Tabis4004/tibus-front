@@ -34,13 +34,28 @@ flutter pub get >/dev/null
 WRANGLER_CONFIG="wrangler.$CLIENT.jsonc"
 [ -f "$WRANGLER_CONFIG" ] || WRANGLER_CONFIG="wrangler.jsonc"
 
+# --dart-define dérivés de branding/<client>/brand.json (URL/clé Supabase
+# propres à ce client si définies, bascules de fonctionnalités par marque)
+# — voir tool/brand_dart_defines.py. Vide pour tout client qui ne définit
+# rien dans brand.json : comportement inchangé (repli sur Tibus 1.0).
+#
+# Chaîne (pas un tableau bash) + expansion NON quotée volontaire ci-dessous :
+# évite le piège classique "tableau vide + set -u" qui plante sous le
+# /bin/bash 3.2 encore livré par défaut sur macOS (corrigé seulement en
+# bash >= 4.4). Sûr ici : les tokens --dart-define=CLE=VALEUR ne contiennent
+# pas d'espace.
+DART_DEFINES="$(python3 tool/brand_dart_defines.py "$CLIENT" | tr '\n' ' ')"
+if [ -n "$DART_DEFINES" ]; then
+  echo "==> --dart-define spécifiques à « $CLIENT » : $DART_DEFINES"
+fi
+
 echo "==> Compilation : $TARGET"
 case "$TARGET" in
-  web)     flutter build web --release ;;
-  deploy)  flutter build web --release ;;
-  apk)     flutter build apk --release ;;
-  aab)     flutter build appbundle --release ;;
-  windows) flutter build windows --release ;;
+  web)     flutter build web --release $DART_DEFINES ;;
+  deploy)  flutter build web --release $DART_DEFINES ;;
+  apk)     flutter build apk --release $DART_DEFINES ;;
+  aab)     flutter build appbundle --release $DART_DEFINES ;;
+  windows) flutter build windows --release $DART_DEFINES ;;
   *) echo "cible inconnue : $TARGET" >&2; exit 1 ;;
 esac
 

@@ -9,5 +9,8 @@
   "iconBackground": "#FFFFFF",
   "iconPadding": 0.08,
   "worker": "courrier-sis",
-  "publisher": "Société SIS"
+  "publisher": "Société SIS",
+  "features": {
+    "showLoyaltyPromoReferral": false
+  }
 }

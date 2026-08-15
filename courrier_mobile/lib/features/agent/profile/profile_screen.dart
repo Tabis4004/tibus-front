@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/config/brand_features.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../client/loyalty/loyalty_screen.dart';
@@ -98,12 +99,16 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          const Text('Marketing & fidélisation', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _MenuTile(icon: Icons.card_giftcard, label: 'Programme fidélité', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoyaltyScreen()))),
-          _MenuTile(icon: Icons.local_offer_outlined, label: 'Codes promo', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PromoScreen()))),
-          _MenuTile(icon: Icons.share_outlined, label: 'Parrainage', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferralScreen()))),
+          // Masqué pour les marques "logiciel métier" sans volet client
+          // (ex. SIS) — voir kShowLoyaltyPromoReferral, brand_features.dart.
+          if (kShowLoyaltyPromoReferral) ...[
+            const SizedBox(height: 16),
+            const Text('Marketing & fidélisation', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _MenuTile(icon: Icons.card_giftcard, label: 'Programme fidélité', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoyaltyScreen()))),
+            _MenuTile(icon: Icons.local_offer_outlined, label: 'Codes promo', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PromoScreen()))),
+            _MenuTile(icon: Icons.share_outlined, label: 'Parrainage', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferralScreen()))),
+          ],
           const SizedBox(height: 16),
           const Text('Aide & support', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),

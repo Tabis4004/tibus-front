@@ -19,6 +19,17 @@ Ce qui est modifié :
 
 La marque appliquée est mémorisée dans `branding/.current`, pour qu'un
 `git status` inattendu s'explique d'un coup d'œil.
+
+Champs optionnels supplémentaires de brand.json (n'affectent PAS ce script,
+lus par tool/brand_dart_defines.py -> --dart-define -> build_client.sh) :
+  supabaseUrl / supabaseAnonKey  Base Supabase propre à ce client au lieu
+                                  du repli Tibus 1.0 (voir demande SIS /
+                                  auto-hébergement Hostinger). Absent =
+                                  comportement inchangé.
+  features.showLoyaltyPromoReferral  false pour masquer fidélité/codes
+                                  promo/parrainage dans le menu Profil
+                                  agent (logiciels métier sans volet
+                                  client, ex. SIS). Absent = affiché.
 """
 
 import json
