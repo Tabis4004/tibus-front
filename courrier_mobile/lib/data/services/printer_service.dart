@@ -127,15 +127,16 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        // Téléphone de la gare de DESTINATION sous le nom de la compagnie,
-        // et téléphone du SIÈGE (compagnie) juste en dessous (ordre permuté,
-        // demande explicite) — le téléphone de la gare de DÉPART est lui
-        // affiché dans le bloc EXPÉDITEUR ci-dessous (voir rows, ligne
-        // "Tél. agence"). NB : l'ordre d'affichage réel sur le pont P3 natif
-        // est fixé côté Kotlin (renderUnified, P3PrinterModule.kt), pas par
-        // l'ordre de ce tableau — les deux ont été permutés ensemble.
-        if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
-        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
+        // Destination en toutes lettres sous le nom de la compagnie —
+        // remplace l'ancien "Tél dest: <numéro>" (demande explicite du
+        // 20/08/2026). Le téléphone du SIÈGE (compagnie) est lui déplacé en
+        // pied de page (voir footer ci-dessous). Le rendu réel de cette
+        // ligne est fixé côté Kotlin (renderUnified/normalizeStructured,
+        // P3PrinterModule.kt), qui extrait le texte après "Tel Destination:"
+        // — garder ce libellé exact ici. Le téléphone de la gare de DÉPART
+        // reste affiché dans le bloc EXPÉDITEUR ci-dessous (voir rows, ligne
+        // "Tél. agence").
+        'Tel Destination: ${colis.gareDestination}',
         // Sous-titre EXPLICITE : sans lui, le module P3 natif retombe sur
         // « Ticket » par défaut (normalizeStructured, P3PrinterModule.kt).
         'Reçu expédition colis',
@@ -168,8 +169,15 @@ class PrinterService {
       // ci-dessous), nécessaire au scan pendant chargement/arrivée/livraison.
       qr: '',
       // Tiret ASCII (pas « — ») : le cadratin faisait perdre le « R » de
-      // « Retrait » au rendu P3 (« etrait sous 72h » sur le papier).
-      footer: 'Retrait sous 72h - passé ce délai,\nfrais de magasinage.\nPowered by www.tibus.app',
+      // « Retrait » au rendu P3 (« etrait sous 72h » sur le papier). Le
+      // téléphone du SIÈGE, déplacé depuis l'en-tête (voir plus haut),
+      // s'ajoute ici avec une formule d'appel explicite (demande explicite
+      // du 20/08/2026) — Kotlin se contente de découper ce footer sur les
+      // \n et d'imprimer chaque ligne (voir renderUnified,
+      // P3PrinterModule.kt), pas besoin de changement côté natif ici.
+      footer: 'Retrait sous 72h - passé ce délai,\nfrais de magasinage.'
+          '${colis.companyPhone.isNotEmpty ? "\nPour plus d'informations veuillez appeler\nle tél siège : ${colis.companyPhone}" : ""}'
+          '\nPowered by www.tibus.app',
       paperWidthMm: paperWidthMm,
     );
   }
@@ -183,14 +191,14 @@ class PrinterService {
     return printReceipt(
       header: [
         colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
-        // Même en-tête que le reçu (voir printColisReceipt) : téléphone de
-        // la gare de destination ET du siège (compagnie), ordre permuté
-        // (dest en haut, demande explicite), puis sous-titre explicite —
-        // sans lui, le module P3 natif retombe sur « Ticket ». Le téléphone
-        // de la gare de départ est lui dans le bloc expédition ci-dessous
-        // (ligne "Tél. agence").
-        if (colis.gareDestinationPhone.isNotEmpty) 'Tél dest: ${colis.gareDestinationPhone}',
-        if (colis.companyPhone.isNotEmpty) 'Tél siège: ${colis.companyPhone}',
+        // Même en-tête que le reçu (voir printColisReceipt) : destination en
+        // toutes lettres au lieu du téléphone de la gare de destination
+        // (demande explicite du 20/08/2026), puis sous-titre explicite —
+        // sans lui, le module P3 natif retombe sur « Ticket ». Pas de "Tél
+        // siège" ici : ce talon n'a pas de pied de page où le reçu le
+        // déplace désormais. Le téléphone de la gare de départ est lui dans
+        // le bloc expédition ci-dessous (ligne "Tél. agence").
+        'Tel Destination: ${colis.gareDestination}',
         'Reçu expédition colis',
       ],
       reference: colisReceiptNumber(colis),

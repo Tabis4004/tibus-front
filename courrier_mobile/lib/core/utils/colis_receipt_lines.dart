@@ -109,15 +109,14 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
-    // Téléphone de la gare de DESTINATION sous le nom de la compagnie, et
-    // téléphone du SIÈGE (compagnie) juste en dessous (ordre permuté, demande
-    // explicite). Le téléphone de la gare de DÉPART est lui affiché plus
-    // bas, dans le bloc EXPÉDITEUR (voir "Tél. agence" ci-dessous, à côté du
-    // champ Agence).
-    if (colis.gareDestinationPhone.isNotEmpty)
-      {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
-    if (colis.companyPhone.isNotEmpty)
-      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Destination affichée en toutes lettres sous le nom de la compagnie —
+    // remplace l'ancien "Tél dest: <numéro>" (peu lisible/utile en en-tête,
+    // demande explicite du 20/08/2026). Le téléphone du SIÈGE (compagnie)
+    // est lui déplacé en PIED de page (voir plus bas, après "Retrait sous
+    // 72h"), avec une formule d'appel explicite plutôt qu'un numéro nu en
+    // en-tête. Le téléphone de la gare de DÉPART reste dans le bloc
+    // EXPÉDITEUR (voir "Tél. agence" ci-dessous, à côté du champ Agence).
+    {'text': 'Tel Destination: ${colis.gareDestination}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     // Colis enregistré hors connexion, pas encore confirmé par le serveur
     // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
@@ -159,6 +158,13 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': '================================', 'align': 'center', 'bold': true},
     {'text': 'Retrait sous 72h - passé ce délai, des frais', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'de magasinage sont imputables.', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Téléphone du SIÈGE déplacé ici depuis l'en-tête (voir plus haut) —
+    // avec une formule d'appel explicite plutôt qu'un numéro nu (demande
+    // explicite du 20/08/2026).
+    if (colis.companyPhone.isNotEmpty) ...[
+      {'text': "Pour plus d'informations veuillez appeler", 'align': 'center', 'bold': true, 'size': 'small'},
+      {'text': 'le tél siège : ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    ],
     {'text': 'Powered by www.tibus.app', 'align': 'center', 'bold': true, 'size': 'small'},
   ];
 }
@@ -193,15 +199,14 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
-    // Même en-tête que le reçu (voir colisReceiptLines) : téléphone de la
-    // gare de destination puis du siège (compagnie), ordre permuté (demande
-    // explicite, dest en haut). Le téléphone de la gare de DÉPART est lui
+    // Même en-tête que le reçu (voir colisReceiptLines) : destination en
+    // toutes lettres au lieu du téléphone de la gare de destination (demande
+    // explicite du 20/08/2026). Pas de "Tél siège" ici — le talon (étiquette
+    // à coller sur le colis) n'a pas de pied de page "Retrait sous 72h" où
+    // le reçu le déplace désormais ; le téléphone de la gare de DÉPART reste
     // dans le bloc expédition, plus bas (voir "Agence"/"Tél. agence" dans
     // colisTalonBodyLines).
-    if (colis.gareDestinationPhone.isNotEmpty)
-      {'text': 'Tél dest: ${colis.gareDestinationPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
-    if (colis.companyPhone.isNotEmpty)
-      {'text': 'Tél siège: ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Tel Destination: ${colis.gareDestination}', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.isPendingSync)
       {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},

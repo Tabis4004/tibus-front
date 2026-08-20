@@ -396,19 +396,16 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  // Téléphone de la gare de DESTINATION sous le nom de la
-                  // compagnie, et téléphone du SIÈGE (compagnie) juste en
-                  // dessous (ordre permuté, demande explicite). Le téléphone
-                  // de la gare de DÉPART est lui affiché dans le bloc
-                  // EXPÉDITEUR (voir _Field 'Tél. agence' plus bas).
-                  if (colis.gareDestinationPhone.isNotEmpty)
-                    Text('Tél dest: ${colis.gareDestinationPhone}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  if (colis.companyPhone.isNotEmpty)
-                    Text('Tél siège: ${colis.companyPhone}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  // Destination en toutes lettres sous le nom de la
+                  // compagnie — remplace l'ancien "Tél dest: <numéro>"
+                  // (demande explicite du 20/08/2026). Le téléphone du SIÈGE
+                  // (compagnie) est lui déplacé en PIED de page (voir plus
+                  // bas, après "Retrait sous 72h"). Le téléphone de la gare
+                  // de DÉPART reste affiché dans le bloc EXPÉDITEUR (voir
+                  // _Field 'Tél. agence' plus bas).
+                  Text('Tel Destination: ${colis.gareDestination}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
                 ],
               ),
@@ -487,6 +484,17 @@ class _ReceiptBox extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                   ),
+                  // Téléphone du SIÈGE déplacé ici depuis l'en-tête (voir
+                  // plus haut) — avec une formule d'appel explicite plutôt
+                  // qu'un numéro nu (demande explicite du 20/08/2026).
+                  if (colis.companyPhone.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      "Pour plus d'informations veuillez appeler\nle tél siège : ${colis.companyPhone}",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                   // Pas de QR sur le reçu — ni à l'impression (voir
                   // printer_service.dart / P3PrinterModule.kt), ni dans cet
                   // aperçu : l'aperçu doit refléter le rendu papier. Le QR
@@ -574,17 +582,14 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            // Même en-tête que le reçu (voir _ReceiptBox) : téléphone de la
-            // gare de destination et du siège (compagnie), en gras, ordre
-            // permuté (dest en haut, demande explicite), puis sous-titre
-            // explicite. Le téléphone de la gare de départ est lui affiché
-            // plus bas, dans le bloc expédition.
-            if (colis.gareDestinationPhone.isNotEmpty)
-              Text('Tél dest: ${colis.gareDestinationPhone}',
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-            if (colis.companyPhone.isNotEmpty)
-              Text('Tél siège: ${colis.companyPhone}',
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+            // Même en-tête que le reçu (voir _ReceiptBox) : destination en
+            // toutes lettres au lieu du téléphone de la gare de destination
+            // (demande explicite du 20/08/2026), puis sous-titre explicite.
+            // Pas de "Tél siège" ici — ce talon n'a pas de pied de page où
+            // le reçu le déplace désormais. Le téléphone de la gare de
+            // départ est lui affiché plus bas, dans le bloc expédition.
+            Text('Tel Destination: ${colis.gareDestination}',
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
             const Text('Reçu expédition colis', style: TextStyle(fontSize: 9)),
             if (colis.isPendingSync)
               const Text('*** PROVISOIRE ***',

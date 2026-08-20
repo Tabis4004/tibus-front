@@ -140,9 +140,12 @@ class P3PrinterModule(private val ctx: Context) {
         val company: String = "TIBUS",
         val companyEmail: String = "",
         val companyPhone: String = "",
-        /** Téléphone de la gare de DESTINATION, affiché sous companyPhone en
-         * en-tête (reçu colis — voir printer_service.dart). */
-        val destinationPhone: String = "",
+        /** Destination (nom de gare) en toutes lettres, affichée sous
+         * companyName en en-tête (reçu colis — voir printer_service.dart).
+         * Remplace l'ancien champ destinationPhone (demande explicite du
+         * 20/08/2026) : le téléphone du siège est lui en pied de page
+         * (t.footer), plus de "Tél dest" en en-tête. */
+        val destinationName: String = "",
         val subtitle: String = "Ticket de reservation",
         val reference: String = "",
         val passenger: String = "",
@@ -170,18 +173,15 @@ class P3PrinterModule(private val ctx: Context) {
         // ---- Header
         printWrappedLine(p, t.company.ifBlank { "TIBUS" },
             PrintOptions(align = "center", size = "large", bold = true), paperWidth)
-        // Téléphones gare de destination + siège sous le nom de la
-        // compagnie, en GRAS — ordre permuté (dest en haut, demande
-        // explicite). L'ordre réel imprimé est fixé ICI (ces deux blocs),
-        // PAS par l'ordre du header envoyé depuis Dart (voir
-        // normalizeStructured plus bas, qui reconstruit companyPhone/
-        // destinationPhone par reconnaissance de motif quel que soit l'ordre
-        // reçu).
-        if (t.destinationPhone.isNotBlank())
-            printWrappedLine(p, "Tél dest: ${t.destinationPhone}",
-                PrintOptions(align = "center", size = "small", bold = true), paperWidth)
-        if (t.companyPhone.isNotBlank())
-            printWrappedLine(p, "Tél siège: ${t.companyPhone}",
+        // Destination en toutes lettres sous le nom de la compagnie, en GRAS
+        // (demande explicite du 20/08/2026 — remplace l'ancien "Tél dest:
+        // <numéro>"). Plus de "Tél siège" ici : le téléphone du siège est
+        // désormais uniquement en pied de page (voir t.footer plus bas,
+        // construit côté Dart dans printer_service.dart). L'extraction de
+        // destinationName est faite dans normalizeStructured plus bas, PAS
+        // par l'ordre du header envoyé depuis Dart.
+        if (t.destinationName.isNotBlank())
+            printWrappedLine(p, "Tel Destination: ${t.destinationName}",
                 PrintOptions(align = "center", size = "small", bold = true), paperWidth)
         if (t.companyEmail.isNotBlank())
             printWrappedLine(p, t.companyEmail,
@@ -383,12 +383,14 @@ class P3PrinterModule(private val ctx: Context) {
                 !Regex("(?i)dest").containsMatchIn(it)
         }
             ?.let { Regex("\\+?\\d{8,15}").find(it)?.value }).orEmpty()
-        // Ligne d'en-tête « Tél dest: … » (téléphone gare de destination) —
-        // sinon elle serait simplement perdue (seuls company/phone/email/
-        // subtitle sont rendus).
-        val destinationPhone = cleanHeader.firstOrNull {
+        // Ligne d'en-tête « Tel Destination: <nom de gare> » — sinon elle
+        // serait simplement perdue (seuls company/phone/email/subtitle sont
+        // rendus). Le texte utile est tout ce qui suit le premier ":" : pas
+        // de regex téléphone ici, contrairement à l'ancien format "Tél dest:
+        // <numéro>" (remplacé, demande explicite du 20/08/2026).
+        val destinationName = cleanHeader.firstOrNull {
             Regex("(?i)t[ée]l").containsMatchIn(it) && Regex("(?i)dest").containsMatchIn(it)
-        }?.let { Regex("\\+?\\d{8,15}").find(it)?.value }.orEmpty()
+        }?.substringAfter(":")?.trim().orEmpty()
         val subtitle = cleanHeader.drop(1).firstOrNull {
             !it.contains("@") && !it.startsWith("+") && !Regex("(?i)t[ée]l").containsMatchIn(it)
         }.orEmpty()
@@ -417,7 +419,7 @@ class P3PrinterModule(private val ctx: Context) {
             company = map["company"]?.let { cleanTitle(it) }?.ifBlank { companyFromHeader } ?: companyFromHeader,
             companyEmail = companyEmail,
             companyPhone = companyPhone,
-            destinationPhone = destinationPhone,
+            destinationName = destinationName,
             subtitle = subtitle.ifBlank { "Ticket" },
             reference = resolvedReference,
             passenger = if (useExactRows) "" else pickFirst(map, "voyageur", "passager", "nom", "client", "nom du passager", "nom et prenom"),
