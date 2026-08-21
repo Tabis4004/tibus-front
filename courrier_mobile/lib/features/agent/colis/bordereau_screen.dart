@@ -58,22 +58,31 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
 
   Future<void> _create() async {
     final colisService = ref.read(colisServiceProvider);
+    List<GareOption> villes;
     List<GareOption> gares;
     List<BusOption> buses;
     try {
+      // Ville de départ (migration 202, retour terrain SIS point 3) : les
+      // colis se regroupent à un point central avant emballage, sans être
+      // triés par gare d'origine — le lot regroupe donc tous les colis
+      // d'une VILLE. La gare de destination, elle, reste précise (colis.listGares).
+      villes = await colisService.listVillesDepart(widget.companyId);
       gares = await colisService.listGares(widget.companyId);
       buses = await colisService.listBuses(widget.companyId);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gares indisponibles : $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Villes/gares indisponibles : $e')));
       }
       return;
     }
     if (!mounted) return;
 
-    String? gareDepartId = gares.length == 1 ? gares.first.id : null;
+    String? villeDepartId = villes.length == 1 ? villes.first.id : null;
     String? gareDestId;
     String? busId;
+    // Date de lot éditable par l'agent (migration 202, point 5) — défaut
+    // aujourd'hui, c'est cette date qui s'affichera partout (liste + étiquette).
+    DateTime dateLot = DateTime.now();
 
     final created = await showModalBottomSheet<BordereauDetail>(
       context: context,
@@ -95,25 +104,25 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                 const Text('Créer un lot', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 const Text(
-                  'Un lot regroupe les colis d\'UNE SEULE destination : scannez ensuite chaque colis '
-                  'à emballer, puis marquez le lot « Emballé » pour imprimer son étiquette.',
+                  'Un lot regroupe les colis d\'UNE VILLE de départ vers UNE SEULE destination : '
+                  'scannez ensuite chaque colis à emballer, puis marquez le lot « Emballé » pour '
+                  'imprimer son étiquette.',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  initialValue: gareDepartId,
-                  decoration: const InputDecoration(labelText: 'Gare de départ *'),
-                  items: gares
-                      .map((g) => DropdownMenuItem(value: g.id, child: Text(g.name)))
+                  initialValue: villeDepartId,
+                  decoration: const InputDecoration(labelText: 'Ville de départ *'),
+                  items: villes
+                      .map((v) => DropdownMenuItem(value: v.id, child: Text(v.name)))
                       .toList(),
-                  onChanged: (v) => setSheetState(() => gareDepartId = v),
+                  onChanged: (v) => setSheetState(() => villeDepartId = v),
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String?>(
                   initialValue: gareDestId,
                   decoration: const InputDecoration(labelText: 'Gare de destination *'),
                   items: gares
-                      .where((g) => g.id != gareDepartId)
                       .map((g) => DropdownMenuItem<String?>(value: g.id, child: Text(g.name)))
                       .toList(),
                   onChanged: (v) => setSheetState(() => gareDestId = v),
@@ -130,22 +139,41 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                   ],
                   onChanged: (v) => setSheetState(() => busId = v),
                 ),
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: dateLot,
+                      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+                    if (picked != null) setSheetState(() => dateLot = picked);
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Date du lot', prefixIcon: Icon(Icons.event)),
+                    child: Text(
+                      '${dateLot.day.toString().padLeft(2, '0')}/${dateLot.month.toString().padLeft(2, '0')}/${dateLot.year}',
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.qr_code_scanner),
                     label: Text(creating ? 'Création…' : 'Créer et scanner'),
-                    onPressed: creating || gareDepartId == null || gareDestId == null
+                    onPressed: creating || villeDepartId == null || gareDestId == null
                         ? null
                         : () async {
                             setSheetState(() => creating = true);
                             try {
                               final detail = await ref.read(bordereauServiceProvider).create(
                                     companyId: widget.companyId,
-                                    gareDepartId: gareDepartId!,
+                                    villeDepartId: villeDepartId!,
                                     gareDestinationId: gareDestId!,
                                     busId: busId,
+                                    dateLot: dateLot,
                                   );
                               if (sheetContext.mounted) {
                                 Navigator.of(sheetContext).pop(detail);
@@ -216,13 +244,13 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                       return Card(
                         child: ListTile(
                           title: Text(
-                            'Lot ${row.numeroLot ?? '—'} · ${row.gareDepart} → ${row.gareDestination ?? "?"}',
+                            'Lot ${row.numeroLot ?? '—'} · ${row.villeDepart} → ${row.gareDestination ?? "?"}',
                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                           ),
                           subtitle: Text(
                             '${row.reference} · ${row.colisCount} colis'
                             '${row.busPlateNumber != null ? " · Bus ${row.busPlateNumber}" : ""}'
-                            '${row.createdAt != null ? " · ${_fmtDate(row.createdAt!)}" : ""}',
+                            '${row.dateLot != null ? " · ${_fmtDateOnly(row.dateLot!)}" : (row.createdAt != null ? " · ${_fmtDate(row.createdAt!)}" : "")}',
                           ),
                           trailing: Chip(
                             visualDensity: VisualDensity.compact,
@@ -253,6 +281,14 @@ String _fmtDate(DateTime d) {
   final local = d.toLocal();
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
+}
+
+// Date de lot (champ `date` sans heure, éditable par l'agent) — affichage
+// jour/mois/année seul, sans heure (contrairement à _fmtDate ci-dessus qui
+// reste utilisé en repli pour createdAt).
+String _fmtDateOnly(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(d.day)}/${two(d.month)}/${d.year}';
 }
 
 /// Libellé du statut de lot — ouvert (emballage), clos (= « Emballé »,
@@ -482,7 +518,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${detail.gareDepart} → ${detail.gareDestination ?? "?"}',
+                    '${detail.villeDepart} → ${detail.gareDestination ?? "?"}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
@@ -491,6 +527,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                     // regroupe les colis par lot/destination, sans valorisation.
                     '${detail.colis.length} colis'
                     '${detail.busPlateNumber != null ? " · Bus ${detail.busPlateNumber}" : ""}'
+                    '${detail.dateLot != null ? " · ${_fmtDateOnly(detail.dateLot!)}" : ""}'
                     '${isOpen ? "" : " · ${_lotStatutLabel(detail.statut)}"}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),

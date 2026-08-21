@@ -1,14 +1,23 @@
 import { supabase } from "@/lib/supabase";
 import { mapColisRow, type ColisAutonomeRow, type ColisSmsPayload, type ColisStatut } from "@/lib/supabase/colis-autonomes.ts";
 
+export type VilleOption = { id: string; name: string };
+
 export type BordereauListRow = {
   id: string;
   reference: string;
   statut: "ouvert" | "clos";
-  gareDepart: string;
+  // Ville de départ (migration 202, retour terrain SIS point 3) : un lot
+  // regroupe désormais tous les colis d'une VILLE de départ (les colis se
+  // rassemblent à un point central avant emballage, sans être triés par
+  // gare d'origine) — remplace l'ancienne gare de départ précise.
+  villeDepart: string;
   gareDestination: string | null;
   busPlateNumber: string | null;
   colisCount: number;
+  // Date de lot éditable par l'agent à la création (migration 202, point 5)
+  // — à afficher à la place de createdAt, qui reste l'horodatage technique.
+  dateLot: string | null;
   createdAt: string;
   closedAt: string | null;
 };
@@ -36,9 +45,12 @@ export type BordereauDetail = {
   statut: "ouvert" | "clos";
   companyId: string;
   companyName: string;
-  gareDepart: string;
+  // Ville de départ (migration 202) — le détail par colis (colis.gareDepart)
+  // garde lui la gare réelle d'origine, conservée pour traçabilité.
+  villeDepart: string;
   gareDestination: string | null;
   busPlateNumber: string | null;
+  dateLot: string | null;
   createdAt: string;
   closedAt: string | null;
   colis: BordereauColisRow[];
@@ -52,9 +64,10 @@ function mapDetail(data: Record<string, unknown>): BordereauDetail {
     statut: data.statut === "clos" ? "clos" : "ouvert",
     companyId: String(data.companyId ?? ""),
     companyName: String(data.companyName ?? ""),
-    gareDepart: String(data.gareDepart ?? ""),
+    villeDepart: String(data.villeDepart ?? ""),
     gareDestination: data.gareDestination ? String(data.gareDestination) : null,
     busPlateNumber: data.busPlateNumber ? String(data.busPlateNumber) : null,
+    dateLot: data.dateLot ? String(data.dateLot) : null,
     createdAt: String(data.createdAt ?? ""),
     closedAt: data.closedAt ? String(data.closedAt) : null,
     colis: colis.map((row) => ({
@@ -78,18 +91,38 @@ function mapDetail(data: Record<string, unknown>): BordereauDetail {
 
 export async function createBordereauSupabase(input: {
   companyId: string;
-  gareDepartId: string;
+  villeDepartId: string;
   gareDestinationId?: string | null;
   busId?: string | null;
+  // Date de lot éditable par l'agent (migration 202, point 5) — au format
+  // "yyyy-MM-dd" ; si omise, le serveur prend la date du jour.
+  dateLot?: string | null;
 }): Promise<BordereauDetail> {
   const { data, error } = await supabase.rpc("create_bordereau_livraison", {
     p_company_id: input.companyId,
-    p_gare_depart_id: input.gareDepartId,
+    p_ville_depart_id: input.villeDepartId,
     p_gare_destination_id: input.gareDestinationId ?? null,
     p_bus_id: input.busId ?? null,
+    p_date_lot: input.dateLot ?? null,
   });
   if (error) throw error;
   return mapDetail((data ?? {}) as Record<string, unknown>);
+}
+
+/**
+ * Villes de départ disponibles pour la compagnie (migration 202) — peuple
+ * le sélecteur "Ville de départ" à la création d'un lot, remplace la liste
+ * de gares utilisée jusqu'ici pour ce champ précis.
+ */
+export async function listCompanyVillesDepartSupabase(companyId: string): Promise<VilleOption[]> {
+  const { data, error } = await supabase.rpc("list_company_villes_depart", {
+    p_company_id: companyId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    name: String(row.name ?? ""),
+  }));
 }
 
 export async function addColisToBordereauSupabase(
@@ -151,10 +184,11 @@ export async function listBordereauxSupabase(
     id: String(row.id),
     reference: String(row.reference ?? ""),
     statut: row.statut === "clos" ? "clos" : "ouvert",
-    gareDepart: String(row.gareDepart ?? ""),
+    villeDepart: String(row.villeDepart ?? ""),
     gareDestination: row.gareDestination ? String(row.gareDestination) : null,
     busPlateNumber: row.busPlateNumber ? String(row.busPlateNumber) : null,
     colisCount: Number(row.colisCount ?? 0),
+    dateLot: row.dateLot ? String(row.dateLot) : null,
     createdAt: String(row.createdAt ?? ""),
     closedAt: row.closedAt ? String(row.closedAt) : null,
   }));

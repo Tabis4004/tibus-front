@@ -129,7 +129,7 @@ class _BordereauChargeurScreenState extends ConsumerState<BordereauChargeurScree
                       return Card(
                         child: ListTile(
                           title: Text(
-                            'Lot ${row.numeroLot ?? '—'} · ${row.gareDepart} → ${row.gareDestination ?? "?"}',
+                            'Lot ${row.numeroLot ?? '—'} · ${row.villeDepart} → ${row.gareDestination ?? "?"}',
                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                           ),
                           subtitle: Text(

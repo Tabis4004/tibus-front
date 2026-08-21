@@ -404,7 +404,7 @@ class PrinterService {
   /// (référence + destinataire/montant), voir bordereauReceiptLines pour le
   /// même contenu côté WisePrinter/ESC-POS.
   Future<void> printBordereau(BordereauDetail d, {int paperWidthMm = 58}) {
-    final trajet = '${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
+    final trajet = '${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
     return printReceipt(
       header: [d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER', 'Bordereau de livraison'],
       // Le pont P3 natif affiche "reference" en gros dans un encadré
@@ -419,7 +419,7 @@ class PrinterService {
       rows: [
         ['Trajet', trajet],
         if (d.busPlateNumber != null) ['Bus', d.busPlateNumber!],
-        if (d.createdAt != null) ['Créé le', formatBordereauDate(d.createdAt!)],
+        if (d.dateLot != null) ['Date', formatBordereauDateOnly(d.dateLot!)],
         ['Colis', '${d.colis.length}'],
         for (var i = 0; i < d.colis.length; i++)
           [

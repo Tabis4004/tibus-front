@@ -12,7 +12,7 @@ import 'bordereau_receipt_lines.dart';
 /// plateformes (voir bouton "Exporter en PDF (A4)", bordereau_print_sheet.dart).
 Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
   final doc = pw.Document();
-  final trajet = '${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
+  final trajet = '${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
 
   doc.addPage(
     pw.MultiPage(
@@ -55,8 +55,8 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
           pw.Text(trajet, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
           if (d.busPlateNumber != null)
             pw.Text('Bus : ${d.busPlateNumber}', style: const pw.TextStyle(fontSize: 10)),
-          if (d.createdAt != null)
-            pw.Text('Créé le : ${formatBordereauDate(d.createdAt!)}', style: const pw.TextStyle(fontSize: 10)),
+          if (d.dateLot != null)
+            pw.Text('Date : ${formatBordereauDateOnly(d.dateLot!)}', style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 8),
           pw.Divider(),
         ],

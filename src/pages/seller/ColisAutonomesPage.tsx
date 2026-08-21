@@ -1021,7 +1021,6 @@ export default function ColisAutonomesPage({
               companyId={companyId}
               gares={gares}
               buses={buses}
-              defaultGareDepartId={cashGareId || gareDepartId || null}
               onColisChanged={() => void refreshListSilently()}
             />
           ) : null}

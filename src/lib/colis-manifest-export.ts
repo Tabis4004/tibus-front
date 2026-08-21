@@ -152,12 +152,12 @@ export function exportBordereauPDF(
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(
-    `Trajet : ${bordereau.gareDepart} → ${bordereau.gareDestination ?? "toutes destinations"}`,
+    `Trajet : ${bordereau.villeDepart} → ${bordereau.gareDestination ?? "toutes destinations"}`,
     14,
     30,
   );
   doc.text(
-    `Bus : ${bordereau.busPlateNumber ?? "—"} · Créé le ${format(new Date(bordereau.createdAt), "dd/MM/yyyy HH:mm")}${
+    `Bus : ${bordereau.busPlateNumber ?? "—"} · Date ${bordereau.dateLot ? format(new Date(bordereau.dateLot), "dd/MM/yyyy") : format(new Date(bordereau.createdAt), "dd/MM/yyyy HH:mm")}${
       bordereau.closedAt ? ` · Emballé le ${format(new Date(bordereau.closedAt), "dd/MM/yyyy HH:mm")}` : " · EN COURS"
     }`,
     14,

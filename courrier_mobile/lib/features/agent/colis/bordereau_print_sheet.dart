@@ -19,10 +19,12 @@ import '../../../data/services/printer_service.dart' show PrinterDevice, Printer
 String _bordereauShareMessage(BordereauDetail d) {
   return [
     'TIBUS COURRIER — Bordereau ${d.reference}',
-    'Trajet : ${d.gareDepart} -> ${d.gareDestination ?? "Toutes destinations"}',
+    'Trajet : ${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}',
     if (d.busPlateNumber != null) 'Bus : ${d.busPlateNumber}',
     '${d.colis.length} colis',
-    if (d.createdAt != null) 'Créé le : ${formatBordereauDate(d.createdAt!)}',
+    // Date de lot éditable par l'agent (migration 202) — c'est elle qui doit
+    // s'afficher, pas l'horodatage technique de création.
+    if (d.dateLot != null) 'Date : ${formatBordereauDateOnly(d.dateLot!)}',
   ].join('\n');
 }
 
@@ -335,7 +337,7 @@ class _BordereauBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trajet = '${detail.gareDepart} → ${detail.gareDestination ?? "Toutes destinations"}';
+    final trajet = '${detail.villeDepart} → ${detail.gareDestination ?? "Toutes destinations"}';
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black87, width: 1.4),
@@ -371,7 +373,7 @@ class _BordereauBox extends StatelessWidget {
               const SizedBox(height: 8),
               Text(trajet, style: const TextStyle(fontWeight: FontWeight.w600)),
               if (detail.busPlateNumber != null) Text('Bus : ${detail.busPlateNumber}'),
-              if (detail.createdAt != null) Text('Créé le : ${formatBordereauDate(detail.createdAt!)}'),
+              if (detail.dateLot != null) Text('Date : ${formatBordereauDateOnly(detail.dateLot!)}'),
               const Divider(height: 16),
               Text('${detail.colis.length} colis', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),

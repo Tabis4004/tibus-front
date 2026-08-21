@@ -25,17 +25,27 @@ class BordereauService {
 
   /// Création d'un lot — la gare de destination est désormais OBLIGATOIRE
   /// (regroupement par destination, demande explicite de l'emballeur).
+  /// [villeDepartId] remplace depuis la migration 202 l'ancienne gare de
+  /// départ précise (retour terrain SIS point 3) : les colis se regroupent
+  /// à un point central avant emballage, sans être triés par gare d'origine
+  /// — le lot regroupe donc tous les colis de la VILLE choisie. [dateLot]
+  /// est éditable par l'agent (point 5) ; par défaut la date du jour côté
+  /// serveur si omise.
   Future<BordereauDetail> create({
     required String companyId,
-    required String gareDepartId,
+    required String villeDepartId,
     required String gareDestinationId,
     String? busId,
+    DateTime? dateLot,
   }) async {
     final data = await _client.rpc('create_bordereau_livraison', params: {
       'p_company_id': companyId,
-      'p_gare_depart_id': gareDepartId,
+      'p_ville_depart_id': villeDepartId,
       'p_gare_destination_id': gareDestinationId,
       'p_bus_id': busId,
+      'p_date_lot': dateLot != null
+          ? '${dateLot.year.toString().padLeft(4, '0')}-${dateLot.month.toString().padLeft(2, '0')}-${dateLot.day.toString().padLeft(2, '0')}'
+          : null,
     });
     return BordereauDetail.fromMap(data as Map<String, dynamic>);
   }
@@ -170,10 +180,15 @@ class BordereauSummary {
   final String reference;
   final int? numeroLot;
   final String statut; // 'ouvert' | 'clos' | 'charge' | 'arrive'
-  final String gareDepart;
+  // Ville de départ (migration 202) — remplace l'ancienne gare de départ
+  // précise : un lot regroupe désormais tous les colis de cette ville.
+  final String villeDepart;
   final String? gareDestination;
   final String? busPlateNumber;
   final int colisCount;
+  // Date de lot éditable par l'agent à la création (migration 202, point 5)
+  // — à afficher à la place de createdAt, qui reste l'horodatage technique.
+  final DateTime? dateLot;
   final DateTime? createdAt;
 
   const BordereauSummary({
@@ -181,10 +196,11 @@ class BordereauSummary {
     required this.reference,
     this.numeroLot,
     required this.statut,
-    required this.gareDepart,
+    required this.villeDepart,
     this.gareDestination,
     this.busPlateNumber,
     required this.colisCount,
+    this.dateLot,
     this.createdAt,
   });
 
@@ -198,10 +214,11 @@ class BordereauSummary {
         reference: (map['reference'] ?? '') as String,
         numeroLot: (map['numeroLot'] as num?)?.toInt(),
         statut: (map['statut'] ?? 'ouvert') as String,
-        gareDepart: (map['gareDepart'] ?? '') as String,
+        villeDepart: (map['villeDepart'] ?? '') as String,
         gareDestination: map['gareDestination'] as String?,
         busPlateNumber: map['busPlateNumber'] as String?,
         colisCount: (map['colisCount'] as num?)?.toInt() ?? 0,
+        dateLot: map['dateLot'] != null ? DateTime.tryParse(map['dateLot'] as String) : null,
         createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'] as String) : null,
       );
 }
@@ -274,9 +291,12 @@ class BordereauDetail {
   final String statut;
   final String companyId;
   final String companyName;
-  final String gareDepart;
+  // Ville de départ (migration 202) — le détail par colis (colis.gareDepart)
+  // garde lui la gare réelle d'origine, conservée pour traçabilité.
+  final String villeDepart;
   final String? gareDestination;
   final String? busPlateNumber;
+  final DateTime? dateLot;
   final DateTime? createdAt;
   final DateTime? closedAt;
   final List<BordereauColisRow> colis;
@@ -288,9 +308,10 @@ class BordereauDetail {
     required this.statut,
     required this.companyId,
     required this.companyName,
-    required this.gareDepart,
+    required this.villeDepart,
     this.gareDestination,
     this.busPlateNumber,
+    this.dateLot,
     this.createdAt,
     this.closedAt,
     required this.colis,
@@ -309,9 +330,10 @@ class BordereauDetail {
         statut: (map['statut'] ?? 'ouvert') as String,
         companyId: (map['companyId'] ?? '') as String,
         companyName: (map['companyName'] ?? '') as String,
-        gareDepart: (map['gareDepart'] ?? '') as String,
+        villeDepart: (map['villeDepart'] ?? '') as String,
         gareDestination: map['gareDestination'] as String?,
         busPlateNumber: map['busPlateNumber'] as String?,
+        dateLot: map['dateLot'] != null ? DateTime.tryParse(map['dateLot'] as String) : null,
         createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'] as String) : null,
         closedAt: map['closedAt'] != null ? DateTime.tryParse(map['closedAt'] as String) : null,
         colis: ((map['colis'] as List?) ?? const [])

@@ -48,9 +48,11 @@ import {
   getBordereauSupabase,
   listBordereauxSupabase,
   listColisDisponiblesBordereauSupabase,
+  listCompanyVillesDepartSupabase,
   removeColisFromBordereauSupabase,
   type BordereauDetail,
   type BordereauListRow,
+  type VilleOption,
 } from "@/lib/supabase/bordereaux.ts";
 import { exportBordereauPDF } from "@/lib/colis-manifest-export.ts";
 import { getCompanyColisSettingsSupabase, type ColisReportConfig } from "@/lib/supabase/colis-autonomes.ts";
@@ -74,13 +76,11 @@ export default function BordereauPanel({
   companyId,
   gares,
   buses,
-  defaultGareDepartId,
   onColisChanged,
 }: {
   companyId: string;
   gares: GareOption[];
   buses: ColisBusOption[];
-  defaultGareDepartId?: string | null;
   onColisChanged?: () => void;
 }) {
   const { t } = useTranslation("seller");
@@ -88,9 +88,19 @@ export default function BordereauPanel({
   const [detail, setDetail] = useState<BordereauDetail | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [gareDepartId, setGareDepartId] = useState(defaultGareDepartId ?? "");
+  // Ville de départ (migration 202, retour terrain SIS point 3) : un lot
+  // regroupe désormais tous les colis d'une VILLE de départ (les colis se
+  // rassemblent à un point central avant emballage, sans être triés par
+  // gare d'origine) — remplace l'ancienne gare de départ précise. Plus de
+  // préremplissage automatique depuis la gare de caisse ouverte (gare ≠
+  // ville) : l'agent choisit explicitement.
+  const [villes, setVilles] = useState<VilleOption[]>([]);
+  const [villeDepartId, setVilleDepartId] = useState("");
   const [gareDestId, setGareDestId] = useState("");
   const [busId, setBusId] = useState("");
+  // Date de lot éditable par l'agent (migration 202, point 5) — défaut
+  // aujourd'hui, c'est cette date qui s'affiche partout (liste + impression).
+  const [dateLot, setDateLot] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [manualRef, setManualRef] = useState("");
   const [adding, setAdding] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -108,6 +118,12 @@ export default function BordereauPanel({
     void getCompanyColisSettingsSupabase(companyId)
       .then((settings) => setBordereauReportConfig(settings.uiConfig.reports.bordereau))
       .catch(() => {});
+  }, [companyId]);
+
+  useEffect(() => {
+    void listCompanyVillesDepartSupabase(companyId)
+      .then(setVilles)
+      .catch(() => setVilles([]));
   }, [companyId]);
 
   const loadList = useCallback(() => {
@@ -155,17 +171,18 @@ export default function BordereauPanel({
   }, [detail?.id, detail?.statut]);
 
   const handleCreate = async () => {
-    if (!gareDepartId) {
-      toast.error("Choisissez la gare de départ");
+    if (!villeDepartId) {
+      toast.error("Choisissez la ville de départ");
       return;
     }
     setCreating(true);
     try {
       const created = await createBordereauSupabase({
         companyId,
-        gareDepartId,
+        villeDepartId,
         gareDestinationId: gareDestId || null,
         busId: busId || null,
+        dateLot: dateLot || null,
       });
       toast.success(`Bordereau ${created.reference} créé — scannez les colis embarqués.`);
       setShowCreate(false);
@@ -312,11 +329,11 @@ export default function BordereauPanel({
           <CardContent className="p-4 space-y-1">
             <p className="font-bold">{detail.reference}</p>
             <p className="text-sm">
-              {detail.gareDepart} → {detail.gareDestination ?? t("colis.bordereau_all_dest", { defaultValue: "toutes destinations" })}
+              {detail.villeDepart} → {detail.gareDestination ?? t("colis.bordereau_all_dest", { defaultValue: "toutes destinations" })}
               {detail.busPlateNumber ? ` · Bus ${detail.busPlateNumber}` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
-              {format(new Date(detail.createdAt), "dd/MM/yyyy HH:mm")} ·{" "}
+              {detail.dateLot ? format(new Date(detail.dateLot), "dd/MM/yyyy") : format(new Date(detail.createdAt), "dd/MM/yyyy HH:mm")} ·{" "}
               {detail.colis.length}{" "}
               {t("colis.bordereau_count", { defaultValue: "colis scannés" })}
             </p>
@@ -499,11 +516,11 @@ export default function BordereauPanel({
                 <p className="font-semibold text-sm">
                   {row.reference}
                   <span className="ml-2 font-normal text-muted-foreground">
-                    {row.gareDepart} → {row.gareDestination ?? "toutes destinations"}
+                    {row.villeDepart} → {row.gareDestination ?? "toutes destinations"}
                   </span>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {format(new Date(row.createdAt), "dd/MM/yyyy HH:mm")}
+                  {row.dateLot ? format(new Date(row.dateLot), "dd/MM/yyyy") : format(new Date(row.createdAt), "dd/MM/yyyy HH:mm")}
                   {row.busPlateNumber ? ` · Bus ${row.busPlateNumber}` : ""} · {row.colisCount} colis
                 </p>
               </div>
@@ -527,17 +544,21 @@ export default function BordereauPanel({
             </DialogHeader>
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
-                <Label>Gare de départ *</Label>
-                <Select value={gareDepartId} onValueChange={setGareDepartId}>
+                <Label>Ville de départ *</Label>
+                <Select value={villeDepartId} onValueChange={setVilleDepartId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choisir la gare" />
+                    <SelectValue placeholder="Choisir la ville" />
                   </SelectTrigger>
                   <SelectContent>
-                    {gares.map((gare) => (
-                      <SelectItem key={gare.id} value={gare.id}>{gare.name}</SelectItem>
+                    {villes.map((ville) => (
+                      <SelectItem key={ville.id} value={ville.id}>{ville.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Le lot regroupe tous les colis de cette ville, quelle que soit leur gare d'origine
+                  exacte (point central/hub).
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Gare de destination (optionnel)</Label>
@@ -550,11 +571,9 @@ export default function BordereauPanel({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Toutes destinations</SelectItem>
-                    {gares
-                      .filter((gare) => gare.id !== gareDepartId)
-                      .map((gare) => (
-                        <SelectItem key={gare.id} value={gare.id}>{gare.name}</SelectItem>
-                      ))}
+                    {gares.map((gare) => (
+                      <SelectItem key={gare.id} value={gare.id}>{gare.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -577,12 +596,20 @@ export default function BordereauPanel({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label>Date du lot</Label>
+                <Input
+                  type="date"
+                  value={dateLot}
+                  onChange={(e) => setDateLot(e.target.value)}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="secondary" onClick={() => setShowCreate(false)} disabled={creating}>
                 {t("buttons.cancel", { ns: "common" })}
               </Button>
-              <Button onClick={() => void handleCreate()} disabled={creating || !gareDepartId}>
+              <Button onClick={() => void handleCreate()} disabled={creating || !villeDepartId}>
                 {creating ? "…" : t("colis.bordereau_create_btn", { defaultValue: "Créer et scanner" })}
               </Button>
             </DialogFooter>

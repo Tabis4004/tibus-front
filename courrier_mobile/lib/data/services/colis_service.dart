@@ -224,6 +224,21 @@ class ColisService {
         .toList();
   }
 
+  /// Villes de départ disponibles pour créer un lot (migration 202, retour
+  /// terrain SIS point 3) : un lot se crée désormais par VILLE de départ —
+  /// les colis y sont regroupés quelle que soit leur gare d'origine exacte
+  /// dans cette ville (le point central/hub n'est qu'une gare de plus dans
+  /// sa ville) — plus par gare précise. Réutilise GareOption (même forme
+  /// id/name) même si ce sont ici des villes.
+  Future<List<GareOption>> listVillesDepart(String companyId) async {
+    final data = await _client.rpc('list_company_villes_depart', params: {'p_company_id': companyId});
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(GareOption.fromMap)
+        .where((v) => v.id.isNotEmpty && v.name.isNotEmpty)
+        .toList();
+  }
+
   /// Bus actifs de la compagnie, pour le sélecteur "bus du convoi" — lecture
   /// directe de la table Bus (RLS `bus_select` publique pour les compagnies
   /// actives, même accès que le sélecteur web listCompanyBusesSupabase).
