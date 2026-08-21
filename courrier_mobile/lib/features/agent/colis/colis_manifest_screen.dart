@@ -142,7 +142,12 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
               )
               .companyName ??
           'Tibus';
-      await shareColisManifestCsv(rows: rows, companyName: companyName, filterLabel: _filterLabel);
+      await shareColisManifestCsv(
+        rows: rows,
+        companyName: companyName,
+        filterLabel: _filterLabel,
+        showTotal: _canSeeTotalFret,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export impossible : $e')));
@@ -150,9 +155,25 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
     }
   }
 
+  /// Vrai si le compte doit voir le total agrégé (montant) du manifeste —
+  /// même règle que _colis_stats_full_access côté base (migrations 182/183/
+  /// 199) : owner/comptable_compagnie/super_admin uniquement. emballeur_gare/
+  /// chargeur_gare/distributeur_gare ont un accès PLEIN à la LISTE des colis
+  /// (nécessaire pour trier/emballer par destination, toutes gares), mais
+  /// n'ont jamais eu vocation à voir le chiffre d'affaires agrégé de la
+  /// compagnie — fuite corrigée le 20/08/2026 (compte sischargeur@gmail.com,
+  /// retour terrain SIS) : le KPI "Total fret" était affiché sans aucune
+  /// condition de rôle.
+  bool get _canSeeTotalFret {
+    final roles = ref.read(myRolesProvider).value ?? const [];
+    const allowed = ['super_admin', 'owner', 'comptable_compagnie'];
+    return roles.any((r) => allowed.contains(r.name));
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
+    final canSeeTotalFret = _canSeeTotalFret;
     final totalFret = filtered.fold<double>(0, (sum, c) => sum + c.montantFret);
 
     return Scaffold(
@@ -186,15 +207,17 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
                           background: AppColors.accentRed,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: KpiCard(
-                          icon: Icons.payments_outlined,
-                          value: totalFret.toStringAsFixed(0),
-                          label: 'Total fret',
-                          background: AppColors.primaryGreen,
+                      if (canSeeTotalFret) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: KpiCard(
+                            icon: Icons.payments_outlined,
+                            value: totalFret.toStringAsFixed(0),
+                            label: 'Total fret',
+                            background: AppColors.primaryGreen,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 20),

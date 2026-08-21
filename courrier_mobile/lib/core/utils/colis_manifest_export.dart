@@ -14,6 +14,11 @@ Future<void> shareColisManifestCsv({
   required List<Colis> rows,
   required String companyName,
   required String filterLabel,
+  // Même règle que _canSeeTotalFret côté écran (colis_manifest_screen.dart) —
+  // fuite corrigée le 20/08/2026 : le CSV exportait le total agrégé quel que
+  // soit le rôle, y compris pour emballeur_gare/chargeur_gare/distributeur_gare
+  // qui ont accès à la liste mais pas au chiffre d'affaires compagnie.
+  bool showTotal = true,
 }) async {
   final dateFmt = DateFormat('dd/MM/yy HH:mm');
   final total = rows.fold<double>(0, (sum, r) => sum + r.montantFret);
@@ -27,7 +32,9 @@ Future<void> shareColisManifestCsv({
   buffer.writeln(csvRow(['Filtre', filterLabel]));
   buffer.writeln(csvRow(['Édité le', dateFmt.format(DateTime.now())]));
   buffer.writeln(csvRow(["Nombre d'envois", rows.length.toString()]));
-  buffer.writeln(csvRow(['Total fret', total.toStringAsFixed(0)]));
+  if (showTotal) {
+    buffer.writeln(csvRow(['Total fret', total.toStringAsFixed(0)]));
+  }
   buffer.writeln();
   buffer.writeln(csvRow([
     'Date', 'Réf.', 'Gare départ', 'Gare destination', 'Expéditeur', 'Tél. exp.',

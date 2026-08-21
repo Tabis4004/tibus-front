@@ -35,11 +35,34 @@ class AppRole {
   bool has(String droit) => droits.contains(droit);
 
   /// Vrai pour les rôles "staff" qui gèrent des colis (vue agent).
+  ///
+  /// BUG CORRIGÉ (20/08/2026) : liste figée à l'ancien périmètre (avant les
+  /// rôles emballeur_gare/chargeur_gare/distributeur_gare, migration 193
+  /// côté base, et les rôles gare vendeur_gare/controleur_gare/comptable_gare/
+  /// chauffeur/controleur/comptable_compagnie déjà assignables côté web
+  /// depuis longtemps — voir owner-team-roles.ts). Un compte qui n'a QUE l'un
+  /// de ces rôles (ex. emballeur pur) faisait échouer
+  /// activeCompanyIdProvider (providers.dart), qui filtre sur isAgentRole en
+  /// repli quand aucune caisse n'est ouverte : aucune compagnie active ->
+  /// écran d'accueil bloqué sur "Aucun rôle actif trouvé", malgré des rôles
+  /// bien attribués en base. Seul un compte ayant EN PLUS un rôle déjà
+  /// couvert (ex. vendeur) contournait le problème — d'où l'impression que
+  /// "seul vendeur débloque les fonctionnalités emballeur/chargeur".
   bool get isAgentRole => const [
         'super_admin',
         'admin_pays',
         'owner',
         'gerant_gare',
+        'gestionnaire_gare',
         'vendeur',
+        'vendeur_gare',
+        'chauffeur',
+        'controleur',
+        'controleur_gare',
+        'comptable_compagnie',
+        'comptable_gare',
+        'emballeur_gare',
+        'chargeur_gare',
+        'distributeur_gare',
       ].contains(name);
 }
