@@ -1,0 +1,26 @@
+-- Bug de prod découvert en direct (20/08/2026 21:45, courrier.societe-sis.com,
+-- capture d'écran utilisateur) : la migration 202 a ajouté un 5e paramètre
+-- (p_date_lot) à create_bordereau_livraison. Postgres ne remplace une
+-- fonction via CREATE OR REPLACE que si le nombre ET les types de
+-- paramètres sont identiques à une définition existante -- ajouter un
+-- paramètre crée un SURCHARGE (overload) au lieu de remplacer l'ancienne
+-- version. Résultat : les DEUX versions coexistaient
+-- (create_bordereau_livraison(uuid,uuid,uuid,uuid) ET (uuid,uuid,uuid,uuid,date)).
+-- L'app web (pas encore redéployée avec le nouveau code du commit c4f8c48)
+-- continuait d'appeler avec les anciens noms de paramètres
+-- (p_gare_depart_id...) et PostgREST résolvait vers l'ANCIENNE version
+-- 4-arg, qui insère bien gare_depart_id mais ne connaît pas
+-- ville_depart_id (NOT NULL depuis la migration 202) -> "null value in
+-- column ville_depart_id violates not-null constraint" à chaque création
+-- de lot (aucune ligne n'a été persistée, l'INSERT échoué a bien annulé
+-- toute la transaction).
+--
+-- Fix : supprimer l'ancien overload 4-arg pour ne garder que la version
+-- ville_depart_id + date_lot. Une fois le nouveau code (déjà committé)
+-- déployé, les appels utiliseront p_ville_depart_id et fonctionneront.
+-- Vérifié après coup : aucun autre RPC touché par la migration 202
+-- n'avait ce même risque de surcharge fantôme (tous gardaient le même
+-- nombre/types de paramètres, sauf list_bordereaux_livraison dont le
+-- changement de RETURNS TABLE avait déjà été géré par un DROP FUNCTION
+-- explicite dans la migration 202).
+DROP FUNCTION IF EXISTS public.create_bordereau_livraison(uuid, uuid, uuid, uuid);
