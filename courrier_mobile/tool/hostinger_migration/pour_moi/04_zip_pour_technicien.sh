@@ -29,4 +29,7 @@ zip -r "$ZIP" . -x ".DS_Store" -x "stack/*" >/dev/null
 echo "Paquet prêt : $(cd .. && pwd)/paquet_technicien_sis.zip"
 echo
 echo "Contenu :"
-unzip -l "$ZIP" | tail -n +4 | head -n -2
+# `head -n -N` est une extension GNU absente du `head` livré par défaut sur
+# macOS (BSD) -- on filtre plutôt les lignes de contenu de `unzip -l`
+# (elles commencent toutes par la taille en octets), portable partout.
+unzip -l "$ZIP" | grep -E '^ *[0-9]'

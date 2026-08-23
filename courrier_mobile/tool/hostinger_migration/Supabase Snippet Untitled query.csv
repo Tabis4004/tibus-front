@@ -1,4 +1,5 @@
--- ==== FUNCTION _assert_bordereau_access ====
+script
+"-- ==== FUNCTION _assert_bordereau_access ====
 CREATE OR REPLACE FUNCTION public._assert_bordereau_access(p_company_id uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -55,11 +56,11 @@ AS $function$
   SELECT public.is_super_admin()
     OR public.has_company_role(p_company_id, ARRAY['owner'])
     OR EXISTS (
-      SELECT 1 FROM "UserRoles" ur
-      JOIN "Role" r ON r.id = ur."roleId"
-      JOIN "Users" u ON u.id = ur."userId"
-      JOIN "Companies" c ON c."countryId" = ur."countryId"
-      WHERE u."auth_user_id" = auth.uid()
+      SELECT 1 FROM ""UserRoles"" ur
+      JOIN ""Role"" r ON r.id = ur.""roleId""
+      JOIN ""Users"" u ON u.id = ur.""userId""
+      JOIN ""Companies"" c ON c.""countryId"" = ur.""countryId""
+      WHERE u.""auth_user_id"" = auth.uid()
         AND c.id = p_company_id
         AND r.name = 'admin_pays'
     );
@@ -73,18 +74,18 @@ CREATE OR REPLACE FUNCTION public._colis_notification_recipients(p_company_id uu
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  SELECT COALESCE(array_agg(DISTINCT ur."userId"), ARRAY[]::uuid[])
-  FROM "UserRoles" ur
-  JOIN "Role" r ON r.id = ur."roleId"
-  WHERE ur."companyId" = p_company_id
+  SELECT COALESCE(array_agg(DISTINCT ur.""userId""), ARRAY[]::uuid[])
+  FROM ""UserRoles"" ur
+  JOIN ""Role"" r ON r.id = ur.""roleId""
+  WHERE ur.""companyId"" = p_company_id
     AND (
       r.name IN ('owner', 'comptable_compagnie')
       OR (
         r.name IN ('gerant_gare', 'gestionnaire_gare')
-        AND ur."gareId" IN (p_gare_depart_id, COALESCE(p_gare_destination_id, p_gare_depart_id))
+        AND ur.""gareId"" IN (p_gare_depart_id, COALESCE(p_gare_destination_id, p_gare_depart_id))
       )
     )
-    AND (p_exclude_user_id IS NULL OR ur."userId" <> p_exclude_user_id);
+    AND (p_exclude_user_id IS NULL OR ur.""userId"" <> p_exclude_user_id);
 $function$
 ;
 
@@ -97,10 +98,10 @@ CREATE OR REPLACE FUNCTION public._colis_stats_full_access(p_user_id uuid, p_com
 AS $function$
   SELECT public.is_super_admin() OR EXISTS (
     SELECT 1
-    FROM "UserRoles" ur
-    JOIN "Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = p_user_id
-      AND ur."companyId" = p_company_id
+    FROM ""UserRoles"" ur
+    JOIN ""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = p_user_id
+      AND ur.""companyId"" = p_company_id
       AND r.name IN ('owner', 'comptable_compagnie')
   );
 $function$
@@ -113,18 +114,18 @@ CREATE OR REPLACE FUNCTION public._colis_stats_gerant_gares(p_user_id uuid, p_co
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-  SELECT array_agg(DISTINCT ur."gareId")
-  FROM "UserRoles" ur
-  JOIN "Role" r ON r.id = ur."roleId"
-  WHERE ur."userId" = p_user_id
-    AND ur."companyId" = p_company_id
-    AND ur."gareId" IS NOT NULL
+  SELECT array_agg(DISTINCT ur.""gareId"")
+  FROM ""UserRoles"" ur
+  JOIN ""Role"" r ON r.id = ur.""roleId""
+  WHERE ur.""userId"" = p_user_id
+    AND ur.""companyId"" = p_company_id
+    AND ur.""gareId"" IS NOT NULL
     AND r.name IN ('gerant_gare', 'gestionnaire_gare');
 $function$
 ;
 
 -- ==== FUNCTION _company_module_flag ====
-CREATE OR REPLACE FUNCTION public._company_module_flag(p_row "CompanyFeatureModules", p_module text)
+CREATE OR REPLACE FUNCTION public._company_module_flag(p_row ""CompanyFeatureModules"", p_module text)
  RETURNS boolean
  LANGUAGE plpgsql
  IMMUTABLE
@@ -132,12 +133,12 @@ CREATE OR REPLACE FUNCTION public._company_module_flag(p_row "CompanyFeatureModu
 AS $function$
 BEGIN
   RETURN CASE upper(trim(p_module))
-    WHEN 'A' THEN p_row."moduleA"
-    WHEN 'B' THEN p_row."moduleB"
-    WHEN 'C' THEN p_row."moduleC"
-    WHEN 'D' THEN p_row."moduleD"
-    WHEN 'E' THEN p_row."moduleE"
-    WHEN 'F' THEN p_row."moduleF"
+    WHEN 'A' THEN p_row.""moduleA""
+    WHEN 'B' THEN p_row.""moduleB""
+    WHEN 'C' THEN p_row.""moduleC""
+    WHEN 'D' THEN p_row.""moduleD""
+    WHEN 'E' THEN p_row.""moduleE""
+    WHEN 'F' THEN p_row.""moduleF""
     ELSE false
   END;
 END;
@@ -153,7 +154,7 @@ CREATE OR REPLACE FUNCTION public._create_colis_notifications(p_user_ids uuid[],
 AS $function$
 BEGIN
   IF p_user_ids IS NULL OR array_length(p_user_ids, 1) IS NULL THEN RETURN; END IF;
-  INSERT INTO "Notifications" ("userId", type, title, message, "isRead", metadata)
+  INSERT INTO ""Notifications"" (""userId"", type, title, message, ""isRead"", metadata)
   SELECT uid, p_type, p_title, p_message, false, p_metadata
   FROM unnest(p_user_ids) AS uid;
 END;
@@ -168,8 +169,8 @@ CREATE OR REPLACE FUNCTION public._is_gare_scoped_role(p_role_name text)
 AS $function$
   -- emballeur_gare / chargeur_gare / distributeur_gare sont devenus des
   -- rôles compagnie GLOBAUX (plus rattachés a une seule gare) — voir
-  -- owner-team-roles.ts, commentaire "migration 193". Ils restent nommés
-  -- avec le suffixe "_gare" pour raisons historiques mais ne doivent plus
+  -- owner-team-roles.ts, commentaire ""migration 193"". Ils restent nommés
+  -- avec le suffixe ""_gare"" pour raisons historiques mais ne doivent plus
   -- exiger de gareId ici.
   SELECT p_role_name IN (
     'gerant_gare', 'gestionnaire_gare', 'vendeur_gare', 'controleur_gare', 'comptable_gare'
@@ -187,13 +188,13 @@ AS $function$
 DECLARE
   v_company_id uuid;
 BEGIN
-  SELECT ur."companyId"
+  SELECT ur.""companyId""
   INTO v_company_id
-  FROM "UserRoles" ur
-  JOIN "Role" r ON r.id = ur."roleId"
-  WHERE ur."userId" = public.current_app_user_id()
+  FROM ""UserRoles"" ur
+  JOIN ""Role"" r ON r.id = ur.""roleId""
+  WHERE ur.""userId"" = public.current_app_user_id()
     AND r.name = 'owner'
-    AND ur."companyId" IS NOT NULL
+    AND ur.""companyId"" IS NOT NULL
   LIMIT 1;
   RETURN v_company_id;
 END;
@@ -262,13 +263,13 @@ BEGIN
         (110, 'Transports interne',             '6135', 'Transports internes et déplacements exploitation', true)
     ) AS t(sort_order, name, ohada_code, ohada_label, is_preset)
   LOOP
-    INSERT INTO "CompanyExpenseCategory" (
-      "companyId",
+    INSERT INTO ""CompanyExpenseCategory"" (
+      ""companyId"",
       name,
-      "ohadaAccountCode",
-      "ohadaAccountLabel",
-      "sortOrder",
-      "isPreset"
+      ""ohadaAccountCode"",
+      ""ohadaAccountLabel"",
+      ""sortOrder"",
+      ""isPreset""
     )
     VALUES (
       p_company_id,
@@ -278,7 +279,7 @@ BEGIN
       v_preset.sort_order,
       v_preset.is_preset
     )
-    ON CONFLICT ("companyId", name) DO NOTHING;
+    ON CONFLICT (""companyId"", name) DO NOTHING;
   END LOOP;
 END;
 $function$
@@ -306,7 +307,7 @@ BEGIN
     RAISE EXCEPTION 'Colis d''une autre compagnie';
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM "Gares" g WHERE g.id = v_colis.gare_depart_id AND g."cityId" = v_bl.ville_depart_id
+    SELECT 1 FROM ""Gares"" g WHERE g.id = v_colis.gare_depart_id AND g.""cityId"" = v_bl.ville_depart_id
   ) THEN
     RAISE EXCEPTION 'Ce colis ne part pas de la ville de depart de ce lot';
   END IF;
@@ -475,10 +476,10 @@ AS $function$
   SELECT public.is_super_admin()
     OR EXISTS (
       SELECT 1
-      FROM public."UserRoles" ur
-      JOIN public."Role" r ON r.id = ur."roleId"
-      WHERE ur."userId" = public.current_app_user_id()
-        AND ur."companyId" = p_company_id
+      FROM public.""UserRoles"" ur
+      JOIN public.""Role"" r ON r.id = ur.""roleId""
+      WHERE ur.""userId"" = public.current_app_user_id()
+        AND ur.""companyId"" = p_company_id
         AND r.name IN ('owner', 'vendeur', 'vendeur_gare', 'chauffeur')
     );
 $function$
@@ -495,11 +496,11 @@ AS $function$
     OR public.has_company_role(p_company_id, ARRAY['owner', 'comptable_compagnie'])
     OR EXISTS (
       SELECT 1
-      FROM public."UserRoles" ur
-      JOIN public."Role" r ON r.id = ur."roleId"
-      WHERE ur."userId" = public.current_app_user_id()
-        AND ur."companyId" = p_company_id
-        AND ur."gareId" IS NOT NULL
+      FROM public.""UserRoles"" ur
+      JOIN public.""Role"" r ON r.id = ur.""roleId""
+      WHERE ur.""userId"" = public.current_app_user_id()
+        AND ur.""companyId"" = p_company_id
+        AND ur.""gareId"" IS NOT NULL
         AND r.name IN ('comptable_gare', 'gerant_gare')
     );
 $function$
@@ -591,7 +592,7 @@ BEGIN
       'AAAAAEEEEIIIOOOOUUUUCNaaaaaeeeeiiioooouuuucn')),
     '[^A-Z0-9]', '', 'g'), 4)
   INTO v_prefix
-  FROM "Gares" g WHERE g.id = p_gare_id;
+  FROM ""Gares"" g WHERE g.id = p_gare_id;
   RETURN COALESCE(NULLIF(v_prefix, ''), 'GARE');
 END;
 $function$
@@ -623,7 +624,7 @@ AS $function$
       WHEN 'livre' THEN COALESCE(c.sms_on_livre, false)
       ELSE false
     END
-  FROM public."Companies" c
+  FROM public.""Companies"" c
   WHERE c.id = p_company_id;
 $function$
 ;
@@ -636,13 +637,13 @@ CREATE OR REPLACE FUNCTION public.company_colis_module_enabled(p_company_id uuid
  SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT COALESCE(
-    (SELECT m."moduleD" FROM "CompanyFeatureModules" m WHERE m."companyId" = p_company_id),
+    (SELECT m.""moduleD"" FROM ""CompanyFeatureModules"" m WHERE m.""companyId"" = p_company_id),
     -- Pas de ligne modules : mêmes défauts que get_company_feature_modules
     -- (module D actif par défaut).
     true
   )
   OR COALESCE(
-    (SELECT c.colis_autonome_enabled FROM "Companies" c WHERE c.id = p_company_id),
+    (SELECT c.colis_autonome_enabled FROM ""Companies"" c WHERE c.id = p_company_id),
     false
   );
 $function$
@@ -655,10 +656,10 @@ CREATE OR REPLACE FUNCTION public.company_colis_sms_owner_config_enabled(p_compa
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  SELECT COALESCE(m."moduleD", false)
-    AND COALESCE(m."moduleDColisSmsConfig", false)
-  FROM public."CompanyFeatureModules" m
-  WHERE m."companyId" = p_company_id;
+  SELECT COALESCE(m.""moduleD"", false)
+    AND COALESCE(m.""moduleDColisSmsConfig"", false)
+  FROM public.""CompanyFeatureModules"" m
+  WHERE m.""companyId"" = p_company_id;
 $function$
 ;
 
@@ -669,17 +670,17 @@ CREATE OR REPLACE FUNCTION public.company_colis_sms_step_allowed(p_company_id uu
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-  SELECT COALESCE(m."moduleD", false)
-    AND COALESCE(m."moduleDColisSmsConfig", false)
+  SELECT COALESCE(m.""moduleD"", false)
+    AND COALESCE(m.""moduleDColisSmsConfig"", false)
     AND CASE p_statut
-      WHEN 'enregistre' THEN COALESCE(m."smsEnregistreAllowed", false)
-      WHEN 'charge' THEN COALESCE(m."smsChargeAllowed", false)
-      WHEN 'arrive' THEN COALESCE(m."smsArriveAllowed", false)
-      WHEN 'livre' THEN COALESCE(m."smsLivreAllowed", false)
+      WHEN 'enregistre' THEN COALESCE(m.""smsEnregistreAllowed"", false)
+      WHEN 'charge' THEN COALESCE(m.""smsChargeAllowed"", false)
+      WHEN 'arrive' THEN COALESCE(m.""smsArriveAllowed"", false)
+      WHEN 'livre' THEN COALESCE(m.""smsLivreAllowed"", false)
       ELSE false
     END
-  FROM public."CompanyFeatureModules" m
-  WHERE m."companyId" = p_company_id;
+  FROM public.""CompanyFeatureModules"" m
+  WHERE m.""companyId"" = p_company_id;
 $function$
 ;
 
@@ -691,7 +692,7 @@ CREATE OR REPLACE FUNCTION public.company_has_module(p_company_id uuid, p_module
  SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_row public."CompanyFeatureModules"%ROWTYPE;
+  v_row public.""CompanyFeatureModules""%ROWTYPE;
   v_enabled boolean;
   v_module text := upper(trim(p_module));
 BEGIN
@@ -700,8 +701,8 @@ BEGIN
   END IF;
 
   SELECT * INTO v_row
-  FROM public."CompanyFeatureModules"
-  WHERE "companyId" = p_company_id;
+  FROM public.""CompanyFeatureModules""
+  WHERE ""companyId"" = p_company_id;
 
   IF NOT FOUND THEN
   -- Rétrocompatibilité : compagnies sans ligne = pack quasi complet hors TPE.
@@ -713,7 +714,7 @@ BEGIN
     RETURN false;
   END IF;
 
-  IF v_module IN ('B', 'C', 'E') AND NOT (v_row."moduleA" OR v_row."moduleD") THEN
+  IF v_module IN ('B', 'C', 'E') AND NOT (v_row.""moduleA"" OR v_row.""moduleD"") THEN
     RETURN false;
   END IF;
 
@@ -738,7 +739,7 @@ DECLARE
 BEGIN
   SELECT colis_prix_min_fixe_general, colis_prix_min_taux_general
     INTO v_general_fixe, v_general_taux
-  FROM "Companies" WHERE id = p_company_id;
+  FROM ""Companies"" WHERE id = p_company_id;
 
   IF v_general_fixe IS NOT NULL THEN
     RETURN GREATEST(v_general_fixe, 0);
@@ -778,8 +779,8 @@ CREATE OR REPLACE FUNCTION public.count_unread_my_notifications()
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  SELECT COUNT(*)::integer FROM "Notifications"
-  WHERE "userId" = public.current_app_user_id() AND "isRead" = false;
+  SELECT COUNT(*)::integer FROM ""Notifications""
+  WHERE ""userId"" = public.current_app_user_id() AND ""isRead"" = false;
 $function$
 ;
 
@@ -801,17 +802,17 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM "Gares" g WHERE g."cityId" = p_ville_depart_id AND g."companyId" = p_company_id
+    SELECT 1 FROM ""Gares"" g WHERE g.""cityId"" = p_ville_depart_id AND g.""companyId"" = p_company_id
   ) THEN
     RAISE EXCEPTION 'Ville de depart invalide pour cette compagnie (aucune gare de cette compagnie dans cette ville)';
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM "Gares" g WHERE g.id = p_gare_destination_id AND g."companyId" = p_company_id
+    SELECT 1 FROM ""Gares"" g WHERE g.id = p_gare_destination_id AND g.""companyId"" = p_company_id
   ) THEN
     RAISE EXCEPTION 'Gare de destination invalide pour cette compagnie';
   END IF;
   IF p_bus_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM "Bus" b WHERE b.id = p_bus_id AND b."companyId" = p_company_id
+    SELECT 1 FROM ""Bus"" b WHERE b.id = p_bus_id AND b.""companyId"" = p_company_id
   ) THEN
     RAISE EXCEPTION 'Bus invalide pour cette compagnie';
   END IF;
@@ -838,8 +839,8 @@ CREATE OR REPLACE FUNCTION public.current_app_user_id()
  SET search_path TO 'public'
 AS $function$
   SELECT u.id
-  FROM "Users" u
-  WHERE u."auth_user_id" = auth.uid()
+  FROM ""Users"" u
+  WHERE u.""auth_user_id"" = auth.uid()
   LIMIT 1;
 $function$
 ;
@@ -900,16 +901,16 @@ DECLARE
   v_holder record;
 BEGIN
   SELECT r.name INTO v_role_name
-  FROM public."Role" r
-  WHERE r.id = NEW."roleId";
+  FROM public.""Role"" r
+  WHERE r.id = NEW.""roleId"";
 
-  IF v_role_name IS DISTINCT FROM 'admin_pays' OR NEW."countryId" IS NULL THEN
+  IF v_role_name IS DISTINCT FROM 'admin_pays' OR NEW.""countryId"" IS NULL THEN
     RETURN NEW;
   END IF;
 
   SELECT h.user_id, h.full_name, h.email
   INTO v_holder
-  FROM public.get_country_admin_pays_holder(NEW."countryId", NEW."userId") h
+  FROM public.get_country_admin_pays_holder(NEW.""countryId"", NEW.""userId"") h
   LIMIT 1;
 
   IF v_holder.user_id IS NOT NULL THEN
@@ -917,7 +918,7 @@ BEGIN
       'ADMIN_PAYS_COUNTRY_TAKEN|%|%|%',
       COALESCE(v_holder.full_name, ''),
       COALESCE(v_holder.email, ''),
-      NEW."countryId"::text;
+      NEW.""countryId""::text;
   END IF;
 
   RETURN NEW;
@@ -965,8 +966,8 @@ BEGIN
   INTO v_colis
   FROM bordereau_colis bc
   JOIN colis_autonomes ca ON ca.id = bc.colis_id
-  JOIN "Gares" gd ON gd.id = ca.gare_depart_id
-  JOIN "Gares" gdest ON gdest.id = ca.gare_destination_id
+  JOIN ""Gares"" gd ON gd.id = ca.gare_depart_id
+  JOIN ""Gares"" gdest ON gdest.id = ca.gare_destination_id
   WHERE bc.bordereau_id = p_bordereau_id;
 
   RETURN jsonb_build_object(
@@ -975,10 +976,10 @@ BEGIN
     'numeroLot', v_bl.numero_lot,
     'statut', v_bl.statut,
     'companyId', v_bl.company_id,
-    'companyName', (SELECT name FROM "Companies" WHERE id = v_bl.company_id),
-    'villeDepart', (SELECT name FROM "Cities" WHERE id = v_bl.ville_depart_id),
-    'gareDestination', (SELECT name FROM "Gares" WHERE id = v_bl.gare_destination_id),
-    'busPlateNumber', (SELECT "registrationNumber" FROM "Bus" WHERE id = v_bl.bus_id),
+    'companyName', (SELECT name FROM ""Companies"" WHERE id = v_bl.company_id),
+    'villeDepart', (SELECT name FROM ""Cities"" WHERE id = v_bl.ville_depart_id),
+    'gareDestination', (SELECT name FROM ""Gares"" WHERE id = v_bl.gare_destination_id),
+    'busPlateNumber', (SELECT ""registrationNumber"" FROM ""Bus"" WHERE id = v_bl.bus_id),
     'dateLot', v_bl.date_lot,
     'createdAt', v_bl.created_at,
     'closedAt', v_bl.closed_at,
@@ -1008,7 +1009,7 @@ BEGIN
     'customFields', COALESCE(ca.custom_fields, '{}'::jsonb),
     'natureIds', COALESCE((SELECT jsonb_agg(cns.nature_id) FROM public.colis_natures_selectionnees cns WHERE cns.colis_id = ca.id), '[]'::jsonb),
     'natures', COALESCE((SELECT jsonb_agg(n.libelle ORDER BY n.libelle) FROM public.colis_natures_selectionnees cns JOIN public.colis_natures n ON n.id = cns.nature_id WHERE cns.colis_id = ca.id), '[]'::jsonb))
-  INTO v_row FROM public.colis_autonomes ca JOIN "Gares" gd ON gd.id = ca.gare_depart_id JOIN "Gares" gdest ON gdest.id = ca.gare_destination_id JOIN "Companies" c ON c.id = ca.company_id WHERE ca.id = p_colis_id;
+  INTO v_row FROM public.colis_autonomes ca JOIN ""Gares"" gd ON gd.id = ca.gare_depart_id JOIN ""Gares"" gdest ON gdest.id = ca.gare_destination_id JOIN ""Companies"" c ON c.id = ca.company_id WHERE ca.id = p_colis_id;
   RETURN v_row;
 END; $function$
 ;
@@ -1139,7 +1140,7 @@ BEGIN
       ca.vendeur_id,
       gdest.name AS gare_destination
     FROM public.colis_autonomes ca
-    JOIN "Gares" gdest ON gdest.id = ca.gare_destination_id
+    JOIN ""Gares"" gdest ON gdest.id = ca.gare_destination_id
     WHERE ca.company_id = p_company_id
       AND ca.statut_colis <> 'annule'
       AND (v_gerant_gares IS NULL OR ca.gare_depart_id = ANY(v_gerant_gares))
@@ -1150,7 +1151,7 @@ BEGIN
   by_vendeur AS (
     SELECT
       f.vendeur_id,
-      COALESCE(NULLIF(TRIM(COALESCE(u."firstName", '') || ' ' || COALESCE(u."lastName", '')), ''), u.username, 'Agent inconnu') AS vendeur_name,
+      COALESCE(NULLIF(TRIM(COALESCE(u.""firstName"", '') || ' ' || COALESCE(u.""lastName"", '')), ''), u.username, 'Agent inconnu') AS vendeur_name,
       u.username AS vendeur_username,
       jsonb_agg(
         jsonb_build_object(
@@ -1169,8 +1170,8 @@ BEGIN
       COALESCE(SUM(f.montant_fret), 0) AS total_frais,
       COALESCE(SUM(f.valeur_marchandise), 0) AS total_valeur
     FROM filtered f
-    LEFT JOIN "Users" u ON u.id = f.vendeur_id
-    GROUP BY f.vendeur_id, u."firstName", u."lastName", u.username
+    LEFT JOIN ""Users"" u ON u.id = f.vendeur_id
+    GROUP BY f.vendeur_id, u.""firstName"", u.""lastName"", u.username
   )
   SELECT jsonb_build_object(
     'groups', COALESCE(
@@ -1219,16 +1220,16 @@ BEGIN
   SELECT COALESCE(jsonb_agg(row_to_json(t)), '[]'::jsonb) INTO v_result
   FROM (
     SELECT
-      g.id AS "gareId",
-      g.name AS "gareName",
+      g.id AS ""gareId"",
+      g.name AS ""gareName"",
       COUNT(ca.id) AS count,
       COALESCE(SUM(ca.montant_fret), 0) AS montant
-    FROM public."Gares" g
+    FROM public.""Gares"" g
     LEFT JOIN public.colis_autonomes ca
       ON ca.gare_depart_id = g.id
       AND ca.company_id = p_company_id
       AND ca.created_at::date = now()::date
-    WHERE g."companyId" = p_company_id
+    WHERE g.""companyId"" = p_company_id
       AND g.name <> '__CASH_SESSION_HUB__'
       AND g.name NOT LIKE '\_\_%'
     GROUP BY g.id, g.name
@@ -1249,7 +1250,7 @@ CREATE OR REPLACE FUNCTION public.get_company_colis_settings(p_company_id uuid)
 AS $function$
 DECLARE
   v_user_id uuid := public.current_app_user_id();
-  v_row "Companies"%ROWTYPE;
+  v_row ""Companies""%ROWTYPE;
   v_sms_config_allowed boolean := false;
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
@@ -1257,7 +1258,7 @@ BEGIN
     RAISE EXCEPTION 'Droits insuffisants';
   END IF;
 
-  SELECT * INTO v_row FROM "Companies" WHERE id = p_company_id;
+  SELECT * INTO v_row FROM ""Companies"" WHERE id = p_company_id;
   IF v_row.id IS NULL THEN RAISE EXCEPTION 'Compagnie introuvable'; END IF;
 
   SELECT COALESCE(public.company_colis_sms_owner_config_enabled(p_company_id), false)
@@ -1290,32 +1291,32 @@ DECLARE
   v_companies jsonb;
 BEGIN
   SELECT
-    NULLIF(BTRIM(cs."whatsappNumber"), ''),
-    NULLIF(BTRIM(cs."notificationEmail"), '')
+    NULLIF(BTRIM(cs.""whatsappNumber""), ''),
+    NULLIF(BTRIM(cs.""notificationEmail""), '')
   INTO v_platform, v_platform_email
-  FROM "ContactSettings" cs
-  WHERE cs."scope" = 'platform'
+  FROM ""ContactSettings"" cs
+  WHERE cs.""scope"" = 'platform'
   LIMIT 1;
 
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
-        'companyId', cs."scope",
+        'companyId', cs.""scope"",
         'companyName', COALESCE(c.name, 'Compagnie'),
-        'whatsappNumber', NULLIF(BTRIM(cs."whatsappNumber"), ''),
-        'notificationEmail', NULLIF(BTRIM(cs."notificationEmail"), '')
+        'whatsappNumber', NULLIF(BTRIM(cs.""whatsappNumber""), ''),
+        'notificationEmail', NULLIF(BTRIM(cs.""notificationEmail""), '')
       )
       ORDER BY c.name
     ),
     '[]'::jsonb
   )
   INTO v_companies
-  FROM "ContactSettings" cs
-  LEFT JOIN "Companies" c ON c.id::text = cs."scope"
-  WHERE cs."scope" <> 'platform'
+  FROM ""ContactSettings"" cs
+  LEFT JOIN ""Companies"" c ON c.id::text = cs.""scope""
+  WHERE cs.""scope"" <> 'platform'
     AND (
-      NULLIF(BTRIM(cs."whatsappNumber"), '') IS NOT NULL
-      OR NULLIF(BTRIM(cs."notificationEmail"), '') IS NOT NULL
+      NULLIF(BTRIM(cs.""whatsappNumber""), '') IS NOT NULL
+      OR NULLIF(BTRIM(cs.""notificationEmail""), '') IS NOT NULL
     );
 
   RETURN jsonb_build_object(
@@ -1336,13 +1337,13 @@ CREATE OR REPLACE FUNCTION public.get_country_admin_pays_holder(p_country_id uui
 AS $function$
   SELECT
     u.id,
-    NULLIF(TRIM(COALESCE(u."firstName", '') || ' ' || COALESCE(u."lastName", '')), '')::text,
+    NULLIF(TRIM(COALESCE(u.""firstName"", '') || ' ' || COALESCE(u.""lastName"", '')), '')::text,
     u.email::text
-  FROM public."UserRoles" ur
-  JOIN public."Role" r ON r.id = ur."roleId" AND r.name = 'admin_pays'
-  JOIN public."Users" u ON u.id = ur."userId"
-  WHERE ur."countryId" = p_country_id
-    AND (p_exclude_user_id IS NULL OR ur."userId" <> p_exclude_user_id)
+  FROM public.""UserRoles"" ur
+  JOIN public.""Role"" r ON r.id = ur.""roleId"" AND r.name = 'admin_pays'
+  JOIN public.""Users"" u ON u.id = ur.""userId""
+  WHERE ur.""countryId"" = p_country_id
+    AND (p_exclude_user_id IS NULL OR ur.""userId"" <> p_exclude_user_id)
   ORDER BY u.email
   LIMIT 1;
 $function$
@@ -1363,9 +1364,9 @@ DECLARE
 BEGIN
   v_user_id := public.current_app_user_id();
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'Utilisateur introuvable'; END IF;
-  SELECT c.*, g.name AS gare_name, g."companyId" AS company_id INTO v_row
+  SELECT c.*, g.name AS gare_name, g.""companyId"" AS company_id INTO v_row
   FROM caisses_gares c
-  JOIN "Gares" g ON g.id = c.gare_id
+  JOIN ""Gares"" g ON g.id = c.gare_id
   WHERE c.gestionnaire_id = v_user_id
     AND c.statut IN ('ouverte', 'en_reversement')
     AND (p_gare_id IS NULL OR c.gare_id = p_gare_id)
@@ -1406,19 +1407,19 @@ CREATE OR REPLACE FUNCTION public.has_company_droit(p_company_id uuid, p_droit t
 AS $function$
   SELECT public.is_super_admin()
     OR EXISTS (
-      SELECT 1 FROM "UserRoles" ur
-      JOIN "Role" r ON r.id = ur."roleId"
-      JOIN "Users" u ON u.id = ur."userId"
-      WHERE u."auth_user_id" = auth.uid()
-        AND ur."companyId" = p_company_id
+      SELECT 1 FROM ""UserRoles"" ur
+      JOIN ""Role"" r ON r.id = ur.""roleId""
+      JOIN ""Users"" u ON u.id = ur.""userId""
+      WHERE u.""auth_user_id"" = auth.uid()
+        AND ur.""companyId"" = p_company_id
         AND p_droit = ANY (r.droits)
     )
     OR EXISTS (
-      SELECT 1 FROM "UserRoles" ur
-      JOIN "Role" r ON r.id = ur."roleId"
-      JOIN "Users" u ON u.id = ur."userId"
-      JOIN "Companies" c ON c."countryId" = ur."countryId"
-      WHERE u."auth_user_id" = auth.uid()
+      SELECT 1 FROM ""UserRoles"" ur
+      JOIN ""Role"" r ON r.id = ur.""roleId""
+      JOIN ""Users"" u ON u.id = ur.""userId""
+      JOIN ""Companies"" c ON c.""countryId"" = ur.""countryId""
+      WHERE u.""auth_user_id"" = auth.uid()
         AND c.id = p_company_id
         AND r.name = 'admin_pays'
         AND p_droit = ANY (r.droits)
@@ -1434,11 +1435,11 @@ CREATE OR REPLACE FUNCTION public.has_company_role(p_company_id uuid, p_roles te
  SET search_path TO 'public'
 AS $function$
   SELECT EXISTS (
-    SELECT 1 FROM "UserRoles" ur
-    JOIN "Role" r ON r.id = ur."roleId"
-    JOIN "Users" u ON u.id = ur."userId"
-    WHERE u."auth_user_id" = auth.uid()
-      AND ur."companyId" = p_company_id
+    SELECT 1 FROM ""UserRoles"" ur
+    JOIN ""Role"" r ON r.id = ur.""roleId""
+    JOIN ""Users"" u ON u.id = ur.""userId""
+    WHERE u.""auth_user_id"" = auth.uid()
+      AND ur.""companyId"" = p_company_id
       AND r.name = ANY (p_roles)
   );
 $function$
@@ -1453,13 +1454,13 @@ CREATE OR REPLACE FUNCTION public.has_gare_colis_access(p_user_id uuid, p_compan
 AS $function$
   SELECT EXISTS (
     SELECT 1
-    FROM "UserRoles" ur
-    JOIN "Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = p_user_id
-      AND ur."companyId" = p_company_id
-      AND ur."gareId" IS NOT NULL
+    FROM ""UserRoles"" ur
+    JOIN ""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = p_user_id
+      AND ur.""companyId"" = p_company_id
+      AND ur.""gareId"" IS NOT NULL
       AND r.name = 'comptable_gare'
-      AND ur."gareId" IN (p_gare_depart_id, p_gare_destination_id)
+      AND ur.""gareId"" IN (p_gare_depart_id, p_gare_destination_id)
   );
 $function$
 ;
@@ -1472,10 +1473,10 @@ CREATE OR REPLACE FUNCTION public.has_gare_role(p_gare_id uuid, p_roles text[])
  SET search_path TO 'public'
 AS $function$
   SELECT EXISTS (
-    SELECT 1 FROM public."UserRoles" ur
-    JOIN public."Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = public.current_app_user_id()
-      AND ur."gareId" = p_gare_id
+    SELECT 1 FROM public.""UserRoles"" ur
+    JOIN public.""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = public.current_app_user_id()
+      AND ur.""gareId"" = p_gare_id
       AND r.name = ANY (p_roles)
   ) OR public.is_super_admin();
 $function$
@@ -1490,10 +1491,10 @@ CREATE OR REPLACE FUNCTION public.is_company_role_user(p_user_id uuid, p_company
 AS $function$
   SELECT EXISTS (
     SELECT 1
-    FROM "UserRoles" ur
-    JOIN "Role" ro ON ro.id = ur."roleId"
-    WHERE ur."userId" = p_user_id
-      AND ur."companyId" = p_company_id
+    FROM ""UserRoles"" ur
+    JOIN ""Role"" ro ON ro.id = ur.""roleId""
+    WHERE ur.""userId"" = p_user_id
+      AND ur.""companyId"" = p_company_id
       AND ro.name IN ('owner', 'comptable_compagnie', 'controleur', 'vendeur',
                        'emballeur_gare', 'chargeur_gare', 'distributeur_gare')
   )
@@ -1510,9 +1511,9 @@ CREATE OR REPLACE FUNCTION public.is_super_admin()
 AS $function$
   SELECT EXISTS (
     SELECT 1
-    FROM "UserRoles" ur
-    JOIN "Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = public.current_app_user_id()
+    FROM ""UserRoles"" ur
+    JOIN ""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = public.current_app_user_id()
       AND r.name = 'super_admin'
   );
 $function$
@@ -1520,7 +1521,7 @@ $function$
 
 -- ==== FUNCTION list_bordereau_notify_contacts ====
 CREATE OR REPLACE FUNCTION public.list_bordereau_notify_contacts(p_company_id uuid)
- RETURNS TABLE(user_id uuid, "firstName" text, "lastName" text, email text, phone text, role_name text)
+ RETURNS TABLE(user_id uuid, ""firstName"" text, ""lastName"" text, email text, phone text, role_name text)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
@@ -1530,11 +1531,11 @@ BEGIN
 
   RETURN QUERY
   SELECT DISTINCT ON (u.id)
-    u.id, u."firstName"::text, u."lastName"::text, u.email::text, u.phone::text, r.name::text
-  FROM public."UserRoles" ur
-  JOIN public."Role" r ON r.id = ur."roleId"
-  JOIN public."Users" u ON u.id = ur."userId"
-  WHERE ur."companyId" = p_company_id
+    u.id, u.""firstName""::text, u.""lastName""::text, u.email::text, u.phone::text, r.name::text
+  FROM public.""UserRoles"" ur
+  JOIN public.""Role"" r ON r.id = ur.""roleId""
+  JOIN public.""Users"" u ON u.id = ur.""userId""
+  WHERE ur.""companyId"" = p_company_id
     AND r.name IN ('owner', 'controleur')
   ORDER BY u.id, (r.name = 'owner') DESC;
 END;
@@ -1543,7 +1544,7 @@ $function$
 
 -- ==== FUNCTION list_bordereaux_livraison ====
 CREATE OR REPLACE FUNCTION public.list_bordereaux_livraison(p_company_id uuid, p_limit integer DEFAULT 50)
- RETURNS TABLE(id uuid, reference text, "numeroLot" integer, statut text, "villeDepart" text, "gareDestination" text, "busPlateNumber" text, "colisCount" bigint, "dateLot" date, "createdAt" timestamp with time zone, "closedAt" timestamp with time zone)
+ RETURNS TABLE(id uuid, reference text, ""numeroLot"" integer, statut text, ""villeDepart"" text, ""gareDestination"" text, ""busPlateNumber"" text, ""colisCount"" bigint, ""dateLot"" date, ""createdAt"" timestamp with time zone, ""closedAt"" timestamp with time zone)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
@@ -1552,13 +1553,13 @@ BEGIN
   PERFORM public._assert_bordereau_access(p_company_id);
   RETURN QUERY
   SELECT bl.id, bl.reference, bl.numero_lot, bl.statut,
-         vd.name::text, gdest.name::text, b."registrationNumber"::text,
+         vd.name::text, gdest.name::text, b.""registrationNumber""::text,
          (SELECT count(*) FROM bordereau_colis bc WHERE bc.bordereau_id = bl.id),
          bl.date_lot, bl.created_at, bl.closed_at
   FROM bordereaux_livraison bl
-  LEFT JOIN "Cities" vd ON vd.id = bl.ville_depart_id
-  LEFT JOIN "Gares" gdest ON gdest.id = bl.gare_destination_id
-  LEFT JOIN "Bus" b ON b.id = bl.bus_id
+  LEFT JOIN ""Cities"" vd ON vd.id = bl.ville_depart_id
+  LEFT JOIN ""Gares"" gdest ON gdest.id = bl.gare_destination_id
+  LEFT JOIN ""Bus"" b ON b.id = bl.bus_id
   WHERE bl.company_id = p_company_id
   ORDER BY bl.date_lot DESC, bl.created_at DESC
   LIMIT GREATEST(COALESCE(p_limit, 50), 1);
@@ -1588,22 +1589,22 @@ BEGIN
     OR public.has_company_role(p_company_id, ARRAY['emballeur_gare','chargeur_gare','distributeur_gare']);
 
   IF NOT v_full_access THEN
-    SELECT array_agg(ur."gareId") INTO v_gare_ids
-    FROM "UserRoles" ur
-    JOIN "Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = v_user_id
-      AND ur."companyId" = p_company_id
-      AND ur."gareId" IS NOT NULL
+    SELECT array_agg(ur.""gareId"") INTO v_gare_ids
+    FROM ""UserRoles"" ur
+    JOIN ""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = v_user_id
+      AND ur.""companyId"" = p_company_id
+      AND ur.""gareId"" IS NOT NULL
       AND r.name IN ('comptable_gare', 'emballeur_gare', 'chargeur_gare', 'distributeur_gare');
   END IF;
 
   IF NOT v_full_access AND v_gare_ids IS NULL THEN
     SELECT EXISTS (
       SELECT 1
-      FROM "UserRoles" ur
-      JOIN "Role" r ON r.id = ur."roleId"
-      WHERE ur."userId" = v_user_id
-        AND ur."companyId" = p_company_id
+      FROM ""UserRoles"" ur
+      JOIN ""Role"" r ON r.id = ur.""roleId""
+      WHERE ur.""userId"" = v_user_id
+        AND ur.""companyId"" = p_company_id
         AND r.name IN ('vendeur', 'vendeur_gare', 'chauffeur', 'controleur')
     ) INTO v_own_sales_role;
     IF NOT v_own_sales_role THEN
@@ -1613,37 +1614,37 @@ BEGIN
 
   v_search_digits := NULLIF(regexp_replace(COALESCE(v_search, ''), '[^0-9]', '', 'g'), '');
 
-  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb ORDER BY sub."createdAt" DESC), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb ORDER BY sub.""createdAt"" DESC), '[]'::jsonb)
   INTO v_rows
   FROM (
     SELECT
       ca.id,
-      ca.statut_colis AS "statutColis",
-      ca.numero_recu AS "numeroRecu",
-      ca.nom_expediteur AS "nomExpediteur",
-      ca.telephone_expediteur AS "telephoneExpediteur",
-      ca.nom_destinataire AS "nomDestinataire",
-      ca.telephone_destinataire AS "telephoneDestinataire",
-      ca.description_contenu AS "descriptionContenu",
-      ca.poids_kg AS "poidsKg",
-      ca.nombre_pieces AS "nombrePieces",
-      ca.montant_fret AS "montantFret",
-      ca.valeur_marchandise AS "valeurMarchandise",
-      ca.created_at AS "createdAt",
-      ca.updated_at AS "updatedAt",
-      gd.name AS "gareDepart",
-      gdest.name AS "gareDestination",
-      COALESCE(ca.custom_fields, '{}'::jsonb) AS "customFields",
+      ca.statut_colis AS ""statutColis"",
+      ca.numero_recu AS ""numeroRecu"",
+      ca.nom_expediteur AS ""nomExpediteur"",
+      ca.telephone_expediteur AS ""telephoneExpediteur"",
+      ca.nom_destinataire AS ""nomDestinataire"",
+      ca.telephone_destinataire AS ""telephoneDestinataire"",
+      ca.description_contenu AS ""descriptionContenu"",
+      ca.poids_kg AS ""poidsKg"",
+      ca.nombre_pieces AS ""nombrePieces"",
+      ca.montant_fret AS ""montantFret"",
+      ca.valeur_marchandise AS ""valeurMarchandise"",
+      ca.created_at AS ""createdAt"",
+      ca.updated_at AS ""updatedAt"",
+      gd.name AS ""gareDepart"",
+      gdest.name AS ""gareDestination"",
+      COALESCE(ca.custom_fields, '{}'::jsonb) AS ""customFields"",
       COALESCE(
         (SELECT jsonb_agg(n.libelle ORDER BY n.libelle)
          FROM public.colis_natures_selectionnees cns
          JOIN public.colis_natures n ON n.id = cns.nature_id
          WHERE cns.colis_id = ca.id),
         '[]'::jsonb
-      ) AS "natures"
+      ) AS ""natures""
     FROM public.colis_autonomes ca
-    JOIN "Gares" gd ON gd.id = ca.gare_depart_id
-    JOIN "Gares" gdest ON gdest.id = ca.gare_destination_id
+    JOIN ""Gares"" gd ON gd.id = ca.gare_depart_id
+    JOIN ""Gares"" gdest ON gdest.id = ca.gare_destination_id
     WHERE ca.company_id = p_company_id
       AND (p_statut IS NULL OR ca.statut_colis = p_statut)
       AND (
@@ -1653,7 +1654,7 @@ BEGIN
       )
       -- Recherche serveur : porte sur TOUTE la table (pas seulement les
       -- p_limit lignes les plus récentes) — corrige le cas où un colis
-      -- plus ancien (ex. numero_recu "COCO000187") était invisible car
+      -- plus ancien (ex. numero_recu ""COCO000187"") était invisible car
       -- hors de la fenêtre des N derniers colis chargés côté frontend.
       AND (
         v_search IS NULL
@@ -1690,42 +1691,42 @@ BEGIN
   IF v_bl.id IS NULL THEN RAISE EXCEPTION 'Bordereau introuvable'; END IF;
   PERFORM public._assert_bordereau_access(v_bl.company_id);
 
-  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb ORDER BY sub."createdAt" DESC), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb ORDER BY sub.""createdAt"" DESC), '[]'::jsonb)
   INTO v_rows
   FROM (
     SELECT
       ca.id,
-      ca.statut_colis AS "statutColis",
-      ca.numero_recu AS "numeroRecu",
-      ca.nom_expediteur AS "nomExpediteur",
-      ca.telephone_expediteur AS "telephoneExpediteur",
-      ca.nom_destinataire AS "nomDestinataire",
-      ca.telephone_destinataire AS "telephoneDestinataire",
-      ca.description_contenu AS "descriptionContenu",
-      ca.poids_kg AS "poidsKg",
-      ca.nombre_pieces AS "nombrePieces",
-      ca.montant_fret AS "montantFret",
-      ca.valeur_marchandise AS "valeurMarchandise",
-      ca.pourcentage_percu AS "pourcentagePercu",
-      ca.bus_id AS "busId",
-      b."registrationNumber" AS "busPlateNumber",
-      ca.created_at AS "createdAt",
-      ca.updated_at AS "updatedAt",
-      gd.name AS "gareDepart",
-      gdest.name AS "gareDestination",
+      ca.statut_colis AS ""statutColis"",
+      ca.numero_recu AS ""numeroRecu"",
+      ca.nom_expediteur AS ""nomExpediteur"",
+      ca.telephone_expediteur AS ""telephoneExpediteur"",
+      ca.nom_destinataire AS ""nomDestinataire"",
+      ca.telephone_destinataire AS ""telephoneDestinataire"",
+      ca.description_contenu AS ""descriptionContenu"",
+      ca.poids_kg AS ""poidsKg"",
+      ca.nombre_pieces AS ""nombrePieces"",
+      ca.montant_fret AS ""montantFret"",
+      ca.valeur_marchandise AS ""valeurMarchandise"",
+      ca.pourcentage_percu AS ""pourcentagePercu"",
+      ca.bus_id AS ""busId"",
+      b.""registrationNumber"" AS ""busPlateNumber"",
+      ca.created_at AS ""createdAt"",
+      ca.updated_at AS ""updatedAt"",
+      gd.name AS ""gareDepart"",
+      gdest.name AS ""gareDestination"",
       COALESCE(
         (SELECT jsonb_agg(n.libelle ORDER BY n.libelle)
          FROM public.colis_natures_selectionnees cns
          JOIN public.colis_natures n ON n.id = cns.nature_id
          WHERE cns.colis_id = ca.id),
         '[]'::jsonb
-      ) AS "natures"
+      ) AS ""natures""
     FROM public.colis_autonomes ca
-    JOIN "Gares" gd ON gd.id = ca.gare_depart_id
-    JOIN "Gares" gdest ON gdest.id = ca.gare_destination_id
-    LEFT JOIN "Bus" b ON b.id = ca.bus_id
+    JOIN ""Gares"" gd ON gd.id = ca.gare_depart_id
+    JOIN ""Gares"" gdest ON gdest.id = ca.gare_destination_id
+    LEFT JOIN ""Bus"" b ON b.id = ca.bus_id
     WHERE ca.company_id = v_bl.company_id
-      AND gd."cityId" = v_bl.ville_depart_id
+      AND gd.""cityId"" = v_bl.ville_depart_id
       AND (v_bl.gare_destination_id IS NULL OR ca.gare_destination_id = v_bl.gare_destination_id)
       AND ca.statut_colis <> 'livre'
       AND NOT EXISTS (
@@ -1771,9 +1772,9 @@ BEGIN
     jsonb_agg(
       jsonb_build_object(
         'id', u.id,
-        'name', COALESCE(NULLIF(TRIM(u."firstName" || ' ' || u."lastName"), ''), u.username)
+        'name', COALESCE(NULLIF(TRIM(u.""firstName"" || ' ' || u.""lastName""), ''), u.username)
       )
-      ORDER BY COALESCE(NULLIF(TRIM(u."firstName" || ' ' || u."lastName"), ''), u.username)
+      ORDER BY COALESCE(NULLIF(TRIM(u.""firstName"" || ' ' || u.""lastName""), ''), u.username)
     ),
     '[]'::jsonb
   )
@@ -1785,7 +1786,7 @@ BEGIN
       AND ca.vendeur_id IS NOT NULL
       AND (v_gerant_gares IS NULL OR ca.gare_depart_id = ANY(v_gerant_gares))
   ) v
-  JOIN "Users" u ON u.id = v.vendeur_id;
+  JOIN ""Users"" u ON u.id = v.vendeur_id;
 
   RETURN v_rows;
 END;
@@ -1809,8 +1810,8 @@ BEGIN
 
   RETURN QUERY
   SELECT g.id, g.name::text
-  FROM public."Gares" g
-  WHERE g."companyId" = p_company_id
+  FROM public.""Gares"" g
+  WHERE g.""companyId"" = p_company_id
     AND g.name <> '__CASH_SESSION_HUB__'
     AND g.name NOT LIKE '\_\_%'
   ORDER BY g.name;
@@ -1835,9 +1836,9 @@ BEGIN
 
   RETURN QUERY
   SELECT DISTINCT c.id, c.name::text AS name
-  FROM public."Cities" c
-  JOIN public."Gares" g ON g."cityId" = c.id
-  WHERE g."companyId" = p_company_id
+  FROM public.""Cities"" c
+  JOIN public.""Gares"" g ON g.""cityId"" = c.id
+  WHERE g.""companyId"" = p_company_id
     AND g.name <> '__CASH_SESSION_HUB__'
     AND g.name NOT LIKE '\_\_%'
   ORDER BY name;
@@ -1859,14 +1860,14 @@ AS $function$
       'type', n.type,
       'title', n.title,
       'message', n.message,
-      'isRead', n."isRead",
+      'isRead', n.""isRead"",
       'metadata', n.metadata,
-      'createdAt', n."createdAt"
+      'createdAt', n.""createdAt""
     ) AS row_data,
-    n."createdAt" AS created_at
-    FROM "Notifications" n
-    WHERE n."userId" = public.current_app_user_id()
-    ORDER BY n."createdAt" DESC
+    n.""createdAt"" AS created_at
+    FROM ""Notifications"" n
+    WHERE n.""userId"" = public.current_app_user_id()
+    ORDER BY n.""createdAt"" DESC
     LIMIT LEAST(GREATEST(COALESCE(p_limit, 20), 1), 100)
   ) t;
 $function$
@@ -1903,10 +1904,10 @@ BEGIN
     m.solde_apres,
     m.ticket_id,
     COALESCE(m.colis_autonome_id, m.colis_id) AS colis_id,
-    NULLIF(TRIM(u."firstName" || ' ' || u."lastName"), ''),
+    NULLIF(TRIM(u.""firstName"" || ' ' || u.""lastName""), ''),
     m.note
   FROM mouvements_caisse m
-  LEFT JOIN "Users" u ON u.id = m.effectue_par
+  LEFT JOIN ""Users"" u ON u.id = m.effectue_par
   WHERE m.caisse_id = p_caisse_id
   ORDER BY m.created_at DESC
   LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 100), 500))
@@ -1923,8 +1924,8 @@ CREATE OR REPLACE FUNCTION public.mark_all_my_notifications_read()
  SET search_path TO 'public'
 AS $function$
 BEGIN
-  UPDATE "Notifications" SET "isRead" = true
-  WHERE "userId" = public.current_app_user_id() AND "isRead" = false;
+  UPDATE ""Notifications"" SET ""isRead"" = true
+  WHERE ""userId"" = public.current_app_user_id() AND ""isRead"" = false;
 END;
 $function$
 ;
@@ -1956,9 +1957,9 @@ BEGIN
     RAISE EXCEPTION 'Le lot doit d''abord etre charge (parti) avant confirmation de reception';
   END IF;
 
-  SELECT c.name INTO v_company_name FROM "Companies" c WHERE c.id = v_bl.company_id;
-  SELECT name INTO v_ville_depart_name FROM "Cities" WHERE id = v_bl.ville_depart_id;
-  SELECT name INTO v_gare_destination_name FROM "Gares" WHERE id = v_bl.gare_destination_id;
+  SELECT c.name INTO v_company_name FROM ""Companies"" c WHERE c.id = v_bl.company_id;
+  SELECT name INTO v_ville_depart_name FROM ""Cities"" WHERE id = v_bl.ville_depart_id;
+  SELECT name INTO v_gare_destination_name FROM ""Gares"" WHERE id = v_bl.gare_destination_id;
 
   FOR v_row IN
     SELECT ca.* FROM colis_autonomes ca
@@ -2027,9 +2028,9 @@ BEGIN
     RAISE EXCEPTION 'Le lot doit d''abord etre cloture (emballage termine) avant chargement';
   END IF;
 
-  SELECT c.name INTO v_company_name FROM "Companies" c WHERE c.id = v_bl.company_id;
-  SELECT name INTO v_ville_depart_name FROM "Cities" WHERE id = v_bl.ville_depart_id;
-  SELECT name INTO v_gare_destination_name FROM "Gares" WHERE id = v_bl.gare_destination_id;
+  SELECT c.name INTO v_company_name FROM ""Companies"" c WHERE c.id = v_bl.company_id;
+  SELECT name INTO v_ville_depart_name FROM ""Cities"" WHERE id = v_bl.ville_depart_id;
+  SELECT name INTO v_gare_destination_name FROM ""Gares"" WHERE id = v_bl.gare_destination_id;
 
   FOR v_row IN
     SELECT ca.* FROM colis_autonomes ca
@@ -2080,8 +2081,8 @@ CREATE OR REPLACE FUNCTION public.mark_my_notification_read(p_notification_id uu
  SET search_path TO 'public'
 AS $function$
 BEGIN
-  UPDATE "Notifications" SET "isRead" = true
-  WHERE id = p_notification_id AND "userId" = public.current_app_user_id();
+  UPDATE ""Notifications"" SET ""isRead"" = true
+  WHERE id = p_notification_id AND ""userId"" = public.current_app_user_id();
 END;
 $function$
 ;
@@ -2120,10 +2121,10 @@ BEGIN
   IF p_company_id IS NOT NULL THEN
     IF NOT EXISTS (
       SELECT 1
-      FROM public."UserRoles" ur
-      JOIN public."Role" r ON r.id = ur."roleId"
-      WHERE ur."userId" = v_user_id
-        AND ur."companyId" = p_company_id
+      FROM public.""UserRoles"" ur
+      JOIN public.""Role"" r ON r.id = ur.""roleId""
+      WHERE ur.""userId"" = v_user_id
+        AND ur.""companyId"" = p_company_id
         AND r.name IN ('owner', 'vendeur', 'vendeur_gare', 'chauffeur')
     ) AND NOT public.is_super_admin() THEN
       RAISE EXCEPTION 'Aucun role de vente dans cette compagnie';
@@ -2144,9 +2145,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (
     SELECT 1
-    FROM public."Gares" g
+    FROM public.""Gares"" g
     WHERE g.id = p_gare_id
-      AND g."companyId" = v_company_id
+      AND g.""companyId"" = v_company_id
       AND g.name <> '__CASH_SESSION_HUB__'
       AND g.name NOT LIKE '\_\_%'
   ) THEN
@@ -2156,21 +2157,21 @@ BEGIN
   SELECT public.is_super_admin()
     OR EXISTS (
       SELECT 1
-      FROM public."UserRoles" ur
-      JOIN public."Role" r ON r.id = ur."roleId"
-      WHERE ur."userId" = v_user_id
-        AND ur."companyId" = v_company_id
+      FROM public.""UserRoles"" ur
+      JOIN public.""Role"" r ON r.id = ur.""roleId""
+      WHERE ur.""userId"" = v_user_id
+        AND ur.""companyId"" = v_company_id
         AND r.name IN ('owner', 'vendeur', 'chauffeur')
     )
   INTO v_all_gares;
 
   IF NOT v_all_gares AND NOT EXISTS (
     SELECT 1
-    FROM public."UserRoles" ur
-    JOIN public."Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = v_user_id
-      AND ur."gareId" = p_gare_id
-      AND ur."companyId" = v_company_id
+    FROM public.""UserRoles"" ur
+    JOIN public.""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = v_user_id
+      AND ur.""gareId"" = p_gare_id
+      AND ur.""companyId"" = v_company_id
       AND r.name = 'vendeur_gare'
   ) THEN
     RAISE EXCEPTION 'Ouverture reservee a votre gare assignee';
@@ -2185,7 +2186,7 @@ BEGIN
   END IF;
 
   v_gare_id := p_gare_id;
-  SELECT g.name::text INTO v_gare_name FROM public."Gares" g WHERE g.id = v_gare_id;
+  SELECT g.name::text INTO v_gare_name FROM public.""Gares"" g WHERE g.id = v_gare_id;
 
   INSERT INTO public.caisses_gares (gare_id, gestionnaire_id, solde_especes_actuel, statut, fond_roulement, opened_at)
   VALUES (v_gare_id, v_user_id, v_fond, 'ouverte', v_fond, now())
@@ -2214,8 +2215,8 @@ AS $function$
 DECLARE
   v_colis public.colis_autonomes%ROWTYPE;
   v_loyalty_user_id uuid;
-  v_settings "CompanyLoyaltySettings"%ROWTYPE;
-  v_balance_row "TravelerLoyaltyBalance"%ROWTYPE;
+  v_settings ""CompanyLoyaltySettings""%ROWTYPE;
+  v_balance_row ""TravelerLoyaltyBalance""%ROWTYPE;
   v_points_earned integer := 0;
   v_new_balance integer := 0;
   v_phone_digits text;
@@ -2230,40 +2231,40 @@ BEGIN
   -- compte requis pour envoyer un colis) : on ne crédite que s'il existe
   -- déjà un compte Users avec ce même numéro (correspondance exacte).
   SELECT u.id INTO v_loyalty_user_id
-  FROM "Users" u
+  FROM ""Users"" u
   WHERE public.normalize_phone_digits(u.phone) = v_phone_digits
   LIMIT 1;
 
   IF v_loyalty_user_id IS NULL THEN RETURN; END IF;
 
-  SELECT * INTO v_settings FROM "CompanyLoyaltySettings" WHERE "companyId" = v_colis.company_id;
-  IF v_settings."companyId" IS NULL OR NOT v_settings."isActive" THEN RETURN; END IF;
-  IF v_colis.montant_fret <= 0 OR v_settings."spendUnitAmount" <= 0 THEN RETURN; END IF;
+  SELECT * INTO v_settings FROM ""CompanyLoyaltySettings"" WHERE ""companyId"" = v_colis.company_id;
+  IF v_settings.""companyId"" IS NULL OR NOT v_settings.""isActive"" THEN RETURN; END IF;
+  IF v_colis.montant_fret <= 0 OR v_settings.""spendUnitAmount"" <= 0 THEN RETURN; END IF;
 
-  v_points_earned := FLOOR(v_colis.montant_fret / v_settings."spendUnitAmount")::integer * v_settings."pointsPerSpendUnit";
+  v_points_earned := FLOOR(v_colis.montant_fret / v_settings.""spendUnitAmount"")::integer * v_settings.""pointsPerSpendUnit"";
   IF v_points_earned <= 0 THEN RETURN; END IF;
 
   SELECT * INTO v_balance_row
-  FROM "TravelerLoyaltyBalance"
-  WHERE "userId" = v_loyalty_user_id AND "companyId" = v_colis.company_id
+  FROM ""TravelerLoyaltyBalance""
+  WHERE ""userId"" = v_loyalty_user_id AND ""companyId"" = v_colis.company_id
   FOR UPDATE;
 
-  IF v_balance_row."id" IS NULL THEN
-    INSERT INTO "TravelerLoyaltyBalance" ("userId", "companyId", "pointsBalance", "lifetimeEarned")
+  IF v_balance_row.""id"" IS NULL THEN
+    INSERT INTO ""TravelerLoyaltyBalance"" (""userId"", ""companyId"", ""pointsBalance"", ""lifetimeEarned"")
     VALUES (v_loyalty_user_id, v_colis.company_id, 0, 0)
     RETURNING * INTO v_balance_row;
   END IF;
 
-  v_new_balance := v_balance_row."pointsBalance" + v_points_earned;
-  UPDATE "TravelerLoyaltyBalance"
+  v_new_balance := v_balance_row.""pointsBalance"" + v_points_earned;
+  UPDATE ""TravelerLoyaltyBalance""
   SET
-    "pointsBalance" = v_new_balance,
-    "lifetimeEarned" = "lifetimeEarned" + v_points_earned,
-    "updatedAt" = now()
-  WHERE "id" = v_balance_row."id";
+    ""pointsBalance"" = v_new_balance,
+    ""lifetimeEarned"" = ""lifetimeEarned"" + v_points_earned,
+    ""updatedAt"" = now()
+  WHERE ""id"" = v_balance_row.""id"";
 
-  INSERT INTO "LoyaltyPointLedger" (
-    "userId", "companyId", "colisId", "entryType", "pointsDelta", "balanceAfter", "note"
+  INSERT INTO ""LoyaltyPointLedger"" (
+    ""userId"", ""companyId"", ""colisId"", ""entryType"", ""pointsDelta"", ""balanceAfter"", ""note""
   )
   VALUES (
     v_loyalty_user_id, v_colis.company_id, p_colis_id, 'earn', v_points_earned, v_new_balance,
@@ -2355,12 +2356,12 @@ BEGIN
     RAISE EXCEPTION 'Gare de depart et destination doivent etre differentes';
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM "Gares" g WHERE g.id = p_gare_depart_id AND g."companyId" = p_company_id
+    SELECT 1 FROM ""Gares"" g WHERE g.id = p_gare_depart_id AND g.""companyId"" = p_company_id
   ) THEN
     RAISE EXCEPTION 'Gare de depart invalide';
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM "Gares" g WHERE g.id = p_gare_destination_id AND g."companyId" = p_company_id
+    SELECT 1 FROM ""Gares"" g WHERE g.id = p_gare_destination_id AND g.""companyId"" = p_company_id
   ) THEN
     RAISE EXCEPTION 'Gare de destination invalide';
   END IF;
@@ -2371,7 +2372,7 @@ BEGIN
     RAISE EXCEPTION 'Valeur marchandise obligatoire (sert de base au remboursement en cas de perte)';
   END IF;
   IF p_bus_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM "Bus" b WHERE b.id = p_bus_id AND b."companyId" = p_company_id
+    SELECT 1 FROM ""Bus"" b WHERE b.id = p_bus_id AND b.""companyId"" = p_company_id
   ) THEN
     RAISE EXCEPTION 'Bus invalide';
   END IF;
@@ -2446,9 +2447,9 @@ BEGIN
 
   SELECT c.name, gd.name, gdest.name
   INTO v_company_name, v_gare_depart, v_gare_destination
-  FROM "Companies" c
-  JOIN "Gares" gd ON gd.id = p_gare_depart_id
-  JOIN "Gares" gdest ON gdest.id = p_gare_destination_id
+  FROM ""Companies"" c
+  JOIN ""Gares"" gd ON gd.id = p_gare_depart_id
+  JOIN ""Gares"" gdest ON gdest.id = p_gare_destination_id
   WHERE c.id = p_company_id;
 
   v_sms_message := public.build_colis_sms_message(
@@ -2494,17 +2495,17 @@ AS $function$
 DECLARE
   v_user_id uuid;
 BEGIN
-  SELECT "id" INTO v_user_id FROM "Users" WHERE "auth_user_id" = auth.uid();
+  SELECT ""id"" INTO v_user_id FROM ""Users"" WHERE ""auth_user_id"" = auth.uid();
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Utilisateur introuvable';
   END IF;
 
-  INSERT INTO "DeviceTokens" ("userId", "fcmToken", "platform", "appVersion", "lastSeenAt")
+  INSERT INTO ""DeviceTokens"" (""userId"", ""fcmToken"", ""platform"", ""appVersion"", ""lastSeenAt"")
   VALUES (v_user_id, p_fcm_token, p_platform, p_app_version, now())
-  ON CONFLICT ("fcmToken") DO UPDATE SET
-    "userId" = EXCLUDED."userId",
-    "lastSeenAt" = now(),
-    "appVersion" = EXCLUDED."appVersion";
+  ON CONFLICT (""fcmToken"") DO UPDATE SET
+    ""userId"" = EXCLUDED.""userId"",
+    ""lastSeenAt"" = now(),
+    ""appVersion"" = EXCLUDED.""appVersion"";
 END;
 $function$
 ;
@@ -2602,11 +2603,11 @@ BEGIN
   IF v_user IS NULL THEN RETURN NULL; END IF;
 
   RETURN (
-    SELECT ur."companyId"
-    FROM public."UserRoles" ur
-    JOIN public."Role" r ON r.id = ur."roleId"
-    WHERE ur."userId" = v_user
-      AND ur."companyId" IS NOT NULL
+    SELECT ur.""companyId""
+    FROM public.""UserRoles"" ur
+    JOIN public.""Role"" r ON r.id = ur.""roleId""
+    WHERE ur.""userId"" = v_user
+      AND ur.""companyId"" IS NOT NULL
       AND r.name IN ('owner', 'vendeur', 'vendeur_gare', 'chauffeur')
     ORDER BY
       CASE r.name
@@ -2651,7 +2652,7 @@ CREATE OR REPLACE FUNCTION public.station_cash_gare_company_id(p_gare_id uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  SELECT g."companyId" FROM "Gares" g WHERE g.id = p_gare_id;
+  SELECT g.""companyId"" FROM ""Gares"" g WHERE g.id = p_gare_id;
 $function$
 ;
 
@@ -2725,7 +2726,7 @@ AS $function$
 DECLARE
   v_user_id uuid;
 BEGIN
-  SELECT "id" INTO v_user_id FROM "Users" WHERE "auth_user_id" = auth.uid();
+  SELECT ""id"" INTO v_user_id FROM ""Users"" WHERE ""auth_user_id"" = auth.uid();
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Utilisateur introuvable';
   END IF;
@@ -2734,9 +2735,9 @@ BEGIN
     RAISE EXCEPTION 'Colis introuvable';
   END IF;
 
-  INSERT INTO "ColisTrackingSubscriptions" ("colisId", "userId")
+  INSERT INTO ""ColisTrackingSubscriptions"" (""colisId"", ""userId"")
   VALUES (p_colis_id, v_user_id)
-  ON CONFLICT ("colisId", "userId") DO NOTHING;
+  ON CONFLICT (""colisId"", ""userId"") DO NOTHING;
 END;
 $function$
 ;
@@ -2749,9 +2750,9 @@ CREATE OR REPLACE FUNCTION public.sync_colis_autonome_from_module_d()
  SET search_path TO 'public'
 AS $function$
 BEGIN
-  UPDATE "Companies"
-  SET colis_autonome_enabled = COALESCE(NEW."moduleD", false)
-  WHERE id = NEW."companyId";
+  UPDATE ""Companies""
+  SET colis_autonome_enabled = COALESCE(NEW.""moduleD"", false)
+  WHERE id = NEW.""companyId"";
   RETURN NEW;
 END;
 $function$
@@ -2824,8 +2825,8 @@ CREATE OR REPLACE FUNCTION public.unregister_device_token(p_fcm_token character 
  SET search_path TO 'public'
 AS $function$
 BEGIN
-  DELETE FROM "DeviceTokens" WHERE "fcmToken" = p_fcm_token
-    AND "userId" IN (SELECT "id" FROM "Users" WHERE "auth_user_id" = auth.uid());
+  DELETE FROM ""DeviceTokens"" WHERE ""fcmToken"" = p_fcm_token
+    AND ""userId"" IN (SELECT ""id"" FROM ""Users"" WHERE ""auth_user_id"" = auth.uid());
 END;
 $function$
 ;
@@ -2840,13 +2841,13 @@ AS $function$
 DECLARE
   v_user_id uuid;
 BEGIN
-  SELECT "id" INTO v_user_id FROM "Users" WHERE "auth_user_id" = auth.uid();
+  SELECT ""id"" INTO v_user_id FROM ""Users"" WHERE ""auth_user_id"" = auth.uid();
   IF v_user_id IS NULL THEN
     RETURN;
   END IF;
 
-  DELETE FROM "ColisTrackingSubscriptions"
-  WHERE "colisId" = p_colis_id AND "userId" = v_user_id;
+  DELETE FROM ""ColisTrackingSubscriptions""
+  WHERE ""colisId"" = p_colis_id AND ""userId"" = v_user_id;
 END;
 $function$
 ;
@@ -2876,7 +2877,7 @@ BEGIN
   IF NOT public.is_company_role_user(v_user_id, v_colis.company_id) THEN RAISE EXCEPTION 'Droits insuffisants'; END IF;
   IF p_new_statut NOT IN ('enregistre', 'charge', 'arrive', 'livre') THEN RAISE EXCEPTION 'Statut invalide'; END IF;
   IF p_bus_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM "Bus" b WHERE b.id = p_bus_id AND b."companyId" = v_colis.company_id
+    SELECT 1 FROM ""Bus"" b WHERE b.id = p_bus_id AND b.""companyId"" = v_colis.company_id
   ) THEN
     RAISE EXCEPTION 'Bus invalide';
   END IF;
@@ -2902,9 +2903,9 @@ BEGIN
   WHERE id = p_colis_id;
   SELECT c.name, gd.name, gdest.name
   INTO v_company_name, v_gare_depart, v_gare_destination
-  FROM "Companies" c
-  JOIN "Gares" gd ON gd.id = v_colis.gare_depart_id
-  JOIN "Gares" gdest ON gdest.id = v_colis.gare_destination_id
+  FROM ""Companies"" c
+  JOIN ""Gares"" gd ON gd.id = v_colis.gare_depart_id
+  JOIN ""Gares"" gdest ON gdest.id = v_colis.gare_destination_id
   WHERE c.id = v_colis.company_id;
   v_message := public.build_colis_sms_message(p_new_statut, p_colis_id, v_company_name, v_gare_depart, v_gare_destination);
 
@@ -2952,34 +2953,34 @@ DECLARE
   v_role_name varchar;
 BEGIN
   SELECT r.scope, r.name INTO v_scope, v_role_name
-  FROM public."Role" r WHERE r.id = NEW."roleId";
+  FROM public.""Role"" r WHERE r.id = NEW.""roleId"";
 
   IF v_scope IS NULL THEN
-    RAISE EXCEPTION 'Rôle introuvable : %', NEW."roleId";
+    RAISE EXCEPTION 'Rôle introuvable : %', NEW.""roleId"";
   END IF;
 
-  IF v_scope = 'platform' AND NEW."companyId" IS NOT NULL THEN
-    RAISE EXCEPTION 'Rôle plateforme "%" : companyId doit être NULL', v_role_name;
+  IF v_scope = 'platform' AND NEW.""companyId"" IS NOT NULL THEN
+    RAISE EXCEPTION 'Rôle plateforme ""%"" : companyId doit être NULL', v_role_name;
   END IF;
 
-  IF v_scope = 'company' AND NEW."companyId" IS NULL THEN
-    RAISE EXCEPTION 'Rôle compagnie "%" : companyId est obligatoire', v_role_name;
+  IF v_scope = 'company' AND NEW.""companyId"" IS NULL THEN
+    RAISE EXCEPTION 'Rôle compagnie ""%"" : companyId est obligatoire', v_role_name;
   END IF;
 
-  IF v_role_name = 'admin_pays' AND NEW."countryId" IS NULL THEN
+  IF v_role_name = 'admin_pays' AND NEW.""countryId"" IS NULL THEN
     RAISE EXCEPTION 'admin_pays requiert un countryId';
   END IF;
 
-  IF v_scope = 'platform' AND v_role_name <> 'admin_pays' AND NEW."countryId" IS NOT NULL THEN
-    RAISE EXCEPTION 'Rôle "%" : countryId doit être NULL', v_role_name;
+  IF v_scope = 'platform' AND v_role_name <> 'admin_pays' AND NEW.""countryId"" IS NOT NULL THEN
+    RAISE EXCEPTION 'Rôle ""%"" : countryId doit être NULL', v_role_name;
   END IF;
 
-  IF public._is_gare_scoped_role(v_role_name) AND NEW."gareId" IS NULL THEN
-    RAISE EXCEPTION 'Rôle gare "%" : gareId est obligatoire', v_role_name;
+  IF public._is_gare_scoped_role(v_role_name) AND NEW.""gareId"" IS NULL THEN
+    RAISE EXCEPTION 'Rôle gare ""%"" : gareId est obligatoire', v_role_name;
   END IF;
 
-  IF NEW."gareId" IS NOT NULL AND NOT public._is_gare_scoped_role(v_role_name) THEN
-    RAISE EXCEPTION 'Seuls les rôles gare peuvent avoir un gareId (rôle "%")', v_role_name;
+  IF NEW.""gareId"" IS NOT NULL AND NOT public._is_gare_scoped_role(v_role_name) THEN
+    RAISE EXCEPTION 'Seuls les rôles gare peuvent avoir un gareId (rôle ""%"")', v_role_name;
   END IF;
 
   RETURN NEW;
@@ -2989,34 +2990,34 @@ $function$
 
 -- ============================= TRIGGERS =============================
 
--- ==== TRIGGER colis_autonomes_module_guard ON "colis_autonomes" ====
-DROP TRIGGER IF EXISTS colis_autonomes_module_guard ON "colis_autonomes";
+-- ==== TRIGGER colis_autonomes_module_guard ON ""colis_autonomes"" ====
+DROP TRIGGER IF EXISTS colis_autonomes_module_guard ON ""colis_autonomes"";
 CREATE TRIGGER colis_autonomes_module_guard BEFORE INSERT ON public.colis_autonomes FOR EACH ROW EXECUTE FUNCTION trg_colis_autonomes_module_guard();
 
--- ==== TRIGGER colis_numero_recu_trg ON "colis_autonomes" ====
-DROP TRIGGER IF EXISTS colis_numero_recu_trg ON "colis_autonomes";
+-- ==== TRIGGER colis_numero_recu_trg ON ""colis_autonomes"" ====
+DROP TRIGGER IF EXISTS colis_numero_recu_trg ON ""colis_autonomes"";
 CREATE TRIGGER colis_numero_recu_trg BEFORE INSERT ON public.colis_autonomes FOR EACH ROW EXECUTE FUNCTION assign_colis_numero_recu();
 
--- ==== TRIGGER companies_seed_colis_natures ON "Companies" ====
-DROP TRIGGER IF EXISTS companies_seed_colis_natures ON "Companies";
-CREATE TRIGGER companies_seed_colis_natures AFTER INSERT ON public."Companies" FOR EACH ROW EXECUTE FUNCTION tg_seed_company_colis_natures();
+-- ==== TRIGGER companies_seed_colis_natures ON ""Companies"" ====
+DROP TRIGGER IF EXISTS companies_seed_colis_natures ON ""Companies"";
+CREATE TRIGGER companies_seed_colis_natures AFTER INSERT ON public.""Companies"" FOR EACH ROW EXECUTE FUNCTION tg_seed_company_colis_natures();
 
--- ==== TRIGGER companies_seed_expense_categories ON "Companies" ====
-DROP TRIGGER IF EXISTS companies_seed_expense_categories ON "Companies";
-CREATE TRIGGER companies_seed_expense_categories AFTER INSERT ON public."Companies" FOR EACH ROW EXECUTE FUNCTION tg_seed_company_expense_categories();
+-- ==== TRIGGER companies_seed_expense_categories ON ""Companies"" ====
+DROP TRIGGER IF EXISTS companies_seed_expense_categories ON ""Companies"";
+CREATE TRIGGER companies_seed_expense_categories AFTER INSERT ON public.""Companies"" FOR EACH ROW EXECUTE FUNCTION tg_seed_company_expense_categories();
 
--- ==== TRIGGER gares_validate_city_country ON "Gares" ====
-DROP TRIGGER IF EXISTS gares_validate_city_country ON "Gares";
-CREATE TRIGGER gares_validate_city_country BEFORE INSERT OR UPDATE OF "cityId", "companyId" ON public."Gares" FOR EACH ROW EXECUTE FUNCTION tg_validate_gare_city_in_company_country();
+-- ==== TRIGGER gares_validate_city_country ON ""Gares"" ====
+DROP TRIGGER IF EXISTS gares_validate_city_country ON ""Gares"";
+CREATE TRIGGER gares_validate_city_country BEFORE INSERT OR UPDATE OF ""cityId"", ""companyId"" ON public.""Gares"" FOR EACH ROW EXECUTE FUNCTION tg_validate_gare_city_in_company_country();
 
--- ==== TRIGGER trg_single_admin_pays_per_country ON "UserRoles" ====
-DROP TRIGGER IF EXISTS trg_single_admin_pays_per_country ON "UserRoles";
-CREATE TRIGGER trg_single_admin_pays_per_country BEFORE INSERT OR UPDATE OF "roleId", "countryId", "userId" ON public."UserRoles" FOR EACH ROW EXECUTE FUNCTION enforce_single_admin_pays_per_country();
+-- ==== TRIGGER trg_single_admin_pays_per_country ON ""UserRoles"" ====
+DROP TRIGGER IF EXISTS trg_single_admin_pays_per_country ON ""UserRoles"";
+CREATE TRIGGER trg_single_admin_pays_per_country BEFORE INSERT OR UPDATE OF ""roleId"", ""countryId"", ""userId"" ON public.""UserRoles"" FOR EACH ROW EXECUTE FUNCTION enforce_single_admin_pays_per_country();
 
--- ==== TRIGGER trg_sync_colis_module_d ON "CompanyFeatureModules" ====
-DROP TRIGGER IF EXISTS trg_sync_colis_module_d ON "CompanyFeatureModules";
-CREATE TRIGGER trg_sync_colis_module_d AFTER INSERT OR UPDATE OF "moduleD" ON public."CompanyFeatureModules" FOR EACH ROW EXECUTE FUNCTION sync_colis_autonome_from_module_d();
+-- ==== TRIGGER trg_sync_colis_module_d ON ""CompanyFeatureModules"" ====
+DROP TRIGGER IF EXISTS trg_sync_colis_module_d ON ""CompanyFeatureModules"";
+CREATE TRIGGER trg_sync_colis_module_d AFTER INSERT OR UPDATE OF ""moduleD"" ON public.""CompanyFeatureModules"" FOR EACH ROW EXECUTE FUNCTION sync_colis_autonome_from_module_d();
 
--- ==== TRIGGER user_roles_assignment_check ON "UserRoles" ====
-DROP TRIGGER IF EXISTS user_roles_assignment_check ON "UserRoles";
-CREATE TRIGGER user_roles_assignment_check BEFORE INSERT OR UPDATE ON public."UserRoles" FOR EACH ROW EXECUTE FUNCTION validate_user_role_assignment();
+-- ==== TRIGGER user_roles_assignment_check ON ""UserRoles"" ====
+DROP TRIGGER IF EXISTS user_roles_assignment_check ON ""UserRoles"";
+CREATE TRIGGER user_roles_assignment_check BEFORE INSERT OR UPDATE ON public.""UserRoles"" FOR EACH ROW EXECUTE FUNCTION validate_user_role_assignment();"

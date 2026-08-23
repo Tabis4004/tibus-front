@@ -1,0 +1,12 @@
+id,companyId,name,ohadaAccountCode,ohadaAccountLabel,sortOrder,isPreset,createdAt,updatedAt
+7ae8810b-bb35-44df-bfe8-21738a7f6f72,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Carburant,6047,Achats de carburants et lubrifiants,10,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+e7311e77-a8d4-4fc6-bb3c-d51b23986522,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Réparations,6156,"Entretien, réparations et maintenance",20,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+d870fdf4-d89b-404c-994e-5d23c4aafd6f,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Pièces détachées,6042,Achats de pièces et fournitures consommables,30,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+55c6ab9c-0817-4f5c-938a-67ec73f58383,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Salaires équipe,6412,"Salaires, appointements et commissions du personnel",40,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+b8c1ea44-3498-44b7-9297-36644e133947,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Électricité,6052,Eau et électricité,50,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+f61ac8e6-fd68-4c45-9d8b-0c97d6ad8d1d,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Communication,6241,Frais de téléphone et communication,60,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+ff7e4b2d-3a77-4753-894d-314fc016573e,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Internet,6248,Frais d'Internet,70,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+cabab57e-d594-453d-8c25-7fa70a429962,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Achat de matériel de bureau,6045,Achats de matériel et fournitures de bureau,80,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+df5d7f93-c59a-4ddf-bae0-6273391c5400,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Marketing,6228,"Publicité, publications et relations publiques",90,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+e9d1d3d1-e4e4-43e0-aa82-080d7f2e1ffa,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Abonnement TV,6288,"Abonnements et services (TV, médias)",100,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
+28de0fa3-5d33-49c4-bd0a-98955962e378,1422ab71-4a45-45af-8e7c-4c72a2f9b296,Transports interne,6135,Transports internes et déplacements exploitation,110,t,2026-07-10 23:34:04.522665+00,2026-07-10 23:34:04.522665+00
