@@ -15,11 +15,25 @@ class ColisService {
   // Limite relevée (100 -> 2000, plafond serveur 5000 — migration 193) :
   // l'écran "Liste des colis" ne doit plus tronquer silencieusement les
   // colis les plus anciens d'une compagnie active (rapport terrain).
-  Future<List<Colis>> listColis({required String companyId, ColisStatut? statut, int limit = 2000}) async {
+  //
+  // p_search (migration 194) : recherche côté serveur sur TOUTE la table
+  // (numero_recu, expéditeur, destinataire, référence CL-XXXXXXXX,
+  // téléphones) — ne se limite pas aux `limit` colis les plus récents.
+  // Corrige le cas où un colis plus ancien (ex. "COCO000187") restait
+  // invisible dans la recherche de "Liste des colis" alors qu'il était
+  // trouvable via "Scanner un colis" (rapport terrain).
+  Future<List<Colis>> listColis({
+    required String companyId,
+    ColisStatut? statut,
+    int limit = 2000,
+    String? search,
+  }) async {
+    final trimmedSearch = search?.trim();
     final data = await _client.rpc('list_colis_autonomes', params: {
       'p_company_id': companyId,
       'p_statut': statut?.dbValue,
       'p_limit': limit,
+      'p_search': (trimmedSearch == null || trimmedSearch.isEmpty) ? null : trimmedSearch,
     });
     return (data as List)
         .whereType<Map<String, dynamic>>()

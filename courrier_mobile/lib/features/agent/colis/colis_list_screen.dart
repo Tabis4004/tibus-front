@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
@@ -108,11 +109,55 @@ class _ListBody extends ConsumerStatefulWidget {
 
 class _ListBodyState extends ConsumerState<_ListBody> {
   late Future<List<Colis>> _colisFuture;
+  // Recherche serveur (migration 194) : un colis hors de la fenêtre des
+  // `limit` plus récents doit rester trouvable, comme il l'est déjà via
+  // "Scanner un colis" — voir colis_service.dart. Fusionné avec `items`
+  // dans le FutureBuilder ci-dessous.
+  Timer? _searchDebounce;
+  List<Colis> _serverSearchResults = [];
+  String _lastSearchedQuery = '';
 
   @override
   void initState() {
     super.initState();
     _colisFuture = _fetch();
+    widget.search.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.search.removeListener(_onSearchChanged);
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = widget.search.text.trim();
+    _searchDebounce?.cancel();
+    if (query.length < 3) {
+      if (_serverSearchResults.isNotEmpty) {
+        setState(() {
+          _serverSearchResults = [];
+          _lastSearchedQuery = '';
+        });
+      }
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final found = await ref.read(colisServiceProvider).listColis(
+              companyId: widget.companyId,
+              search: query,
+            );
+        if (!mounted || widget.search.text.trim() != query) return;
+        setState(() {
+          _serverSearchResults = found;
+          _lastSearchedQuery = query;
+        });
+      } catch (_) {
+        // recherche indisponible : le filtrage reste sur les colis déjà chargés
+      }
+    });
   }
 
   @override
@@ -232,6 +277,15 @@ class _ListBodyState extends ConsumerState<_ListBody> {
                 var items = snapshot.data!;
                 final query = widget.search.text.trim().toLowerCase();
                 if (query.isNotEmpty) {
+                  // Fusion avec les résultats de la recherche serveur
+                  // (colis potentiellement hors des `limit` plus récents).
+                  if (_serverSearchResults.isNotEmpty && _lastSearchedQuery.toLowerCase() == query) {
+                    final byId = {for (final c in items) c.id: c};
+                    for (final c in _serverSearchResults) {
+                      byId[c.id] = c;
+                    }
+                    items = byId.values.toList();
+                  }
                   // Recherche sur numéro de reçu (GESC000048), référence
                   // CL-XXXXXXXX/id, noms et téléphones expéditeur/destinataire.
                   items = items.where((c) {
