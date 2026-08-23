@@ -21,8 +21,10 @@ fi
 
 OUT="../pour_technicien/sis_schema_tables.sql"
 
-# Périmètre établi par l'audit du 2026-08-09 (voir
-# 01_generate_functions_and_triggers.sql pour le détail du raisonnement).
+# Périmètre établi par l'audit du 2026-08-09, complété le 2026-08-23
+# ("Cities" ajoutée -- référencée par list_company_villes_depart, appelée
+# par colis_service.dart, absente de l'audit initial) -- voir
+# 01_generate_functions_and_triggers.sql pour le détail du raisonnement.
 # --schema-only : structure (colonnes, contraintes, index, séquences,
 # policies RLS) sans les données -- les données sont exportées séparément
 # et filtrées sur la compagnie SIS (voir 03_export_sis_data.sh).
@@ -31,6 +33,7 @@ pg_dump "$TIBUS1_DB_URL" \
   --no-owner --no-privileges \
   -n public \
   -t '"Countries"' \
+  -t '"Cities"' \
   -t '"Companies"' \
   -t '"CompanyFeatureModules"' \
   -t '"CompanyExpenseCategory"' \

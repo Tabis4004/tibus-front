@@ -30,6 +30,7 @@ copy() {
 
 # Tables de référence globales, exportées EN ENTIER (pas propres à SIS) :
 copy "Countries.csv"            'SELECT * FROM "Countries"'
+copy "Cities.csv"               'SELECT * FROM "Cities"'
 copy "Role.csv"                 'SELECT * FROM "Role"'
 copy "ContactSettings.csv"      'SELECT * FROM "ContactSettings"'
 

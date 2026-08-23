@@ -19,7 +19,12 @@
 -- .from(...) appelés par courrier_mobile (lib/data/services/*.dart) avec
 -- la fermeture de leurs dépendances internes (fonctions -> fonctions
 -- qu'elles appellent -> tables qu'elles touchent), tracée directement sur
--- Tibus 1.0 le 2026-08-09. Exclut volontairement : codes promo, parrainage,
+-- Tibus 1.0 le 2026-08-09, RE-VÉRIFIÉE le 2026-08-23 (re-grep de tous les
+-- .rpc()/.from() du code actuel contre cette liste : un seul écart trouvé,
+-- list_company_villes_depart, ajoutée ci-dessous -- elle référence aussi
+-- la table "Cities", absente jusqu'ici, ajoutée à 02_table_schema_pg_dump.sh
+-- et 03_export_sis_data.sh, cf. commentaire dédié plus bas). Exclut
+-- volontairement : codes promo, parrainage,
 -- fidélité voyageur (claim_referral_signup, list_owner_promo_codes,
 -- get_traveler_loyalty_context, validate_loyalty_redemption) — features
 -- "propriétaire" transverses avec la billetterie bus, jamais demandées par
@@ -43,6 +48,7 @@ with fn(name) as (
     ('resolve_colis_retrait_code'),('deliver_colis_autonome'),('set_colis_autonome_photo'),
     ('get_company_colis_settings'),('get_colis_autonome_stats'),('get_colis_today_by_gare'),
     ('list_company_colis_vendeurs'),('get_colis_sales_journal'),('list_company_gares_for_stats'),
+    ('list_company_villes_depart'),
     ('get_open_station_cash_for_user'),('open_station_cash_register'),('list_station_cash_movements'),
     ('submit_station_cash_reversal'),('close_station_cash_register'),('subscribe_to_colis_tracking'),
     ('unsubscribe_from_colis_tracking'),('get_contact_options'),('list_bordereaux_livraison'),

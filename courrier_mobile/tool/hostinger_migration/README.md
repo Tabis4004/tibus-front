@@ -51,9 +51,11 @@ veux.
 
 ## Périmètre
 
-18 tables, 85 fonctions, 8 triggers — voir l'en-tête de
+19 tables, 86 fonctions, 8 triggers — voir l'en-tête de
 `pour_moi/01_generate_functions_and_triggers.sql` pour le détail et le
-raisonnement (dépendances tracées directement sur la base le 2026-08-09).
+raisonnement (dépendances tracées directement sur la base le 2026-08-09,
+re-vérifiées le 2026-08-23 : `list_company_villes_depart` + table
+`Cities` manquaient, ajoutées).
 Explicitement exclus, à la demande du client : codes promo, parrainage,
 fidélité voyageur — SIS est un logiciel métier interne, sans volet client
 pour les réservations.

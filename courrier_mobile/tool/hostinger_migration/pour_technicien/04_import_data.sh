@@ -46,6 +46,7 @@ psql "$HOSTINGER_DB_URL" -c "SET session_replication_role = replica;" >/dev/null
 # vérifiées pendant le chargement, mais un ordre logique reste plus lisible
 # en cas d'erreur à corriger manuellement.
 load '"Countries"'                     "Countries.csv"
+load '"Cities"'                        "Cities.csv"
 load '"Role"'                          "Role.csv"
 load '"ContactSettings"'               "ContactSettings.csv"
 load '"Companies"'                     "Companies.csv"
