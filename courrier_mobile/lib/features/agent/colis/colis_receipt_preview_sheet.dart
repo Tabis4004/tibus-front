@@ -396,14 +396,16 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  // Destination en toutes lettres sous le nom de la
-                  // compagnie — remplace l'ancien "Tél dest: <numéro>"
-                  // (demande explicite du 20/08/2026). Le téléphone du SIÈGE
+                  // Numéro de la gare de destination en en-tête (demande
+                  // explicite du 26/08/2026, qui annule celle du 20/08/2026
+                  // ci-dessous). Repli sur le nom de la gare si son
+                  // téléphone n'est pas renseigné. Le téléphone du SIÈGE
                   // (compagnie) est lui déplacé en PIED de page (voir plus
                   // bas, après "Retrait sous 72h"). Le téléphone de la gare
                   // de DÉPART reste affiché dans le bloc EXPÉDITEUR (voir
                   // _Field 'Tél. agence' plus bas).
-                  Text('Tel Destination: ${colis.gareDestination}',
+                  Text(
+                      'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
@@ -582,25 +584,28 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            // Même en-tête que le reçu (voir _ReceiptBox) : destination en
-            // toutes lettres au lieu du téléphone de la gare de destination
-            // (demande explicite du 20/08/2026), puis sous-titre explicite.
-            // Pas de "Tél siège" ici — ce talon n'a pas de pied de page où
-            // le reçu le déplace désormais. Le téléphone de la gare de
-            // départ est lui affiché plus bas, dans le bloc expédition.
-            Text('Tel Destination: ${colis.gareDestination}',
+            // Numéro de la gare de destination en en-tête (demande explicite
+            // du 26/08/2026, qui annule celle du 20/08/2026 ci-dessous),
+            // puis sous-titre explicite. Pas de "Tél siège" ici — ce talon
+            // n'a pas de pied de page où le reçu le déplace désormais. Le
+            // téléphone de la gare de départ est lui affiché plus bas, dans
+            // le bloc expédition.
+            Text(
+                'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
                 style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
             const Text('Reçu expédition colis', style: TextStyle(fontSize: 9)),
             if (colis.isPendingSync)
               const Text('*** PROVISOIRE ***',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
             const SizedBox(height: 6),
-            // Cadre du numéro (flex 3) + QR COMPACT (flex 1, taille fixe
-            // 44px) — demande explicite : un gros QR n'est pas le format
-            // voulu, l'étiquette de référence a un petit QR à côté du
-            // numéro. Reste en haut du talon, exactement comme sur cet
-            // aperçu (voir printer_service.dart / esc_pos_printer_service.dart
-            // / P3PrinterModule.kt / colis_receipt_pdf.dart pour le même
+            // Cadre du numéro (flex 3) + QR COMPACT (flex 1) — réduit une
+            // seconde fois (44 -> 32px, demande explicite du 26/08/2026)
+            // pour laisser plus de place visuelle au numéro du destinataire
+            // ci-dessous, l'info que l'agent de la gare d'arrivée doit
+            // pouvoir composer d'un coup d'œil. Reste en haut du talon,
+            // exactement comme sur cet aperçu (voir
+            // printer_service.dart / esc_pos_printer_service.dart /
+            // P3PrinterModule.kt / colis_receipt_pdf.dart pour le même
             // agencement compact à l'impression réelle).
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -614,23 +619,32 @@ class _TalonBox extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                QrImageView(data: colis.id, size: 44),
+                QrImageView(data: colis.id, size: 32),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Nom de ville réduit (15 -> 12, demande explicite du
+                // 26/08/2026) : c'était l'élément le plus imposant du talon,
+                // au détriment du numéro du destinataire ci-dessous.
                 Expanded(
                   child: Text(colis.gareDestination.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
                 Text('${colis.montantFret.toStringAsFixed(0)} FCFA', style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 6),
             Text(colis.nomDestinataire, style: const TextStyle(fontWeight: FontWeight.w600)),
-            Text(colis.telephoneDestinataire),
+            // Téléphone du destinataire agrandi et mis en gras (demande
+            // explicite du 26/08/2026) : c'est le numéro que la gare de
+            // destination doit appeler pour prévenir le client à l'arrivée
+            // du colis — il doit être le plus visible possible sur le
+            // talon collé au colis.
+            Text(colis.telephoneDestinataire,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 6),
             Text('Expéditeur : ${colis.nomExpediteur}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
             Text(colis.telephoneExpediteur, style: const TextStyle(fontSize: 10, color: Colors.black54)),

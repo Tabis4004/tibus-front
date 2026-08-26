@@ -109,14 +109,20 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
-    // Destination affichée en toutes lettres sous le nom de la compagnie —
-    // remplace l'ancien "Tél dest: <numéro>" (peu lisible/utile en en-tête,
-    // demande explicite du 20/08/2026). Le téléphone du SIÈGE (compagnie)
-    // est lui déplacé en PIED de page (voir plus bas, après "Retrait sous
-    // 72h"), avec une formule d'appel explicite plutôt qu'un numéro nu en
-    // en-tête. Le téléphone de la gare de DÉPART reste dans le bloc
+    // Numéro de la gare de destination en en-tête (demande explicite du
+    // 26/08/2026, qui annule celle du 20/08/2026 ci-dessous) : la gare
+    // d'arrivée doit pouvoir composer ce numéro directement à la lecture du
+    // reçu. Repli sur le nom de la gare si son téléphone n'est pas
+    // renseigné (gareDestinationPhone vide). Le téléphone du SIÈGE
+    // (compagnie) reste en PIED de page (voir plus bas, après "Retrait sous
+    // 72h"). Le téléphone de la gare de DÉPART reste dans le bloc
     // EXPÉDITEUR (voir "Tél. agence" ci-dessous, à côté du champ Agence).
-    {'text': 'Tel Destination: ${colis.gareDestination}', 'align': 'center', 'bold': true, 'size': 'small'},
+    {
+      'text': 'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
+      'align': 'center',
+      'bold': true,
+      'size': 'small',
+    },
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     // Colis enregistré hors connexion, pas encore confirmé par le serveur
     // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
@@ -171,12 +177,15 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
 
 /// Taille du QR du TALON, exprimée en px (contrat des ponts WisePrinter /
 /// Web Serial ; EscPosLinesEncoder la convertit en taille de module ESC/POS,
-/// ici 96/40 → module 3, le plus petit encore scannable de façon fiable).
+/// ici 64/40 → module 2, le plus petit encore scannable de façon fiable).
 /// Volontairement compact : sur le modèle papier de référence le QR est une
 /// vignette à côté du numéro, pas un pavé qui occupe le tiers du talon.
-/// Valeur précédente : 140 (→ module 4), responsable d'environ 4 mm de
-/// longueur papier en trop.
-const int colisTalonQrSize = 96;
+/// Réduit une seconde fois (96 -> 64, demande explicite du 26/08/2026) pour
+/// laisser plus de place visuelle au numéro du destinataire, qui doit être
+/// l'élément le plus visible du talon (voir colisTalonDestinataireLines) :
+/// c'est ce numéro que l'agent de la gare de destination doit pouvoir
+/// composer d'un coup d'œil pour prévenir le destinataire.
+const int colisTalonQrSize = 64;
 
 /// Avance papier en fin de TALON, avant la coupe. Réduite de 3 à 1 ligne :
 /// deux lignes vides de moins, soit ~7 mm de papier économisés par talon,
@@ -199,14 +208,18 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
     {'text': company, 'align': 'center', 'bold': true},
-    // Même en-tête que le reçu (voir colisReceiptLines) : destination en
-    // toutes lettres au lieu du téléphone de la gare de destination (demande
-    // explicite du 20/08/2026). Pas de "Tél siège" ici — le talon (étiquette
-    // à coller sur le colis) n'a pas de pied de page "Retrait sous 72h" où
-    // le reçu le déplace désormais ; le téléphone de la gare de DÉPART reste
-    // dans le bloc expédition, plus bas (voir "Agence"/"Tél. agence" dans
-    // colisTalonBodyLines).
-    {'text': 'Tel Destination: ${colis.gareDestination}', 'align': 'center', 'bold': true, 'size': 'small'},
+    // Numéro de la gare de destination en en-tête (demande explicite du
+    // 26/08/2026, qui annule celle du 20/08/2026 ci-dessus) : c'est ce
+    // numéro que la gare d'arrivée doit pouvoir composer directement en
+    // recevant le colis, avant même d'ouvrir le talon. Repli sur le nom de
+    // la gare si son téléphone n'est pas renseigné (gareDestinationPhone
+    // vide) pour ne jamais afficher une ligne "Tel Destination:" vide.
+    {
+      'text': 'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
+      'align': 'center',
+      'bold': true,
+      'size': 'small',
+    },
     {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.isPendingSync)
       {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},
@@ -222,10 +235,18 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
 /// esc_pos_printer_service.dart) sans toucher à l'ordre des autres ponts
 /// (P3 natif, WisePrinter) qui utilisent colisTalonBodyLines tel quel.
 List<Map<String, dynamic>> colisTalonDestinataireLines(Colis colis) => [
-      {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true, 'size': 'large'},
+      // Nom de ville réduit (large -> défaut, demande explicite du
+      // 26/08/2026) : c'était l'élément le plus imposant du talon, au
+      // détriment du numéro du destinataire ci-dessous, qui est
+      // l'information réellement utile à l'agent de la gare d'arrivée.
+      {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true},
       {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true},
       {'text': colis.nomDestinataire, 'bold': true},
-      {'text': colis.telephoneDestinataire},
+      // Téléphone du destinataire agrandi et mis en gras (demande explicite
+      // du 26/08/2026) : c'est le numéro que la gare de destination doit
+      // appeler pour prévenir le client à l'arrivée du colis — il doit être
+      // le plus visible possible sur le talon collé au colis.
+      {'text': colis.telephoneDestinataire, 'bold': true, 'size': 'large'},
     ];
 
 /// Expéditeur + agence de départ — voir colisTalonDestinataireLines.
