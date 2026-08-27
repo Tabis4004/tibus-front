@@ -253,13 +253,26 @@ class P3PrinterModule(private val ctx: Context) {
         if (t.extraFields.isNotEmpty()) {
             val sectionMarkers = setOf("EXPÉDITEUR", "BÉNÉFICIAIRE", "CONTENU")
             separator(p, paperWidth)
+            // Suivi de la section courante pour repérer le champ "Téléphone"
+            // du bloc BÉNÉFICIAIRE (destinataire) : après normalizeStructuredRow
+            // le libellé est identique ("Téléphone") pour l'expéditeur et le
+            // destinataire, seule la position (juste après le marqueur
+            // BÉNÉFICIAIRE) permet de distinguer les deux lignes.
+            var currentSection = ""
             t.extraFields.forEach { (label, value) ->
                 if (label.uppercase(Locale.US) in sectionMarkers) {
-                    printWrappedLine(p, label.uppercase(Locale.US), PrintOptions(bold = true), paperWidth)
+                    currentSection = label.uppercase(Locale.US)
+                    printWrappedLine(p, currentSection, PrintOptions(bold = true), paperWidth)
                     printWrappedLine(p, "-".repeat(paperWidth.coerceIn(24, 56)), PrintOptions(), paperWidth)
                     printWrappedLine(p, value, PrintOptions(bold = true), paperWidth)
                 } else {
-                    printField(p, label, value, paperWidth)
+                    // Téléphone du destinataire en plus gros (+2 pts, "medium"
+                    // = 26 pts vs 24 pts en "normal" — même échelle que la
+                    // référence encadrée, voir printBoxedLine) : demande
+                    // explicite du 27/08/2026, impression TPE P3 uniquement.
+                    val isDestinataireTelephone = currentSection == "BÉNÉFICIAIRE" &&
+                        normalizeFieldKey(label) == "telephone"
+                    printField(p, label, value, paperWidth, size = if (isDestinataireTelephone) "medium" else "normal")
                 }
             }
             separator(p, paperWidth)
@@ -1198,19 +1211,22 @@ class P3PrinterModule(private val ctx: Context) {
         checkCode("printFinish", p.printFinish())
     }
 
-    private fun printField(p: Printer, label: String, value: String, width: Int) {
+    private fun printField(p: Printer, label: String, value: String, width: Int, size: String = "normal") {
         val cleanLabel = label.trim().trimEnd(':')
         val cleanValue = value.replace(Regex("\\s+"), " ").trim().trim(':', '-', '|')
         if (cleanLabel.isBlank() || cleanValue.isBlank()) return
         // Valeurs en GRAS (demande explicite : « Téléphone: *5555555* ») —
         // l'imprimante ne gère qu'un style par ligne, donc la ligne complète
         // label+valeur est imprimée en gras, comme l'aperçu à l'écran.
+        // `size` permet d'agrandir ponctuellement un champ précis (ex.
+        // téléphone du destinataire, voir l'appel dans renderUnified)
+        // sans affecter les autres lignes label/valeur.
         val oneLine = "$cleanLabel: $cleanValue"
         if (oneLine.length <= width) {
-            printWrappedLine(p, oneLine, PrintOptions(bold = true), width)
+            printWrappedLine(p, oneLine, PrintOptions(bold = true, size = size), width)
         } else {
-            printWrappedLine(p, "$cleanLabel:", PrintOptions(bold = true), width)
-            printWrappedLine(p, cleanValue, PrintOptions(bold = true), width)
+            printWrappedLine(p, "$cleanLabel:", PrintOptions(bold = true, size = size), width)
+            printWrappedLine(p, cleanValue, PrintOptions(bold = true, size = size), width)
         }
     }
 

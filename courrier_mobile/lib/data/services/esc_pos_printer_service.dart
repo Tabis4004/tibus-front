@@ -221,12 +221,18 @@ class EscPosPrinterService {
         continue;
       }
       final size = line['size'] as String?;
+      // "medium" (ex. téléphone du destinataire, colisReceiptLines) : hauteur
+      // doublée SEULE, largeur normale — pas d'équivalent exact "+2 pts" sur
+      // ce type d'imprimante (seuls des multiplicateurs entiers de
+      // largeur/hauteur existent), donc on prend le réglage le plus proche
+      // d'un léger agrandissement sans doubler aussi la largeur comme le
+      // fait "large" (demande explicite du 27/08/2026).
       bytes.addAll(generator.text(
         text,
         styles: PosStyles(
           align: _align(line['align'] as String?),
           bold: line['bold'] == true,
-          height: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
+          height: (size == 'large' || size == 'medium') ? PosTextSize.size2 : PosTextSize.size1,
           width: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
           // Sans codeTable explicite, esc_pos_utils_plus laisse la table de
           // caractères active sur son réglage d'usine (CP437 par défaut,

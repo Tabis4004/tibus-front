@@ -1,166 +1,302 @@
-import 'dart:convert';
-import 'dart:typed_data';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/bordereau_receipt_lines.dart';
+import '../../core/utils/colis_receipt_lines.dart';
+import '../../core/utils/colis_sales_journal_lines.dart';
+import '../models/colis.dart';
+import 'bordereau_service.dart';
 
-/// Convertit le même format `lines` que celui utilisé pour le pont
-/// WisePrinter (`{header, lines: [{text, align, bold, size}], qr, qrSize,
-/// feedLines, cut}` — voir PosBridge.printViaWisePrinter) en une séquence
-/// d'octets ESC/POS bruts, pour impression directe via l'API Web Serial
-/// (port USB), sans dépendre d'un wrapper natif ni de QZ Tray.
+/// Impression via un vrai pont ESC/POS (USB ou Bluetooth), pour les
+/// imprimantes physiques du guichet non couvertes par les deux autres ponts
+/// de PrinterService : ni imprimante P3/Wiseasy intégrée (Android natif),
+/// ni pont desktop WisePrinter/Xprinter (window.WisePrinter, web uniquement).
 ///
-/// Commandes couvertes : init, alignement, gras, taille de police, saut de
-/// ligne, QR code (GS ( k — norme ESC/POS standard, largement documentée,
-/// compatible avec la plupart des imprimantes thermiques type Xprinter),
-/// avance papier, coupe.
+/// Couvre notamment :
+/// - Xprinter XP-Q200 (reçu 80mm, interface USB) ;
+/// - Mini Printer MPT-II (48mm, Bluetooth classique/SPP) ;
+/// - YHD-8390 (reçu 80mm, USB + LAN + Bluetooth + WiFi) — TPE ESC/POS
+///   générique : pas de SDK propriétaire, il parle ESC/POS standard sur
+///   toutes ses interfaces. En LAN/WiFi il écoute en TCP brut ("RAW/JetDirect",
+///   port 9100) : voir connectNetwork() ci-dessous.
 ///
-/// ⚠️ À valider sur le matériel réel : le paramétrage QR (densité, taille de
-/// module) peut nécessiter un ajustement selon le modèle exact de Xprinter.
-class EscPosLinesEncoder {
-  static const int _esc = 0x1B;
-  static const int _gs = 0x1D;
+/// Bibliothèques : flutter_pos_printer_platform_image_3 (fork maintenu de
+/// flutter_pos_printer_platform, discontinued) gère la découverte/connexion
+/// USB + Bluetooth + réseau sur Android/iOS/Windows ; esc_pos_utils_plus
+/// génère les octets ESC/POS (texte, styles, QR natif) à partir des mêmes
+/// lignes que le pont WisePrinter (colisReceiptLines()).
+class EscPosPrinterService {
+  final PrinterManager _manager = PrinterManager.instance;
 
-  /// [qrAfterLine] : index (exclusif) dans [lines] après lequel insérer le QR
-  /// au lieu de le rejeter en fin de ticket. Sert au TALON, où le QR doit
-  /// être EN HAUT, juste sous la référence encadrée — même agencement que le
-  /// pont ESC/POS USB/Bluetooth (EscPosPrinterService.printColisTalon) et que
-  /// l'aperçu écran (_TalonBox). `null` = comportement historique (QR en fin
-  /// de ticket), conservé pour le reçu client et les bordereaux.
-  static Uint8List encode({
-    required String header,
-    required List<Map<String, dynamic>> lines,
-    String qr = '',
-    int qrSize = 220,
-    int feedLines = 4,
-    bool cut = true,
-    int? qrAfterLine,
-  }) {
-    final bytes = BytesBuilder();
+  /// Recherche des imprimantes USB déjà branchées (Android/Windows).
+  Stream<PrinterDevice> discoverUsb() =>
+      _manager.discovery(type: PrinterType.usb);
 
-    // Initialisation imprimante (ESC @)
-    bytes.addByte(_esc);
-    bytes.addByte(0x40);
+  /// Recherche des imprimantes Bluetooth appairées/à proximité (Android —
+  /// classique par défaut ; BLE si [isBle], ex. certains modèles récents).
+  Stream<PrinterDevice> discoverBluetooth({bool isBle = false}) =>
+      _manager.discovery(type: PrinterType.bluetooth, isBle: isBle);
 
-    if (header.isNotEmpty) {
-      _writeAligned(bytes, header, align: 'center', bold: true, size: 'large');
-      _feed(bytes, 1);
-    }
+  Future<void> connectUsb(PrinterDevice device) {
+    return _manager.connect(
+      type: PrinterType.usb,
+      model: UsbPrinterInput(
+        name: device.name,
+        productId: device.productId,
+        vendorId: device.vendorId,
+      ),
+    );
+  }
 
-    final qrIndex = (qr.isNotEmpty && qrAfterLine != null)
-        ? qrAfterLine.clamp(0, lines.length)
-        : null;
+  Future<void> connectBluetooth(PrinterDevice device, {bool isBle = false}) {
+    return _manager.connect(
+      type: PrinterType.bluetooth,
+      model: BluetoothPrinterInput(
+        name: device.name,
+        address: device.address!,
+        isBle: isBle,
+        autoConnect: false,
+      ),
+    );
+  }
 
-    for (var i = 0; i < lines.length; i++) {
-      if (qrIndex != null && i == qrIndex) {
-        _writeQrCode(bytes, qr, moduleSize: _moduleSize(qrSize));
-      }
-      final line = lines[i];
-      final text = (line['text'] ?? '').toString();
+  /// Connexion réseau LAN/WiFi (TCP brut port 9100, dit "RAW/JetDirect") —
+  /// couvre les imprimantes Ethernet/WiFi type YHD-8390. Pas de découverte
+  /// automatique fiable en réseau : l'agent saisit l'adresse IP affichée par
+  /// le ticket d'auto-test de l'imprimante (bouton FEED maintenu à
+  /// l'allumage), mémorisée ensuite via [saveNetworkIp].
+  Future<void> connectNetwork(String ipAddress, {int port = 9100}) {
+    return _manager.connect(
+      type: PrinterType.network,
+      model: TcpPrinterInput(ipAddress: ipAddress.trim(), port: port),
+    );
+  }
+
+  static const _lastNetworkIpKey = 'escpos_last_network_ip';
+
+  /// Dernière IP réseau utilisée avec succès (pré-remplit le champ).
+  Future<String?> lastNetworkIp() async =>
+      (await SharedPreferences.getInstance()).getString(_lastNetworkIpKey);
+
+  Future<void> saveNetworkIp(String ip) async =>
+      (await SharedPreferences.getInstance()).setString(_lastNetworkIpKey, ip.trim());
+
+  Future<void> disconnect(PrinterType type) => _manager.disconnect(type: type);
+
+  /// Reçu colis imprimé sur le pont [type] (USB ou Bluetooth), déjà connecté
+  /// via [connectUsb]/[connectBluetooth]. Mêmes lignes que le pont
+  /// WisePrinter (colisReceiptLines()) : en-tête, blocs EXPÉDITEUR/
+  /// BÉNÉFICIAIRE/CONTENU. Pas de QR sur cette copie client (voir demande
+  /// "enlever le QR code du reçu du client") — il reste sur le talon
+  /// (printColisTalon ci-dessous), seul document réellement scanné pendant
+  /// le cycle chargement/arrivée/livraison.
+  Future<void> printColisReceipt(
+    Colis colis, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+    String? agentName,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = _renderLines(generator, colisReceiptLines(colis, agentName: agentName));
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  /// Talon (étiquette adhésive) imprimé sur le pont [type] — voir
+  /// PrinterService.printColisTalon pour le même contenu côté pont P3 natif.
+  ///
+  /// Marges + ordre spécifiques à CE pont (USB/Bluetooth réel) : retour
+  /// terrain avec une imprimante Bluetooth YHD-8390, où le scotch utilisé
+  /// pour coller le talon sur le colis mord sur les bords du papier coupé et
+  /// efface le texte qui s'y trouve. Le pont P3 natif et WisePrinter ne sont
+  /// pas concernés (étiquette autocollante native, pas de scotch) — on ne
+  /// touche donc ni à colisTalonFeedLines/colisTalonQrSize (partagés avec
+  /// eux) ni à l'ordre de colisTalonBodyLines, seulement au rendu ici.
+  Future<void> printColisTalon(
+    Colis colis, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = <int>[];
+    // Marge haute : sans cette ligne vide, le scotch posé sur le bord
+    // supérieur du talon découpé mord directement sur le nom de la
+    // compagnie / téléphones.
+    bytes.addAll(generator.feed(1));
+    // QR juste après la référence encadrée — EN HAUT du talon, pas en bas
+    // (demande explicite) — même agencement que l'aperçu écran (_TalonBox,
+    // colis_receipt_preview_sheet.dart). Taille compacte (size3), pour
+    // coller au format de référence (étiquette collée sur le colis) :
+    // QR discret à côté du numéro, pas un gros QR qui domine le talon.
+    bytes.addAll(_renderLines(generator, colisTalonHeaderLines(colis)));
+    bytes.addAll(generator.qrcode(colis.id, size: QRSize.size3));
+    // Expéditeur juste après le QR — pas en toute fin de talon comme sur les
+    // autres ponts : c'est le bloc que le scotch ne doit surtout pas
+    // effacer, le rapprocher du QR (loin du bord coupé du bas) protège les
+    // deux à la fois. Destination/destinataire ensuite.
+    bytes.addAll(_renderLines(generator, colisTalonExpediteurLines(colis)));
+    bytes.addAll(_renderLines(generator, colisTalonDestinataireLines(colis)));
+    // Marge basse avant la coupe : relevée par rapport à colisTalonFeedLines
+    // (1 ligne, pensé pour économiser du papier sur les ponts sans scotch) —
+    // ici le scotch posé sur le bord inférieur mordait directement sur le
+    // dernier bloc imprimé.
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  /// Reçu + talon en une seule action ("sur le même envoi") — deux
+  /// impressions successives sur le même pont, chacune terminée par une
+  /// coupe : le reçu pour le client, le talon à détacher et coller sur le
+  /// colis.
+  Future<void> printColisReceiptWithTalon(
+    Colis colis, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+    String? agentName,
+  }) async {
+    await printColisReceipt(colis, type: type, paperSize: paperSize, agentName: agentName);
+    await printColisTalon(colis, type: type, paperSize: paperSize);
+  }
+
+  /// Bordereau de livraison imprimé sur le pont [type] — mêmes lignes que le
+  /// pont WisePrinter (bordereauReceiptLines()).
+  Future<void> printBordereau(
+    BordereauDetail d, {
+    required PrinterType type,
+    PaperSize paperSize = PaperSize.mm80,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = _renderLines(generator, bordereauReceiptLines(d));
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(generator.qrcode(d.id));
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  /// Journal de vente colis imprimé sur le pont [type] (USB ou Bluetooth) —
+  /// seul pont qui n'avait AUCUN support d'impression de journal avant cet
+  /// ajout (contrairement au P3 natif et à WisePrinter). Mêmes lignes que le
+  /// pont WisePrinter (colisSalesJournalLines()) : par agent, colis par
+  /// colis, sous-total encadré, puis total général.
+  Future<void> printColisSalesJournal(
+    ColisSalesJournal journal, {
+    required PrinterType type,
+    required String companyName,
+    required String periodLabel,
+    PaperSize paperSize = PaperSize.mm80,
+    ColisReportSetting reportSetting = const ColisReportSetting(),
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final bytes = _renderLines(
+      generator,
+      colisSalesJournalLines(
+        journal,
+        companyName: companyName,
+        periodLabel: periodLabel,
+        reportSetting: reportSetting,
+      ),
+    );
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    await _manager.send(type: type, bytes: bytes);
+  }
+
+  List<int> _renderLines(Generator generator, List<Map<String, dynamic>> lines) {
+    final bytes = <int>[];
+    for (final line in lines) {
+      final text = _sanitizeForEscPos((line['text'] as String?) ?? '');
       if (text.isEmpty) {
-        _feed(bytes, 1);
+        bytes.addAll(generator.feed(1));
         continue;
       }
-      _writeAligned(
-        bytes,
+      final size = line['size'] as String?;
+      // "medium" (ex. téléphone du destinataire, colisReceiptLines) : hauteur
+      // doublée SEULE, largeur normale — pas d'équivalent exact "+2 pts" sur
+      // ce type d'imprimante (seuls des multiplicateurs entiers de
+      // largeur/hauteur existent), donc on prend le réglage le plus proche
+      // d'un léger agrandissement sans doubler aussi la largeur comme le
+      // fait "large" (demande explicite du 27/08/2026).
+      bytes.addAll(generator.text(
         text,
-        align: (line['align'] ?? 'left').toString(),
-        bold: line['bold'] == true,
-        size: (line['size'] ?? 'normal').toString(),
-      );
+        styles: PosStyles(
+          align: _align(line['align'] as String?),
+          bold: line['bold'] == true,
+          height: (size == 'large' || size == 'medium') ? PosTextSize.size2 : PosTextSize.size1,
+          width: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
+          // Sans codeTable explicite, esc_pos_utils_plus laisse la table de
+          // caractères active sur son réglage d'usine (CP437 par défaut,
+          // voir PosStyles.defaults) — variable d'un modèle à l'autre. C'est
+          // ce qui faisait sortir "É" en "ø" sur une imprimante Bluetooth
+          // YHD-8390 tout en étant correct sur un Xprinter USB (défauts
+          // usine différents). CP850 (Multilingual Latin-1, accents
+          // français) force la même table sur tout le monde.
+          //
+          // Note : `codeTable` est un simple String (voir dartdoc de
+          // PosStyles), pas un enum — un premier correctif avait utilisé à
+          // tort `PosCodeTable.westEur`, un identifiant qui n'existe pas
+          // dans cette version du package (2.0.4) et cassait la compilation.
+          codeTable: 'CP850',
+        ),
+      ));
     }
-    if (qrIndex != null && qrIndex == lines.length) {
-      _writeQrCode(bytes, qr, moduleSize: _moduleSize(qrSize));
-    }
-
-    if (qr.isNotEmpty && qrIndex == null) {
-      // Ancien placement : QR en fin de ticket. Une seule ligne d'écart avant
-      // le QR (deux auparavant : un _feed + une ligne vide parasite émise par
-      // _writeAligned avec un texte vide) — gain de longueur papier sans rien
-      // retirer du contenu.
-      _feed(bytes, 1);
-      _setAlign(bytes, 'center');
-      _writeQrCode(bytes, qr, moduleSize: _moduleSize(qrSize));
-    }
-
-    _feed(bytes, feedLines);
-
-    if (cut) {
-      // GS V 1 : coupe partielle (la plupart des Xprinter thermiques)
-      bytes.addByte(_gs);
-      bytes.addByte(0x56);
-      bytes.addByte(0x01);
-    }
-
-    return bytes.toBytes();
+    return bytes;
   }
 
-  /// Taille de module QR (3 à 8) déduite de [qrSize] (px, contrat du pont
-  /// WisePrinter). 96 → 3 (QR compact du talon), 220 → 6 (reçus/bordereaux).
-  static int _moduleSize(int qrSize) => (qrSize / 40).clamp(3, 8).round();
-
-  /// ESC a n — alignement seul, sans écrire de texte ni de saut de ligne
-  /// (contrairement à _writeAligned, qui terminait par un 0x0A parasite).
-  static void _setAlign(BytesBuilder bytes, String align) {
-    bytes.addByte(_esc);
-    bytes.addByte(0x61);
-    bytes.addByte(align == 'center' ? 1 : (align == 'right' ? 2 : 0));
-  }
-
-  static void _feed(BytesBuilder bytes, int n) {
-    for (var i = 0; i < n; i++) {
-      bytes.addByte(0x0A);
+  /// Nettoie le texte avant envoi au générateur ESC/POS.
+  ///
+  /// `esc_pos_utils_plus` encode chaque ligne en Latin-1 (voir
+  /// `generator.text()` -> `_encode()` -> `latin1.encode()` côté package) et
+  /// lève `Invalid argument (string): Contains invalid characters.` dès
+  /// qu'un caractère dépasse le code point 255 — c'est ce qui plantait
+  /// l'impression Bluetooth/USB (Mini Printer MPT-II, Xprinter) sur le tiret
+  /// cadratin "—" du footer ("Retrait sous 72h — passé ce délai…", voir
+  /// colis_receipt_lines.dart) et menaçait aussi le "—" utilisé comme
+  /// valeur par défaut de colisNatureLabel()/colisDescriptionLabel(), sans
+  /// parler des données libres saisies par l'agent (nom, description…).
+  ///
+  /// Le pont P3 natif (MethodChannel) et le pont WisePrinter (desktop, JS)
+  /// n'ont pas cette contrainte — ce nettoyage est spécifique au pont
+  /// ESC/POS USB/Bluetooth de ce fichier.
+  ///
+  /// On remplace d'abord les caractères typographiques Unicode courants par
+  /// leur équivalent ASCII/Latin-1, puis, en dernier recours, tout caractère
+  /// restant hors Latin-1 est substitué par '?' pour ne plus jamais
+  /// bloquer l'impression, même sur une saisie imprévue.
+  String _sanitizeForEscPos(String text) {
+    final replaced = text
+        .replaceAll('—', '-')
+        .replaceAll('–', '-')
+        .replaceAll('…', '...')
+        .replaceAll('’', "'")
+        .replaceAll('‘', "'")
+        .replaceAll('“', '"')
+        .replaceAll('”', '"');
+    final buffer = StringBuffer();
+    for (final rune in replaced.runes) {
+      buffer.writeCharCode(rune <= 0xFF ? rune : 0x3F); // 0x3F = '?'
     }
+    return buffer.toString();
   }
 
-  static void _writeAligned(
-    BytesBuilder bytes,
-    String text, {
-    required String align,
-    required bool bold,
-    required String size,
-  }) {
-    // ESC a n — alignement (0 gauche, 1 centre, 2 droite)
-    bytes.addByte(_esc);
-    bytes.addByte(0x61);
-    bytes.addByte(align == 'center' ? 1 : (align == 'right' ? 2 : 0));
-
-    // ESC E n — gras on/off
-    bytes.addByte(_esc);
-    bytes.addByte(0x45);
-    bytes.addByte(bold ? 1 : 0);
-
-    // GS ! n — taille (0x00 normal, 0x11 double largeur+hauteur, 0x01 double hauteur)
-    bytes.addByte(_gs);
-    bytes.addByte(0x21);
-    bytes.addByte(size == 'large' ? 0x11 : (size == 'small' ? 0x00 : 0x00));
-
-    bytes.add(latin1.encode(text));
-    bytes.addByte(0x0A);
-
-    // Reset gras/taille pour la ligne suivante
-    bytes.addByte(_esc);
-    bytes.addByte(0x45);
-    bytes.addByte(0);
-    bytes.addByte(_gs);
-    bytes.addByte(0x21);
-    bytes.addByte(0x00);
-  }
-
-  static void _writeQrCode(BytesBuilder bytes, String data, {int moduleSize = 5}) {
-    _setAlign(bytes, 'center');
-    final payload = utf8.encode(data);
-    final storeLen = payload.length + 3;
-    final pL = storeLen % 256;
-    final pH = storeLen ~/ 256;
-
-    // Modèle QR (GS ( k, fn 165, modèle 2)
-    bytes.add([_gs, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
-    // Taille du module (fn 167)
-    bytes.add([_gs, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize]);
-    // Niveau de correction d'erreur (fn 169, niveau 48 = L)
-    bytes.add([_gs, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30]);
-    // Stocker les données (fn 180)
-    bytes.add([_gs, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30]);
-    bytes.add(payload);
-    // Imprimer (fn 181)
-    bytes.add([_gs, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
+  PosAlign _align(String? value) {
+    switch (value) {
+      case 'center':
+        return PosAlign.center;
+      case 'right':
+        return PosAlign.right;
+      default:
+        return PosAlign.left;
+    }
   }
 }

@@ -458,7 +458,7 @@ class _ReceiptBox extends StatelessWidget {
               children: [
                 Text(colis.nomDestinataire, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                _Field('Téléphone', colis.telephoneDestinataire),
+                _Field('Téléphone', colis.telephoneDestinataire, valueFontSizeDelta: 2),
                 _Field('Destination', colis.gareDestination),
                 // Tél. destination déplacé en en-tête (voir plus haut).
               ],
@@ -544,17 +544,30 @@ class _Section extends StatelessWidget {
 class _Field extends StatelessWidget {
   final String label;
   final String value;
-  const _Field(this.label, this.value);
+  // Ex. téléphone du destinataire : +2 pts (demande explicite du 27/08/2026,
+  // même agrandissement que sur le papier — voir colisReceiptLines,
+  // P3PrinterModule.kt/printField, EscPosLinesEncoder). `null` = taille
+  // héritée du DefaultTextStyle ambiant (12, voir _ReceiptBox).
+  final double? valueFontSizeDelta;
+  const _Field(this.label, this.value, {this.valueFontSizeDelta});
 
   @override
   Widget build(BuildContext context) {
+    final baseSize = DefaultTextStyle.of(context).style.fontSize ?? 12;
     return Padding(
       padding: const EdgeInsets.only(top: 1),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Colors.black54))),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(
+              value,
+              style: valueFontSizeDelta != null
+                  ? TextStyle(fontSize: baseSize + valueFontSizeDelta!, fontWeight: FontWeight.bold)
+                  : null,
+            ),
+          ),
         ],
       ),
     );
