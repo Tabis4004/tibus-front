@@ -157,29 +157,34 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
             future: _statsFuture,
             builder: (context, snapshot) {
               final stats = snapshot.data;
-              return IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: KpiCard(
-                        icon: Icons.local_shipping_outlined,
-                        value: '${stats?.today ?? '—'}',
-                        label: "Aujourd'hui",
-                        background: AppColors.accentRed,
-                      ),
+              // Pas d'IntrinsicHeight : combiné à un FittedBox (dans
+              // _MontantDuJourCard), IntrinsicHeight calcule une largeur
+              // incohérente sur Flutter Web (bug connu du renderer) et fait
+              // exploser la largeur d'une des deux cartes. Chaque carte a
+              // mainAxisSize.min et prend sa hauteur naturelle -- la verte
+              // peut être légèrement plus haute que la rouge quand le
+              // bouton "Détail" est visible, c'est un compromis assumé.
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: KpiCard(
+                      icon: Icons.local_shipping_outlined,
+                      value: '${stats?.today ?? '—'}',
+                      label: "Aujourd'hui",
+                      background: AppColors.accentRed,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _MontantDuJourCard(
-                        value: stats == null ? '—' : '${stats.montantToday.toStringAsFixed(0)} FCFA',
-                        onDetail: _canSeeGareBreakdown(roles)
-                            ? () => showTodayByGareSheet(context, companyId: companyId)
-                            : null,
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _MontantDuJourCard(
+                      value: stats == null ? '—' : '${stats.montantToday.toStringAsFixed(0)} FCFA',
+                      onDetail: _canSeeGareBreakdown(roles)
+                          ? () => showTodayByGareSheet(context, companyId: companyId)
+                          : null,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           ),
