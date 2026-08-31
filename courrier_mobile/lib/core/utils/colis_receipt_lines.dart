@@ -108,7 +108,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final ref = colisReceiptNumber(colis);
   final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
   return [
-    {'text': company, 'align': 'center', 'bold': true, 'size': 'large'},
+    {'text': company, 'align': 'center', 'bold': true},
     // Numéro de la gare de destination en en-tête (demande explicite du
     // 26/08/2026, qui annule celle du 20/08/2026 ci-dessous) : la gare
     // d'arrivée doit pouvoir composer ce numéro directement à la lecture du
@@ -123,8 +123,18 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
       'bold': true,
       'size': 'small',
     },
-    {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
-    // Colis enregistré hors connexion, pas encore confirmé par le serveur
+    // "Recu expedition colis" — accents "ç"/"é" retirés (ici et sur le
+    // talon plus bas) : sur ce modèle d'imprimante Bluetooth, la table
+    // CP850 sélectionnée (voir codeTable dans esc_pos_printer_service.dart)
+    // ne semble pas honorée par le firmware pour ces deux caractères
+    // précis, qui ressortent en glyphes grecs (τ/θ) au lieu des accents
+    // attendus — un 3e comportement différent après le "É -> ø" déjà
+    // documenté sur le YHD-8390. Accent supprimé plutôt que de chasser un
+    // nouveau cas par modèle d'imprimante (demande explicite du
+    // 30/08/2026). N'affecte QUE ce pont ESC/POS et le pont WisePrinter qui
+    // partagent ces lignes -- le pont P3 natif (printer_service.dart) garde
+    // l'accent, rendu via police Android, pas de byte ESC/POS en jeu.
+    {'text': 'Recu expedition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     // (voir PendingColis/SyncService) — l'agent doit le savoir avant de
     // remettre ce reçu au client : la référence ci-dessous est provisoire,
     // remplacée par la vraie référence une fois synchronisé.
@@ -133,7 +143,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
       {'text': 'En attente de connexion - sera confirmé', 'align': 'center', 'bold': true, 'size': 'small'},
     ],
     {'text': '================================', 'align': 'center', 'bold': true},
-    {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'large'},
+    {'text': 'N°  $ref', 'align': 'center', 'bold': true},
     {'text': '================================', 'align': 'center', 'bold': true},
     {'text': 'EXPÉDITEUR', 'bold': true},
     {'text': colis.nomExpediteur, 'bold': true},
@@ -151,7 +161,12 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     {'text': 'BÉNÉFICIAIRE', 'bold': true},
     {'text': colis.nomDestinataire, 'bold': true},
     {'text': ''},
-    {'text': 'Téléphone       ${colis.telephoneDestinataire}', 'bold': true},
+    // Téléphone du bénéficiaire agrandi (demande explicite du 26/08/2026,
+    // déjà appliquée sur le talon -- voir colisTalonDestinataireLines --
+    // mais manquante ici sur le reçu principal jusqu'à ce correctif) :
+    // c'est le numéro qu'on rappelle en cas de souci, il doit être le plus
+    // lisible possible.
+    {'text': 'Téléphone       ${colis.telephoneDestinataire}', 'bold': true, 'size': 'large'},
     {'text': 'Destination     ${colis.gareDestination}', 'bold': true},
     // Tél. destination déplacé en en-tête (voir plus haut).
     {'text': '--------------------------------', 'bold': true},
@@ -220,11 +235,11 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
       'bold': true,
       'size': 'small',
     },
-    {'text': 'Reçu expédition colis', 'align': 'center', 'bold': true, 'size': 'small'},
+    {'text': 'Recu expedition colis', 'align': 'center', 'bold': true, 'size': 'small'},
     if (colis.isPendingSync)
       {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': '================================', 'align': 'center'},
-    {'text': ref, 'align': 'center', 'bold': true, 'size': 'large'},
+    {'text': ref, 'align': 'center', 'bold': true},
     {'text': '================================', 'align': 'center'},
   ];
 }
