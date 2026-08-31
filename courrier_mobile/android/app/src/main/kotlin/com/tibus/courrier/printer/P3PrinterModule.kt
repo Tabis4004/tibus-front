@@ -171,8 +171,13 @@ class P3PrinterModule(private val ctx: Context) {
         val p = preparePrinter()
 
         // ---- Header
+        // Taille normale (pas "large"/30pt) — au-delà de 24pt le nom de
+        // compagnie déborde sur les tickets 58mm (constaté sur imprimante
+        // Wiseasy/P3 intégrée, demande explicite du 30/08/2026 : revenir à
+        // 24pt sur l'en-tête uniquement, ne pas toucher au téléphone
+        // bénéficiaire agrandi plus bas).
         printWrappedLine(p, t.company.ifBlank { "TIBUS" },
-            PrintOptions(align = "center", size = "large", bold = true), paperWidth)
+            PrintOptions(align = "center", bold = true), paperWidth)
         // Destination en toutes lettres sous le nom de la compagnie, en GRAS
         // (demande explicite du 20/08/2026 — remplace l'ancien "Tél dest:
         // <numéro>"). Plus de "Tél siège" ici : le téléphone du siège est
@@ -253,26 +258,26 @@ class P3PrinterModule(private val ctx: Context) {
         if (t.extraFields.isNotEmpty()) {
             val sectionMarkers = setOf("EXPÉDITEUR", "BÉNÉFICIAIRE", "CONTENU")
             separator(p, paperWidth)
-            // Suivi de la section courante pour repérer le champ "Téléphone"
-            // du bloc BÉNÉFICIAIRE (destinataire) : après normalizeStructuredRow
-            // le libellé est identique ("Téléphone") pour l'expéditeur et le
-            // destinataire, seule la position (juste après le marqueur
-            // BÉNÉFICIAIRE) permet de distinguer les deux lignes.
+            // Suit la section en cours pour agrandir UNIQUEMENT le
+            // téléphone du bénéficiaire (demande explicite du 26/08/2026,
+            // déjà fait côté pont ESC/POS -- colisTalonDestinataireLines/
+            // colisReceiptLines -- mais jusqu'ici absent du pont P3). Le
+            // repère "espace en trop" utilisé côté Dart pour distinguer le
+            // "Téléphone" expéditeur du "Téléphone " bénéficiaire ne survit
+            // pas à cleanDisplayLabel() (qui trim()), d'où ce suivi de
+            // section à la place.
             var currentSection = ""
             t.extraFields.forEach { (label, value) ->
-                if (label.uppercase(Locale.US) in sectionMarkers) {
-                    currentSection = label.uppercase(Locale.US)
-                    printWrappedLine(p, currentSection, PrintOptions(bold = true), paperWidth)
+                val upperLabel = label.uppercase(Locale.US)
+                if (upperLabel in sectionMarkers) {
+                    currentSection = upperLabel
+                    printWrappedLine(p, upperLabel, PrintOptions(bold = true), paperWidth)
                     printWrappedLine(p, "-".repeat(paperWidth.coerceIn(24, 56)), PrintOptions(), paperWidth)
                     printWrappedLine(p, value, PrintOptions(bold = true), paperWidth)
                 } else {
-                    // Téléphone du destinataire en plus gros (+2 pts, "medium"
-                    // = 26 pts vs 24 pts en "normal" — même échelle que la
-                    // référence encadrée, voir printBoxedLine) : demande
-                    // explicite du 27/08/2026, impression TPE P3 uniquement.
-                    val isDestinataireTelephone = currentSection == "BÉNÉFICIAIRE" &&
-                        normalizeFieldKey(label) == "telephone"
-                    printField(p, label, value, paperWidth, size = if (isDestinataireTelephone) "medium" else "normal")
+                    val isBeneficiaryPhone = currentSection == "BÉNÉFICIAIRE" &&
+                        label.trim().trimEnd(':').equals("Téléphone", ignoreCase = true)
+                    printField(p, label, value, paperWidth, large = isBeneficiaryPhone)
                 }
             }
             separator(p, paperWidth)
@@ -1211,22 +1216,21 @@ class P3PrinterModule(private val ctx: Context) {
         checkCode("printFinish", p.printFinish())
     }
 
-    private fun printField(p: Printer, label: String, value: String, width: Int, size: String = "normal") {
+    private fun printField(p: Printer, label: String, value: String, width: Int, large: Boolean = false) {
         val cleanLabel = label.trim().trimEnd(':')
         val cleanValue = value.replace(Regex("\\s+"), " ").trim().trim(':', '-', '|')
         if (cleanLabel.isBlank() || cleanValue.isBlank()) return
         // Valeurs en GRAS (demande explicite : « Téléphone: *5555555* ») —
         // l'imprimante ne gère qu'un style par ligne, donc la ligne complète
         // label+valeur est imprimée en gras, comme l'aperçu à l'écran.
-        // `size` permet d'agrandir ponctuellement un champ précis (ex.
-        // téléphone du destinataire, voir l'appel dans renderUnified)
-        // sans affecter les autres lignes label/valeur.
+        // [large] : uniquement le téléphone du bénéficiaire (voir appelant).
         val oneLine = "$cleanLabel: $cleanValue"
+        val opts = PrintOptions(bold = true, size = if (large) "large" else "normal")
         if (oneLine.length <= width) {
-            printWrappedLine(p, oneLine, PrintOptions(bold = true, size = size), width)
+            printWrappedLine(p, oneLine, opts, width)
         } else {
-            printWrappedLine(p, "$cleanLabel:", PrintOptions(bold = true, size = size), width)
-            printWrappedLine(p, cleanValue, PrintOptions(bold = true, size = size), width)
+            printWrappedLine(p, "$cleanLabel:", opts, width)
+            printWrappedLine(p, cleanValue, opts, width)
         }
     }
 
@@ -1268,9 +1272,10 @@ class P3PrinterModule(private val ctx: Context) {
         val boxWidth = (text.length + 4).coerceIn(12, maxW)
         val border = "+" + "-".repeat(boxWidth - 2) + "+"
         printWrappedLine(p, border, PrintOptions(align = "center"), width)
-        // Référence en "medium" (26 pts, +2 vs normal) — demande explicite ;
-        // le texte est centré sans barres latérales, pas de désalignement.
-        printWrappedLine(p, text, PrintOptions(align = "center", bold = true, size = "medium"), width)
+        // Référence en taille normale (24pt) — était en "medium" (26pt),
+        // au-delà de 24 ça déborde sur les tickets 58mm (même correctif que
+        // l'en-tête ci-dessus, demande explicite du 30/08/2026).
+        printWrappedLine(p, text, PrintOptions(align = "center", bold = true), width)
         printWrappedLine(p, border, PrintOptions(align = "center"), width)
     }
 
