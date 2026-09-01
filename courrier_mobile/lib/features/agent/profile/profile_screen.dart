@@ -7,6 +7,7 @@ import '../../client/loyalty/loyalty_screen.dart';
 import '../../client/promo/promo_screen.dart';
 import '../../client/referral/referral_screen.dart';
 import '../support/support_screen.dart';
+import '../admin/admin_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -98,6 +99,30 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
             ),
+          ),
+          // Bouton Administration : visible uniquement si l'utilisateur a le
+          // rôle owner dans au moins une compagnie. Les RPC appelées derrière
+          // (create_company_gare, assign_company_role, etc.) revérifient
+          // elles-mêmes has_company_role(..., ARRAY['owner']) côté serveur —
+          // ce test côté client n'est qu'un confort d'affichage, pas la
+          // sécurité réelle.
+          rolesAsync.maybeWhen(
+            data: (roles) => roles.any((r) => r.name == 'owner')
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      const Text('Gestion', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      _MenuTile(
+                        icon: Icons.admin_panel_settings_outlined,
+                        label: 'Administration',
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen())),
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+            orElse: () => const SizedBox.shrink(),
           ),
           // Masqué pour les marques "logiciel métier" sans volet client
           // (ex. SIS) — voir kShowLoyaltyPromoReferral, brand_features.dart.
