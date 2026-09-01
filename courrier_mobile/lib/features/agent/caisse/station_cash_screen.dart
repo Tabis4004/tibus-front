@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/providers.dart';
-import '../../../core/config/colis_ui_config.dart';
 import '../../../data/models/colis.dart';
 import '../stats/colis_sales_journal_print_sheet.dart';
 
@@ -16,7 +15,10 @@ import '../stats/colis_sales_journal_print_sheet.dart';
 /// historique), et la clôture de session est une action séparée et
 /// explicite, indépendante de la validation comptable/owner du reversement.
 class StationCashScreen extends ConsumerStatefulWidget {
-  const StationCashScreen({super.key});
+  /// Accès de secours (gérant de gare / comptable, voir AppRole.isCashBackupRole) :
+  /// solde + impression des journaux uniquement, aucune action de caisse.
+  final bool readOnly;
+  const StationCashScreen({super.key, this.readOnly = false});
 
   @override
   ConsumerState<StationCashScreen> createState() => _StationCashScreenState();
@@ -35,7 +37,6 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
   String? _selectedGareId;
   OpenStationCash? _cash;
   List<StationCashMovement> _movements = [];
-  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
 
   @override
   void initState() {
@@ -61,16 +62,18 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
       _companyId = companyId;
       final service = ref.read(colisServiceProvider);
       final results = await Future.wait([
-        service.listGares(companyId),
+        // list_company_station_gares (pas listGares/list_company_gares_for_stats,
+        // qui donnerait TOUTES les gares de la compagnie) : un agent
+        // gare-scoped (vendeur_gare) ne doit pouvoir ouvrir sa caisse —
+        // donc enregistrer un colis en gare de départ — que sur sa propre
+        // gare. Les rôles compagnie (owner/vendeur/chauffeur) continuent
+        // de voir toutes les gares, comme avant.
+        service.listStationGares(companyId),
         service.getOpenStationCash(),
       ]);
       if (!mounted) return;
       final gares = results[0] as List<GareOption>;
       final cash = results[1] as OpenStationCash;
-      var uiConfig = ColisUiConfig.defaults;
-      try {
-        uiConfig = ColisUiConfig.fromSettings(await service.getCompanyColisSettings(companyId));
-      } catch (_) {}
       List<StationCashMovement> movements = [];
       if (cash.open && cash.id != null) {
         movements = await service.listStationCashMovements(cash.id!, limit: 80);
@@ -84,7 +87,6 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         if (gares.length == 1) _selectedGareId = gares.first.id;
         _cash = cash;
         _movements = movements;
-        _uiConfig = uiConfig;
         _loading = false;
       });
     } catch (e) {
@@ -251,7 +253,6 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         journal: journal,
         companyName: companyName,
         periodLabel: "Aujourd'hui",
-        reportSetting: _uiConfig.reports['salesJournal'] ?? const ColisReportSetting(),
       );
     } catch (e) {
       if (mounted) {
@@ -330,35 +331,27 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         children: [
           if (cash.pendingReversal && !cash.open)
             _PendingReversalCard(balance: cash.balance ?? 0)
-          else if (!cash.open) ...[
-            _OpenCashForm(
-              gares: _gares,
-              selectedGareId: _selectedGareId,
-              onGareChanged: (v) => setState(() => _selectedGareId = v),
-              openingFloatController: _openingFloat,
-              saving: _saving,
-              onOpen: _openCash,
-            ),
-            // Journal de vente indépendant de la session de caisse (données
-            // scopées par compagnie/période, pas par mouvement de caisse —
-            // get_colis_sales_journal) : un owner doit pouvoir le consulter
-            // sans avoir jamais ouvert de caisse lui-même, contrairement au
-            // journal de caisse / remise / clôture ci-dessous qui, eux,
-            // décrivent une session active et n'ont pas de sens sans elle.
-            if (_uiConfig.showReport('salesJournal')) ...[
-              const SizedBox(height: 16),
-              _SalesJournalCard(saving: _saving, onPrint: _printSalesJournal),
-            ],
-          ] else
+          else if (!cash.open)
+            widget.readOnly
+                ? const _ReadOnlyNoCashCard()
+                : _OpenCashForm(
+                    gares: _gares,
+                    selectedGareId: _selectedGareId,
+                    onGareChanged: (v) => setState(() => _selectedGareId = v),
+                    openingFloatController: _openingFloat,
+                    saving: _saving,
+                    onOpen: _openCash,
+                  )
+          else
             _OpenCashDetails(
               cash: cash,
               reversalController: _reversalAmount,
               saving: _saving,
+              readOnly: widget.readOnly,
               onSubmitReversal: _submitReversal,
               onCloseCash: _closeCash,
               onPrintJournal: _printJournal,
               onPrintSalesJournal: _printSalesJournal,
-              uiConfig: _uiConfig,
               dateFmt: _dateFmt,
             ),
           const SizedBox(height: 20),
@@ -443,22 +436,22 @@ class _OpenCashDetails extends StatelessWidget {
   final OpenStationCash cash;
   final TextEditingController reversalController;
   final bool saving;
+  final bool readOnly;
   final VoidCallback onSubmitReversal;
   final VoidCallback onCloseCash;
   final VoidCallback onPrintJournal;
   final VoidCallback onPrintSalesJournal;
-  final ColisUiConfig uiConfig;
   final DateFormat dateFmt;
 
   const _OpenCashDetails({
     required this.cash,
     required this.reversalController,
     required this.saving,
+    required this.readOnly,
     required this.onSubmitReversal,
     required this.onCloseCash,
     required this.onPrintJournal,
     required this.onPrintSalesJournal,
-    required this.uiConfig,
     required this.dateFmt,
   });
 
@@ -501,130 +494,154 @@ class _OpenCashDetails extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        if (uiConfig.showReport('cashJournal')) ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
-                    'remises) avec le total (solde final) en bas.',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: saving ? null : onPrintJournal,
-                    icon: const Icon(Icons.print_outlined),
-                    label: Text(saving ? '…' : 'Imprimer le journal'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (uiConfig.showReport('salesJournal')) ...[
-          // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
-          // agent, scoping serveur — get_colis_sales_journal) : document
-          // distinct du journal de caisse ci-dessus (mouvements d'espèces).
-          // Même impression que Stats → « Mon rapport d'activité ». Widget
-          // partagé avec l'état "caisse fermée" de _buildBody (voir
-          // _SalesJournalCard) — ce rapport n'a pas besoin d'une session
-          // ouverte, contrairement au journal de caisse ci-dessus.
-          _SalesJournalCard(saving: saving, onPrint: onPrintSalesJournal),
-          const SizedBox(height: 16),
-        ],
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Remise au comptable', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 const Text(
-                  'Enregistre une remise d\'espèces au comptable/owner (historique — date, montant, '
-                  'à qui). La caisse reste ouverte et les ventes continuent normalement.',
+                  'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
+                  'remises) avec le total (solde final) en bas.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: reversalController,
-                  decoration: const InputDecoration(labelText: 'Montant remis (FCFA)'),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: saving ? null : onSubmitReversal,
-                  child: Text(saving ? '…' : 'Enregistrer la remise'),
+                OutlinedButton.icon(
+                  onPressed: saving ? null : onPrintJournal,
+                  icon: const Icon(Icons.print_outlined),
+                  label: Text(saving ? '…' : 'Imprimer le journal'),
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
+        // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
+        // agent, scoping serveur — get_colis_sales_journal) : document
+        // distinct du journal de caisse ci-dessus (mouvements d'espèces).
+        // Même impression que Stats → « Mon rapport d'activité ».
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Clôturer la session', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 const Text(
-                  'Action séparée de la remise ci-dessus : à faire quand votre journée de vente '
-                  'est terminée, indépendamment d\'une validation comptable en attente.',
+                  'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
+                  'à remettre avec la caisse en fin de session.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: saving ? null : onCloseCash,
-                  child: Text(saving ? '…' : 'Clôturer la caisse'),
+                OutlinedButton.icon(
+                  onPressed: saving ? null : onPrintSalesJournal,
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: Text(saving ? '…' : 'Imprimer le journal de vente'),
                 ),
               ],
             ),
           ),
         ),
+        if (!readOnly) ...[
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Remise au comptable', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Enregistre une remise d\'espèces au comptable/owner (historique — date, montant, '
+                    'à qui). La caisse reste ouverte et les ventes continuent normalement.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: reversalController,
+                    decoration: const InputDecoration(labelText: 'Montant remis (FCFA)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: saving ? null : onSubmitReversal,
+                    child: Text(saving ? '…' : 'Enregistrer la remise'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Clôturer la session', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Action séparée de la remise ci-dessus : à faire quand votre journée de vente '
+                    'est terminée, indépendamment d\'une validation comptable en attente.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: saving ? null : onCloseCash,
+                    child: Text(saving ? '…' : 'Clôturer la caisse'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 16),
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.visibility_outlined, color: Colors.grey),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Accès de secours en lecture seule — ouverture, remise et clôture réservées '
+                      'au vendeur titulaire de cette caisse.',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-/// Carte "Journal de vente" — réutilisée qu'une caisse soit ouverte
-/// (_OpenCashDetails) ou fermée (_buildBody) : les données viennent de
-/// get_colis_sales_journal, scopées compagnie/période, pas d'un mouvement de
-/// caisse précis. Un owner sans caisse personnelle ouverte doit pouvoir
-/// consulter ce rapport comme n'importe quel autre rôle privilégié.
-class _SalesJournalCard extends StatelessWidget {
-  final bool saving;
-  final VoidCallback onPrint;
-
-  const _SalesJournalCard({required this.saving, required this.onPrint});
+class _ReadOnlyNoCashCard extends StatelessWidget {
+  const _ReadOnlyNoCashCard();
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: EdgeInsets.all(16),
+        child: Row(
           children: [
-            const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            const Text(
-              'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
-              'à remettre avec la caisse en fin de session.',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: saving ? null : onPrint,
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+            Icon(Icons.point_of_sale_outlined, color: Colors.grey),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Aucune caisse ouverte actuellement pour cette gare. '
+                '(Accès de secours en lecture seule — l\'ouverture est réservée au vendeur.)',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
           ],
         ),
