@@ -59,6 +59,18 @@ class AdminScreen extends ConsumerWidget {
                 subtitle: 'Ajouter une ville disponible',
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdminCitiesScreen(companyId: companyId))),
               ),
+              _AdminTile(
+                icon: Icons.business_outlined,
+                label: 'Coordonnées de la compagnie',
+                subtitle: 'Nom, téléphone, logo, gérant',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdminCompanyInfoScreen(companyId: companyId))),
+              ),
+              _AdminTile(
+                icon: Icons.tune,
+                label: 'Réglages colis autonome',
+                subtitle: 'Natures, prix minimum, formulaire, rapports',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdminColisSettingsScreen(companyId: companyId))),
+              ),
             ],
           );
         },
@@ -800,6 +812,368 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+// ==================================================== COORDONNÉES COMPAGNIE
+
+class AdminCompanyInfoScreen extends ConsumerStatefulWidget {
+  final String companyId;
+  const AdminCompanyInfoScreen({super.key, required this.companyId});
+
+  @override
+  ConsumerState<AdminCompanyInfoScreen> createState() => _AdminCompanyInfoScreenState();
+}
+
+class _AdminCompanyInfoScreenState extends ConsumerState<AdminCompanyInfoScreen> {
+  late Future<CompanyInfo> _future;
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _logoCtrl = TextEditingController();
+  final _managerCtrl = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ref.read(adminServiceProvider).getCompanyInfo(widget.companyId).then((info) {
+      _nameCtrl.text = info.name ?? '';
+      _phoneCtrl.text = info.phone ?? '';
+      _logoCtrl.text = info.logo ?? '';
+      _managerCtrl.text = info.managerName ?? '';
+      return info;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() { _saving = true; _error = null; });
+    try {
+      await ref.read(adminServiceProvider).updateCompanyInfo(
+            companyId: widget.companyId,
+            name: _nameCtrl.text.trim(),
+            phone: _phoneCtrl.text.trim(),
+            logo: _logoCtrl.text.trim(),
+            managerName: _managerCtrl.text.trim(),
+          );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Coordonnées enregistrées.')));
+    } catch (e) {
+      setState(() => _error = 'Échec : $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Coordonnées de la compagnie')),
+      body: FutureBuilder<CompanyInfo>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (snap.hasError) return Center(child: Text('Erreur : ${snap.error}'));
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nom de la compagnie')),
+              const SizedBox(height: 12),
+              TextField(controller: _phoneCtrl, decoration: const InputDecoration(labelText: 'Téléphone'), keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              TextField(controller: _managerCtrl, decoration: const InputDecoration(labelText: 'Nom du gérant')),
+              const SizedBox(height: 12),
+              TextField(controller: _logoCtrl, decoration: const InputDecoration(labelText: 'URL du logo', helperText: 'Lien vers une image déjà hébergée')),
+              if (_logoCtrl.text.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Image.network(_logoCtrl.text.trim(), height: 80, errorBuilder: (_, __, ___) => const Text('Aperçu indisponible')),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: AppColors.accentRed, fontSize: 12)),
+              ],
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Enregistrer'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==================================================== RÉGLAGES COLIS AUTONOME
+
+class AdminColisSettingsScreen extends ConsumerStatefulWidget {
+  final String companyId;
+  const AdminColisSettingsScreen({super.key, required this.companyId});
+
+  @override
+  ConsumerState<AdminColisSettingsScreen> createState() => _AdminColisSettingsScreenState();
+}
+
+class _AdminColisSettingsScreenState extends ConsumerState<AdminColisSettingsScreen> {
+  ColisSettings? _settings;
+  List<ColisNature> _natures = [];
+  bool _loading = true;
+  String? _error;
+
+  final _prixFixeCtrl = TextEditingController();
+  final _prixTauxCtrl = TextEditingController();
+  final _pourcentageCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    setState(() => _loading = true);
+    try {
+      final service = ref.read(adminServiceProvider);
+      final results = await Future.wait([
+        service.getColisSettings(widget.companyId),
+        service.listColisNatures(widget.companyId),
+      ]);
+      final settings = results[0] as ColisSettings;
+      setState(() {
+        _settings = settings;
+        _natures = results[1] as List<ColisNature>;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() { _error = 'Échec du chargement : $e'; _loading = false; });
+    }
+  }
+
+  Future<void> _saveUiConfig(Map<String, dynamic> nextConfig) async {
+    try {
+      await ref.read(adminServiceProvider).updateColisUiConfig(companyId: widget.companyId, uiConfig: nextConfig);
+      _reload();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
+    }
+  }
+
+  Future<void> _savePricing() async {
+    try {
+      await ref.read(adminServiceProvider).updateColisPricing(
+            companyId: widget.companyId,
+            prixMinFixe: double.tryParse(_prixFixeCtrl.text.trim()),
+            prixMinTaux: double.tryParse(_prixTauxCtrl.text.trim()),
+            pourcentagePercu: double.tryParse(_pourcentageCtrl.text.trim()),
+          );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Prix minimum enregistrés.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
+    }
+  }
+
+  Future<void> _openNatureForm({ColisNature? existing}) async {
+    final libelleCtrl = TextEditingController(text: existing?.libelle);
+    final fixeCtrl = TextEditingController(text: existing?.prixMinFixe?.toString());
+    final tauxCtrl = TextEditingController(text: existing?.prixMinTaux?.toString());
+    String? error;
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(existing == null ? 'Nouvelle nature' : 'Modifier la nature', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              TextField(controller: libelleCtrl, decoration: const InputDecoration(labelText: 'Libellé * (ex: Carton, Enveloppe)')),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(child: TextField(controller: fixeCtrl, decoration: const InputDecoration(labelText: 'Prix min. fixe (optionnel)'), keyboardType: TextInputType.number)),
+                const SizedBox(width: 10),
+                Expanded(child: TextField(controller: tauxCtrl, decoration: const InputDecoration(labelText: 'Taux min. /kg (optionnel)'), keyboardType: TextInputType.number)),
+              ]),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!, style: const TextStyle(color: AppColors.accentRed, fontSize: 12)),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: saving ? null : () async {
+                    if (libelleCtrl.text.trim().isEmpty) {
+                      setSheetState(() => error = 'Le libellé est obligatoire.');
+                      return;
+                    }
+                    setSheetState(() { saving = true; error = null; });
+                    try {
+                      await ref.read(adminServiceProvider).upsertColisNature(
+                            companyId: widget.companyId,
+                            libelle: libelleCtrl.text.trim(),
+                            natureId: existing?.id,
+                            isActive: existing?.isActive ?? true,
+                            prixMinFixe: double.tryParse(fixeCtrl.text.trim()),
+                            prixMinTaux: double.tryParse(tauxCtrl.text.trim()),
+                          );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                      _reload();
+                    } catch (e) {
+                      setSheetState(() { saving = false; error = 'Échec : $e'; });
+                    }
+                  },
+                  child: saving
+                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Enregistrer'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleNatureActive(ColisNature n) async {
+    try {
+      await ref.read(adminServiceProvider).upsertColisNature(
+            companyId: widget.companyId,
+            libelle: n.libelle,
+            natureId: n.id,
+            isActive: !n.isActive,
+            prixMinFixe: n.prixMinFixe,
+            prixMinTaux: n.prixMinTaux,
+          );
+      _reload();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
+    }
+  }
+
+  Future<void> _deleteNature(ColisNature n) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer cette nature ?'),
+        content: Text(n.libelle),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await ref.read(adminServiceProvider).deleteColisNature(n.id);
+      _reload();
+    } catch (e) {
+      // Le serveur refuse si la nature est déjà utilisée par un colis —
+      // message renvoyé tel quel ("desactivez-la" plutôt que supprimer).
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_error != null) return Scaffold(appBar: AppBar(title: const Text('Réglages colis autonome')), body: Center(child: Text(_error!)));
+    final s = _settings!;
+    if (_prixFixeCtrl.text.isEmpty) _prixFixeCtrl.text = '';
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Réglages colis autonome')),
+      floatingActionButton: FloatingActionButton(onPressed: () => _openNatureForm(), child: const Icon(Icons.add)),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text('Natures de colis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 8),
+          if (_natures.isEmpty) const Text('Aucune nature.', style: TextStyle(color: AppColors.textSecondary)),
+          ..._natures.map((n) => Card(
+                margin: const EdgeInsets.only(bottom: 6),
+                child: ListTile(
+                  title: Text(n.libelle, style: TextStyle(color: n.isActive ? null : AppColors.textSecondary)),
+                  subtitle: (n.prixMinFixe != null || n.prixMinTaux != null)
+                      ? Text('Min. ${n.prixMinFixe ?? '—'} FCFA fixe · ${n.prixMinTaux ?? '—'} FCFA/kg')
+                      : null,
+                  onTap: () => _openNatureForm(existing: n),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Switch(value: n.isActive, onChanged: (_) => _toggleNatureActive(n)),
+                    IconButton(icon: const Icon(Icons.delete_outline, color: AppColors.accentRed), onPressed: () => _deleteNature(n)),
+                  ]),
+                ),
+              )),
+          const Divider(height: 32),
+
+          const Text('Prix minimum général (override)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text(
+            "Si renseigné, remplace les prix minimums par nature pour tous les colis. Laissez vide pour utiliser les règles par nature.",
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: TextField(controller: _prixFixeCtrl, decoration: const InputDecoration(labelText: 'Prix min. fixe (FCFA)'), keyboardType: TextInputType.number)),
+            const SizedBox(width: 10),
+            Expanded(child: TextField(controller: _prixTauxCtrl, decoration: const InputDecoration(labelText: 'Taux min. (FCFA/kg)'), keyboardType: TextInputType.number)),
+          ]),
+          const SizedBox(height: 10),
+          TextField(controller: _pourcentageCtrl, decoration: const InputDecoration(labelText: 'Pourcentage perçu par défaut (%)'), keyboardType: TextInputType.number),
+          const SizedBox(height: 12),
+          FilledButton(onPressed: _savePricing, child: const Text('Enregistrer les prix')),
+          const Divider(height: 32),
+
+          const Text('Formulaire colis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text('Masquer un champ non utilisé par votre compagnie.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          SwitchListTile(
+            title: const Text('Poids (kg)'),
+            value: s.formFieldPoids,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(poids: v)),
+          ),
+          SwitchListTile(
+            title: const Text('Nombre de pièces'),
+            value: s.formFieldPieces,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(pieces: v)),
+          ),
+          SwitchListTile(
+            title: const Text('Pourcentage perçu (calcul auto du montant)'),
+            value: s.formFieldPourcentagePercu,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(pourcentagePercu: v)),
+          ),
+          const Divider(height: 32),
+
+          const Text('Visibilité des rapports', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text('Masquer un rapport entier pour votre compagnie.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          SwitchListTile(
+            title: const Text('Rapport d\'activité (Stats)'),
+            value: s.reportStatsEnabled,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(statsEnabled: v)),
+          ),
+          SwitchListTile(
+            title: const Text('Bordereau d\'envoi (manifeste / emballage)'),
+            value: s.reportBordereauEnabled,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(bordereauEnabled: v)),
+          ),
+          SwitchListTile(
+            title: const Text('Journal de caisse'),
+            value: s.reportCashJournalEnabled,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(cashJournalEnabled: v)),
+          ),
+          SwitchListTile(
+            title: const Text('Journal de vente'),
+            value: s.reportSalesJournalEnabled,
+            onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(salesJournalEnabled: v)),
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

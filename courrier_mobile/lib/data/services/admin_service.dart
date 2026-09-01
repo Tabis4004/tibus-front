@@ -172,6 +172,91 @@ class AdminService {
   Future<void> revokeRole(String userRoleId) async {
     await _client.rpc('revoke_company_role', params: {'p_user_role_id': userRoleId});
   }
+
+  // ------------------------------------------------- Coordonnées compagnie
+
+  Future<CompanyInfo> getCompanyInfo(String companyId) async {
+    final data = await _client.rpc('get_company_info', params: {'p_company_id': companyId});
+    return CompanyInfo.fromMap(data as Map<String, dynamic>);
+  }
+
+  Future<void> updateCompanyInfo({
+    required String companyId,
+    String? name,
+    String? phone,
+    String? logo,
+    String? managerName,
+  }) async {
+    await _client.rpc('update_company_info', params: {
+      'p_company_id': companyId,
+      'p_name': name,
+      'p_phone': phone,
+      'p_logo': logo,
+      'p_manager_name': managerName,
+    });
+  }
+
+  // ------------------------------------------ Réglages colis autonome
+
+  /// Réutilise le même backend que Tibus Africa (get_company_colis_settings,
+  /// update_company_colis_price_settings, update_company_colis_ui_config) —
+  /// pas de duplication, ces RPC existent déjà et sont déjà utilisées par
+  /// l'autre panneau d'admin.
+  Future<ColisSettings> getColisSettings(String companyId) async {
+    final data = await _client.rpc('get_company_colis_settings', params: {'p_company_id': companyId});
+    return ColisSettings.fromMap(data as Map<String, dynamic>);
+  }
+
+  Future<void> updateColisPricing({
+    required String companyId,
+    double? prixMinFixe,
+    double? prixMinTaux,
+    double? pourcentagePercu,
+  }) async {
+    await _client.rpc('update_company_colis_price_settings', params: {
+      'p_company_id': companyId,
+      'p_prix_min_fixe_general': prixMinFixe,
+      'p_prix_min_taux_general': prixMinTaux,
+      'p_pourcentage_percu_general': pourcentagePercu,
+    });
+  }
+
+  /// [uiConfig] doit être l'objet complet (formFields + reports +
+  /// customFields) — cette RPC remplace toute la config, pas de merge
+  /// partiel côté serveur. Toujours repartir de [getColisSettings] puis
+  /// modifier seulement la partie voulue avant de renvoyer l'ensemble.
+  Future<void> updateColisUiConfig({required String companyId, required Map<String, dynamic> uiConfig}) async {
+    await _client.rpc('update_company_colis_ui_config', params: {'p_company_id': companyId, 'p_ui_config': uiConfig});
+  }
+
+  Future<List<ColisNature>> listColisNatures(String companyId) async {
+    final data = await _client.from('colis_natures').select().eq('company_id', companyId).order('libelle');
+    return (data as List).whereType<Map<String, dynamic>>().map(ColisNature.fromMap).toList();
+  }
+
+  Future<void> upsertColisNature({
+    required String companyId,
+    required String libelle,
+    String? natureId,
+    bool isActive = true,
+    double? prixMinFixe,
+    double? prixMinTaux,
+  }) async {
+    await _client.rpc('upsert_colis_nature', params: {
+      'p_company_id': companyId,
+      'p_libelle': libelle,
+      'p_nature_id': natureId,
+      'p_is_active': isActive,
+      'p_prix_min_fixe': prixMinFixe,
+      'p_prix_min_taux': prixMinTaux,
+    });
+  }
+
+  /// Échoue côté serveur si la nature est déjà utilisée par un colis
+  /// existant (message explicite : "desactivez-la" plutôt que supprimer).
+  Future<void> deleteColisNature(String natureId) async {
+    await _client.rpc('delete_colis_nature', params: {'p_nature_id': natureId});
+  }
 }
 
 // ============================================================== Modèles
@@ -331,3 +416,115 @@ const kAssignableRoles = <String>[
 /// aussi — voir _is_gare_scoped_role côté base).
 bool isGareScopedRole(String roleName) =>
     const ['gerant_gare', 'vendeur_gare', 'controleur_gare', 'comptable_gare'].contains(roleName);
+
+class CompanyInfo {
+  final String? name;
+  final String? phone;
+  final String? logo;
+  final String? managerName;
+  const CompanyInfo({this.name, this.phone, this.logo, this.managerName});
+  factory CompanyInfo.fromMap(Map<String, dynamic> map) => CompanyInfo(
+        name: map['name'] as String?,
+        phone: map['phone'] as String?,
+        logo: map['logo'] as String?,
+        managerName: map['managerName'] as String?,
+      );
+}
+
+class ColisNature {
+  final String id;
+  final String libelle;
+  final bool isActive;
+  final double? prixMinFixe;
+  final double? prixMinTaux;
+  const ColisNature({required this.id, required this.libelle, required this.isActive, this.prixMinFixe, this.prixMinTaux});
+  factory ColisNature.fromMap(Map<String, dynamic> map) => ColisNature(
+        id: map['id'] as String,
+        libelle: map['libelle'] as String,
+        isActive: map['is_active'] as bool? ?? true,
+        prixMinFixe: (map['prix_min_fixe'] as num?)?.toDouble(),
+        prixMinTaux: (map['prix_min_taux'] as num?)?.toDouble(),
+      );
+}
+
+/// Reflète exactement la structure JSON de `Companies.colis_ui_config`
+/// (voir Tibus Africa, section "Formulaire colis & rapports"/"Visibilité
+/// des rapports") : { formFields: {poids, pieces, pourcentagePercu},
+/// reports: {stats, bordereau, cashJournal, salesJournal} (chacun {enabled,
+/// hiddenFields}), customFields: [] }. [rawUiConfig] garde l'objet complet
+/// tel quel pour ne jamais perdre customFields/hiddenFields qu'on ne
+/// modifie pas depuis cet écran.
+class ColisSettings {
+  final bool colisAutonomeEnabled;
+  final Map<String, dynamic> rawUiConfig;
+  final bool formFieldPoids;
+  final bool formFieldPieces;
+  final bool formFieldPourcentagePercu;
+  final bool reportStatsEnabled;
+  final bool reportBordereauEnabled;
+  final bool reportCashJournalEnabled;
+  final bool reportSalesJournalEnabled;
+
+  const ColisSettings({
+    required this.colisAutonomeEnabled,
+    required this.rawUiConfig,
+    required this.formFieldPoids,
+    required this.formFieldPieces,
+    required this.formFieldPourcentagePercu,
+    required this.reportStatsEnabled,
+    required this.reportBordereauEnabled,
+    required this.reportCashJournalEnabled,
+    required this.reportSalesJournalEnabled,
+  });
+
+  factory ColisSettings.fromMap(Map<String, dynamic> map) {
+    final ui = (map['uiConfig'] as Map<String, dynamic>?) ?? {};
+    final formFields = (ui['formFields'] as Map<String, dynamic>?) ?? {};
+    final reports = (ui['reports'] as Map<String, dynamic>?) ?? {};
+    bool enabledOf(String key) => ((reports[key] as Map<String, dynamic>?)?['enabled'] as bool?) ?? true;
+    return ColisSettings(
+      colisAutonomeEnabled: map['colisAutonomeEnabled'] as bool? ?? false,
+      rawUiConfig: ui,
+      formFieldPoids: formFields['poids'] as bool? ?? true,
+      formFieldPieces: formFields['pieces'] as bool? ?? true,
+      formFieldPourcentagePercu: formFields['pourcentagePercu'] as bool? ?? true,
+      reportStatsEnabled: enabledOf('stats'),
+      reportBordereauEnabled: enabledOf('bordereau'),
+      reportCashJournalEnabled: enabledOf('cashJournal'),
+      reportSalesJournalEnabled: enabledOf('salesJournal'),
+    );
+  }
+
+  /// Reconstruit un uiConfig complet à jour, en conservant hiddenFields et
+  /// customFields inchangés — à utiliser juste avant updateColisUiConfig.
+  Map<String, dynamic> toUpdatedUiConfig({
+    bool? poids,
+    bool? pieces,
+    bool? pourcentagePercu,
+    bool? statsEnabled,
+    bool? bordereauEnabled,
+    bool? cashJournalEnabled,
+    bool? salesJournalEnabled,
+  }) {
+    final next = Map<String, dynamic>.from(rawUiConfig);
+    next['formFields'] = {
+      'poids': poids ?? formFieldPoids,
+      'pieces': pieces ?? formFieldPieces,
+      'pourcentagePercu': pourcentagePercu ?? formFieldPourcentagePercu,
+    };
+    final reports = Map<String, dynamic>.from((rawUiConfig['reports'] as Map<String, dynamic>?) ?? {});
+    Map<String, dynamic> reportOf(String key, bool enabled) {
+      final current = Map<String, dynamic>.from((reports[key] as Map<String, dynamic>?) ?? {'hiddenFields': []});
+      current['enabled'] = enabled;
+      return current;
+    }
+
+    next['reports'] = {
+      'stats': reportOf('stats', statsEnabled ?? reportStatsEnabled),
+      'bordereau': reportOf('bordereau', bordereauEnabled ?? reportBordereauEnabled),
+      'cashJournal': reportOf('cashJournal', cashJournalEnabled ?? reportCashJournalEnabled),
+      'salesJournal': reportOf('salesJournal', salesJournalEnabled ?? reportSalesJournalEnabled),
+    };
+    return next;
+  }
+}
