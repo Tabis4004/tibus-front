@@ -1,0 +1,27 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+*.iml
+*.ipr
+*.iws
+
+# Secrets
+.env
+
+# Platform (générés par `flutter create .` — voir README.md, aucun code
+# natif custom ici contrairement à courrier_mobile/android)
+android/
+ios/
+web/
+macos/
+linux/
+windows/
+
+# IDE
+.idea/
+.vscode/
