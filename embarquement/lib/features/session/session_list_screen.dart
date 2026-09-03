@@ -6,13 +6,16 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_session.dart';
 import '../../data/models/embarquement_itineraire.dart';
 import '../../data/models/embarquement_bus.dart';
+import '../scan/scan_screen.dart';
+import '../manifest/manifest_screen.dart';
 
 /// Liste des sessions Embarquement de la compagnie active — appelle la RPC
 /// embarquement_list_sessions déjà en place. L'ouverture depuis un départ
-/// Tibus existant (list_embarquement_departures) arrive en Phase 1 ; pour
+/// Tibus existant (list_embarquement_departures) reste à faire ; pour
 /// l'instant seule l'ouverture hors-Tibus (référentiel itinéraires/bus, ou
-/// saisie libre de secours) est câblée, ce qui suffit à valider la chaîne
-/// complète référentiel → session de bout en bout dès la Phase 0.
+/// saisie libre de secours) est câblée. Une session ouverte mène au scan
+/// (embarquement_scan_tibus/embarquement_scan_external, Phase 1) ; une
+/// session clôturée mène directement au manifeste (lecture seule).
 class SessionListScreen extends ConsumerStatefulWidget {
   const SessionListScreen({super.key});
 
@@ -123,6 +126,18 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
                           visualDensity: VisualDensity.compact,
                           label: Text(s.isOpen ? 'Ouverte' : 'Clôturée'),
                         ),
+                        onTap: () async {
+                          if (s.isOpen) {
+                            final closed = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(builder: (_) => ScanScreen(session: s)),
+                            );
+                            if (closed == true) _load(companyId);
+                          } else {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => ManifestScreen(session: s)),
+                            );
+                          }
+                        },
                       ),
                     );
                   },

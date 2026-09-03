@@ -2,6 +2,7 @@ import 'supabase_service.dart';
 import '../models/embarquement_session.dart';
 import '../models/embarquement_itineraire.dart';
 import '../models/embarquement_bus.dart';
+import '../models/embarquement_scan.dart';
 
 /// Enveloppe les RPC serveur Embarquement — celles déjà en place
 /// (embarquement_create_session/list_sessions/update_session,
@@ -105,5 +106,55 @@ class EmbarquementService {
 
   Future<void> deleteBus(String id) {
     return _client.rpc('embarquement_delete_bus', params: {'p_id': id});
+  }
+
+  // Scan ------------------------------------------------------------------
+
+  Future<TibusScanOutcome> scanTibus({
+    required String sessionId,
+    required String rawPayload,
+    required String reference,
+    String? token,
+  }) async {
+    final data = await _client.rpc('embarquement_scan_tibus', params: {
+      'p_session_id': sessionId,
+      'p_raw_payload': rawPayload,
+      'p_reference': reference,
+      'p_token': token,
+    });
+    return TibusScanOutcome.fromRpc(data as Map<String, dynamic>);
+  }
+
+  /// Renvoie le statut ('valid'/'duplicate') — voir embarquement_scan_external.
+  Future<String> scanExternal({
+    required String sessionId,
+    required String rawPayload,
+    required String passengerName,
+    String? ticketNumber,
+    String? originLabel,
+    String? destinationLabel,
+  }) async {
+    final data = await _client.rpc('embarquement_scan_external', params: {
+      'p_session_id': sessionId,
+      'p_raw_payload': rawPayload,
+      'p_passenger_name': passengerName,
+      'p_ticket_number': ticketNumber,
+      'p_origin_label': originLabel,
+      'p_destination_label': destinationLabel,
+    });
+    return (data as Map<String, dynamic>)['status'] as String;
+  }
+
+  // Manifeste & clôture -----------------------------------------------------
+
+  Future<List<EmbarquementScan>> listManifest(String sessionId) async {
+    final data = await _client.rpc('embarquement_list_manifest', params: {
+      'p_session_id': sessionId,
+    });
+    return (data as List).whereType<Map<String, dynamic>>().map(EmbarquementScan.fromMap).toList();
+  }
+
+  Future<void> closeSession(String sessionId) {
+    return _client.rpc('embarquement_close_session', params: {'p_session_id': sessionId});
   }
 }
