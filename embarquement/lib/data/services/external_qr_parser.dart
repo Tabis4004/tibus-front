@@ -102,7 +102,58 @@ ParsedExternalQr parseExternalQrPayload(String raw) {
     if (parsed.wasStructured) return parsed;
   }
 
-  // 4. Repli — payload brut conservé, champs vides, correction manuelle
-  // obligatoire côté écran (jamais d'ajout silencieux au manifeste).
+  // 4. Repli heuristique (positionnel) — beaucoup d'applis tierces encodent
+  // le QR comme une simple liste de valeurs séparées par ; | , tab ou saut
+  // de ligne, SANS nom de champ (ex. "1400304;BOBO-OUAGA;BELEM SALAMATA").
+  // Les tiers 1-3 ci-dessus ne peuvent rien en tirer (pas de "clé: valeur").
+  // Ici on devine chaque jeton à sa forme plutôt qu'à son nom de champ :
+  // nombre pur → n° de billet, "MOT-MOT" → gare départ/destination,
+  // 2-4 mots en lettres → nom. Jamais de certitude — l'agent valide/corrige
+  // toujours à l'écran (external_scan_review_sheet.dart), donc une
+  // mauvaise supposition ici n'est jamais enregistrée sans relecture.
+  final tokens = trimmed
+      .split(RegExp(r'[;,|\t\n]+'))
+      .map((t) => t.trim())
+      .where((t) => t.isNotEmpty)
+      .toList();
+  if (tokens.length > 1) {
+    String? ticket;
+    String? origin;
+    String? dest;
+    String? name;
+    final routeRe = RegExp(r'^([A-Za-zÀ-ÿ]{2,20})\s*-\s*([A-Za-zÀ-ÿ]{2,20})$');
+    final nameRe = RegExp(r'^[A-Za-zÀ-ÿ]+(\s+[A-Za-zÀ-ÿ]+){1,3}$');
+    final digitsRe = RegExp(r'^\d{3,12}$');
+    for (final t in tokens) {
+      if (ticket == null && digitsRe.hasMatch(t)) {
+        ticket = t;
+        continue;
+      }
+      final routeMatch = origin == null ? routeRe.firstMatch(t) : null;
+      if (routeMatch != null) {
+        origin = routeMatch.group(1);
+        dest = routeMatch.group(2);
+        continue;
+      }
+      if (name == null && nameRe.hasMatch(t)) {
+        name = t;
+      }
+    }
+    if (ticket != null || origin != null || name != null) {
+      return ParsedExternalQr(
+        passengerName: name,
+        ticketNumber: ticket,
+        originLabel: origin,
+        destinationLabel: dest,
+        rawPayload: trimmed,
+        wasStructured: true,
+      );
+    }
+  }
+
+  // 5. Repli final — payload brut conservé, champs vides, correction
+  // manuelle obligatoire côté écran (jamais d'ajout silencieux au
+  // manifeste). Le payload reste affiché à l'écran de révision pour
+  // permettre d'affiner ce parseur une fois le format réel connu.
   return ParsedExternalQr(rawPayload: trimmed, wasStructured: false);
 }

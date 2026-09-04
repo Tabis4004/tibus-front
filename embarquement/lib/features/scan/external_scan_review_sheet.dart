@@ -67,7 +67,23 @@ class _ExternalScanReviewSheetState extends State<ExternalScanReviewSheet> {
               const SizedBox(height: 8),
               Text(_error!, style: const TextStyle(color: AppColors.accentRed)),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            // Contenu brut du QR — permet à l'agent de vérifier/compléter à
+            // l'œil quand le préremplissage automatique est incomplet, et de
+            // copier le texte exact pour nous le transmettre si un format de
+            // billet n'est pas encore bien reconnu.
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Contenu brut du QR', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              children: [
+                SelectableText(
+                  widget.parsed.rawPayload,
+                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
