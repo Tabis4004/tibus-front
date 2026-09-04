@@ -4,18 +4,19 @@ import 'package:intl/intl.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_session.dart';
-import '../../data/models/embarquement_itineraire.dart';
-import '../../data/models/embarquement_bus.dart';
+import '../../data/models/company_gare_option.dart';
+import '../../data/models/company_bus_option.dart';
 import '../scan/scan_screen.dart';
 import '../manifest/manifest_screen.dart';
 
 /// Liste des sessions Embarquement de la compagnie active — appelle la RPC
 /// embarquement_list_sessions déjà en place. L'ouverture depuis un départ
 /// Tibus existant (list_embarquement_departures) reste à faire ; pour
-/// l'instant seule l'ouverture hors-Tibus (référentiel itinéraires/bus, ou
-/// saisie libre de secours) est câblée. Une session ouverte mène au scan
-/// (embarquement_scan_tibus/embarquement_scan_external, Phase 1) ; une
-/// session clôturée mène directement au manifeste (lecture seule).
+/// l'instant seule l'ouverture hors-Tibus est câblée, en piochant dans les
+/// VRAIES gares/bus de la compagnie (Administration) — plus de ressaisie
+/// séparée. Une session ouverte mène au scan (embarquement_scan_tibus/
+/// embarquement_scan_external, Phase 1) ; une session clôturée mène
+/// directement au manifeste (lecture seule).
 class SessionListScreen extends ConsumerStatefulWidget {
   const SessionListScreen({super.key});
 
@@ -188,10 +189,11 @@ class _NewHorsTibusSessionSheet extends ConsumerStatefulWidget {
 }
 
 class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionSheet> {
-  List<EmbarquementItineraire> _itineraires = [];
-  List<EmbarquementBus> _buses = [];
+  List<CompanyGareOption> _gares = [];
+  List<CompanyBusOption> _buses = [];
   bool _loadingRef = true;
-  String? _itineraireId;
+  String? _origineId;
+  String? _destinationId;
   String? _busId;
   final _routeLabelCtrl = TextEditingController();
   final _busLabelCtrl = TextEditingController();
@@ -208,24 +210,35 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
   Future<void> _loadReferentiel() async {
     final service = ref.read(embarquementServiceProvider);
     final results = await Future.wait([
-      service.listItineraires(widget.companyId),
-      service.listBuses(widget.companyId),
+      service.listCompanyGares(widget.companyId),
+      service.listCompanyBus(widget.companyId),
     ]);
     if (!mounted) return;
     setState(() {
-      _itineraires = results[0] as List<EmbarquementItineraire>;
-      _buses = results[1] as List<EmbarquementBus>;
+      _gares = results[0] as List<CompanyGareOption>;
+      _buses = results[1] as List<CompanyBusOption>;
       _loadingRef = false;
     });
   }
 
   Future<void> _submit() async {
-    final routeLabel = _itineraireId != null
-        ? _itineraires.firstWhere((i) => i.id == _itineraireId).label
-        : _routeLabelCtrl.text.trim();
-    if (routeLabel.isEmpty) {
-      setState(() => _error = 'Choisir un itinéraire ou saisir un trajet');
-      return;
+    String routeLabel;
+    String? gareId;
+    if (_gares.isNotEmpty) {
+      if (_origineId == null || _destinationId == null) {
+        setState(() => _error = 'Choisir une gare de départ et de destination');
+        return;
+      }
+      final origine = _gares.firstWhere((g) => g.id == _origineId);
+      final destination = _gares.firstWhere((g) => g.id == _destinationId);
+      routeLabel = '${origine.name} → ${destination.name}';
+      gareId = origine.id;
+    } else {
+      routeLabel = _routeLabelCtrl.text.trim();
+      if (routeLabel.isEmpty) {
+        setState(() => _error = 'Trajet requis');
+        return;
+      }
     }
     final busLabel = _busId != null
         ? _buses.firstWhere((b) => b.id == _busId).label
@@ -248,6 +261,7 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
             routeLabel: routeLabel,
             busLabel: busLabel,
             capacityDeclared: capacity,
+            gareId: gareId,
           );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -273,35 +287,47 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
                 children: [
                   const Text('Nouvelle session hors-Tibus', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  if (_itineraires.isNotEmpty) ...[
+                  if (_gares.isNotEmpty) ...[
                     DropdownButtonFormField<String>(
-                      value: _itineraireId,
-                      decoration: const InputDecoration(labelText: 'Itinéraire (référentiel)'),
-                      items: _itineraires
-                          .map((i) => DropdownMenuItem(value: i.id, child: Text(i.label)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _itineraireId = v),
+                      value: _origineId,
+                      decoration: const InputDecoration(labelText: 'Gare de départ *'),
+                      items: _gares.map((g) => DropdownMenuItem(value: g.id, child: Text(g.label))).toList(),
+                      onChanged: (v) => setState(() => _origineId = v),
                     ),
                     const SizedBox(height: 8),
-                  ],
-                  if (_itineraireId == null)
+                    DropdownButtonFormField<String>(
+                      value: _destinationId,
+                      decoration: const InputDecoration(labelText: 'Gare de destination *'),
+                      items: _gares.map((g) => DropdownMenuItem(value: g.id, child: Text(g.label))).toList(),
+                      onChanged: (v) => setState(() => _destinationId = v),
+                    ),
+                  ] else ...[
+                    const Text(
+                      "Aucune gare déclarée — ajoute-les dans Administration pour ne plus avoir à saisir le trajet à chaque session.",
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _routeLabelCtrl,
-                      decoration: const InputDecoration(labelText: 'Ou saisir le trajet librement'),
+                      decoration: const InputDecoration(labelText: 'Trajet (saisie libre) *'),
                     ),
+                  ],
                   const SizedBox(height: 10),
                   if (_buses.isNotEmpty) ...[
                     DropdownButtonFormField<String>(
                       value: _busId,
-                      decoration: const InputDecoration(labelText: 'Bus (référentiel)'),
+                      decoration: const InputDecoration(labelText: 'Bus *'),
                       items: _buses
                           .map((b) => DropdownMenuItem(value: b.id, child: Text('${b.label} (${b.capacity} places)')))
                           .toList(),
                       onChanged: (v) => setState(() => _busId = v),
                     ),
+                  ] else ...[
+                    const Text(
+                      "Aucun bus déclaré — ajoute-le dans Administration pour ne plus avoir à saisir la capacité à chaque session.",
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
                     const SizedBox(height: 8),
-                  ],
-                  if (_busId == null) ...[
                     TextField(
                       controller: _busLabelCtrl,
                       decoration: const InputDecoration(labelText: 'Bus (optionnel, saisie libre)'),

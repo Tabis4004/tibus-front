@@ -3,6 +3,8 @@ import '../models/embarquement_session.dart';
 import '../models/embarquement_itineraire.dart';
 import '../models/embarquement_bus.dart';
 import '../models/embarquement_scan.dart';
+import '../models/company_gare_option.dart';
+import '../models/company_bus_option.dart';
 
 /// Enveloppe les RPC serveur Embarquement — celles déjà en place
 /// (embarquement_create_session/list_sessions/update_session,
@@ -51,7 +53,24 @@ class EmbarquementService {
     return (data as Map<String, dynamic>)['id'] as String;
   }
 
-  // Référentiel — itinéraires -------------------------------------------
+  /// Vraies gares de la compagnie (table "Gares", gérées via Administration)
+  /// — lecture large (tous rôles Embarquement), contrairement à
+  /// list_company_gares_admin (owner uniquement) côté AdminService. Alimente
+  /// l'ouverture de session hors-Tibus sans ressaisie séparée.
+  Future<List<CompanyGareOption>> listCompanyGares(String companyId) async {
+    final data = await _client.rpc('embarquement_list_company_gares', params: {'p_company_id': companyId});
+    return (data as List).whereType<Map<String, dynamic>>().map(CompanyGareOption.fromMap).toList();
+  }
+
+  /// Vrais bus de la compagnie (table "Bus") — même principe, lecture large.
+  Future<List<CompanyBusOption>> listCompanyBus(String companyId) async {
+    final data = await _client.rpc('embarquement_list_company_bus', params: {'p_company_id': companyId});
+    return (data as List).whereType<Map<String, dynamic>>().map(CompanyBusOption.fromMap).toList();
+  }
+
+  // Référentiel — itinéraires (Phase 0, non utilisé côté écrans depuis
+  // l'ajout d'Administration + listCompanyGares/listCompanyBus ci-dessus —
+  // conservé pour compat/évolution future, voir home_shell.dart). ---------
 
   Future<List<EmbarquementItineraire>> listItineraires(String companyId) async {
     final data = await _client.rpc('embarquement_list_itineraires', params: {
