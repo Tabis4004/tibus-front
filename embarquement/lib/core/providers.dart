@@ -1,10 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/embarquement_service.dart';
+import '../data/services/ticket_ocr_service.dart';
 import '../data/models/app_role.dart';
 
 final authServiceProvider = Provider((ref) => AuthService());
 final embarquementServiceProvider = Provider((ref) => EmbarquementService());
+
+/// Un seul TextRecognizer pour toute l'app (voir ticket_ocr_service.dart) —
+/// Provider (pas autoDispose) pour ne jamais recréer/refermer le recognizer
+/// entre deux photos de billet.
+final ticketOcrServiceProvider = Provider((ref) => TicketOcrService());
 
 /// Rôles de l'utilisateur connecté (une entrée par compagnie affectée) —
 /// même requête que courrier_mobile (myRolesProvider), sans le repli

@@ -13,10 +13,29 @@ build/
 # Secrets
 .env
 
-# Platform (générés par `flutter create .` — voir README.md, aucun code
-# natif custom ici contrairement à courrier_mobile/android)
-android/
-ios/
+# Platform (générés par `flutter create .` — voir README.md). android/ et
+# ios/ contiennent maintenant de la config native custom (permissions
+# INTERNET/CAMERA, usage descriptions caméra/photos — voir
+# AndroidManifest.xml/Info.plist) qui DOIT être versionnée, sinon elle
+# disparaît au prochain clone/CI comme le piège déjà documenté dans
+# CLAUDE.md pour web/ (branding perdu car web/ traité à tort comme
+# "généré"). Le blanket-ignore de tout android/ et ios/ ne peut pas être
+# levé en un exclude ciblé (git n'autorise pas de "!" à l'intérieur d'un
+# répertoire déjà exclu) — donc on ré-inclut explicitement chaque niveau
+# jusqu'aux 2 fichiers modifiés ; le reste (Gradle, Pods, xcuserdata...)
+# reste ignoré comme avant.
+android/*
+!android/app/
+android/app/*
+!android/app/src/
+android/app/src/*
+!android/app/src/main/
+android/app/src/main/*
+!android/app/src/main/AndroidManifest.xml
+ios/*
+!ios/Runner/
+ios/Runner/*
+!ios/Runner/Info.plist
 web/
 macos/
 linux/
