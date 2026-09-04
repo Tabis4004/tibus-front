@@ -14,19 +14,86 @@ final myRolesProvider = FutureProvider<List<AppRole>>((ref) async {
   return ref.read(authServiceProvider).fetchMyRoles();
 });
 
-/// Compagnie "active" pour la session agent — première compagnie où
-/// l'utilisateur a un rôle Embarquement (owner/controleur/vendeur/chauffeur/
-/// super_admin), cf. AppRole.isEmbarquementRole. Pas de dépendance à une
-/// caisse ouverte (spécifique à courrier_mobile/colis, non pertinent ici).
-///
-/// Simplification V1 assumée : un agent multi-compagnies verra la première
-/// compagnie où il a un rôle Embarquement ; un sélecteur explicite reste à
-/// ajouter si le besoin se confirme (même remarque que côté courrier_mobile).
-final activeCompanyIdProvider = FutureProvider<String?>((ref) async {
+/// Une compagnie où l'utilisateur a au moins un rôle Embarquement, avec le
+/// "meilleur" rôle qu'il y détient (pour affichage et tri).
+class EmbarquementCompanyOption {
+  final String companyId;
+  final String companyName;
+  final String bestRoleName;
+  const EmbarquementCompanyOption({
+    required this.companyId,
+    required this.companyName,
+    required this.bestRoleName,
+  });
+}
+
+// owner d'abord (signal le plus fort de "c'est ma compagnie"), puis le
+// reste par ordre décroissant de responsabilité.
+const _rolePriority = ['owner', 'controleur', 'vendeur', 'chauffeur'];
+
+int _rolePriorityIndex(String name) {
+  final i = _rolePriority.indexOf(name);
+  return i == -1 ? _rolePriority.length : i;
+}
+
+/// Liste des compagnies où l'utilisateur peut utiliser Embarquement, triée
+/// avec la compagnie la plus probable (rôle owner) en premier — un compte
+/// multi-compagnies (ex. owner d'une compagnie ET vendeur d'une autre, cas
+/// réel rencontré en test) doit tomber sur la bonne par défaut, pas sur la
+/// première trouvée dans un ordre non garanti par la requête serveur (même
+/// limitation déjà documentée côté courrier_mobile/core/providers.dart).
+final embarquementCompaniesProvider = FutureProvider<List<EmbarquementCompanyOption>>((ref) async {
   final roles = await ref.watch(myRolesProvider.future);
-  final embarquementRoles = roles.where((r) => r.isEmbarquementRole && r.companyId != null).toList();
-  if (embarquementRoles.isEmpty) return null;
-  return embarquementRoles.first.companyId;
+  final byCompany = <String, AppRole>{};
+  for (final r in roles) {
+    if (!r.isEmbarquementRole || r.companyId == null) continue;
+    final existing = byCompany[r.companyId!];
+    if (existing == null || _rolePriorityIndex(r.name) < _rolePriorityIndex(existing.name)) {
+      byCompany[r.companyId!] = r;
+    }
+  }
+  final options = byCompany.values
+      .map((r) => EmbarquementCompanyOption(
+            companyId: r.companyId!,
+            companyName: r.companyName ?? r.companyId!,
+            bestRoleName: r.name,
+          ))
+      .toList();
+  options.sort((a, b) => _rolePriorityIndex(a.bestRoleName).compareTo(_rolePriorityIndex(b.bestRoleName)));
+  return options;
+});
+
+/// Override manuel de la compagnie active (sélecteur, voir ProfileScreen) —
+/// null = pas de choix explicite, on retombe sur la première compagnie de
+/// embarquementCompaniesProvider.
+final selectedCompanyIdProvider = StateProvider<String?>((ref) => null);
+
+/// Compagnie "active" pour la session agent — la sélection manuelle si elle
+/// est encore valide (l'utilisateur y a toujours un rôle Embarquement),
+/// sinon la première compagnie de embarquementCompaniesProvider (owner en
+/// priorité). Pas de dépendance à une caisse ouverte (spécifique à
+/// courrier_mobile/colis, non pertinent ici).
+final activeCompanyIdProvider = FutureProvider<String?>((ref) async {
+  final companies = await ref.watch(embarquementCompaniesProvider.future);
+  if (companies.isEmpty) return null;
+  final selected = ref.watch(selectedCompanyIdProvider);
+  if (selected != null && companies.any((c) => c.companyId == selected)) {
+    return selected;
+  }
+  return companies.first.companyId;
+});
+
+/// Nom de la compagnie active — pour affichage (AppBar, Profil), afin que
+/// l'utilisateur puisse vérifier immédiatement laquelle est sélectionnée
+/// plutôt que de deviner devant un écran vide.
+final activeCompanyNameProvider = FutureProvider<String?>((ref) async {
+  final companyId = await ref.watch(activeCompanyIdProvider.future);
+  if (companyId == null) return null;
+  final companies = await ref.watch(embarquementCompaniesProvider.future);
+  for (final c in companies) {
+    if (c.companyId == companyId) return c.companyName;
+  }
+  return null;
 });
 
 /// Vrai si l'utilisateur connecté a, sur la compagnie active, un rôle

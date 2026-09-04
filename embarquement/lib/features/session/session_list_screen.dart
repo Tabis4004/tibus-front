@@ -46,9 +46,27 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   @override
   Widget build(BuildContext context) {
     final companyIdAsync = ref.watch(activeCompanyIdProvider);
+    final companyNameAsync = ref.watch(activeCompanyNameProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sessions Embarquement')),
+      appBar: AppBar(
+        title: const Text('Sessions Embarquement'),
+        // Affiche la compagnie active pour éviter la confusion vécue en
+        // test (compte multi-compagnies retombant sur la mauvaise par
+        // défaut) — voir sélecteur dans l'onglet Profil si plusieurs.
+        bottom: companyNameAsync.maybeWhen(
+          data: (name) => name == null
+              ? null
+              : PreferredSize(
+                  preferredSize: const Size.fromHeight(24),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(name, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  ),
+                ),
+          orElse: () => null,
+        ),
+      ),
       body: companyIdAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Erreur : $e')),
