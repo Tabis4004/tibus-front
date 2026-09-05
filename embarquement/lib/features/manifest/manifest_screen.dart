@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_scan.dart';
 import '../../data/models/embarquement_session.dart';
+import '../report/report_screen.dart';
 
 /// Liste temps réel des scans d'une session (embarquement_list_manifest) —
 /// pull-to-refresh en V1 (pas de websocket/Realtime, suffisant pour un
@@ -62,7 +63,20 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Manifeste — ${widget.session.routeLabel}')),
+      appBar: AppBar(
+        title: Text('Manifeste — ${widget.session.routeLabel}'),
+        actions: [
+          // Seul chemin vers le rapport d'une session déjà clôturée : la
+          // liste des sessions ouvre le manifeste, pas l'écran de scan.
+          IconButton(
+            icon: const Icon(Icons.assessment_outlined),
+            tooltip: 'Rapport',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ReportScreen(session: widget.session)),
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<EmbarquementScan>>(

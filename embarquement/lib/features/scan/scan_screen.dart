@@ -11,6 +11,7 @@ import '../../data/services/external_qr_parser.dart';
 import '../../data/services/ticket_ocr_parser.dart';
 import '../../data/services/ticket_qr_parser.dart';
 import '../manifest/manifest_screen.dart';
+import '../report/report_screen.dart';
 import 'external_scan_review_sheet.dart';
 
 /// Écran de scan (§7 du plan) — 4 états couleur : vert (valide), orange
@@ -245,6 +246,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             tooltip: 'Manifeste',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => ManifestScreen(session: widget.session)),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.assessment_outlined),
+            tooltip: 'Rapport',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ReportScreen(session: widget.session)),
             ),
           ),
           IconButton(

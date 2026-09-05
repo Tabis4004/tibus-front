@@ -3,6 +3,7 @@ import '../models/embarquement_session.dart';
 import '../models/embarquement_itineraire.dart';
 import '../models/embarquement_bus.dart';
 import '../models/embarquement_scan.dart';
+import '../models/embarquement_report.dart';
 import '../models/company_gare_option.dart';
 import '../models/company_bus_option.dart';
 
@@ -175,5 +176,15 @@ class EmbarquementService {
 
   Future<void> closeSession(String sessionId) {
     return _client.rpc('embarquement_close_session', params: {'p_session_id': sessionId});
+  }
+
+  /// Rapport d'embarquement (migration 209) — consultable à tout moment, pas
+  /// seulement après clôture : au portillon, l'agent a besoin des places
+  /// restantes en direct. Le champ is_closed dit si les chiffres sont figés.
+  Future<EmbarquementReport> report(String sessionId) async {
+    final data = await _client.rpc('embarquement_report', params: {
+      'p_session_id': sessionId,
+    });
+    return EmbarquementReport.fromMap(data as Map<String, dynamic>);
   }
 }
