@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_scan.dart';
 import '../../data/models/embarquement_session.dart';
-import '../../data/services/ticket_qr_parser.dart';
 import '../../data/services/external_qr_parser.dart';
+import '../../data/services/ticket_ocr_parser.dart';
+import '../../data/services/ticket_qr_parser.dart';
 import '../manifest/manifest_screen.dart';
 import 'external_scan_review_sheet.dart';
 
@@ -18,6 +20,17 @@ import 'external_scan_review_sheet.dart';
 /// Une seule étape d'embarquement (décision utilisateur) : le scan Tibus
 /// enregistre directement l'embarquement (p_record_boarding=true côté
 /// serveur), pas de confirmation "à bord" séparée.
+///
+/// DEUX entrées, volontairement indépendantes :
+///   - la caméra de scan (MobileScanner), qui ne sait décoder que des
+///     codes-barres — jamais du texte imprimé ;
+///   - "Photographier le billet", qui prend une photo et la lit par OCR
+///     on-device (ML Kit).
+/// La seconde existe parce que la première ne peut rien faire d'un billet
+/// tiers sans QR (ou dont le QR ne se lit pas) : l'OCR n'était accessible
+/// qu'À L'INTÉRIEUR de la feuille de correction, laquelle ne s'ouvrait
+/// qu'après un QR décodé. Sans QR, aucun écran ne s'ouvrait et l'agent
+/// restait bloqué devant la caméra.
 class ScanScreen extends ConsumerStatefulWidget {
   final EmbarquementSession session;
   const ScanScreen({super.key, required this.session});
@@ -36,10 +49,57 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   int _validCount = 0;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_chargerCompteurDepuisManifeste());
+  }
+
+  /// Le compteur en tête d'écran n'était qu'un compteur local : remis à zéro
+  /// dès que l'agent quittait l'écran de scan (ou relançait l'app), il
+  /// affichait "0 embarqué" sur un bus déjà à moitié plein. On le reconstruit
+  /// donc depuis le manifeste serveur à chaque ouverture.
+  Future<void> _chargerCompteurDepuisManifeste() async {
+    try {
+      final manifest =
+          await ref.read(embarquementServiceProvider).listManifest(widget.session.id);
+      if (!mounted) return;
+      setState(() => _validCount = manifest.where((s) => s.isValid).length);
+    } catch (_) {
+      // Manifeste indisponible (réseau, droits) : on garde le compteur local.
+      // Le scan reste pleinement utilisable, seul l'affichage est dégradé.
+    }
+  }
+
+  @override
   void dispose() {
     _scannerController.dispose();
     _manualCtrl.dispose();
     super.dispose();
+  }
+
+  /// La caméra est une ressource exclusive (surtout sur Android) : tant que
+  /// MobileScanner la tient, image_picker peut échouer ou rendre un aperçu
+  /// noir. On la rend donc pendant toute la parenthèse "photo + feuille de
+  /// correction", puis on relance le scan. À n'utiliser qu'au niveau le plus
+  /// externe d'un flux — deux pauses imbriquées relanceraient la caméra trop
+  /// tôt.
+  Future<T> _withCameraPaused<T>(Future<T> Function() body) async {
+    try {
+      await _scannerController.stop();
+    } catch (_) {
+      // caméra déjà arrêtée / indisponible — sans conséquence ici
+    }
+    try {
+      return await body();
+    } finally {
+      if (mounted) {
+        try {
+          await _scannerController.start();
+        } catch (_) {
+          // idem : l'errorBuilder de MobileScanner affichera la cause
+        }
+      }
+    }
   }
 
   Future<void> _handlePayload(String raw) async {
@@ -49,12 +109,38 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       if (looksLikeTibusQr(raw)) {
         await _scanTibus(raw);
       } else {
-        await _scanExternal(raw);
+        await _withCameraPaused(
+          () => _reviewAndSubmitExternal(parseExternalQrPayload(raw), fromPhoto: false),
+        );
       }
     } finally {
       // Anti-rebond : on laisse un court délai avant de ré-accepter un scan,
       // le temps que l'agent voie le résultat et éloigne le prochain billet.
       await Future.delayed(const Duration(milliseconds: 900));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Entrée "photo", sans QR préalable — pour les billets tiers dont le QR
+  /// est illisible, absent, ou n'encode qu'une référence.
+  Future<void> _photographierBillet() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await _withCameraPaused(() async {
+        final photo = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          imageQuality: 90,
+        );
+        if (photo == null) return; // agent a annulé la prise de photo
+        final text = await ref.read(ticketOcrServiceProvider).recognizeText(photo.path);
+        await _reviewAndSubmitExternal(parseTicketOcrText(text), fromPhoto: true);
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _lastResult = _LastResult.invalid('Lecture de la photo : $e'));
+      }
+    } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -82,18 +168,23 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
   }
 
-  Future<void> _scanExternal(String raw) async {
-    final parsed = parseExternalQrPayload(raw);
+  /// Tronc commun aux deux entrées non-Tibus (QR tiers et photo) : la
+  /// relecture par l'agent est toujours obligatoire avant enregistrement.
+  /// L'appelant est responsable de la pause caméra (_withCameraPaused).
+  Future<void> _reviewAndSubmitExternal(
+    ParsedExternalQr parsed, {
+    required bool fromPhoto,
+  }) async {
     final reviewed = await showModalBottomSheet<Map<String, String?>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => ExternalScanReviewSheet(parsed: parsed),
+      builder: (_) => ExternalScanReviewSheet(parsed: parsed, fromPhoto: fromPhoto),
     );
     if (reviewed == null) return; // annulé — pas d'ajout, pas de comptage
     try {
       final status = await ref.read(embarquementServiceProvider).scanExternal(
             sessionId: widget.session.id,
-            rawPayload: raw,
+            rawPayload: parsed.rawPayload,
             passengerName: reviewed['passengerName']!,
             ticketNumber: reviewed['ticketNumber'],
             originLabel: reviewed['originLabel'],
@@ -104,7 +195,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         _lastResult = _LastResult(
           status: status,
           title: reviewed['passengerName']!,
-          subtitle: status == 'duplicate' ? 'Déjà scanné dans cette session' : 'QR externe ajouté au manifeste',
+          subtitle: status == 'duplicate'
+              ? 'Déjà scanné dans cette session'
+              : (fromPhoto
+                  ? 'Billet photographié ajouté au manifeste'
+                  : 'QR externe ajouté au manifeste'),
         );
         if (status == 'valid') _validCount++;
       });
@@ -203,34 +298,46 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               width: double.infinity,
               color: AppColors.background,
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_lastResult != null) _buildResultBanner(_lastResult!) else _buildIdleBanner(),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _manualCtrl,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(hintText: 'TB-XXXXXXXX', prefixIcon: Icon(Icons.keyboard)),
+              // Défilement : la zone basse est à hauteur fixe (flex) et porte
+              // désormais bandeau + bouton photo + saisie manuelle — sur un
+              // petit écran, sans ça, la colonne déborde.
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_lastResult != null) _buildResultBanner(_lastResult!) else _buildIdleBanner(),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _photographierBillet,
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      label: const Text('Photographier le billet (sans QR)'),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _manualCtrl,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(hintText: 'TB-XXXXXXXX', prefixIcon: Icon(Icons.keyboard)),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _busy
-                            ? null
-                            : () {
-                                final v = _manualCtrl.text.trim();
-                                if (v.isNotEmpty) unawaited(_handlePayload(v));
-                                _manualCtrl.clear();
-                              },
-                        child: const Text('Vérifier'),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _busy
+                              ? null
+                              : () {
+                                  final v = _manualCtrl.text.trim();
+                                  if (v.isNotEmpty) unawaited(_handlePayload(v));
+                                  _manualCtrl.clear();
+                                },
+                          child: const Text('Vérifier'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -243,7 +350,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
       child: Text(
-        'Présente un QR devant la caméra — billet Tibus ou QR tiers.',
+        'Présente un QR devant la caméra — billet Tibus ou QR tiers.\n'
+        "Billet sans QR lisible : photographie-le, le texte sera lu automatiquement.",
         textAlign: TextAlign.center,
         style: TextStyle(color: AppColors.textSecondary),
       ),

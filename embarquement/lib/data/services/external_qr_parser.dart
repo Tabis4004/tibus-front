@@ -102,21 +102,22 @@ ParsedExternalQr parseExternalQrPayload(String raw) {
     if (parsed.wasStructured) return parsed;
   }
 
-  // 4. Repli heuristique (positionnel) — beaucoup d'applis tierces encodent
-  // le QR comme une simple liste de valeurs séparées par ; | , tab ou saut
-  // de ligne, SANS nom de champ (ex. "1400304;BOBO-OUAGA;BELEM SALAMATA").
-  // Les tiers 1-3 ci-dessus ne peuvent rien en tirer (pas de "clé: valeur").
-  // Ici on devine chaque jeton à sa forme plutôt qu'à son nom de champ :
-  // nombre pur → n° de billet, "MOT-MOT" → gare départ/destination,
-  // 2-4 mots en lettres → nom. Jamais de certitude — l'agent valide/corrige
-  // toujours à l'écran (external_scan_review_sheet.dart), donc une
-  // mauvaise supposition ici n'est jamais enregistrée sans relecture.
+  // 4. Repli heuristique (positionnel, jusqu'au mono-jeton) — beaucoup
+  // d'applis tierces encodent le QR comme une simple liste de valeurs
+  // séparées par ; | , tab ou saut de ligne, SANS nom de champ
+  // (ex. "1400304;BOBO-OUAGA;BELEM SALAMATA"). Les tiers 1-3 ci-dessus ne
+  // peuvent rien en tirer (pas de "clé: valeur"). Ici on devine chaque
+  // jeton à sa forme plutôt qu'à son nom de champ : nombre pur → n° de
+  // billet, "MOT-MOT" → gare départ/destination, 2-4 mots en lettres → nom.
+  // Jamais de certitude — l'agent valide/corrige toujours à l'écran
+  // (external_scan_review_sheet.dart), donc une mauvaise supposition ici
+  // n'est jamais enregistrée sans relecture.
   final tokens = trimmed
       .split(RegExp(r'[;,|\t\n]+'))
       .map((t) => t.trim())
       .where((t) => t.isNotEmpty)
       .toList();
-  if (tokens.length > 1) {
+  if (tokens.isNotEmpty) {
     String? ticket;
     String? origin;
     String? dest;
@@ -137,6 +138,23 @@ ParsedExternalQr parseExternalQrPayload(String raw) {
       }
       if (name == null && nameRe.hasMatch(t)) {
         name = t;
+      }
+    }
+    // Cas mono-jeton, le plus fréquent sur le terrain : le QR d'un billet
+    // tiers n'encode QUE la référence. Purement numérique, la boucle
+    // ci-dessus l'a déjà prise ; alphanumérique ("AB1400304"), aucune règle
+    // de forme ne s'y applique et on tombait au repli brut ci-dessous —
+    // feuille de correction entièrement vide, ressaisie intégrale par
+    // l'agent. On la retient comme n° de billet si elle est compacte et
+    // contient au moins un chiffre (l'agent corrige si besoin).
+    if (ticket == null && origin == null && name == null && tokens.length == 1) {
+      final only = tokens.first;
+      if (only.length >= 3 &&
+          only.length <= 32 &&
+          !only.contains(RegExp(r'\s')) &&
+          !only.contains('://') &&
+          RegExp(r'\d').hasMatch(only)) {
+        ticket = only;
       }
     }
     if (ticket != null || origin != null || name != null) {

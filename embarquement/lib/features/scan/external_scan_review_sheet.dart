@@ -17,9 +17,19 @@ import '../../data/services/ticket_ocr_parser.dart';
 /// billet" prend une photo et lit son texte par OCR on-device (ML Kit,
 /// gratuit, hors connexion) pour préremplir les champs — voir
 /// ticket_ocr_service.dart / ticket_ocr_parser.dart.
+///
+/// [fromPhoto] indique que le préremplissage vient déjà d'une photo prise
+/// depuis l'écran de scan (nouvelle entrée sans QR, voir scan_screen.dart) :
+/// les libellés s'adaptent, et le bouton photo devient un "reprendre" plutôt
+/// qu'une première prise.
 class ExternalScanReviewSheet extends ConsumerStatefulWidget {
   final ParsedExternalQr parsed;
-  const ExternalScanReviewSheet({super.key, required this.parsed});
+  final bool fromPhoto;
+  const ExternalScanReviewSheet({
+    super.key,
+    required this.parsed,
+    this.fromPhoto = false,
+  });
 
   @override
   ConsumerState<ExternalScanReviewSheet> createState() => _ExternalScanReviewSheetState();
@@ -33,6 +43,18 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
   String? _error;
   String? _ocrRawText;
   bool _scanningPhoto = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Photo prise en amont (écran de scan) : rien n'a été reconnu, on le dit
+    // tout de suite plutôt que de laisser l'agent devant quatre champs vides
+    // sans explication.
+    if (widget.fromPhoto && !widget.parsed.wasStructured) {
+      _error = "Rien d'exploitable trouvé sur la photo — vérifie le cadrage/l'éclairage, "
+          'reprends la photo, ou saisis manuellement.';
+    }
+  }
 
   Future<void> _photographierBillet() async {
     setState(() {
@@ -90,6 +112,28 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
     });
   }
 
+  String get _title => widget.fromPhoto
+      ? 'Billet photographié'
+      : 'QR non reconnu comme billet Tibus';
+
+  String get _subtitle {
+    if (widget.fromPhoto) {
+      return widget.parsed.wasStructured
+          ? 'Informations lues sur la photo — vérifie avant de valider.'
+          : 'Aucune information lue — reprends la photo ou saisis ci-dessous.';
+    }
+    return widget.parsed.wasStructured
+        ? 'Informations extraites automatiquement du QR — vérifie avant de valider.'
+        : "Le QR ne contient qu'une référence — photographie le billet pour préremplir le reste, ou saisis-le ci-dessous.";
+  }
+
+  String get _photoButtonLabel {
+    if (_scanningPhoto) return 'Lecture de la photo…';
+    return widget.fromPhoto
+        ? 'Reprendre la photo du billet'
+        : 'Photographier le billet pour préremplir';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -102,12 +146,10 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('QR non reconnu comme billet Tibus', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(_title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(
-              widget.parsed.wasStructured
-                  ? 'Informations extraites automatiquement du QR — vérifie avant de valider.'
-                  : "Le QR ne contient qu'une référence — photographie le billet pour préremplir le reste, ou saisis-le ci-dessous.",
+              _subtitle,
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -116,7 +158,7 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
               icon: _scanningPhoto
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.camera_alt_outlined),
-              label: Text(_scanningPhoto ? 'Lecture de la photo…' : 'Photographier le billet pour préremplir'),
+              label: Text(_photoButtonLabel),
             ),
             const SizedBox(height: 16),
             TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nom complet *')),
@@ -141,8 +183,8 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
               childrenPadding: const EdgeInsets.only(bottom: 8),
               children: [
                 SelectableText(
-                  'QR : ${widget.parsed.rawPayload}'
-                  '${_ocrRawText != null ? '\n\nPhoto (OCR) :\n$_ocrRawText' : ''}',
+                  '${widget.fromPhoto ? "Photo (OCR) : " : "QR : "}${widget.parsed.rawPayload}'
+                  '${_ocrRawText != null ? '\n\nDernière photo (OCR) :\n$_ocrRawText' : ''}',
                   style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppColors.textSecondary),
                 ),
               ],
