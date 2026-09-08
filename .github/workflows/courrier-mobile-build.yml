@@ -51,7 +51,12 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          # Figé sur la version installée en local (flutter --version, le
+          # 2026-09-08) plutôt que "channel: stable" -- une version plus
+          # récente du plugin Gradle de Flutter a changé de comportement
+          # (lecture "new DSL" façon AGP 9+) et cassait le build ici, alors
+          # que cette version-ci fonctionne (testée en local avec succès).
+          flutter-version: "3.44.3"
           cache: true
 
       - name: Dépendances Python (génération des icônes de marque)
