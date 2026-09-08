@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "477794147886",
-    "project_id": "sis-courrier",
-    "storage_bucket": "sis-courrier.firebasestorage.app"
+    "project_number": "562197975631",
+    "project_id": "tibus-courrier",
+    "storage_bucket": "tibus-courrier.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:477794147886:android:409e3fdbc8c9c6839e89bf",
+        "mobilesdk_app_id": "1:562197975631:android:bdbb470abeefe36cb5903a",
         "android_client_info": {
-          "package_name": "com.sis.courrier"
+          "package_name": "com.tibus.courrier"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB0jowKGbIUXUpHbDRo4I6akSx7jEzoehI"
+          "current_key": "AIzaSyBZlSz5p74wpm0hHpNxgjgIbYKp9pQso94"
         }
       ],
       "services": {
