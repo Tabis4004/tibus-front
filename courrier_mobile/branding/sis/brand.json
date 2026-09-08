@@ -5,11 +5,14 @@
   "themeColor": "#1E5A9C",
   "backgroundColor": "#FFFFFF",
   "companyId": "com.societe-sis",
+  "androidApplicationId": "com.sis.courrier",
   "logo": "logo.jpeg",
   "iconBackground": "#FFFFFF",
   "iconPadding": 0.08,
   "worker": "courrier-sis",
   "publisher": "Société SIS",
+  "supabaseUrl": "https://base.societe-sis.com",
+  "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg3NTA2OTQ2LCJleHAiOjIxMDI4NjY5NDZ9.C9fLbaX-yHhILIOX7NHCPUsGnp1VCw_9eoLdsVgXs-0",
   "features": {
     "showLoyaltyPromoReferral": false
   }

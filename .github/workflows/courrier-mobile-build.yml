@@ -1,0 +1,92 @@
+name: courrier_mobile — build signé (APK/AAB)
+
+# Build manuel (bouton "Run workflow" dans l'onglet Actions de GitHub) —
+# évite de builder en local (espace disque). Reproduit exactement
+# ./tool/build_client.sh <client> <target>, voir ce script pour le détail.
+#
+# Secrets requis (Settings > Secrets and variables > Actions > New repository
+# secret), un jeu par marque :
+#   SIS_KEYSTORE_B64     contenu de ~/sis-mobile-release.jks encodé en base64
+#   SIS_STORE_PASSWORD   storePassword de android/key.sis.properties
+#   SIS_KEY_PASSWORD     keyPassword de android/key.sis.properties
+#   SIS_KEY_ALIAS        keyAlias   (= "sis")
+#   TIBUS_KEYSTORE_B64   idem pour le keystore Tibus existant (optionnel —
+#   TIBUS_STORE_PASSWORD requis seulement si tu build la marque "default")
+#   TIBUS_KEY_PASSWORD
+#   TIBUS_KEY_ALIAS
+#
+# google-services.json N'EST PAS un secret : il est commité dans le repo
+# (courrier_mobile/android/app/google-services.json), embarqué de toute
+# façon dans chaque APK — rien à cacher.
+
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: "Marque à builder (dossiers de courrier_mobile/branding/)"
+        required: true
+        type: choice
+        options: [sis, default]
+        default: sis
+      target:
+        description: "Format de sortie"
+        required: true
+        type: choice
+        options: [aab, apk]
+        default: aab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: courrier_mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restaurer le keystore de release (${{ inputs.client }})
+        env:
+          KEYSTORE_B64: ${{ inputs.client == 'sis' && secrets.SIS_KEYSTORE_B64 || secrets.TIBUS_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ inputs.client == 'sis' && secrets.SIS_STORE_PASSWORD || secrets.TIBUS_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ inputs.client == 'sis' && secrets.SIS_KEY_PASSWORD || secrets.TIBUS_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ inputs.client == 'sis' && secrets.SIS_KEY_ALIAS || secrets.TIBUS_KEY_ALIAS }}
+          PROPS_FILE: ${{ inputs.client == 'sis' && 'android/key.sis.properties' || 'android/key.properties' }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Secrets manquants pour la marque « ${{ inputs.client }} » (voir l'en-tête de ce workflow)." >&2
+            exit 1
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          echo "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          cat > "$PROPS_FILE" <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$KEYSTORE_PATH
+          EOF
+
+      - name: Build (${{ inputs.client }}, ${{ inputs.target }})
+        env:
+          # Numéro de run GitHub : toujours croissant, unique à ce workflow —
+          # sert de versionCode Play Store (voir tool/build_client.sh). Pas
+          # besoin de committer un compteur ni de gérer pubspec.yaml à la main.
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ./tool/build_client.sh ${{ inputs.client }} ${{ inputs.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: courrier-${{ inputs.client }}-${{ inputs.target }}
+          path: |
+            courrier_mobile/build/app/outputs/flutter-apk/app-release.apk
+            courrier_mobile/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: ignore

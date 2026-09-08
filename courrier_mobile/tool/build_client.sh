@@ -49,12 +49,24 @@ if [ -n "$DART_DEFINES" ]; then
   echo "==> --dart-define spécifiques à « $CLIENT » : $DART_DEFINES"
 fi
 
+# Play Store exige un versionCode strictement croissant à chaque envoi, PAR
+# APP (donc un compteur indépendant pour SIS et pour Tibus, vu que ce sont
+# deux applicationId différents depuis le passage en Play Store séparé).
+# BUILD_NUMBER (optionnel, ex. github.run_number côté CI) écrase le +N de
+# pubspec.yaml pour ce build précis, SANS modifier le fichier -- en local,
+# sans cette variable, comportement inchangé (numéro de pubspec.yaml).
+EXTRA_BUILD_ARGS=""
+if [ -n "${BUILD_NUMBER:-}" ]; then
+  EXTRA_BUILD_ARGS="--build-number=$BUILD_NUMBER"
+  echo "==> --build-number=$BUILD_NUMBER (fourni par l'environnement, ex. CI)"
+fi
+
 echo "==> Compilation : $TARGET"
 case "$TARGET" in
   web)     flutter build web --release $DART_DEFINES ;;
   deploy)  flutter build web --release $DART_DEFINES ;;
-  apk)     flutter build apk --release $DART_DEFINES ;;
-  aab)     flutter build appbundle --release $DART_DEFINES ;;
+  apk)     flutter build apk --release $DART_DEFINES $EXTRA_BUILD_ARGS ;;
+  aab)     flutter build appbundle --release $DART_DEFINES $EXTRA_BUILD_ARGS ;;
   windows) flutter build windows --release $DART_DEFINES ;;
   *) echo "cible inconnue : $TARGET" >&2; exit 1 ;;
 esac

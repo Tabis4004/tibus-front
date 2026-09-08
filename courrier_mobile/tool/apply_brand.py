@@ -30,6 +30,17 @@ lus par tool/brand_dart_defines.py -> --dart-define -> build_client.sh) :
                                   promo/parrainage dans le menu Profil
                                   agent (logiciels métier sans volet
                                   client, ex. SIS). Absent = affiché.
+  androidApplicationId          Identifiant Play Store Android (ex.
+                                  "com.sis.courrier"), lu directement par
+                                  android/app/build.gradle.kts (PAS par ce
+                                  script) via branding/.current -- change
+                                  applicationId ET le keystore de release
+                                  utilisé (android/key.<marque>.properties
+                                  si présent, sinon key.properties). Absent
+                                  = repli sur com.tibus.courrier. Un
+                                  applicationId publié sur le Play Store
+                                  est permanent : deux marques distinctes
+                                  ne peuvent pas le partager.
 """
 
 import json
@@ -150,6 +161,22 @@ def main() -> None:
         (r'(VALUE "FileDescription", ")[^"]*(")', rf'\1{esc(app)}\2'),
         (r'(VALUE "ProductName", ")[^"]*(")', rf'\1{esc(app)}\2'),
     ])
+
+    # ------------------------------------------------------ google-services.json
+    # Un client (SIS) peut avoir son PROPRE projet Firebase (pas juste une
+    # 2e app dans celui de Tibus) -- android/app/google-services.json doit
+    # donc correspondre à la marque active, comme android:label ci-dessus.
+    # Placer branding/<client>/google-services.json (téléchargé depuis la
+    # Console Firebase du projet de ce client) pour que ce script le copie
+    # automatiquement avant chaque build. Absent = fichier existant inchangé
+    # (repli sur celui déjà en place, ex. Tibus si jamais retiré par erreur).
+    gservices = BRANDING / name / 'google-services.json'
+    if gservices.exists():
+        dest = ROOT / 'android/app/google-services.json'
+        dest.write_bytes(gservices.read_bytes())
+        print(f"google-services.json\n  {dest.relative_to(ROOT)} (depuis {gservices.relative_to(ROOT)})")
+    else:
+        print(f"google-services.json : {gservices.relative_to(ROOT)} absent, fichier existant inchangé")
 
     # ------------------------------------------------------------- Icônes
     logo_name = brand.get('logo', 'logo.png')
