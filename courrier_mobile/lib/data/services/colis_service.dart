@@ -238,6 +238,22 @@ class ColisService {
         .toList();
   }
 
+  /// Gares où l'agent peut ouvrir une caisse / enregistrer un colis en
+  /// gare de départ — RPC list_company_station_gares (distincte de
+  /// listGares ci-dessus, volontairement) : un rôle gare-scoped
+  /// (vendeur_gare) n'y voit QUE sa/ses gare(s) assignée(s), alors que les
+  /// rôles compagnie (owner, vendeur, chauffeur) voient toutes les gares,
+  /// comme avant (demande du 2026-08-23 : restreindre la gare de départ
+  /// visible à l'enregistrement, sans changer les autres rôles).
+  Future<List<GareOption>> listStationGares(String companyId) async {
+    final data = await _client.rpc('list_company_station_gares', params: {'p_company_id': companyId});
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(GareOption.fromMap)
+        .where((g) => g.id.isNotEmpty && g.name.isNotEmpty && !g.name.startsWith('__'))
+        .toList();
+  }
+
   /// Villes de départ disponibles pour créer un lot (migration 202, retour
   /// terrain SIS point 3) : un lot se crée désormais par VILLE de départ —
   /// les colis y sont regroupés quelle que soit leur gare d'origine exacte
