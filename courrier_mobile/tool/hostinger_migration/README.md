@@ -51,7 +51,21 @@ veux.
 
 ## Périmètre
 
-19 tables, 86 fonctions, 8 triggers — voir l'en-tête de
+24 tables, 94 fonctions (dont 2 signatures pour
+`update_company_colis_price_settings`), 8 triggers (mis à jour le
+2026-09-08 : +4 fonctions d'ÉCRITURE des réglages colis autonome
+[`update_company_colis_price_settings`, `update_company_colis_ui_config`,
+`upsert_colis_nature`, `delete_colis_nature`] — la lecture
+(`get_company_colis_settings`) était migrée mais pas l'écriture, cause du
+bug "réglages colis autonome ne s'appliquent pas" côté SIS ; voir
+`pour_technicien/00_patch_2026-09-08.sql`, déjà répercuté dans
+`functions_and_triggers.sql`).
+Précédemment, mis à jour le 2026-08-28 : +5 tables ["RoleAssignmentRules",
+"reversements_comptables", "bordereaux_livraison", "bordereau_colis",
+"mouvements_caisse"] et +2 fonctions [is_company_staff, can_assign_role],
+toutes invoquées implicitement par des policies RLS ou par le corps de
+fonctions déjà migrées, jamais par un appel .rpc()/.from() direct — donc
+invisibles à un simple grep du code de l'app — voir l'en-tête de
 `pour_moi/01_generate_functions_and_triggers.sql` pour le détail et le
 raisonnement (dépendances tracées directement sur la base le 2026-08-09,
 re-vérifiées le 2026-08-23 : `list_company_villes_depart` + table

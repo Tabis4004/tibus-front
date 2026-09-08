@@ -465,6 +465,35 @@ END;
 $function$
 ;
 
+-- ==== FUNCTION can_assign_role ====
+CREATE OR REPLACE FUNCTION public.can_assign_role(p_assignable_role_id uuid, p_company_id uuid DEFAULT NULL::uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT public.is_super_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM "UserRoles" ur_assigner
+      JOIN "Role" r_assigner ON r_assigner.id = ur_assigner."roleId"
+      JOIN "RoleAssignmentRules" rar ON rar."assignerRoleId" = r_assigner.id
+      JOIN "Users" u ON u.id = ur_assigner."userId"
+      JOIN "Role" r_target ON r_target.id = p_assignable_role_id
+      WHERE u."auth_user_id" = auth.uid()
+        AND rar."assignableRoleId" = p_assignable_role_id
+        AND (
+          (r_target.scope = 'platform' AND ur_assigner."companyId" IS NULL)
+          OR (
+            r_target.scope = 'company'
+            AND r_assigner.name = 'owner'
+            AND ur_assigner."companyId" = p_company_id
+          )
+        )
+    );
+$function$
+;
+
 -- ==== FUNCTION can_operate_station_cash ====
 CREATE OR REPLACE FUNCTION public.can_operate_station_cash(p_company_id uuid)
  RETURNS boolean
@@ -1459,7 +1488,7 @@ AS $function$
       AND ur."companyId" = p_company_id
       AND ur."gareId" IS NOT NULL
       AND r.name = 'comptable_gare'
-      AND ur."gareId" IN (p_gare_depart_id, p_gare_destination_id)
+      AND ur."gareId" = p_gare_depart_id
   );
 $function$
 ;
@@ -1498,6 +1527,20 @@ AS $function$
                        'emballeur_gare', 'chargeur_gare', 'distributeur_gare')
   )
   OR public.has_company_droit(p_company_id, 'manage_feature_modules');
+$function$
+;
+
+-- ==== FUNCTION is_company_staff ====
+CREATE OR REPLACE FUNCTION public.is_company_staff(p_company_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT public.is_super_admin()
+    OR public.has_company_role(p_company_id, ARRAY[
+      'owner', 'comptable_compagnie', 'controleur', 'vendeur'
+    ]);
 $function$
 ;
 
@@ -1648,13 +1691,9 @@ BEGIN
       AND (p_statut IS NULL OR ca.statut_colis = p_statut)
       AND (
         v_full_access
-        OR (v_gare_ids IS NOT NULL AND (ca.gare_depart_id = ANY(v_gare_ids) OR ca.gare_destination_id = ANY(v_gare_ids)))
+        OR (v_gare_ids IS NOT NULL AND ca.gare_depart_id = ANY(v_gare_ids))
         OR (v_gare_ids IS NULL AND ca.vendeur_id = v_user_id)
       )
-      -- Recherche serveur : porte sur TOUTE la table (pas seulement les
-      -- p_limit lignes les plus récentes) — corrige le cas où un colis
-      -- plus ancien (ex. numero_recu "COCO000187") était invisible car
-      -- hors de la fenêtre des N derniers colis chargés côté frontend.
       AND (
         v_search IS NULL
         OR ca.numero_recu ILIKE '%' || v_search || '%'
@@ -1811,6 +1850,64 @@ BEGIN
   SELECT g.id, g.name::text
   FROM public."Gares" g
   WHERE g."companyId" = p_company_id
+    AND g.name <> '__CASH_SESSION_HUB__'
+    AND g.name NOT LIKE '\_\_%'
+  ORDER BY g.name;
+END;
+$function$
+;
+
+-- ==== FUNCTION list_company_station_gares ====
+CREATE OR REPLACE FUNCTION public.list_company_station_gares(p_company_id uuid)
+ RETURNS TABLE(id uuid, name text)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user uuid := public.current_app_user_id();
+  v_all_gares boolean;
+BEGIN
+  IF v_user IS NULL THEN RAISE EXCEPTION 'Utilisateur introuvable'; END IF;
+
+  IF NOT (
+    public.is_super_admin()
+    OR public.can_operate_station_cash(p_company_id)
+  ) THEN
+    RAISE EXCEPTION 'Acces gares caisse refuse';
+  END IF;
+
+  SELECT public.is_super_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public."UserRoles" ur
+      JOIN public."Role" r ON r.id = ur."roleId"
+      WHERE ur."userId" = v_user
+        AND ur."companyId" = p_company_id
+        AND r.name IN ('owner', 'vendeur', 'chauffeur')
+    )
+  INTO v_all_gares;
+
+  IF v_all_gares THEN
+    RETURN QUERY
+    SELECT g.id, g.name::text
+    FROM public."Gares" g
+    WHERE g."companyId" = p_company_id
+      AND g.name <> '__CASH_SESSION_HUB__'
+      AND g.name NOT LIKE '\_\_%'
+    ORDER BY g.name;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT g.id, g.name::text
+  FROM public."UserRoles" ur
+  JOIN public."Role" r ON r.id = ur."roleId"
+  JOIN public."Gares" g ON g.id = ur."gareId"
+  WHERE ur."userId" = v_user
+    AND ur."companyId" = p_company_id
+    AND ur."gareId" IS NOT NULL
+    AND r.name = 'vendeur_gare'
     AND g.name <> '__CASH_SESSION_HUB__'
     AND g.name NOT LIKE '\_\_%'
   ORDER BY g.name;
@@ -3020,3 +3117,166 @@ CREATE TRIGGER trg_sync_colis_module_d AFTER INSERT OR UPDATE OF "moduleD" ON pu
 -- ==== TRIGGER user_roles_assignment_check ON "UserRoles" ====
 DROP TRIGGER IF EXISTS user_roles_assignment_check ON "UserRoles";
 CREATE TRIGGER user_roles_assignment_check BEFORE INSERT OR UPDATE ON public."UserRoles" FOR EACH ROW EXECUTE FUNCTION validate_user_role_assignment();
+-- ==== Ajout 2026-09-08 : écriture des réglages colis autonome (voir 00_patch_2026-09-08.sql) ====
+CREATE OR REPLACE FUNCTION public.update_company_colis_price_settings(p_company_id uuid, p_prix_min_fixe_general double precision, p_prix_min_taux_general double precision)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user_id uuid := public.current_app_user_id();
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
+  IF NOT (public.is_company_role_user(v_user_id, p_company_id) OR public.is_super_admin()) THEN
+    RAISE EXCEPTION 'Droits insuffisants';
+  END IF;
+  IF NOT public.company_colis_module_enabled(p_company_id) THEN
+    RAISE EXCEPTION 'Module colis autonome non active pour cette compagnie';
+  END IF;
+  IF p_prix_min_fixe_general IS NOT NULL AND p_prix_min_fixe_general < 0 THEN
+    RAISE EXCEPTION 'Le prix minimum fixe doit etre positif';
+  END IF;
+  IF p_prix_min_taux_general IS NOT NULL AND p_prix_min_taux_general < 0 THEN
+    RAISE EXCEPTION 'Le taux minimum doit etre positif';
+  END IF;
+
+  UPDATE "Companies"
+  SET
+    colis_prix_min_fixe_general = p_prix_min_fixe_general,
+    colis_prix_min_taux_general = p_prix_min_taux_general
+  WHERE id = p_company_id;
+
+  RETURN public.get_company_colis_settings(p_company_id);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_company_colis_price_settings(p_company_id uuid, p_prix_min_fixe_general double precision, p_prix_min_taux_general double precision, p_pourcentage_percu_general double precision DEFAULT NULL::double precision)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user_id uuid := public.current_app_user_id();
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
+  IF NOT (public.is_company_role_user(v_user_id, p_company_id) OR public.is_super_admin()) THEN
+    RAISE EXCEPTION 'Droits insuffisants';
+  END IF;
+  IF NOT public.company_colis_module_enabled(p_company_id) THEN
+    RAISE EXCEPTION 'Module colis autonome non active pour cette compagnie';
+  END IF;
+  IF p_prix_min_fixe_general IS NOT NULL AND p_prix_min_fixe_general < 0 THEN
+    RAISE EXCEPTION 'Le prix minimum fixe doit etre positif';
+  END IF;
+  IF p_prix_min_taux_general IS NOT NULL AND p_prix_min_taux_general < 0 THEN
+    RAISE EXCEPTION 'Le taux minimum doit etre positif';
+  END IF;
+  IF p_pourcentage_percu_general IS NOT NULL AND (p_pourcentage_percu_general < 0 OR p_pourcentage_percu_general > 100) THEN
+    RAISE EXCEPTION 'Le pourcentage percu doit etre compris entre 0 et 100';
+  END IF;
+
+  UPDATE "Companies"
+  SET
+    colis_prix_min_fixe_general = p_prix_min_fixe_general,
+    colis_prix_min_taux_general = p_prix_min_taux_general,
+    colis_pourcentage_percu_general = p_pourcentage_percu_general
+  WHERE id = p_company_id;
+
+  RETURN public.get_company_colis_settings(p_company_id);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_company_colis_ui_config(p_company_id uuid, p_ui_config jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := public.current_app_user_id();
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
+  IF NOT (
+    public.is_super_admin()
+    OR public.has_company_role(p_company_id, ARRAY['owner', 'comptable_compagnie'])
+  ) THEN
+    RAISE EXCEPTION 'Droits insuffisants';
+  END IF;
+  IF p_ui_config IS NULL OR jsonb_typeof(p_ui_config) <> 'object' THEN
+    RAISE EXCEPTION 'Configuration invalide';
+  END IF;
+
+  UPDATE "Companies"
+  SET colis_ui_config = p_ui_config
+  WHERE id = p_company_id;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Compagnie introuvable'; END IF;
+
+  RETURN public.get_company_colis_settings(p_company_id);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.upsert_colis_nature(p_company_id uuid, p_libelle text, p_nature_id uuid DEFAULT NULL::uuid, p_is_active boolean DEFAULT true, p_prix_min_fixe double precision DEFAULT NULL::double precision, p_prix_min_taux double precision DEFAULT NULL::double precision)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := public.current_app_user_id();
+  v_id uuid;
+  v_libelle text := btrim(COALESCE(p_libelle, ''));
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
+  IF NOT (public.is_company_role_user(v_user_id, p_company_id) OR public.is_super_admin()) THEN RAISE EXCEPTION 'Droits insuffisants'; END IF;
+  IF NOT public.company_colis_module_enabled(p_company_id) THEN RAISE EXCEPTION 'Module colis autonome non active'; END IF;
+  IF v_libelle = '' THEN RAISE EXCEPTION 'Libelle requis'; END IF;
+  IF p_prix_min_fixe IS NOT NULL AND p_prix_min_fixe < 0 THEN RAISE EXCEPTION 'Le prix minimum fixe doit etre positif'; END IF;
+  IF p_prix_min_taux IS NOT NULL AND p_prix_min_taux < 0 THEN RAISE EXCEPTION 'Le taux minimum doit etre positif'; END IF;
+
+  IF p_nature_id IS NOT NULL THEN
+    UPDATE public.colis_natures
+    SET libelle = v_libelle,
+        is_active = COALESCE(p_is_active, true),
+        prix_min_fixe = p_prix_min_fixe,
+        prix_min_taux = p_prix_min_taux
+    WHERE id = p_nature_id AND company_id = p_company_id
+    RETURNING id INTO v_id;
+    IF v_id IS NULL THEN RAISE EXCEPTION 'Nature introuvable'; END IF;
+  ELSE
+    INSERT INTO public.colis_natures (company_id, libelle, is_active, prix_min_fixe, prix_min_taux)
+    VALUES (p_company_id, v_libelle, COALESCE(p_is_active, true), p_prix_min_fixe, p_prix_min_taux)
+    ON CONFLICT (company_id, libelle) DO UPDATE
+      SET is_active = EXCLUDED.is_active,
+          prix_min_fixe = EXCLUDED.prix_min_fixe,
+          prix_min_taux = EXCLUDED.prix_min_taux
+    RETURNING id INTO v_id;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'id', v_id,
+    'libelle', v_libelle,
+    'isActive', COALESCE(p_is_active, true),
+    'prixMinFixe', p_prix_min_fixe,
+    'prixMinTaux', p_prix_min_taux
+  );
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.delete_colis_nature(p_nature_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_company_id uuid; v_user_id uuid := public.current_app_user_id();
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
+  SELECT company_id INTO v_company_id FROM public.colis_natures WHERE id = p_nature_id;
+  IF v_company_id IS NULL THEN RAISE EXCEPTION 'Nature introuvable'; END IF;
+  IF NOT (public.is_company_role_user(v_user_id, v_company_id) OR public.is_super_admin()) THEN RAISE EXCEPTION 'Droits insuffisants'; END IF;
+  IF EXISTS (SELECT 1 FROM public.colis_natures_selectionnees WHERE nature_id = p_nature_id) THEN RAISE EXCEPTION 'Nature utilisee — desactivez-la'; END IF;
+  DELETE FROM public.colis_natures WHERE id = p_nature_id;
+END; $function$;
