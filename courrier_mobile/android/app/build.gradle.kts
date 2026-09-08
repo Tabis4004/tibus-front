@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import groovy.json.JsonSlurper
 
 plugins {
     id("com.android.application")
@@ -10,13 +11,46 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Signature de release — lit android/key.properties (fichier local, JAMAIS
-// commité) si présent. Sans ce fichier, on retombe sur la signature debug
-// pour ne pas casser `flutter run` avant que le keystore ne soit généré.
-// Même pattern que courrier_client et courrier_livreur — avant ce fix,
-// cette app était signée en debug de façon inconditionnelle, sans même
-// cette option de repli propre.
-val keystorePropertiesFile = rootProject.file("key.properties")
+// Marque active (sis, default, ...) — écrite dans branding/.current par
+// tool/apply_brand.py à chaque build (voir build_client.sh, qui l'appelle
+// AVANT `flutter build`). Sert à choisir applicationId + keystore de
+// release ci-dessous, SANS jamais modifier ce fichier à la main : un
+// applicationId Play Store est permanent une fois publié, donc SIS et Tibus
+// ne peuvent pas partager celui-ci — chaque marque a le sien dans son
+// brand.json (androidApplicationId). Une marque qui ne définit pas ce champ
+// retombe sur com.tibus.courrier (comportement historique inchangé).
+val brandingDir = rootProject.file("../branding")
+val currentBrand = brandingDir.resolve(".current")
+    .let { if (it.exists()) it.readText().trim() else "" }
+    .ifBlank { "default" }
+
+val brandJsonFile = brandingDir.resolve("$currentBrand/brand.json")
+val brandApplicationId: String = if (brandJsonFile.exists()) {
+    @Suppress("UNCHECKED_CAST")
+    val brand = JsonSlurper().parse(brandJsonFile) as Map<String, Any?>
+    (brand["androidApplicationId"] as? String) ?: "com.tibus.courrier"
+} else {
+    "com.tibus.courrier"
+}
+// Diagnostic temporaire (2026-09-08) : le CI (Linux) est retombé sur
+// com.tibus.courrier alors que la marque active était "sis" -- marchait en
+// local (macOS). Ce println isole si le problème vient de la lecture de
+// branding/.current, de brand.json, ou d'ailleurs, sans deviner à l'aveugle.
+println("== branding diag : brandingDir=${brandingDir.absolutePath} exists=${brandingDir.exists()} " +
+    "currentBrand=$currentBrand brandJsonFile=${brandJsonFile.absolutePath} " +
+    "brandJsonExists=${brandJsonFile.exists()} brandApplicationId=$brandApplicationId ==")
+
+// Signature de release — lit un keystore dédié à la marque active si
+// présent (android/key.<marque>.properties, ex. key.sis.properties),
+// sinon retombe sur android/key.properties (keystore historique unique,
+// Tibus). Fichiers locaux, JAMAIS commités (voir android/.gitignore).
+// Deux apps Play Store distinctes (applicationId différents) devraient
+// avoir chacune leur propre clé de release plutôt que de la partager.
+// Sans AUCUN des deux fichiers, on retombe sur la signature debug pour ne
+// pas casser `flutter run` avant que le keystore n'existe.
+val perBrandKeystoreFile = rootProject.file("key.$currentBrand.properties")
+val keystorePropertiesFile =
+    if (perBrandKeystoreFile.exists()) perBrandKeystoreFile else rootProject.file("key.properties")
 val keystoreProperties = Properties()
 val hasReleaseKeystore = keystorePropertiesFile.exists()
 if (hasReleaseKeystore) {
@@ -24,6 +58,11 @@ if (hasReleaseKeystore) {
 }
 
 android {
+    // Indépendant de applicationId ci-dessous (namespace = package interne
+    // pour la génération de la classe R, invisible au Play Store et à
+    // l'utilisateur ; applicationId = identifiant public de l'app). Les
+    // deux n'ont pas besoin de correspondre depuis AGP 7+ — pas de dossier
+    // Kotlin à déplacer quand une marque change d'applicationId.
     namespace = "com.tibus.courrier"
     // Forcé à 36 (au lieu de flutter.compileSdkVersion) : plusieurs
     // dépendances transitives de flutter_pos_printer_platform_image_3
@@ -43,8 +82,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.tibus.courrier"
+        // Par marque active — voir brandApplicationId ci-dessus.
+        applicationId = brandApplicationId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
