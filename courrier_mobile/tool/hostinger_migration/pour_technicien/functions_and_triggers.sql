@@ -1300,7 +1300,12 @@ BEGIN
     'smsOnCharge', COALESCE(v_row.sms_on_charge, false),
     'smsOnArrive', COALESCE(v_row.sms_on_arrive, false),
     'smsOnLivre', COALESCE(v_row.sms_on_livre, false),
-    'uiConfig', COALESCE(v_row.colis_ui_config, '{}'::jsonb)
+    'uiConfig', COALESCE(v_row.colis_ui_config, '{}'::jsonb),
+    -- Ajoutés le 2026-09-08 (voir 00_patch_2026-09-08.sql) :
+    -- déjà attendus par le web mais jamais renvoyés jusqu'ici.
+    'colisPrixMinFixeGeneral', v_row.colis_prix_min_fixe_general,
+    'colisPrixMinTauxGeneral', v_row.colis_prix_min_taux_general,
+    'colisPourcentagePercuGeneral', v_row.colis_pourcentage_percu_general
   );
 END;
 $function$

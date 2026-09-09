@@ -170,6 +170,52 @@ BEGIN
 END;
 $function$;
 
+-- get_company_colis_settings : correctif supplémentaire (même date). Cette
+-- fonction était déjà migrée mais ne renvoyait jamais colisPrixMinFixeGeneral/
+-- colisPrixMinTauxGeneral/colisPourcentagePercuGeneral, déjà attendus par le
+-- web (src/lib/supabase/colis-autonomes.ts) -- le "Prix minimum général"
+-- semblait toujours revenir à vide à chaque réouverture de l'écran de
+-- réglages, sur Tibus 1.0 comme sur Hostinger, alors que la valeur était
+-- bien enregistrée en base (voir update_company_colis_price_settings
+-- ci-dessus, qui l'écrit correctement).
+CREATE OR REPLACE FUNCTION public.get_company_colis_settings(p_company_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user_id uuid := public.current_app_user_id();
+  v_row "Companies"%ROWTYPE;
+  v_sms_config_allowed boolean := false;
+BEGIN
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Connexion requise'; END IF;
+  IF NOT (public.is_company_role_user(v_user_id, p_company_id) OR public.is_super_admin()) THEN
+    RAISE EXCEPTION 'Droits insuffisants';
+  END IF;
+
+  SELECT * INTO v_row FROM "Companies" WHERE id = p_company_id;
+  IF v_row.id IS NULL THEN RAISE EXCEPTION 'Compagnie introuvable'; END IF;
+
+  SELECT COALESCE(public.company_colis_sms_owner_config_enabled(p_company_id), false)
+  INTO v_sms_config_allowed;
+
+  RETURN jsonb_build_object(
+    'companyId', v_row.id,
+    'colisAutonomeEnabled', COALESCE(v_row.colis_autonome_enabled, false),
+    'colisSmsConfigEnabled', v_sms_config_allowed,
+    'smsOnEnregistre', COALESCE(v_row.sms_on_enregistre, false),
+    'smsOnCharge', COALESCE(v_row.sms_on_charge, false),
+    'smsOnArrive', COALESCE(v_row.sms_on_arrive, false),
+    'smsOnLivre', COALESCE(v_row.sms_on_livre, false),
+    'uiConfig', COALESCE(v_row.colis_ui_config, '{}'::jsonb),
+    'colisPrixMinFixeGeneral', v_row.colis_prix_min_fixe_general,
+    'colisPrixMinTauxGeneral', v_row.colis_prix_min_taux_general,
+    'colisPourcentagePercuGeneral', v_row.colis_pourcentage_percu_general
+  );
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.delete_colis_nature(p_nature_id uuid)
  RETURNS void
  LANGUAGE plpgsql

@@ -464,6 +464,15 @@ class ColisSettings {
   final bool reportBordereauEnabled;
   final bool reportCashJournalEnabled;
   final bool reportSalesJournalEnabled;
+  /// Override général du prix minimum (fixe XOF), toutes natures confondues
+  /// — voir update_company_colis_price_settings. Ajoutés le 2026-09-08 :
+  /// get_company_colis_settings les enregistrait déjà (Companies.colis_prix_
+  /// min_fixe_general etc.) mais ne les renvoyait pas — l'écran de réglages
+  /// paraissait "oublier" la valeur à chaque réouverture alors qu'elle
+  /// n'avait jamais quitté la base (voir AdminColisSettingsScreen._reload).
+  final double? prixMinFixeGeneral;
+  final double? prixMinTauxGeneral;
+  final double? pourcentagePercuGeneral;
 
   const ColisSettings({
     required this.colisAutonomeEnabled,
@@ -475,6 +484,9 @@ class ColisSettings {
     required this.reportBordereauEnabled,
     required this.reportCashJournalEnabled,
     required this.reportSalesJournalEnabled,
+    this.prixMinFixeGeneral,
+    this.prixMinTauxGeneral,
+    this.pourcentagePercuGeneral,
   });
 
   factory ColisSettings.fromMap(Map<String, dynamic> map) {
@@ -492,6 +504,9 @@ class ColisSettings {
       reportBordereauEnabled: enabledOf('bordereau'),
       reportCashJournalEnabled: enabledOf('cashJournal'),
       reportSalesJournalEnabled: enabledOf('salesJournal'),
+      prixMinFixeGeneral: (map['colisPrixMinFixeGeneral'] as num?)?.toDouble(),
+      prixMinTauxGeneral: (map['colisPrixMinTauxGeneral'] as num?)?.toDouble(),
+      pourcentagePercuGeneral: (map['colisPourcentagePercuGeneral'] as num?)?.toDouble(),
     );
   }
 

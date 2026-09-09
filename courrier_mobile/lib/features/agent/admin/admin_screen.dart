@@ -948,6 +948,14 @@ class _AdminColisSettingsScreenState extends ConsumerState<AdminColisSettingsScr
         _natures = results[1] as List<ColisNature>;
         _loading = false;
       });
+      // Reflète la valeur réellement enregistrée (voir ColisSettings,
+      // champs ajoutés le 2026-09-08) -- sans ça, ces trois champs
+      // paraissaient toujours vides/à 0, qu'un prix minimum général ait
+      // été enregistré ou non : ce n'était pas la sauvegarde qui échouait,
+      // c'est cet écran qui ne relisait jamais la valeur sauvegardée.
+      _prixFixeCtrl.text = settings.prixMinFixeGeneral?.toString() ?? '';
+      _prixTauxCtrl.text = settings.prixMinTauxGeneral?.toString() ?? '';
+      _pourcentageCtrl.text = settings.pourcentagePercuGeneral?.toString() ?? '';
     } catch (e) {
       setState(() { _error = 'Échec du chargement : $e'; _loading = false; });
     }
@@ -1087,7 +1095,6 @@ class _AdminColisSettingsScreenState extends ConsumerState<AdminColisSettingsScr
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_error != null) return Scaffold(appBar: AppBar(title: const Text('Réglages colis autonome')), body: Center(child: Text(_error!)));
     final s = _settings!;
-    if (_prixFixeCtrl.text.isEmpty) _prixFixeCtrl.text = '';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages colis autonome')),
