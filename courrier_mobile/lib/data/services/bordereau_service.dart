@@ -28,27 +28,32 @@ class BordereauService {
   /// [villeDepartId] remplace depuis la migration 202 l'ancienne gare de
   /// départ précise (retour terrain SIS point 3) : les colis se regroupent
   /// à un point central avant emballage, sans être triés par gare d'origine
-  /// — le lot regroupe donc tous les colis de la VILLE choisie. [dateLot]
-  /// est éditable par l'agent (point 5) ; par défaut la date du jour côté
-  /// serveur si omise.
+  /// — le lot regroupe donc tous les colis de la VILLE choisie. [dateDebut]/
+  /// [dateFin] forment la période couverte par le lot (remplace l'ancienne
+  /// [dateLot] unique) ; [dateDebut] par défaut la date du jour côté serveur
+  /// si omise, [dateFin] reste optionnelle (lot encore en cours).
   Future<BordereauDetail> create({
     required String companyId,
     required String villeDepartId,
     required String gareDestinationId,
     String? busId,
-    DateTime? dateLot,
+    DateTime? dateDebut,
+    DateTime? dateFin,
   }) async {
     final data = await _client.rpc('create_bordereau_livraison', params: {
       'p_company_id': companyId,
       'p_ville_depart_id': villeDepartId,
       'p_gare_destination_id': gareDestinationId,
       'p_bus_id': busId,
-      'p_date_lot': dateLot != null
-          ? '${dateLot.year.toString().padLeft(4, '0')}-${dateLot.month.toString().padLeft(2, '0')}-${dateLot.day.toString().padLeft(2, '0')}'
-          : null,
+      'p_date_debut': _toDateParam(dateDebut),
+      'p_date_fin': _toDateParam(dateFin),
     });
     return BordereauDetail.fromMap(data as Map<String, dynamic>);
   }
+
+  static String? _toDateParam(DateTime? d) => d == null
+      ? null
+      : '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   /// Chargeur : scanne le LOT (pas chaque colis) pour confirmer le
   /// chargement dans le véhicule — bascule tous ses colis enregistré ->
@@ -186,9 +191,11 @@ class BordereauSummary {
   final String? gareDestination;
   final String? busPlateNumber;
   final int colisCount;
-  // Date de lot éditable par l'agent à la création (migration 202, point 5)
-  // — à afficher à la place de createdAt, qui reste l'horodatage technique.
-  final DateTime? dateLot;
+  // Période couverte par le lot, éditable par l'agent à la création
+  // (remplace l'ancienne dateLot unique) — à afficher à la place de
+  // createdAt, qui reste l'horodatage technique.
+  final DateTime? dateDebut;
+  final DateTime? dateFin;
   final DateTime? createdAt;
 
   const BordereauSummary({
@@ -200,7 +207,8 @@ class BordereauSummary {
     this.gareDestination,
     this.busPlateNumber,
     required this.colisCount,
-    this.dateLot,
+    this.dateDebut,
+    this.dateFin,
     this.createdAt,
   });
 
@@ -218,7 +226,8 @@ class BordereauSummary {
         gareDestination: map['gareDestination'] as String?,
         busPlateNumber: map['busPlateNumber'] as String?,
         colisCount: (map['colisCount'] as num?)?.toInt() ?? 0,
-        dateLot: map['dateLot'] != null ? DateTime.tryParse(map['dateLot'] as String) : null,
+        dateDebut: map['dateDebut'] != null ? DateTime.tryParse(map['dateDebut'] as String) : null,
+        dateFin: map['dateFin'] != null ? DateTime.tryParse(map['dateFin'] as String) : null,
         createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'] as String) : null,
       );
 }
@@ -296,7 +305,8 @@ class BordereauDetail {
   final String villeDepart;
   final String? gareDestination;
   final String? busPlateNumber;
-  final DateTime? dateLot;
+  final DateTime? dateDebut;
+  final DateTime? dateFin;
   final DateTime? createdAt;
   final DateTime? closedAt;
   final List<BordereauColisRow> colis;
@@ -311,7 +321,8 @@ class BordereauDetail {
     required this.villeDepart,
     this.gareDestination,
     this.busPlateNumber,
-    this.dateLot,
+    this.dateDebut,
+    this.dateFin,
     this.createdAt,
     this.closedAt,
     required this.colis,
@@ -333,7 +344,8 @@ class BordereauDetail {
         villeDepart: (map['villeDepart'] ?? '') as String,
         gareDestination: map['gareDestination'] as String?,
         busPlateNumber: map['busPlateNumber'] as String?,
-        dateLot: map['dateLot'] != null ? DateTime.tryParse(map['dateLot'] as String) : null,
+        dateDebut: map['dateDebut'] != null ? DateTime.tryParse(map['dateDebut'] as String) : null,
+        dateFin: map['dateFin'] != null ? DateTime.tryParse(map['dateFin'] as String) : null,
         createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'] as String) : null,
         closedAt: map['closedAt'] != null ? DateTime.tryParse(map['closedAt'] as String) : null,
         colis: ((map['colis'] as List?) ?? const [])

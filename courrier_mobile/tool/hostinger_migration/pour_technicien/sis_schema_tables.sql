@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 87kobLgFsaA4L3pwhdubygoDFCKSLyqom6wRg1dDkcB4dEmqD5PGfVxVqGbmUaG
+\restrict 5QCfDtDi4gEsyAbB3pdDQV0yc6HigIqxj9lIgM76tufzr0rDeTel1QOhw167gnG
 
 -- Dumped from database version 17.6
--- Dumped by pg_dump version 18.6 (Homebrew)
+-- Dumped by pg_dump version 17.11 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -314,6 +314,24 @@ COMMENT ON COLUMN public."Role"."isSystem" IS 'true = rôle système, false = r�
 
 
 --
+-- Name: RoleAssignmentRules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoleAssignmentRules" (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    "assignerRoleId" uuid NOT NULL,
+    "assignableRoleId" uuid NOT NULL
+);
+
+
+--
+-- Name: TABLE "RoleAssignmentRules"; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public."RoleAssignmentRules" IS 'Définit qui peut attribuer quel rôle. super_admin peut aussi créer des rôles custom.';
+
+
+--
 -- Name: UserRoles; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -349,6 +367,40 @@ CREATE TABLE public."Users" (
     "referralCode" character varying,
     "referredByUserId" uuid,
     "activeOwnerCompanyId" uuid
+);
+
+
+--
+-- Name: bordereau_colis; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bordereau_colis (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    bordereau_id uuid NOT NULL,
+    colis_id uuid NOT NULL,
+    added_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: bordereaux_livraison; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bordereaux_livraison (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    reference text NOT NULL,
+    company_id uuid NOT NULL,
+    gare_depart_id uuid,
+    gare_destination_id uuid,
+    bus_id uuid,
+    statut text DEFAULT 'ouvert'::text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    closed_at timestamp with time zone,
+    numero_lot integer,
+    ville_depart_id uuid NOT NULL,
+    date_lot date DEFAULT CURRENT_DATE NOT NULL,
+    CONSTRAINT bordereaux_livraison_statut_check CHECK ((statut = ANY (ARRAY['ouvert'::text, 'clos'::text, 'charge'::text, 'arrive'::text])))
 );
 
 
@@ -445,6 +497,47 @@ CREATE TABLE public.colis_natures_selectionnees (
 CREATE TABLE public.colis_numerotation_gares (
     gare_id uuid NOT NULL,
     last_seq integer DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: mouvements_caisse; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mouvements_caisse (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    caisse_id uuid NOT NULL,
+    type_mouvement text NOT NULL,
+    montant integer NOT NULL,
+    solde_apres integer NOT NULL,
+    ticket_id uuid,
+    colis_id uuid,
+    effectue_par uuid NOT NULL,
+    reversement_id uuid,
+    note text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    colis_autonome_id uuid,
+    CONSTRAINT mouvements_caisse_montant_check CHECK ((montant > 0)),
+    CONSTRAINT mouvements_caisse_solde_apres_check CHECK ((solde_apres >= 0)),
+    CONSTRAINT mouvements_caisse_type_check CHECK ((type_mouvement = ANY (ARRAY['encaissement_billet'::text, 'encaissement_colis'::text, 'decaissement_annulation'::text, 'reversement_comptable'::text])))
+);
+
+
+--
+-- Name: reversements_comptables; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.reversements_comptables (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    caisse_id uuid NOT NULL,
+    comptable_id uuid,
+    montant_reverse integer NOT NULL,
+    statut_validation text DEFAULT 'en_attente'::text NOT NULL,
+    soumis_par uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    validated_at timestamp with time zone,
+    CONSTRAINT reversements_montant_check CHECK ((montant_reverse > 0)),
+    CONSTRAINT reversements_statut_check CHECK ((statut_validation = ANY (ARRAY['en_attente'::text, 'approuve_recu'::text])))
 );
 
 
@@ -561,6 +654,22 @@ ALTER TABLE ONLY public."Notifications"
 
 
 --
+-- Name: RoleAssignmentRules RoleAssignmentRules_assignerRoleId_assignableRoleId_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoleAssignmentRules"
+    ADD CONSTRAINT "RoleAssignmentRules_assignerRoleId_assignableRoleId_key" UNIQUE ("assignerRoleId", "assignableRoleId");
+
+
+--
+-- Name: RoleAssignmentRules RoleAssignmentRules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoleAssignmentRules"
+    ADD CONSTRAINT "RoleAssignmentRules_pkey" PRIMARY KEY (id);
+
+
+--
 -- Name: Role Role_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -625,6 +734,30 @@ ALTER TABLE ONLY public."Users"
 
 
 --
+-- Name: bordereau_colis bordereau_colis_bordereau_id_colis_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereau_colis
+    ADD CONSTRAINT bordereau_colis_bordereau_id_colis_id_key UNIQUE (bordereau_id, colis_id);
+
+
+--
+-- Name: bordereau_colis bordereau_colis_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereau_colis
+    ADD CONSTRAINT bordereau_colis_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: caisses_gares caisses_gares_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -686,6 +819,22 @@ ALTER TABLE ONLY public.colis_numerotation_gares
 
 ALTER TABLE ONLY public."CompanyExpenseCategory"
     ADD CONSTRAINT company_expense_category_company_name_unique UNIQUE ("companyId", name);
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reversements_comptables reversements_comptables_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reversements_comptables
+    ADD CONSTRAINT reversements_comptables_pkey PRIMARY KEY (id);
 
 
 --
@@ -759,6 +908,20 @@ CREATE INDEX "Users_referred_by_idx" ON public."Users" USING btree ("referredByU
 
 
 --
+-- Name: bordereau_colis_colis_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bordereau_colis_colis_idx ON public.bordereau_colis USING btree (colis_id);
+
+
+--
+-- Name: bordereaux_livraison_company_reference_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX bordereaux_livraison_company_reference_key ON public.bordereaux_livraison USING btree (company_id, reference);
+
+
+--
 -- Name: caisses_gares_gare_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -822,10 +985,45 @@ CREATE INDEX idx_colis_autonomes_bus_id ON public.colis_autonomes USING btree (b
 
 
 --
+-- Name: mouvements_caisse_caisse_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX mouvements_caisse_caisse_idx ON public.mouvements_caisse USING btree (caisse_id, created_at DESC);
+
+
+--
+-- Name: reversements_caisse_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX reversements_caisse_idx ON public.reversements_comptables USING btree (caisse_id, created_at DESC);
+
+
+--
+-- Name: reversements_statut_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX reversements_statut_idx ON public.reversements_comptables USING btree (statut_validation, created_at DESC);
+
+
+--
 -- Name: user_roles_gare_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX user_roles_gare_id_idx ON public."UserRoles" USING btree ("gareId");
+
+
+--
+-- Name: bordereaux_livraison bordereau_numero_lot_trg; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER bordereau_numero_lot_trg BEFORE INSERT ON public.bordereaux_livraison FOR EACH ROW EXECUTE FUNCTION public.assign_bordereau_numero_lot();
+
+
+--
+-- Name: bordereaux_livraison bordereau_reference_trg; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER bordereau_reference_trg BEFORE INSERT ON public.bordereaux_livraison FOR EACH ROW EXECUTE FUNCTION public.assign_bordereau_reference();
 
 
 --
@@ -1044,6 +1242,22 @@ ALTER TABLE ONLY public."Notifications"
 
 
 --
+-- Name: RoleAssignmentRules RoleAssignmentRules_assignableRoleId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoleAssignmentRules"
+    ADD CONSTRAINT "RoleAssignmentRules_assignableRoleId_fkey" FOREIGN KEY ("assignableRoleId") REFERENCES public."Role"(id) ON DELETE CASCADE DEFERRABLE;
+
+
+--
+-- Name: RoleAssignmentRules RoleAssignmentRules_assignerRoleId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoleAssignmentRules"
+    ADD CONSTRAINT "RoleAssignmentRules_assignerRoleId_fkey" FOREIGN KEY ("assignerRoleId") REFERENCES public."Role"(id) ON DELETE CASCADE DEFERRABLE;
+
+
+--
 -- Name: UserRoles UserRoles_assignedBy_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1121,6 +1335,70 @@ ALTER TABLE ONLY public."Users"
 
 ALTER TABLE ONLY public."Users"
     ADD CONSTRAINT "Users_referredByUserId_fkey" FOREIGN KEY ("referredByUserId") REFERENCES public."Users"(id) ON DELETE SET NULL;
+
+
+--
+-- Name: bordereau_colis bordereau_colis_bordereau_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereau_colis
+    ADD CONSTRAINT bordereau_colis_bordereau_id_fkey FOREIGN KEY (bordereau_id) REFERENCES public.bordereaux_livraison(id) ON DELETE CASCADE;
+
+
+--
+-- Name: bordereau_colis bordereau_colis_colis_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereau_colis
+    ADD CONSTRAINT bordereau_colis_colis_id_fkey FOREIGN KEY (colis_id) REFERENCES public.colis_autonomes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_bus_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_bus_id_fkey FOREIGN KEY (bus_id) REFERENCES public."Bus"(id);
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_company_id_fkey FOREIGN KEY (company_id) REFERENCES public."Companies"(id) ON DELETE CASCADE;
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."Users"(id);
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_gare_depart_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_gare_depart_id_fkey FOREIGN KEY (gare_depart_id) REFERENCES public."Gares"(id);
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_gare_destination_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_gare_destination_id_fkey FOREIGN KEY (gare_destination_id) REFERENCES public."Gares"(id);
+
+
+--
+-- Name: bordereaux_livraison bordereaux_livraison_ville_depart_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bordereaux_livraison
+    ADD CONSTRAINT bordereaux_livraison_ville_depart_id_fkey FOREIGN KEY (ville_depart_id) REFERENCES public."Cities"(id);
 
 
 --
@@ -1217,6 +1495,78 @@ ALTER TABLE ONLY public.colis_natures_selectionnees
 
 ALTER TABLE ONLY public.colis_numerotation_gares
     ADD CONSTRAINT colis_numerotation_gares_gare_id_fkey FOREIGN KEY (gare_id) REFERENCES public."Gares"(id) ON DELETE CASCADE;
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_caisse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_caisse_id_fkey FOREIGN KEY (caisse_id) REFERENCES public.caisses_gares(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_colis_autonome_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_colis_autonome_id_fkey FOREIGN KEY (colis_autonome_id) REFERENCES public.colis_autonomes(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_colis_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_colis_id_fkey FOREIGN KEY (colis_id) REFERENCES public."ReservationBus"(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_effectue_par_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_effectue_par_fkey FOREIGN KEY (effectue_par) REFERENCES public."Users"(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_reversement_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_reversement_fkey FOREIGN KEY (reversement_id) REFERENCES public.reversements_comptables(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mouvements_caisse mouvements_caisse_ticket_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mouvements_caisse
+    ADD CONSTRAINT mouvements_caisse_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public."ReservationBus"(id) ON DELETE SET NULL;
+
+
+--
+-- Name: reversements_comptables reversements_comptables_caisse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reversements_comptables
+    ADD CONSTRAINT reversements_comptables_caisse_id_fkey FOREIGN KEY (caisse_id) REFERENCES public.caisses_gares(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: reversements_comptables reversements_comptables_comptable_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reversements_comptables
+    ADD CONSTRAINT reversements_comptables_comptable_id_fkey FOREIGN KEY (comptable_id) REFERENCES public."Users"(id) ON DELETE SET NULL;
+
+
+--
+-- Name: reversements_comptables reversements_comptables_soumis_par_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reversements_comptables
+    ADD CONSTRAINT reversements_comptables_soumis_par_fkey FOREIGN KEY (soumis_par) REFERENCES public."Users"(id) ON DELETE RESTRICT;
 
 
 --
@@ -1346,6 +1696,12 @@ ALTER TABLE public."Notifications" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Role" ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: RoleAssignmentRules; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public."RoleAssignmentRules" ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: UserRoles; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -1356,6 +1712,18 @@ ALTER TABLE public."UserRoles" ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public."Users" ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: bordereau_colis; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.bordereau_colis ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: bordereaux_livraison; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.bordereaux_livraison ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: Bus bus_select; Type: POLICY; Schema: public; Owner: -
@@ -1568,6 +1936,21 @@ CREATE POLICY gares_write ON public."Gares" TO authenticated USING ((public.has_
 
 
 --
+-- Name: mouvements_caisse; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.mouvements_caisse ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: mouvements_caisse mouvements_caisse_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY mouvements_caisse_select ON public.mouvements_caisse FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.caisses_gares c
+  WHERE ((c.id = mouvements_caisse.caisse_id) AND (public.is_super_admin() OR (c.gestionnaire_id = public.current_app_user_id()) OR public.can_validate_station_reversal(public.station_cash_gare_company_id(c.gare_id)))))));
+
+
+--
 -- Name: Notifications notifications_insert; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1586,6 +1969,36 @@ CREATE POLICY notifications_select ON public."Notifications" FOR SELECT TO authe
 --
 
 CREATE POLICY notifications_update ON public."Notifications" FOR UPDATE TO authenticated USING ((public.is_super_admin() OR ("userId" = public.current_app_user_id()))) WITH CHECK ((public.is_super_admin() OR ("userId" = public.current_app_user_id())));
+
+
+--
+-- Name: reversements_comptables; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.reversements_comptables ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: reversements_comptables reversements_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY reversements_select ON public.reversements_comptables FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM (public.caisses_gares c
+     JOIN public."Gares" g ON ((g.id = c.gare_id)))
+  WHERE ((c.id = reversements_comptables.caisse_id) AND (public.is_super_admin() OR (c.gestionnaire_id = public.current_app_user_id()) OR public.can_validate_station_reversal(g."companyId"))))));
+
+
+--
+-- Name: RoleAssignmentRules role_assignment_rules_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY role_assignment_rules_select ON public."RoleAssignmentRules" FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: RoleAssignmentRules role_assignment_rules_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY role_assignment_rules_write ON public."RoleAssignmentRules" TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
 
 
 --
@@ -1663,5 +2076,5 @@ CREATE POLICY users_update ON public."Users" FOR UPDATE TO authenticated USING (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 87kobLgFsaA4L3pwhdubygoDFCKSLyqom6wRg1dDkcB4dEmqD5PGfVxVqGbmUaG
+\unrestrict 5QCfDtDi4gEsyAbB3pdDQV0yc6HigIqxj9lIgM76tufzr0rDeTel1QOhw167gnG
 

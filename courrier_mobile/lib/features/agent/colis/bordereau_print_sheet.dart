@@ -22,9 +22,9 @@ String _bordereauShareMessage(BordereauDetail d) {
     'Trajet : ${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}',
     if (d.busPlateNumber != null) 'Bus : ${d.busPlateNumber}',
     '${d.colis.length} colis',
-    // Date de lot éditable par l'agent (migration 202) — c'est elle qui doit
-    // s'afficher, pas l'horodatage technique de création.
-    if (d.dateLot != null) 'Date : ${formatBordereauDateOnly(d.dateLot!)}',
+    // Période du lot éditable par l'agent — c'est elle qui doit s'afficher,
+    // pas l'horodatage technique de création.
+    if (d.dateDebut != null) 'Date : ${formatBordereauPeriode(d.dateDebut!, d.dateFin)}',
   ].join('\n');
 }
 
@@ -373,7 +373,7 @@ class _BordereauBox extends StatelessWidget {
               const SizedBox(height: 8),
               Text(trajet, style: const TextStyle(fontWeight: FontWeight.w600)),
               if (detail.busPlateNumber != null) Text('Bus : ${detail.busPlateNumber}'),
-              if (detail.dateLot != null) Text('Date : ${formatBordereauDateOnly(detail.dateLot!)}'),
+              if (detail.dateDebut != null) Text('Date : ${formatBordereauPeriode(detail.dateDebut!, detail.dateFin)}'),
               const Divider(height: 16),
               Text('${detail.colis.length} colis', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),

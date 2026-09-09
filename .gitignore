@@ -29,3 +29,18 @@ tsconfig.tsbuildinfo
 # Environment variables
 .env*
 .vercel
+
+# Export sensible (hash de mots de passe / jetons GoTrue) -- jamais commité,
+# transmis manuellement par un canal sûr. Voir courrier_mobile/tool/
+# hostinger_migration/pour_moi/05_export_sis_auth.sh
+**/sis_auth_SENSIBLE/
+
+# Données clients SIS exportées (PII + mouvements financiers réels) --
+# retirées du suivi git le 2026-09-09, transmises au technicien par un
+# canal séparé (jamais via ce repo). Voir courrier_mobile/tool/
+# hostinger_migration/README.md.
+**/hostinger_migration/pour_technicien/sis_export/
+**/hostinger_migration/*.zip
+**/hostinger_migration/pour_technicien.zip
+/courrier_mobile.zip
+/src.zip

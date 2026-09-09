@@ -97,6 +97,17 @@ psql "postgresql://postgres:$(grep ^POSTGRES_PASSWORD= stack/.env | cut -d= -f2)
 (`04_import_data.sh` vous demandera `HOSTINGER_DB_URL` si elle n'est pas
 déjà positionnée — utilisez la même URL que ci-dessus.)
 
+## Si vous recevez une mise à jour (functions_and_triggers.sql / sis_export/ mis à jour)
+
+Ça arrivera au moins une fois, juste avant la bascule finale (pour capturer
+tout ce qui a été enregistré côté Tibus depuis ce premier import). Dans ce
+cas, NE PAS refaire les étapes 1 à 6 -- seulement :
+
+```bash
+psql "$HOSTINGER_DB_URL" -f functions_and_triggers.sql   # idempotent
+./05_resync_data.sh                                       # vide puis recharge les données
+```
+
 ## Étape 7 — Informations à renvoyer à Tibus
 
 Une fois tout démarré, transmettez UNIQUEMENT ces deux informations

@@ -396,16 +396,19 @@ class _ReceiptBox extends StatelessWidget {
                 children: [
                   Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  // Numéro de la gare de destination en en-tête (demande
-                  // explicite du 26/08/2026, qui annule celle du 20/08/2026
-                  // ci-dessous). Repli sur le nom de la gare si son
-                  // téléphone n'est pas renseigné. Le téléphone du SIÈGE
-                  // (compagnie) est lui déplacé en PIED de page (voir plus
-                  // bas, après "Retrait sous 72h"). Le téléphone de la gare
-                  // de DÉPART reste affiché dans le bloc EXPÉDITEUR (voir
-                  // _Field 'Tél. agence' plus bas).
-                  Text(
-                      'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
+                  // Nom de la gare de destination en en-tête (aligné sur ce
+                  // qui est réellement imprimé — printer_service.dart /
+                  // colis_receipt_lines.dart / P3PrinterModule.kt — demande
+                  // explicite du 27/08/2026 : l'aperçu affichait encore le
+                  // numéro de téléphone de la gare suite à une demande du
+                  // 26/08/2026 restée isolée dans ce seul fichier, jamais
+                  // répercutée sur les impressions réelles, d'où l'écart
+                  // entre aperçu et papier). Le téléphone du SIÈGE
+                  // (compagnie) reste en PIED de page (voir plus bas, après
+                  // "Retrait sous 72h"). Le téléphone de la gare de DÉPART
+                  // reste affiché dans le bloc EXPÉDITEUR (voir _Field
+                  // 'Tél. agence' plus bas).
+                  Text('Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   const Text('Reçu expédition colis', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
@@ -597,14 +600,13 @@ class _TalonBox extends StatelessWidget {
           children: [
             Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            // Numéro de la gare de destination en en-tête (demande explicite
-            // du 26/08/2026, qui annule celle du 20/08/2026 ci-dessous),
-            // puis sous-titre explicite. Pas de "Tél siège" ici — ce talon
-            // n'a pas de pied de page où le reçu le déplace désormais. Le
-            // téléphone de la gare de départ est lui affiché plus bas, dans
-            // le bloc expédition.
-            Text(
-                'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
+            // Nom de la gare de destination en en-tête (voir la même
+            // correction et son explication dans le bloc "Aperçu du reçu"
+            // plus haut), puis sous-titre explicite. Pas de "Tél siège" ici
+            // — ce talon n'a pas de pied de page où le reçu le déplace
+            // désormais. Le téléphone de la gare de départ est lui affiché
+            // plus bas, dans le bloc expédition.
+            Text('Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
                 style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
             const Text('Reçu expédition colis', style: TextStyle(fontSize: 9)),
             if (colis.isPendingSync)

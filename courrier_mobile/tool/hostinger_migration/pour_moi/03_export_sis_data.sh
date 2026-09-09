@@ -32,6 +32,7 @@ copy() {
 copy "Countries.csv"            'SELECT * FROM "Countries"'
 copy "Cities.csv"               'SELECT * FROM "Cities"'
 copy "Role.csv"                 'SELECT * FROM "Role"'
+copy "RoleAssignmentRules.csv"  'SELECT * FROM "RoleAssignmentRules"'
 copy "ContactSettings.csv"      'SELECT * FROM "ContactSettings"'
 
 # Compagnie SIS et ses dépendances directes :
@@ -47,6 +48,15 @@ copy "UserRoles.csv" "SELECT * FROM \"UserRoles\" WHERE \"companyId\" = '$SIS_ID
 copy "Gares.csv" "SELECT * FROM \"Gares\" WHERE \"companyId\" = '$SIS_ID'"
 copy "Bus.csv"   "SELECT * FROM \"Bus\" WHERE \"companyId\" = '$SIS_ID'"
 copy "caisses_gares.csv" "SELECT * FROM caisses_gares WHERE gare_id IN (SELECT id FROM \"Gares\" WHERE \"companyId\" = '$SIS_ID')"
+
+# Reversements + mouvements de caisse (absentes de l'audit initial -- voir
+# 01_generate_functions_and_triggers.sql, commentaire daté 2026-08-28) :
+copy "reversements_comptables.csv" "SELECT r.* FROM reversements_comptables r JOIN caisses_gares c ON c.id = r.caisse_id JOIN \"Gares\" g ON g.id = c.gare_id WHERE g.\"companyId\" = '$SIS_ID'"
+copy "mouvements_caisse.csv" "SELECT m.* FROM mouvements_caisse m JOIN caisses_gares c ON c.id = m.caisse_id JOIN \"Gares\" g ON g.id = c.gare_id WHERE g.\"companyId\" = '$SIS_ID'"
+
+# Bordereaux de livraison + dépendances (idem, absentes de l'audit initial) :
+copy "bordereaux_livraison.csv" "SELECT * FROM bordereaux_livraison WHERE company_id = '$SIS_ID'"
+copy "bordereau_colis.csv" "SELECT bc.* FROM bordereau_colis bc JOIN bordereaux_livraison bl ON bl.id = bc.bordereau_id WHERE bl.company_id = '$SIS_ID'"
 
 # Colis + dépendances :
 copy "colis_natures.csv" "SELECT * FROM colis_natures WHERE company_id = '$SIS_ID'"

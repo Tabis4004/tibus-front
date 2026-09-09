@@ -36,33 +36,36 @@ class AppRole {
 
   /// Vrai pour les rôles "staff" qui gèrent des colis (vue agent).
   ///
-  /// BUG CORRIGÉ (20/08/2026) : liste figée à l'ancien périmètre (avant les
-  /// rôles emballeur_gare/chargeur_gare/distributeur_gare, migration 193
-  /// côté base, et les rôles gare vendeur_gare/controleur_gare/comptable_gare/
-  /// chauffeur/controleur/comptable_compagnie déjà assignables côté web
-  /// depuis longtemps — voir owner-team-roles.ts). Un compte qui n'a QUE l'un
-  /// de ces rôles (ex. emballeur pur) faisait échouer
-  /// activeCompanyIdProvider (providers.dart), qui filtre sur isAgentRole en
-  /// repli quand aucune caisse n'est ouverte : aucune compagnie active ->
-  /// écran d'accueil bloqué sur "Aucun rôle actif trouvé", malgré des rôles
-  /// bien attribués en base. Seul un compte ayant EN PLUS un rôle déjà
-  /// couvert (ex. vendeur) contournait le problème — d'où l'impression que
-  /// "seul vendeur débloque les fonctionnalités emballeur/chargeur".
-  bool get isAgentRole => const [
-        'super_admin',
-        'admin_pays',
-        'owner',
-        'gerant_gare',
-        'gestionnaire_gare',
-        'vendeur',
-        'vendeur_gare',
-        'chauffeur',
-        'controleur',
-        'controleur_gare',
-        'comptable_compagnie',
-        'comptable_gare',
-        'emballeur_gare',
-        'chargeur_gare',
-        'distributeur_gare',
-      ].contains(name);
+  /// Piloté par la colonne `scope` de la table Role (vérifié en base le
+  /// 27/08 : tout rôle scope='company' est un rôle staff rattaché à une
+  /// compagnie — emballeur_gare, chargeur_gare, distributeur_gare, vendeur,
+  /// vendeur_gare, comptable_gare, controleur_gare, controleur,
+  /// comptable_compagnie, gerant_gare, chauffeur, owner) plutôt que par une
+  /// liste de noms figée : l'ancienne liste (super_admin/admin_pays/owner/
+  /// gerant_gare/vendeur uniquement) laissait 28 utilisateurs avec un rôle
+  /// staff légitime (ex. emballeur_gare, 11 comptes) sans aucun accès —
+  /// "Aucun rôle actif trouvé pour ce compte" au démarrage de l'app. Tout
+  /// nouveau rôle scope='company' créé côté web sera reconnu ici
+  /// automatiquement, sans nouveau correctif. super_admin/admin_pays
+  /// (scope='platform') restent explicitement inclus pour l'accès de
+  /// secours déjà existant.
+  bool get isAgentRole => scope == 'company' || const ['super_admin', 'admin_pays'].contains(name);
+
+  /// Vrai pour les rôles habilités à vendre un colis : enregistrement
+  /// (register_colis_autonome) + caisse guichet. Demande explicite du
+  /// 27/08 : à part vendeur/vendeur_gare et owner, aucun autre rôle ne doit
+  /// pouvoir enregistrer un colis ni ouvrir/gérer de caisse —
+  /// emballeur_gare/chargeur_gare/distributeur_gare ne font que traiter les
+  /// colis déjà enregistrés (voir HomeScreen._kLotManagerRoles) ;
+  /// comptable_gare/comptable_compagnie consultent les finances depuis la
+  /// plateforme web Tibus, pas depuis cette app.
+  bool get isSellerRole => const ['vendeur', 'vendeur_gare', 'owner'].contains(name);
+
+  /// Vrai pour les rôles qui gardent un accès de secours à la caisse, en
+  /// LECTURE SEULE (solde + impression des journaux), sans pouvoir
+  /// l'ouvrir, enregistrer une remise ni la clôturer — demande explicite
+  /// du 27/08 : gérant de gare et comptable, en secours (encadrement /
+  /// contrôle), mais pas d'action de caisse pour eux dans l'app (le
+  /// comptable suit les finances depuis la plateforme web Tibus).
+  bool get isCashBackupRole => const ['gerant_gare', 'comptable_gare', 'comptable_compagnie'].contains(name);
 }

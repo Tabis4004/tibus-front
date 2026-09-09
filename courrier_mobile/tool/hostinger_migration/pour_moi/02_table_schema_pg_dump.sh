@@ -23,7 +23,13 @@ OUT="../pour_technicien/sis_schema_tables.sql"
 
 # Périmètre établi par l'audit du 2026-08-09, complété le 2026-08-23
 # ("Cities" ajoutée -- référencée par list_company_villes_depart, appelée
-# par colis_service.dart, absente de l'audit initial) -- voir
+# par colis_service.dart, absente de l'audit initial), et le 2026-08-28
+# ("RoleAssignmentRules", "reversements_comptables", "bordereaux_livraison",
+# "bordereau_colis", "mouvements_caisse" ajoutées -- absentes car jamais
+# appelées directement par l'app, seulement à l'intérieur du corps de
+# fonctions déjà migrées : can_assign_role/is_company_staff pour la
+# première, submit_station_cash_reversal/create_bordereau_livraison/
+# record_station_cash_movement/etc. pour les quatre autres) -- voir
 # 01_generate_functions_and_triggers.sql pour le détail du raisonnement.
 # --schema-only : structure (colonnes, contraintes, index, séquences,
 # policies RLS) sans les données -- les données sont exportées séparément
@@ -40,6 +46,7 @@ pg_dump "$TIBUS1_DB_URL" \
   -t '"Users"' \
   -t '"UserRoles"' \
   -t '"Role"' \
+  -t '"RoleAssignmentRules"' \
   -t '"Gares"' \
   -t '"Bus"' \
   -t 'colis_autonomes' \
@@ -47,6 +54,10 @@ pg_dump "$TIBUS1_DB_URL" \
   -t 'colis_natures_selectionnees' \
   -t 'colis_numerotation_gares' \
   -t 'caisses_gares' \
+  -t 'reversements_comptables' \
+  -t 'mouvements_caisse' \
+  -t 'bordereaux_livraison' \
+  -t 'bordereau_colis' \
   -t '"Notifications"' \
   -t '"DeviceTokens"' \
   -t '"ColisTrackingSubscriptions"' \

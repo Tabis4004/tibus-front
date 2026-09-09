@@ -34,11 +34,16 @@ on:
         description: 'Client à builder (nom de dossier sous branding/, ex. default, sis)'
         required: true
         default: 'default'
-  push:
-    branches: [main]
-    paths:
-      - 'courrier_mobile/**'
-      - '.github/workflows/courrier-mobile-apk.yml'
+  # Déclenchement automatique "push" désactivé le 2026-09-08 : ses secrets
+  # ANDROID_* n'ont jamais été configurés sur GitHub, donc chaque push
+  # échouait systématiquement (bruit sans intérêt). Repassé en manuel
+  # uniquement, comme courrier-mobile-build.yml (build AAB SIS/Tibus) —
+  # lance-le depuis Actions > Run workflow quand tu as besoin d'un APK.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'courrier_mobile/**'
+  #     - '.github/workflows/courrier-mobile-apk.yml'
 
 jobs:
   build:

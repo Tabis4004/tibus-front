@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/colis_ui_config.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/colis.dart';
 import '../stats/colis_sales_journal_print_sheet.dart';
@@ -37,6 +38,12 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
   String? _selectedGareId;
   OpenStationCash? _cash;
   List<StationCashMovement> _movements = [];
+  // Réglages "Réglages colis autonome" (visibilité des rapports, voir
+  // AdminColisSettingsScreen) -- jamais consultés jusqu'ici sur cet écran :
+  // "Journal de caisse du jour" et "Journal de vente du jour" s'affichaient
+  // et s'imprimaient inconditionnellement, même quand l'owner les avait
+  // désactivés depuis les réglages (seul stats_screen.dart les respectait).
+  ColisUiConfig _uiConfig = ColisUiConfig.defaults;
 
   @override
   void initState() {
@@ -70,10 +77,12 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         // de voir toutes les gares, comme avant.
         service.listStationGares(companyId),
         service.getOpenStationCash(),
+        service.getCompanyColisSettings(companyId),
       ]);
       if (!mounted) return;
       final gares = results[0] as List<GareOption>;
       final cash = results[1] as OpenStationCash;
+      final uiConfig = ColisUiConfig.fromSettings(results[2] as Map<String, dynamic>);
       List<StationCashMovement> movements = [];
       if (cash.open && cash.id != null) {
         movements = await service.listStationCashMovements(cash.id!, limit: 80);
@@ -87,6 +96,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         if (gares.length == 1) _selectedGareId = gares.first.id;
         _cash = cash;
         _movements = movements;
+        _uiConfig = uiConfig;
         _loading = false;
       });
     } catch (e) {
@@ -353,6 +363,8 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               onPrintJournal: _printJournal,
               onPrintSalesJournal: _printSalesJournal,
               dateFmt: _dateFmt,
+              showCashJournal: _uiConfig.showReport('cashJournal'),
+              showSalesJournal: _uiConfig.showReport('salesJournal'),
             ),
           const SizedBox(height: 20),
           if (_movements.isNotEmpty) ...[
@@ -442,6 +454,8 @@ class _OpenCashDetails extends StatelessWidget {
   final VoidCallback onPrintJournal;
   final VoidCallback onPrintSalesJournal;
   final DateFormat dateFmt;
+  final bool showCashJournal;
+  final bool showSalesJournal;
 
   const _OpenCashDetails({
     required this.cash,
@@ -453,6 +467,8 @@ class _OpenCashDetails extends StatelessWidget {
     required this.onPrintJournal,
     required this.onPrintSalesJournal,
     required this.dateFmt,
+    required this.showCashJournal,
+    required this.showSalesJournal,
   });
 
   String _fmtDate(String? iso) {
@@ -493,58 +509,67 @@ class _OpenCashDetails extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                const Text(
-                  'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
-                  'remises) avec le total (solde final) en bas.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: saving ? null : onPrintJournal,
-                  icon: const Icon(Icons.print_outlined),
-                  label: Text(saving ? '…' : 'Imprimer le journal'),
-                ),
-              ],
+        // Les deux Card ci-dessous respectent désormais "Réglages colis
+        // autonome" (visibilité des rapports, salesJournal/cashJournal) —
+        // jusqu'au 2026-09-09 elles s'affichaient et s'imprimaient
+        // inconditionnellement, même désactivées par l'owner (seul
+        // stats_screen.dart respectait déjà ce réglage).
+        if (showCashJournal) ...[
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Journal de caisse du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Imprime l\'ensemble des mouvements de cette session (encaissements, décaissements, '
+                    'remises) avec le total (solde final) en bas.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: saving ? null : onPrintJournal,
+                    icon: const Icon(Icons.print_outlined),
+                    label: Text(saving ? '…' : 'Imprimer le journal'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
-        // agent, scoping serveur — get_colis_sales_journal) : document
-        // distinct du journal de caisse ci-dessus (mouvements d'espèces).
-        // Même impression que Stats → « Mon rapport d'activité ».
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                const Text(
-                  'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
-                  'à remettre avec la caisse en fin de session.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: saving ? null : onPrintSalesJournal,
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  label: Text(saving ? '…' : 'Imprimer le journal de vente'),
-                ),
-              ],
+        ],
+        if (showSalesJournal) ...[
+          const SizedBox(height: 16),
+          // Raccourci "journal de VENTE" (colis vendus aujourd'hui par cet
+          // agent, scoping serveur — get_colis_sales_journal) : document
+          // distinct du journal de caisse ci-dessus (mouvements d'espèces).
+          // Même impression que Stats → « Mon rapport d'activité ».
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Journal de vente du jour', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Imprime vos ventes de colis du jour (colis par colis, avec total) — '
+                    'à remettre avec la caisse en fin de session.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: saving ? null : onPrintSalesJournal,
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
         if (!readOnly) ...[
           const SizedBox(height: 16),
           Card(

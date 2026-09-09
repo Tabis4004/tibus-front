@@ -136,7 +136,7 @@ class PrinterService {
         // — garder ce libellé exact ici. Le téléphone de la gare de DÉPART
         // reste affiché dans le bloc EXPÉDITEUR ci-dessous (voir rows, ligne
         // "Tél. agence").
-        'Tel Destination: ${colis.gareDestination}',
+        'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
         // Sous-titre EXPLICITE : sans lui, le module P3 natif retombe sur
         // « Ticket » par défaut (normalizeStructured, P3PrinterModule.kt).
         'Reçu expédition colis',
@@ -198,7 +198,7 @@ class PrinterService {
         // siège" ici : ce talon n'a pas de pied de page où le reçu le
         // déplace désormais. Le téléphone de la gare de départ est lui dans
         // le bloc expédition ci-dessous (ligne "Tél. agence").
-        'Tel Destination: ${colis.gareDestination}',
+        'Tel Destination: ${colis.gareDestinationPhone.isNotEmpty ? colis.gareDestinationPhone : colis.gareDestination}',
         'Reçu expédition colis',
       ],
       reference: colisReceiptNumber(colis),
@@ -419,7 +419,7 @@ class PrinterService {
       rows: [
         ['Trajet', trajet],
         if (d.busPlateNumber != null) ['Bus', d.busPlateNumber!],
-        if (d.dateLot != null) ['Date', formatBordereauDateOnly(d.dateLot!)],
+        if (d.dateDebut != null) ['Date', formatBordereauDateOnly(d.dateDebut!)],
         ['Colis', '${d.colis.length}'],
         for (var i = 0; i < d.colis.length; i++)
           [

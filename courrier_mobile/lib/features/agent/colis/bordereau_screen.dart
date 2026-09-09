@@ -80,9 +80,11 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
     String? villeDepartId = villes.length == 1 ? villes.first.id : null;
     String? gareDestId;
     String? busId;
-    // Date de lot éditable par l'agent (migration 202, point 5) — défaut
-    // aujourd'hui, c'est cette date qui s'affichera partout (liste + étiquette).
-    DateTime dateLot = DateTime.now();
+    // Période couverte par le lot, éditable par l'agent — dateDebut par
+    // défaut aujourd'hui, dateFin optionnelle (lot encore en cours) ;
+    // c'est cette période qui s'affichera partout (liste + étiquette).
+    DateTime dateDebut = DateTime.now();
+    DateTime? dateFin;
 
     final created = await showModalBottomSheet<BordereauDetail>(
       context: context,
@@ -140,22 +142,65 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                   onChanged: (v) => setSheetState(() => busId = v),
                 ),
                 const SizedBox(height: 10),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: dateLot,
-                      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null) setSheetState(() => dateLot = picked);
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(labelText: 'Date du lot', prefixIcon: Icon(Icons.event)),
-                    child: Text(
-                      '${dateLot.day.toString().padLeft(2, '0')}/${dateLot.month.toString().padLeft(2, '0')}/${dateLot.year}',
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: dateDebut,
+                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                            lastDate: DateTime.now().add(const Duration(days: 30)),
+                          );
+                          if (picked != null) {
+                            setSheetState(() {
+                              dateDebut = picked;
+                              // La fin ne peut pas précéder le début.
+                              if (dateFin != null && dateFin!.isBefore(dateDebut)) {
+                                dateFin = null;
+                              }
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(labelText: 'Début *', prefixIcon: Icon(Icons.event)),
+                          child: Text(
+                            '${dateDebut.day.toString().padLeft(2, '0')}/${dateDebut.month.toString().padLeft(2, '0')}/${dateDebut.year}',
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: dateFin ?? dateDebut,
+                            firstDate: dateDebut,
+                            lastDate: DateTime.now().add(const Duration(days: 30)),
+                          );
+                          if (picked != null) setSheetState(() => dateFin = picked);
+                        },
+                        onLongPress: dateFin == null ? null : () => setSheetState(() => dateFin = null),
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Fin (optionnel)',
+                            prefixIcon: Icon(Icons.event),
+                            helperText: 'Appui long pour effacer',
+                            helperStyle: TextStyle(fontSize: 10),
+                          ),
+                          child: Text(
+                            dateFin != null
+                                ? '${dateFin!.day.toString().padLeft(2, '0')}/${dateFin!.month.toString().padLeft(2, '0')}/${dateFin!.year}'
+                                : '—',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -173,7 +218,8 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                                     villeDepartId: villeDepartId!,
                                     gareDestinationId: gareDestId!,
                                     busId: busId,
-                                    dateLot: dateLot,
+                                    dateDebut: dateDebut,
+                                    dateFin: dateFin,
                                   );
                               if (sheetContext.mounted) {
                                 Navigator.of(sheetContext).pop(detail);
@@ -250,7 +296,7 @@ class _BordereauListScreenState extends ConsumerState<BordereauListScreen> {
                           subtitle: Text(
                             '${row.reference} · ${row.colisCount} colis'
                             '${row.busPlateNumber != null ? " · Bus ${row.busPlateNumber}" : ""}'
-                            '${row.dateLot != null ? " · ${_fmtDateOnly(row.dateLot!)}" : (row.createdAt != null ? " · ${_fmtDate(row.createdAt!)}" : "")}',
+                            '${row.dateDebut != null ? " · ${_fmtPeriode(row.dateDebut, row.dateFin)}" : (row.createdAt != null ? " · ${_fmtDate(row.createdAt!)}" : "")}',
                           ),
                           trailing: Chip(
                             visualDensity: VisualDensity.compact,
@@ -290,6 +336,19 @@ String _fmtDateOnly(DateTime d) {
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(d.day)}/${two(d.month)}/${d.year}';
 }
+
+// Période du lot (dateDebut/dateFin) — affiche une seule date si dateFin
+// est absente ou identique à dateDebut (cas des lots migrés à un seul jour
+// et des lots créés sans date de fin), sinon "jj/mm – jj/mm/aaaa".
+String _fmtPeriode(DateTime? debut, DateTime? fin) {
+  if (debut == null) return '';
+  if (fin == null || _isSameDay(debut, fin)) return _fmtDateOnly(debut);
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(debut.day)}/${two(debut.month)} – ${_fmtDateOnly(fin)}';
+}
+
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// Libellé du statut de lot — ouvert (emballage), clos (= « Emballé »,
 /// demande promoteur), charge (parti), arrive (reçu à destination) —
@@ -527,7 +586,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
                     // regroupe les colis par lot/destination, sans valorisation.
                     '${detail.colis.length} colis'
                     '${detail.busPlateNumber != null ? " · Bus ${detail.busPlateNumber}" : ""}'
-                    '${detail.dateLot != null ? " · ${_fmtDateOnly(detail.dateLot!)}" : ""}'
+                    '${detail.dateDebut != null ? " · ${_fmtPeriode(detail.dateDebut, detail.dateFin)}" : ""}'
                     '${isOpen ? "" : " · ${_lotStatutLabel(detail.statut)}"}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
