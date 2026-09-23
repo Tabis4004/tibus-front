@@ -198,20 +198,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       builder: (_) => ExternalScanReviewSheet(parsed: parsed, fromPhoto: fromPhoto),
     );
     if (reviewed == null) return; // annulé — pas d'ajout, pas de comptage
-    // La feuille de correction garantit un montant valide avant de rendre la
-    // main (champ obligatoire) ; ce repli à 0 n'est là que pour ne jamais
-    // planter sur un null inattendu, le serveur refusant de toute façon.
-    final montant = parseMontantSaisi(reviewed['amount'] ?? '') ?? 0;
     try {
-      final status = await ref.read(embarquementServiceProvider).scanExternal(
+      final outcome = await ref.read(embarquementServiceProvider).scanExternal(
             sessionId: widget.session.id,
             rawPayload: parsed.rawPayload,
             passengerName: reviewed['passengerName']!,
-            amount: montant,
             ticketNumber: reviewed['ticketNumber'],
             originLabel: reviewed['originLabel'],
             destinationLabel: reviewed['destinationLabel'],
           );
+      final status = outcome.status;
+      final montant = outcome.amount;
       if (!mounted) return;
       setState(() {
         _lastResult = _LastResult(
@@ -221,8 +218,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               ? 'Déjà scanné dans cette session'
               : '${formatMontant(montant)} · ${fromPhoto ? "billet photographié" : "QR externe"} ajouté au manifeste',
         );
-        if (status == 'valid') _validCount++;
-        if (status == 'valid') _totalAmount += montant;
+        if (status == 'valid') {
+          _validCount++;
+          _totalAmount += montant ?? 0;
+        }
       });
     } catch (e) {
       if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : $e'));

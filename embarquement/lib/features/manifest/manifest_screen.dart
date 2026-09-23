@@ -6,6 +6,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_scan.dart';
 import '../../data/models/embarquement_session.dart';
+import '../common/session_signature.dart';
 import '../recette/recette_screen.dart';
 import '../report/report_screen.dart';
 
@@ -124,6 +125,10 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
             }
             return ListView(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: SessionSignature(sessionId: widget.session.id, compact: true),
+                ),
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
+import '../../core/format.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_itineraire.dart';
 
@@ -104,6 +105,16 @@ class _ItinerairesScreenState extends ConsumerState<ItinerairesScreen> {
                       child: ListTile(
                         leading: const Icon(Icons.alt_route, color: AppColors.primaryBlue),
                         title: Text(it.label),
+                        subtitle: Text(
+                          it.isUsable
+                              ? '${formatMontant(it.price)} par embarquement'
+                              : 'Sans tarif — aucune session ne peut être ouverte dessus',
+                          style: TextStyle(
+                            color: it.isUsable ? AppColors.primaryBlue : AppColors.accentRed,
+                            fontSize: 12.5,
+                            fontWeight: it.isUsable ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
                         trailing: isAdmin
                             ? PopupMenuButton<String>(
                                 onSelected: (v) {
@@ -150,14 +161,35 @@ class _ItineraireForm extends ConsumerStatefulWidget {
 class _ItineraireFormState extends ConsumerState<_ItineraireForm> {
   late final _originCtrl = TextEditingController(text: widget.existing?.originLabel ?? '');
   late final _destCtrl = TextEditingController(text: widget.existing?.destinationLabel ?? '');
+  late final _priceCtrl = TextEditingController(
+    text: widget.existing?.price != null ? widget.existing!.price!.round().toString() : '',
+  );
   bool _submitting = false;
   String? _error;
+
+  /// Seul endroit de l'application où un montant se tape — et il est réservé
+  /// aux rôles admin côté serveur, puis journalisé. Au portillon, personne
+  /// ne saisit rien : c'est tout l'intérêt du dispositif.
+  num? _lireTarif() {
+    final brut = _priceCtrl.text.trim().replaceAll(RegExp(r'[\s\u00A0\u202F]'), '').replaceAll(',', '.');
+    if (brut.isEmpty) return null;
+    final value = num.tryParse(brut);
+    if (value == null || value < 0) return null;
+    return value;
+  }
 
   Future<void> _submit() async {
     final origin = _originCtrl.text.trim();
     final dest = _destCtrl.text.trim();
     if (origin.isEmpty || dest.isEmpty) {
       setState(() => _error = 'Origine et destination requises');
+      return;
+    }
+    final price = _lireTarif();
+    if (price == null) {
+      setState(() => _error = _priceCtrl.text.trim().isEmpty
+          ? 'Le tarif est requis — sans lui, aucune session ne peut être ouverte sur ce trajet'
+          : 'Tarif illisible — chiffres seulement (ex. 7000)');
       return;
     }
     setState(() {
@@ -169,6 +201,7 @@ class _ItineraireFormState extends ConsumerState<_ItineraireForm> {
             companyId: widget.companyId,
             originLabel: origin,
             destinationLabel: dest,
+            price: price,
             id: widget.existing?.id,
           );
       if (mounted) Navigator.of(context).pop(true);
@@ -198,6 +231,19 @@ class _ItineraireFormState extends ConsumerState<_ItineraireForm> {
           TextField(controller: _originCtrl, decoration: const InputDecoration(labelText: 'Origine *')),
           const SizedBox(height: 8),
           TextField(controller: _destCtrl, decoration: const InputDecoration(labelText: 'Destination *')),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _priceCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Tarif par embarquement *',
+              hintText: '7000',
+              suffixText: 'FCFA',
+              prefixIcon: Icon(Icons.payments_outlined),
+              helperText: 'Appliqué automatiquement à chaque scan. Toute modification est journalisée.',
+              helperMaxLines: 2,
+            ),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: const TextStyle(color: AppColors.accentRed)),

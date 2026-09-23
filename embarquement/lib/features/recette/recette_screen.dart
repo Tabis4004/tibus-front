@@ -14,6 +14,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_recette.dart';
 import '../../data/models/embarquement_session.dart';
+import '../common/session_signature.dart';
 
 /// Rapport de recette (migration 210) — second rapport du module, document
 /// de caisse : la liste des embarquements ligne à ligne avec leur montant, et
@@ -296,6 +297,8 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 _TotalCard(recette: r),
+                const SizedBox(height: 12),
+                SessionSignature(sessionId: widget.session.id),
                 if (r.withoutAmount > 0) ...[
                   const SizedBox(height: 12),
                   _IncompletWarning(recette: r),

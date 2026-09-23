@@ -13,6 +13,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_report.dart';
 import '../../data/models/embarquement_session.dart';
+import '../common/session_signature.dart';
 
 /// Rapport d'embarquement (plan §7, Phase 4) — trois chiffres qui portent
 /// tout : embarqués, places disponibles, no-show ; le reste (doublons,
@@ -295,6 +296,8 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 _StatusBanner(report: r),
+                const SizedBox(height: 10),
+                SessionSignature(sessionId: widget.session.id),
                 const SizedBox(height: 16),
                 _MetricTile(
                   label: 'Embarqués',

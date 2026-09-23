@@ -5,6 +5,7 @@ import '../models/embarquement_bus.dart';
 import '../models/embarquement_scan.dart';
 import '../models/embarquement_report.dart';
 import '../models/embarquement_recette.dart';
+import '../models/embarquement_session_info.dart';
 import '../models/company_gare_option.dart';
 import '../models/company_bus_option.dart';
 
@@ -55,6 +56,38 @@ class EmbarquementService {
     return (data as Map<String, dynamic>)['id'] as String;
   }
 
+  /// Ouverture d'une session hors-Tibus (migration 211) — on ne transmet
+  /// qu'un identifiant d'itinéraire : le serveur en dérive le libellé du
+  /// trajet ET le tarif, et les fige sur la session. Rien de ce qui touche à
+  /// l'argent ne part du téléphone.
+  ///
+  /// Lève si l'itinéraire n'a pas de tarif : une session sans tarif
+  /// produirait une recette à zéro sans que personne ne s'en aperçoive.
+  Future<String> openSession({
+    required String companyId,
+    required String itineraireId,
+    required int capacityDeclared,
+    String? busLabel,
+    String? gareId,
+  }) async {
+    final data = await _client.rpc('embarquement_open_session', params: {
+      'p_company_id': companyId,
+      'p_itineraire_id': itineraireId,
+      'p_bus_label': busLabel,
+      'p_capacity_declared': capacityDeclared,
+      'p_gare_id': gareId,
+    });
+    return (data as Map<String, dynamic>)['id'] as String;
+  }
+
+  /// Tarif de la session et noms de qui l'a ouverte / clôturée.
+  Future<EmbarquementSessionInfo> sessionInfo(String sessionId) async {
+    final data = await _client.rpc('embarquement_session_info', params: {
+      'p_session_id': sessionId,
+    });
+    return EmbarquementSessionInfo.fromMap(data as Map<String, dynamic>);
+  }
+
   /// Vraies gares de la compagnie (table "Gares", gérées via Administration)
   /// — lecture large (tous rôles Embarquement), contrairement à
   /// list_company_gares_admin (owner uniquement) côté AdminService. Alimente
@@ -84,10 +117,14 @@ class EmbarquementService {
         .toList();
   }
 
+  /// [price] est le tarif unique appliqué à chaque embarquement des sessions
+  /// ouvertes sur cet itinéraire. Réservé aux rôles admin côté serveur, et
+  /// journalisé à chaque changement (migration 211).
   Future<void> upsertItineraire({
     required String companyId,
     required String originLabel,
     required String destinationLabel,
+    num? price,
     String? id,
   }) {
     return _client.rpc('embarquement_upsert_itineraire', params: {
@@ -95,6 +132,7 @@ class EmbarquementService {
       'p_origin_label': originLabel,
       'p_destination_label': destinationLabel,
       'p_id': id,
+      'p_price': price,
     });
   }
 
@@ -146,16 +184,18 @@ class EmbarquementService {
     return TibusScanOutcome.fromRpc(data as Map<String, dynamic>);
   }
 
-  /// Renvoie le statut ('valid'/'duplicate') — voir embarquement_scan_external.
+  /// Enregistre un embarquement hors-Tibus. Renvoie le statut
+  /// ('valid'/'duplicate') et le montant que le SERVEUR a appliqué.
   ///
-  /// [amount] est obligatoire depuis la migration 210 (décision : un total de
-  /// recette partiel serait pire qu'un agent bloqué une seconde sur un
-  /// champ). Le serveur refuse un montant nul ou négatif.
-  Future<String> scanExternal({
+  /// Aucun montant n'est transmis : depuis la migration 211 le paramètre
+  /// p_amount n'existe plus. C'était une faille réelle — un APK modifié ou
+  /// un appel direct à PostgREST pouvait écrire n'importe quelle somme, donc
+  /// fabriquer la preuve que cet outil est justement censé opposer à une
+  /// billetterie tierce suspectée de sous-déclarer.
+  Future<ExternalScanOutcome> scanExternal({
     required String sessionId,
     required String rawPayload,
     required String passengerName,
-    required double amount,
     String? ticketNumber,
     String? originLabel,
     String? destinationLabel,
@@ -167,9 +207,12 @@ class EmbarquementService {
       'p_ticket_number': ticketNumber,
       'p_origin_label': originLabel,
       'p_destination_label': destinationLabel,
-      'p_amount': amount,
     });
-    return (data as Map<String, dynamic>)['status'] as String;
+    final map = data as Map<String, dynamic>;
+    return ExternalScanOutcome(
+      status: map['status'] as String,
+      amount: map['amount'] as num?,
+    );
   }
 
   /// Rapport de recette (migration 210) — liste des embarquements valides
@@ -204,4 +247,12 @@ class EmbarquementService {
     });
     return EmbarquementReport.fromMap(data as Map<String, dynamic>);
   }
+}
+
+/// Résultat d'un embarquement_scan_external : le montant vient du serveur,
+/// jamais du client (voir migration 211).
+class ExternalScanOutcome {
+  final String status;
+  final num? amount;
+  const ExternalScanOutcome({required this.status, this.amount});
 }
