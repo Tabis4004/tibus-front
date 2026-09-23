@@ -56,3 +56,19 @@ class EmbarquementTrajet {
         priceConflict: (map['price_conflict'] ?? false) as bool,
       );
 }
+
+/// Une gare du périmètre de l'utilisateur (embarquement_my_gares).
+class EmbarquementTrajetGare {
+  final String id;
+  final String name;
+  final String cityName;
+  const EmbarquementTrajetGare({required this.id, required this.name, required this.cityName});
+
+  String get label => cityName.isNotEmpty && cityName != name ? '$name ($cityName)' : name;
+
+  factory EmbarquementTrajetGare.fromMap(Map<String, dynamic> map) => EmbarquementTrajetGare(
+        id: map['id'] as String,
+        name: (map['name'] ?? '') as String,
+        cityName: (map['city_name'] ?? '') as String,
+      );
+}

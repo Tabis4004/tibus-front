@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
+import '../referentiel/itineraires_screen.dart';
+import 'permissions_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/admin_service.dart';
 
@@ -69,6 +71,22 @@ class AdminScreen extends ConsumerWidget {
                 label: 'Villes',
                 subtitle: 'Ajouter une ville disponible (requis pour créer une gare)',
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdminCitiesScreen(companyId: companyId))),
+              ),
+              _AdminTile(
+                icon: Icons.alt_route,
+                label: 'Itinéraires et tarifs',
+                subtitle: 'Gare de départ, gare d\'arrivée, prix appliqué à chaque embarquement',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ItinerairesScreen()),
+                ),
+              ),
+              _AdminTile(
+                icon: Icons.shield_outlined,
+                label: 'Permissions par gare',
+                subtitle: "Ouvrir Embarquement à un autre rôle de gare, gare par gare",
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => PermissionsScreen(companyId: companyId)),
+                ),
               ),
               _AdminTile(
                 icon: Icons.business_outlined,

@@ -74,6 +74,13 @@ doublon : Tibus 1.0 porte déjà exactement cette information, dans
 modèle « gare dans une ville → itinéraire gare de départ / gare d'arrivée →
 prix ». Toutes les compagnies y sont déjà renseignées.
 
+Depuis la migration 214, ces itinéraires s'administrent **aussi depuis
+l'app mobile** (`embarquement_upsert_trajet`, réservé au propriétaire), sans
+passer par la billetterie web — l'administration d'Embarquement est autonome,
+comme celle de courrier_mobile. Un trajet créé depuis le module naît avec
+`isSchedulingActive = false` : il sert à l'embarquement et à la tarification,
+il n'est pas mis en vente sans décision explicite côté Tibus.
+
 Depuis la migration 212, `embarquement_itineraires` **est hors circuit** :
 elle existe encore en base mais aucune RPC d'Embarquement ne la lit.
 `embarquement_list_trajets()` lit `ProgrammationTrajetArrets`, et
@@ -123,3 +130,11 @@ Côté Flutter, `AppRole.isEmbarquementRole` et `_rolePriority`
 `can_use_embarquement()`. Le serveur seul fait autorité ; ces listes servent
 uniquement à ne pas proposer une compagnie dont toutes les RPC refuseraient
 l'accès.
+
+Depuis la migration 214, `embarquement_permissions` peut ouvrir le module à un
+rôle de gare supplémentaire, gare par gare. Deux règles appliquées côté
+serveur, la seconde étant la plus importante : le gérant n'accorde que sur SA
+gare, et qu'à un rôle de niveau **strictement inférieur** au sien — sinon la
+délégation deviendrait une escalade de privilèges. Seuls les rôles en
+`%_gare` sont éligibles ; accorder à un rôle à portée compagnie rouvrirait
+exactement ce que la migration 213 a fermé.

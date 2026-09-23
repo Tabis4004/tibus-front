@@ -6,6 +6,7 @@ import '../models/embarquement_report.dart';
 import '../models/embarquement_recette.dart';
 import '../models/embarquement_session_info.dart';
 import '../models/embarquement_trajet.dart';
+import '../models/embarquement_permission.dart';
 import '../models/company_gare_option.dart';
 import '../models/company_bus_option.dart';
 
@@ -67,6 +68,79 @@ class EmbarquementService {
     return (data as List)
         .whereType<Map<String, dynamic>>()
         .map(EmbarquementTrajet.fromMap)
+        .toList();
+  }
+
+  /// Crée ou met à jour un itinéraire tarifé (migration 214) — réservé au
+  /// propriétaire côté serveur. Écrit dans le référentiel Tibus
+  /// (ProgrammationTrajets + ProgrammationTrajetArrets) pour qu'il n'existe
+  /// qu'une source de tarifs, et le changement de prix est journalisé avec
+  /// son auteur par le trigger posé en migration 212.
+  ///
+  /// Un trajet créé ici naît avec isSchedulingActive = false : il sert à
+  /// l'embarquement et à la tarification, il n'est pas mis en vente dans la
+  /// billetterie sans décision explicite côté Tibus.
+  Future<void> upsertTrajet({
+    required String companyId,
+    required String fromGareId,
+    required String toGareId,
+    required num price,
+    int? kilometrage,
+  }) {
+    return _client.rpc('embarquement_upsert_trajet', params: {
+      'p_company_id': companyId,
+      'p_from_gare_id': fromGareId,
+      'p_to_gare_id': toGareId,
+      'p_price': price,
+      'p_kilometrage': kilometrage,
+    });
+  }
+
+  // Permissions déléguées (migration 214) ----------------------------------
+
+  Future<List<EmbarquementPermission>> listPermissions(String companyId) async {
+    final data = await _client.rpc('embarquement_list_permissions', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(EmbarquementPermission.fromMap)
+        .toList();
+  }
+
+  Future<List<GrantableRole>> grantableRoles() async {
+    final data = await _client.rpc('embarquement_grantable_roles');
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(GrantableRole.fromMap)
+        .toList();
+  }
+
+  Future<void> grantPermission({
+    required String companyId,
+    required String gareId,
+    required String roleName,
+  }) {
+    return _client.rpc('embarquement_grant_permission', params: {
+      'p_company_id': companyId,
+      'p_gare_id': gareId,
+      'p_role_name': roleName,
+    });
+  }
+
+  Future<void> revokePermission(String id) {
+    return _client.rpc('embarquement_revoke_permission', params: {'p_id': id});
+  }
+
+  /// Gares du périmètre de l'utilisateur — toute la compagnie pour le
+  /// propriétaire, sa seule gare pour un rôle de gare.
+  Future<List<EmbarquementTrajetGare>> myGares(String companyId) async {
+    final data = await _client.rpc('embarquement_my_gares', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(EmbarquementTrajetGare.fromMap)
         .toList();
   }
 
