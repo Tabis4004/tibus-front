@@ -186,6 +186,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     ParsedExternalQr parsed, {
     required bool fromPhoto,
   }) async {
+    // Le chemin photo enchaîne trois attentes (pause caméra, prise de vue,
+    // OCR) avant d'arriver ici : si l'agent est revenu en arrière entre-temps,
+    // ouvrir une feuille sur un contexte mort lève une exception. L'analyseur
+    // ne le signale pas (use_build_context_synchronously n'est pas activé
+    // dans ce projet), le crash est bien réel.
+    if (!mounted) return;
     final reviewed = await showModalBottomSheet<Map<String, String?>>(
       context: context,
       isScrollControlled: true,
