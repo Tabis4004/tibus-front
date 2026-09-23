@@ -1,11 +1,11 @@
 import 'supabase_service.dart';
 import '../models/embarquement_session.dart';
-import '../models/embarquement_itineraire.dart';
 import '../models/embarquement_bus.dart';
 import '../models/embarquement_scan.dart';
 import '../models/embarquement_report.dart';
 import '../models/embarquement_recette.dart';
 import '../models/embarquement_session_info.dart';
+import '../models/embarquement_trajet.dart';
 import '../models/company_gare_option.dart';
 import '../models/company_bus_option.dart';
 
@@ -52,6 +52,41 @@ class EmbarquementService {
       'p_bus_label': busLabel,
       'p_capacity_declared': capacityDeclared,
       'p_gare_id': gareId,
+    });
+    return (data as Map<String, dynamic>)['id'] as String;
+  }
+
+  /// Itinéraires visibles par l'utilisateur (migration 212) — lus dans le
+  /// référentiel Tibus (ProgrammationTrajetArrets), et déjà restreints par
+  /// le serveur aux gares auxquelles il est rattaché. Un gérant de gare ne
+  /// voit que les départs de sa gare, un owner voit toute la compagnie.
+  Future<List<EmbarquementTrajet>> listTrajets(String companyId) async {
+    final data = await _client.rpc('embarquement_list_trajets', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(EmbarquementTrajet.fromMap)
+        .toList();
+  }
+
+  /// Ouvre une session sur un itinéraire Tibus. Le serveur revérifie que la
+  /// gare de départ est bien dans le périmètre de l'utilisateur, relit le
+  /// tarif lui-même et le fige sur la session — le téléphone ne transmet que
+  /// deux identifiants de gare.
+  Future<String> openSessionGare({
+    required String companyId,
+    required String fromGareId,
+    required String toGareId,
+    required int capacityDeclared,
+    String? busLabel,
+  }) async {
+    final data = await _client.rpc('embarquement_open_session_gare', params: {
+      'p_company_id': companyId,
+      'p_from_gare_id': fromGareId,
+      'p_to_gare_id': toGareId,
+      'p_bus_label': busLabel,
+      'p_capacity_declared': capacityDeclared,
     });
     return (data as Map<String, dynamic>)['id'] as String;
   }
@@ -107,38 +142,12 @@ class EmbarquementService {
   // l'ajout d'Administration + listCompanyGares/listCompanyBus ci-dessus —
   // conservé pour compat/évolution future, voir home_shell.dart). ---------
 
-  Future<List<EmbarquementItineraire>> listItineraires(String companyId) async {
-    final data = await _client.rpc('embarquement_list_itineraires', params: {
-      'p_company_id': companyId,
-    });
-    return (data as List)
-        .whereType<Map<String, dynamic>>()
-        .map(EmbarquementItineraire.fromMap)
-        .toList();
-  }
-
-  /// [price] est le tarif unique appliqué à chaque embarquement des sessions
-  /// ouvertes sur cet itinéraire. Réservé aux rôles admin côté serveur, et
-  /// journalisé à chaque changement (migration 211).
-  Future<void> upsertItineraire({
-    required String companyId,
-    required String originLabel,
-    required String destinationLabel,
-    num? price,
-    String? id,
-  }) {
-    return _client.rpc('embarquement_upsert_itineraire', params: {
-      'p_company_id': companyId,
-      'p_origin_label': originLabel,
-      'p_destination_label': destinationLabel,
-      'p_id': id,
-      'p_price': price,
-    });
-  }
-
-  Future<void> deleteItineraire(String id) {
-    return _client.rpc('embarquement_delete_itineraire', params: {'p_id': id});
-  }
+  // Le référentiel d'itinéraires propre au module a été retiré du circuit
+  // (migration 212) : les trajets et leurs tarifs vivent dans Tibus, lus par
+  // listTrajets ci-dessus. Les RPC embarquement_list/upsert/delete_itineraire
+  // restent en base mais ne sont plus appelées — deux tables de tarifs qui
+  // divergent sont exactement ce qu'un outil de vérification ne peut pas se
+  // permettre.
 
   // Référentiel — bus ------------------------------------------------------
 

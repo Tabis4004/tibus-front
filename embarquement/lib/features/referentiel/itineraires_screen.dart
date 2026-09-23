@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/providers.dart';
 import '../../core/format.dart';
+import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
-import '../../data/models/embarquement_itineraire.dart';
+import '../../data/models/embarquement_trajet.dart';
 
-/// CRUD itinéraires hors-Tibus (owner/super_admin uniquement en écriture,
-/// cf. can_admin_embarquement côté serveur — la RPC elle-même refuse
-/// l'écriture aux autres rôles, ce garde-fou côté écran est juste pour ne
-/// pas montrer un bouton qui échouerait systématiquement).
+/// Itinéraires — ÉCRAN DE CONSULTATION, plus de saisie (migration 212).
+///
+/// Le module tenait son propre référentiel d'itinéraires. C'était un doublon
+/// de ce que Tibus maintient déjà dans ProgrammationTrajetArrets (gare de
+/// départ, gare d'arrivée, prix), et deux tables de tarifs qui divergent sont
+/// précisément ce qu'un outil de vérification de recettes ne peut pas se
+/// permettre. La création se fait donc dans Tibus — gare (dans une ville),
+/// puis itinéraire, puis prix — et Embarquement se contente de lire.
+///
+/// La liste affichée est déjà restreinte par le serveur au périmètre de
+/// l'utilisateur : un gérant ou un contrôleur de gare n'y voit que les
+/// départs de sa propre gare.
 class ItinerairesScreen extends ConsumerStatefulWidget {
   const ItinerairesScreen({super.key});
 
@@ -17,49 +25,22 @@ class ItinerairesScreen extends ConsumerStatefulWidget {
 }
 
 class _ItinerairesScreenState extends ConsumerState<ItinerairesScreen> {
-  Future<List<EmbarquementItineraire>>? _future;
+  Future<List<EmbarquementTrajet>>? _future;
   String? _companyId;
 
   void _load(String companyId) {
     setState(() {
       _companyId = companyId;
-      _future = ref.read(embarquementServiceProvider).listItineraires(companyId);
+      _future = ref.read(embarquementServiceProvider).listTrajets(companyId);
     });
-  }
-
-  Future<void> _openForm(String companyId, {EmbarquementItineraire? existing}) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _ItineraireForm(companyId: companyId, existing: existing),
-    );
-    if (saved == true) _load(companyId);
-  }
-
-  Future<void> _delete(String companyId, EmbarquementItineraire it) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Supprimer cet itinéraire ?'),
-        content: Text(it.label),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    await ref.read(embarquementServiceProvider).deleteItineraire(it.id);
-    _load(companyId);
   }
 
   @override
   Widget build(BuildContext context) {
     final companyIdAsync = ref.watch(activeCompanyIdProvider);
-    final isAdminAsync = ref.watch(isEmbarquementAdminProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Itinéraires hors-Tibus')),
+      appBar: AppBar(title: const Text('Itinéraires et tarifs')),
       body: companyIdAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Erreur : $e')),
@@ -68,194 +49,86 @@ class _ItinerairesScreenState extends ConsumerState<ItinerairesScreen> {
             return const Center(child: Text('Aucune compagnie active.'));
           }
           if (_future == null || _companyId != companyId) _load(companyId);
-          final isAdmin = isAdminAsync.value ?? false;
 
           return RefreshIndicator(
             onRefresh: () async => _load(companyId),
-            child: FutureBuilder<List<EmbarquementItineraire>>(
+            child: FutureBuilder<List<EmbarquementTrajet>>(
               future: _future,
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final items = snap.data ?? const [];
-                if (items.isEmpty) {
-                  return ListView(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Text(
-                          isAdmin
-                              ? "Aucun itinéraire déclaré. Ajoute-en un avec le bouton +."
-                              : "Aucun itinéraire déclaré pour l'instant.",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  );
+                if (snap.hasError) {
+                  return ListView(children: [
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('Erreur : ${snap.error}', textAlign: TextAlign.center),
+                    ),
+                  ]);
                 }
-                return ListView.separated(
+                final items = snap.data ?? const [];
+                return ListView(
                   padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) {
-                    final it = items[i];
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.alt_route, color: AppColors.primaryBlue),
-                        title: Text(it.label),
-                        subtitle: Text(
-                          it.isUsable
-                              ? '${formatMontant(it.price)} par embarquement'
-                              : 'Sans tarif — aucune session ne peut être ouverte dessus',
-                          style: TextStyle(
-                            color: it.isUsable ? AppColors.primaryBlue : AppColors.accentRed,
-                            fontSize: 12.5,
-                            fontWeight: it.isUsable ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
-                        trailing: isAdmin
-                            ? PopupMenuButton<String>(
-                                onSelected: (v) {
-                                  if (v == 'edit') _openForm(companyId, existing: it);
-                                  if (v == 'delete') _delete(companyId, it);
-                                },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'edit', child: Text('Modifier')),
-                                  PopupMenuItem(value: 'delete', child: Text('Supprimer')),
-                                ],
-                              )
-                            : null,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlueLight,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-                  },
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.primaryBlueDark, size: 20),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              "Les itinéraires et leurs tarifs se créent dans Tibus : gare, puis "
+                              "trajet gare de départ vers gare d'arrivée, puis prix. Ils sont lus "
+                              "ici, jamais saisis — une seule source de vérité pour les montants.",
+                              style: TextStyle(color: AppColors.primaryBlueDark, fontSize: 12.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (items.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(28),
+                        child: Text(
+                          'Aucun itinéraire tarifé au départ de votre gare.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      )
+                    else
+                      ...items.map((t) => Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.alt_route,
+                                color: t.priceConflict ? AppColors.accentRed : AppColors.primaryBlue,
+                              ),
+                              title: Text(t.label),
+                              subtitle: Text(
+                                t.priceConflict
+                                    ? 'Tarifs contradictoires dans Tibus — à corriger avant usage'
+                                    : '${formatMontant(t.price)} par embarquement',
+                                style: TextStyle(
+                                  color: t.priceConflict ? AppColors.accentRed : AppColors.primaryBlue,
+                                  fontSize: 12.5,
+                                  fontWeight: t.priceConflict ? FontWeight.normal : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )),
+                  ],
                 );
               },
             ),
           );
         },
-      ),
-      floatingActionButton: companyIdAsync.maybeWhen(
-        data: (companyId) => (companyId == null || !(isAdminAsync.value ?? false))
-            ? null
-            : FloatingActionButton(
-                onPressed: () => _openForm(companyId),
-                child: const Icon(Icons.add),
-              ),
-        orElse: () => null,
-      ),
-    );
-  }
-}
-
-class _ItineraireForm extends ConsumerStatefulWidget {
-  final String companyId;
-  final EmbarquementItineraire? existing;
-  const _ItineraireForm({required this.companyId, this.existing});
-
-  @override
-  ConsumerState<_ItineraireForm> createState() => _ItineraireFormState();
-}
-
-class _ItineraireFormState extends ConsumerState<_ItineraireForm> {
-  late final _originCtrl = TextEditingController(text: widget.existing?.originLabel ?? '');
-  late final _destCtrl = TextEditingController(text: widget.existing?.destinationLabel ?? '');
-  late final _priceCtrl = TextEditingController(
-    text: widget.existing?.price != null ? widget.existing!.price!.round().toString() : '',
-  );
-  bool _submitting = false;
-  String? _error;
-
-  /// Seul endroit de l'application où un montant se tape — et il est réservé
-  /// aux rôles admin côté serveur, puis journalisé. Au portillon, personne
-  /// ne saisit rien : c'est tout l'intérêt du dispositif.
-  num? _lireTarif() {
-    final brut = _priceCtrl.text.trim().replaceAll(RegExp(r'[\s\u00A0\u202F]'), '').replaceAll(',', '.');
-    if (brut.isEmpty) return null;
-    final value = num.tryParse(brut);
-    if (value == null || value < 0) return null;
-    return value;
-  }
-
-  Future<void> _submit() async {
-    final origin = _originCtrl.text.trim();
-    final dest = _destCtrl.text.trim();
-    if (origin.isEmpty || dest.isEmpty) {
-      setState(() => _error = 'Origine et destination requises');
-      return;
-    }
-    final price = _lireTarif();
-    if (price == null) {
-      setState(() => _error = _priceCtrl.text.trim().isEmpty
-          ? 'Le tarif est requis — sans lui, aucune session ne peut être ouverte sur ce trajet'
-          : 'Tarif illisible — chiffres seulement (ex. 7000)');
-      return;
-    }
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
-    try {
-      await ref.read(embarquementServiceProvider).upsertItineraire(
-            companyId: widget.companyId,
-            originLabel: origin,
-            destinationLabel: dest,
-            price: price,
-            id: widget.existing?.id,
-          );
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      setState(() => _error = 'Échec : $e');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16, right: 16, top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            widget.existing == null ? 'Nouvel itinéraire' : 'Modifier l\'itinéraire',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          TextField(controller: _originCtrl, decoration: const InputDecoration(labelText: 'Origine *')),
-          const SizedBox(height: 8),
-          TextField(controller: _destCtrl, decoration: const InputDecoration(labelText: 'Destination *')),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _priceCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Tarif par embarquement *',
-              hintText: '7000',
-              suffixText: 'FCFA',
-              prefixIcon: Icon(Icons.payments_outlined),
-              helperText: 'Appliqué automatiquement à chaque scan. Toute modification est journalisée.',
-              helperMaxLines: 2,
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: AppColors.accentRed)),
-          ],
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _submitting ? null : _submit,
-            child: _submitting
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Enregistrer'),
-          ),
-        ],
       ),
     );
   }

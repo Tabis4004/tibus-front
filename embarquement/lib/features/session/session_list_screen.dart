@@ -4,9 +4,8 @@ import 'package:intl/intl.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_session.dart';
-import '../../data/models/company_gare_option.dart';
 import '../../data/models/company_bus_option.dart';
-import '../../data/models/embarquement_itineraire.dart';
+import '../../data/models/embarquement_trajet.dart';
 import '../../core/format.dart';
 import '../scan/scan_screen.dart';
 import '../manifest/manifest_screen.dart';
@@ -191,12 +190,10 @@ class _NewHorsTibusSessionSheet extends ConsumerStatefulWidget {
 }
 
 class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionSheet> {
-  List<EmbarquementItineraire> _itineraires = [];
-  List<CompanyGareOption> _gares = [];
+  List<EmbarquementTrajet> _trajets = [];
   List<CompanyBusOption> _buses = [];
   bool _loadingRef = true;
-  String? _itineraireId;
-  String? _gareId;
+  String? _trajetKey;
   String? _busId;
   final _busLabelCtrl = TextEditingController();
   final _capacityCtrl = TextEditingController();
@@ -219,39 +216,38 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
   Future<void> _loadReferentiel() async {
     final service = ref.read(embarquementServiceProvider);
     final results = await Future.wait([
-      service.listItineraires(widget.companyId),
-      service.listCompanyGares(widget.companyId),
+      service.listTrajets(widget.companyId),
       service.listCompanyBus(widget.companyId),
     ]);
     if (!mounted) return;
     setState(() {
-      _itineraires = results[0] as List<EmbarquementItineraire>;
-      _gares = results[1] as List<CompanyGareOption>;
-      _buses = results[2] as List<CompanyBusOption>;
+      _trajets = results[0] as List<EmbarquementTrajet>;
+      _buses = results[1] as List<CompanyBusOption>;
       _loadingRef = false;
     });
   }
 
   // Pas de firstOrNull : il vient de package:collection, absent des
   // dépendances de ce module.
-  EmbarquementItineraire? get _itineraireChoisi {
-    for (final i in _itineraires) {
-      if (i.id == _itineraireId) return i;
+  EmbarquementTrajet? get _trajetChoisi {
+    for (final t in _trajets) {
+      if (t.key == _trajetKey) return t;
     }
     return null;
   }
 
-  /// Plus de saisie libre du trajet : une session naît d'un itinéraire
-  /// déclaré, donc d'un tarif. C'est ce qui rend la recette opposable — si
-  /// l'ouvreur pouvait inventer un trajet, il pourrait en choisir le prix.
+  /// Le trajet vient du référentiel Tibus et la liste est déjà restreinte,
+  /// côté serveur, aux gares de l'utilisateur. On ne transmet que deux
+  /// identifiants de gare : ni libellé, ni prix ne partent du téléphone.
   Future<void> _submit() async {
-    final itineraire = _itineraireChoisi;
-    if (itineraire == null) {
+    final trajet = _trajetChoisi;
+    if (trajet == null) {
       setState(() => _error = 'Choisir un itinéraire');
       return;
     }
-    if (!itineraire.isUsable) {
-      setState(() => _error = "Cet itinéraire n'a pas de tarif — à définir dans Administration");
+    if (trajet.priceConflict) {
+      setState(() => _error =
+          "Tarifs contradictoires pour cet itinéraire dans Tibus — à corriger avant d'ouvrir une session");
       return;
     }
     final busLabel = _busId != null
@@ -270,12 +266,12 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
       _error = null;
     });
     try {
-      await ref.read(embarquementServiceProvider).openSession(
+      await ref.read(embarquementServiceProvider).openSessionGare(
             companyId: widget.companyId,
-            itineraireId: itineraire.id,
+            fromGareId: trajet.fromGareId,
+            toGareId: trajet.toGareId,
             capacityDeclared: capacity,
             busLabel: busLabel,
-            gareId: _gareId,
           );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -301,59 +297,47 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
                 children: [
                   const Text('Nouvelle session hors-Tibus', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  if (_itineraires.isEmpty) ...[
+                  if (_trajets.isEmpty) ...[
                     const Text(
-                      "Aucun itinéraire déclaré. Une session ne peut s'ouvrir que sur un "
-                      "itinéraire du référentiel, avec son tarif — à créer dans Administration "
-                      "par un compte propriétaire.",
+                      "Aucun itinéraire disponible depuis votre gare. Les itinéraires et "
+                      "leurs tarifs se créent dans Tibus : gare, puis trajet gare de départ "
+                      "vers gare d'arrivée, puis prix.",
                       style: TextStyle(color: AppColors.accentRed, fontSize: 12.5),
                     ),
                   ] else ...[
                     DropdownButtonFormField<String>(
-                      initialValue: _itineraireId,
+                      initialValue: _trajetKey,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Itinéraire *'),
-                      items: _itineraires
-                          .map((i) => DropdownMenuItem(
-                                value: i.id,
-                                enabled: i.isUsable,
+                      items: _trajets
+                          .map((t) => DropdownMenuItem(
+                                value: t.key,
+                                enabled: !t.priceConflict,
                                 child: Text(
-                                  i.isUsable ? '${i.label} — ${formatMontant(i.price)}' : '${i.label} — sans tarif',
+                                  t.priceConflict
+                                      ? '${t.label} — tarifs contradictoires'
+                                      : '${t.label} — ${formatMontant(t.price)}',
                                   style: TextStyle(
-                                    color: i.isUsable ? null : AppColors.textSecondary,
+                                    color: t.priceConflict ? AppColors.accentRed : null,
                                   ),
                                 ),
                               ))
                           .toList(),
-                      onChanged: (v) => setState(() => _itineraireId = v),
+                      onChanged: (v) => setState(() => _trajetKey = v),
                     ),
-                    if (_itineraireChoisi?.isUsable ?? false) ...[
+                    if (_trajetChoisi != null && !_trajetChoisi!.priceConflict) ...[
                       const SizedBox(height: 6),
-                      // Le tarif est affiché avant l'ouverture : après, il est
-                      // figé sur la session et plus personne ne le change.
                       Row(
                         children: [
                           const Icon(Icons.lock_outline, size: 16, color: AppColors.primaryBlue),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'Chaque embarquement sera compté à ${formatMontant(_itineraireChoisi!.price)}.',
+                              'Chaque embarquement sera compté à ${formatMontant(_trajetChoisi!.price)}.',
                               style: const TextStyle(color: AppColors.primaryBlue, fontSize: 12.5),
                             ),
                           ),
                         ],
-                      ),
-                    ],
-                    if (_gares.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _gareId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Gare (optionnel)'),
-                        items: _gares
-                            .map((g) => DropdownMenuItem(value: g.id, child: Text(g.label)))
-                            .toList(),
-                        onChanged: (v) => setState(() => _gareId = v),
                       ),
                     ],
                   ],
@@ -390,7 +374,7 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
                   ],
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: (_submitting || _itineraires.isEmpty) ? null : _submit,
+                    onPressed: (_submitting || _trajets.isEmpty) ? null : _submit,
                     child: _submitting
                         ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Text('Ouvrir la session'),
