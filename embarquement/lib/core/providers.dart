@@ -33,9 +33,12 @@ class EmbarquementCompanyOption {
   });
 }
 
-// owner d'abord (signal le plus fort de "c'est ma compagnie"), puis le
-// reste par ordre décroissant de responsabilité.
-const _rolePriority = ['owner', 'controleur', 'vendeur', 'chauffeur'];
+// owner d'abord (signal le plus fort de "c'est ma compagnie"), puis les
+// rôles de gare par ordre décroissant de responsabilité. Doit rester aligné
+// sur AppRole.isEmbarquementRole et sur can_use_embarquement() (migration
+// 213) : les rôles à portée compagnie autres qu'owner n'ont plus accès au
+// module.
+const _rolePriority = ['owner', 'gerant_gare', 'controleur_gare', 'comptable_gare'];
 
 int _rolePriorityIndex(String name) {
   final i = _rolePriority.indexOf(name);

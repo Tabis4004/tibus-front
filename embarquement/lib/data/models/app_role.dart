@@ -35,14 +35,26 @@ class AppRole {
 
   bool has(String droit) => droits.contains(droit);
 
-  /// Vrai pour les rôles autorisés à ouvrir/utiliser une session Embarquement
-  /// — même liste que SCANNER_ROLES côté scanner web (src/pages/verify/
-  /// TicketScannerPage.tsx) et que can_use_embarquement() côté serveur :
-  /// owner, controleur, vendeur, chauffeur, super_admin. Décidé avec
-  /// l'utilisateur : Embarquement n'est PAS gaté par le module B (module
-  /// indépendant) — voir plan_module_embarquement_v2.md §2/§8.
-  bool get isEmbarquementRole =>
-      const ['owner', 'controleur', 'vendeur', 'chauffeur', 'super_admin'].contains(name);
+  /// Vrai pour les rôles autorisés à ouvrir/utiliser une session
+  /// Embarquement — doit rester le MIROIR EXACT de can_use_embarquement()
+  /// côté serveur (migration 213), qui seul fait autorité : cette liste ne
+  /// sert qu'à ne pas proposer une compagnie dont toutes les RPC
+  /// refuseraient l'accès.
+  ///
+  /// Volontairement plus étroite que les SCANNER_ROLES du scanner web :
+  /// seuls le propriétaire et les rôles RATTACHÉS À UNE GARE tiennent le
+  /// portillon. Un rôle à portée compagnie (controleur, vendeur, chauffeur)
+  /// n'est rattaché à aucune gare, il pourrait donc ouvrir une session sur
+  /// n'importe quel itinéraire — donc choisir le tarif appliqué à tout un
+  /// départ. C'était la dernière latitude laissée au terrain sur le montant,
+  /// dans un outil dont la raison d'être est justement de le garantir.
+  bool get isEmbarquementRole => const [
+        'owner',
+        'gerant_gare',
+        'controleur_gare',
+        'comptable_gare',
+        'super_admin',
+      ].contains(name);
 
   /// Vrai pour les rôles autorisés à gérer le référentiel hors-Tibus
   /// (itinéraires/bus) — owner/super_admin uniquement, cf.

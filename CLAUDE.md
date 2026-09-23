@@ -63,3 +63,63 @@ manifest `main` (release). Un `flutter build apk --release` sans cette
 permission ajoutée manuellement au manifest `main` n'a aucun accès réseau
 (symptôme : "impossible de se connecter" alors que tout fonctionne en
 debug). Vérifié comme faux sur les 3 apps le 2026-07-26, corrigé.
+
+## Embarquement — le référentiel des tarifs vit dans Tibus, pas dans le module
+
+Le module Embarquement s'était doté de sa propre table d'itinéraires avec
+tarifs (`embarquement_itineraires.price`, migrations 205 et 211). C'était un
+doublon : Tibus 1.0 porte déjà exactement cette information, dans
+`Gares` (`name`, `cityId`, `companyId`) et surtout
+**`ProgrammationTrajetArrets` (`fromGareId`, `toGareId`, `price`)** — soit le
+modèle « gare dans une ville → itinéraire gare de départ / gare d'arrivée →
+prix ». Toutes les compagnies y sont déjà renseignées.
+
+Depuis la migration 212, `embarquement_itineraires` **est hors circuit** :
+elle existe encore en base mais aucune RPC d'Embarquement ne la lit.
+`embarquement_list_trajets()` lit `ProgrammationTrajetArrets`, et
+`embarquement_open_session_gare()` y relit le tarif pour le figer sur la
+session (`embarquement_sessions.fare_amount`).
+
+**Pourquoi c'est structurant, et pas un simple choix d'implémentation.** Le
+premier client d'Embarquement exploite une billetterie tierce et a subi une
+sous-déclaration de recettes ; le module sert de compteur indépendant, opposé
+aux chiffres de cette billetterie. Deux tables de tarifs qui divergent
+détruiraient la valeur probante de l'outil. Corollaires à ne pas relitiger
+sans nouvelle raison :
+
+- Aucun montant ne transite par le client. `embarquement_scan_external` n'a
+  plus de paramètre `p_amount` depuis la migration 212 — il lit
+  `embarquement_sessions.fare_amount`. Une version antérieure l'acceptait :
+  un APK modifié ou un appel direct à PostgREST avec la clé anon pouvait
+  écrire n'importe quelle somme.
+- Les changements de tarif sont journalisés avec leur auteur
+  (`trajet_arret_price_log`, trigger sur `ProgrammationTrajetArrets`). Ce
+  trigger vit sur une table de la billetterie web : il capture
+  `current_app_user_id()` dans un bloc `EXCEPTION` pour ne jamais faire
+  échouer une vente.
+- L'index unique de `ProgrammationTrajetArrets` porte sur
+  `(trajetId, fromGareId, toGareId)`, pas sur le seul couple de gares : deux
+  trajets distincts peuvent légitimement desservir le même segment (réseau à
+  arrêts intermédiaires). Quand deux trajets annoncent des prix différents
+  pour un même couple, `embarquement_list_trajets` lève `price_conflict` et
+  l'ouverture de session est refusée.
+
+## Embarquement — qui peut ouvrir une session (migration 213)
+
+`can_use_embarquement()` admet **`super_admin`, `owner`, `gerant_gare`,
+`controleur_gare`, `comptable_gare`** — et personne d'autre. Les rôles à
+portée compagnie (`controleur`, `vendeur`, `chauffeur`) en sont exclus
+volontairement : n'étant rattachés à aucune gare, ils pourraient ouvrir une
+session sur n'importe quel itinéraire, donc choisir le tarif appliqué à tout
+un départ.
+
+`embarquement_sees_all_gares()` ne renvoie vrai que pour `super_admin` et
+`owner`. Les trois rôles de gare ne voient que les itinéraires partant de
+leur `UserRoles.gareId` — même règle que `list_company_station_gares()`
+(migration 198), déjà en place côté Colis.
+
+Côté Flutter, `AppRole.isEmbarquementRole` et `_rolePriority`
+(`embarquement/lib/core/providers.dart`) doivent rester le miroir exact de
+`can_use_embarquement()`. Le serveur seul fait autorité ; ces listes servent
+uniquement à ne pas proposer une compagnie dont toutes les RPC refuseraient
+l'accès.
