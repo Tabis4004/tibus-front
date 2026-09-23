@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/format.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_scan.dart';
 import '../../data/models/embarquement_session.dart';
+import '../recette/recette_screen.dart';
 import '../report/report_screen.dart';
 
 /// Liste temps réel des scans d'une session (embarquement_list_manifest) —
@@ -66,13 +68,20 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
       appBar: AppBar(
         title: Text('Manifeste — ${widget.session.routeLabel}'),
         actions: [
-          // Seul chemin vers le rapport d'une session déjà clôturée : la
+          // Seul chemin vers les rapports d'une session déjà clôturée : la
           // liste des sessions ouvre le manifeste, pas l'écran de scan.
           IconButton(
             icon: const Icon(Icons.assessment_outlined),
-            tooltip: 'Rapport',
+            tooltip: "Rapport d'embarquement",
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => ReportScreen(session: widget.session)),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.payments_outlined),
+            tooltip: 'Recette',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => RecetteScreen(session: widget.session)),
             ),
           ),
         ],
@@ -96,7 +105,9 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
               );
             }
             final scans = snap.data ?? const [];
-            final validCount = scans.where((s) => s.isValid).length;
+            final valides = scans.where((s) => s.isValid).toList();
+            final validCount = valides.length;
+            final total = valides.fold<num>(0, (sum, s) => sum + (s.amount ?? 0));
             if (scans.isEmpty) {
               return ListView(
                 children: const [
@@ -116,7 +127,8 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    '$validCount embarqué${validCount > 1 ? "s" : ""} · ${scans.length} scan${scans.length > 1 ? "s" : ""} au total',
+                    '$validCount embarqué${validCount > 1 ? "s" : ""} · ${scans.length} scan${scans.length > 1 ? "s" : ""} au total'
+                    '\n${formatMontant(total)} encaissés',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -133,7 +145,7 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                         ),
                         title: Text(s.passengerName ?? 'Voyageur'),
                         subtitle: Text(
-                          '${s.ticketNumber ?? "—"}'
+                          '${s.ticketNumber ?? "—"} · ${formatMontant(s.amount)}'
                           '${s.originLabel != null ? " · ${s.originLabel} → ${s.destinationLabel ?? "?"}" : ""}'
                           '\n${DateFormat('HH:mm:ss').format(s.scannedAt)} · ${s.source == 'tibus' ? "Tibus" : "Externe"}',
                         ),

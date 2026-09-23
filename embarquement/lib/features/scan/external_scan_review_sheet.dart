@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/providers.dart';
+import '../../core/format.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/external_qr_parser.dart';
 import '../../data/services/ticket_ocr_parser.dart';
@@ -40,9 +41,20 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
   late final _ticketCtrl = TextEditingController(text: widget.parsed.ticketNumber ?? '');
   late final _originCtrl = TextEditingController(text: widget.parsed.originLabel ?? '');
   late final _destCtrl = TextEditingController(text: widget.parsed.destinationLabel ?? '');
+  final _amountCtrl = TextEditingController();
   String? _error;
   String? _ocrRawText;
   bool _scanningPhoto = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _ticketCtrl.dispose();
+    _originCtrl.dispose();
+    _destCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -104,11 +116,22 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
       setState(() => _error = 'Le nom complet est requis');
       return;
     }
+    // Montant obligatoire (décision produit) : un total de recette amputé
+    // d'un billet ressemble à un total complet et fausse la caisse, alors
+    // qu'un champ à remplir ne coûte qu'une seconde au portillon.
+    final montant = parseMontantSaisi(_amountCtrl.text);
+    if (montant == null) {
+      setState(() => _error = _amountCtrl.text.trim().isEmpty
+          ? 'Le montant du billet est requis'
+          : 'Montant illisible — chiffres seulement (ex. 7000)');
+      return;
+    }
     Navigator.of(context).pop({
       'passengerName': name,
       'ticketNumber': _ticketCtrl.text.trim().isEmpty ? null : _ticketCtrl.text.trim(),
       'originLabel': _originCtrl.text.trim().isEmpty ? null : _originCtrl.text.trim(),
       'destinationLabel': _destCtrl.text.trim().isEmpty ? null : _destCtrl.text.trim(),
+      'amount': montant.toString(),
     });
   }
 
@@ -168,6 +191,18 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
             TextField(controller: _originCtrl, decoration: const InputDecoration(labelText: 'Gare de départ')),
             const SizedBox(height: 8),
             TextField(controller: _destCtrl, decoration: const InputDecoration(labelText: 'Gare de destination')),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Montant du billet *',
+                hintText: '7000',
+                suffixText: 'FCFA',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+              onSubmitted: (_) => _confirm(),
+            ),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(_error!, style: const TextStyle(color: AppColors.accentRed)),

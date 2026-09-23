@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../core/format.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_scan.dart';
@@ -11,6 +12,7 @@ import '../../data/services/external_qr_parser.dart';
 import '../../data/services/ticket_ocr_parser.dart';
 import '../../data/services/ticket_qr_parser.dart';
 import '../manifest/manifest_screen.dart';
+import '../recette/recette_screen.dart';
 import '../report/report_screen.dart';
 import 'external_scan_review_sheet.dart';
 
@@ -48,6 +50,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   bool _closing = false;
   _LastResult? _lastResult;
   int _validCount = 0;
+  num _totalAmount = 0;
 
   @override
   void initState() {
@@ -64,7 +67,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       final manifest =
           await ref.read(embarquementServiceProvider).listManifest(widget.session.id);
       if (!mounted) return;
-      setState(() => _validCount = manifest.where((s) => s.isValid).length);
+      final valides = manifest.where((s) => s.isValid).toList();
+      setState(() {
+        _validCount = valides.length;
+        _totalAmount = valides.fold<num>(0, (sum, s) => sum + (s.amount ?? 0));
+      });
     } catch (_) {
       // Manifeste indisponible (réseau, droits) : on garde le compteur local.
       // Le scan reste pleinement utilisable, seul l'affichage est dégradé.
@@ -162,7 +169,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       if (!mounted) return;
       setState(() {
         _lastResult = _LastResult.fromTibus(outcome);
-        if (outcome.status == 'valid') _validCount++;
+        if (outcome.status == 'valid') {
+          _validCount++;
+          _totalAmount += outcome.amount ?? 0;
+        }
       });
     } catch (e) {
       if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : $e'));
@@ -182,11 +192,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       builder: (_) => ExternalScanReviewSheet(parsed: parsed, fromPhoto: fromPhoto),
     );
     if (reviewed == null) return; // annulé — pas d'ajout, pas de comptage
+    // La feuille de correction garantit un montant valide avant de rendre la
+    // main (champ obligatoire) ; ce repli à 0 n'est là que pour ne jamais
+    // planter sur un null inattendu, le serveur refusant de toute façon.
+    final montant = parseMontantSaisi(reviewed['amount'] ?? '') ?? 0;
     try {
       final status = await ref.read(embarquementServiceProvider).scanExternal(
             sessionId: widget.session.id,
             rawPayload: parsed.rawPayload,
             passengerName: reviewed['passengerName']!,
+            amount: montant,
             ticketNumber: reviewed['ticketNumber'],
             originLabel: reviewed['originLabel'],
             destinationLabel: reviewed['destinationLabel'],
@@ -198,11 +213,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           title: reviewed['passengerName']!,
           subtitle: status == 'duplicate'
               ? 'Déjà scanné dans cette session'
-              : (fromPhoto
-                  ? 'Billet photographié ajouté au manifeste'
-                  : 'QR externe ajouté au manifeste'),
+              : '${formatMontant(montant)} · ${fromPhoto ? "billet photographié" : "QR externe"} ajouté au manifeste',
         );
         if (status == 'valid') _validCount++;
+        if (status == 'valid') _totalAmount += montant;
       });
     } catch (e) {
       if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : $e'));
@@ -248,12 +262,21 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               MaterialPageRoute(builder: (_) => ManifestScreen(session: widget.session)),
             ),
           ),
-          IconButton(
+          // Deux rapports maintenant : un menu plutôt qu'une quatrième icône,
+          // l'AppBar d'un téléphone ne tenant pas titre + 4 actions.
+          PopupMenuButton<String>(
             icon: const Icon(Icons.assessment_outlined),
-            tooltip: 'Rapport',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ReportScreen(session: widget.session)),
-            ),
+            tooltip: 'Rapports',
+            onSelected: (value) {
+              final Widget page = value == 'recette'
+                  ? RecetteScreen(session: widget.session)
+                  : ReportScreen(session: widget.session);
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'embarquement', child: Text("Rapport d'embarquement")),
+              PopupMenuItem(value: 'recette', child: Text('Rapport de recette')),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.stop_circle_outlined),
@@ -270,7 +293,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               '$_validCount embarqué${_validCount > 1 ? "s" : ""}'
-              '${widget.session.capacityDeclared != null ? " / ${widget.session.capacityDeclared} places" : ""}',
+              '${widget.session.capacityDeclared != null ? " / ${widget.session.capacityDeclared} places" : ""}'
+              ' · ${formatMontant(_totalAmount)}',
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlueDark),
             ),
@@ -421,6 +445,10 @@ class _LastResult {
       'wrong_session' => 'Mauvaise compagnie',
       _ => 'Refusé',
     };
-    return _LastResult(status: outcome.status, title: title, subtitle: outcome.message);
+    final montant = outcome.amount;
+    final subtitle = outcome.status == 'valid' && montant != null
+        ? '${formatMontant(montant)}${outcome.message != null ? " · ${outcome.message}" : ""}'
+        : outcome.message;
+    return _LastResult(status: outcome.status, title: title, subtitle: subtitle);
   }
 }

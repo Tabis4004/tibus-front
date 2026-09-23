@@ -4,6 +4,7 @@ import '../models/embarquement_itineraire.dart';
 import '../models/embarquement_bus.dart';
 import '../models/embarquement_scan.dart';
 import '../models/embarquement_report.dart';
+import '../models/embarquement_recette.dart';
 import '../models/company_gare_option.dart';
 import '../models/company_bus_option.dart';
 
@@ -146,10 +147,15 @@ class EmbarquementService {
   }
 
   /// Renvoie le statut ('valid'/'duplicate') — voir embarquement_scan_external.
+  ///
+  /// [amount] est obligatoire depuis la migration 210 (décision : un total de
+  /// recette partiel serait pire qu'un agent bloqué une seconde sur un
+  /// champ). Le serveur refuse un montant nul ou négatif.
   Future<String> scanExternal({
     required String sessionId,
     required String rawPayload,
     required String passengerName,
+    required double amount,
     String? ticketNumber,
     String? originLabel,
     String? destinationLabel,
@@ -161,8 +167,19 @@ class EmbarquementService {
       'p_ticket_number': ticketNumber,
       'p_origin_label': originLabel,
       'p_destination_label': destinationLabel,
+      'p_amount': amount,
     });
     return (data as Map<String, dynamic>)['status'] as String;
+  }
+
+  /// Rapport de recette (migration 210) — liste des embarquements valides
+  /// avec leur montant et les totaux. Distinct du rapport d'embarquement :
+  /// celui-ci est un document de caisse.
+  Future<EmbarquementRecette> recette(String sessionId) async {
+    final data = await _client.rpc('embarquement_recette', params: {
+      'p_session_id': sessionId,
+    });
+    return EmbarquementRecette.fromMap(data as Map<String, dynamic>);
   }
 
   // Manifeste & clôture -----------------------------------------------------
