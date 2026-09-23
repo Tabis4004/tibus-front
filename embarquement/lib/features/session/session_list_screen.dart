@@ -344,7 +344,7 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
                   const SizedBox(height: 10),
                   if (_buses.isNotEmpty) ...[
                     DropdownButtonFormField<String>(
-                      value: _busId,
+                      initialValue: _busId,
                       decoration: const InputDecoration(labelText: 'Bus *'),
                       items: _buses
                           .map((b) => DropdownMenuItem(value: b.id, child: Text('${b.label} (${b.capacity} places)')))
