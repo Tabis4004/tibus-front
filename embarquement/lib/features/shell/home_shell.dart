@@ -6,9 +6,9 @@ import '../session/session_list_screen.dart';
 import '../admin/admin_screen.dart';
 import 'profile_screen.dart';
 
-/// Coquille avec navigation basse — Sessions (embarquement_list_sessions),
-/// Recettes (tableau de bord, owner / gérant / comptable de gare
-/// uniquement), Administration (gares/bus/équipe/coordonnées compagnie —
+/// Coquille avec navigation basse — Recettes (tableau de bord, accueil de
+/// l'app pour owner / gérant / comptable de gare ; absent pour les autres
+/// rôles), Sessions (embarquement_list_sessions), Administration (gares/bus/équipe/coordonnées compagnie —
 /// réutilise les RPC Tibus existantes, réservé owner/super_admin), Profil.
 ///
 /// L'onglet Recettes n'apparaît que si recetteDashboardAccessProvider
@@ -40,36 +40,47 @@ class _Tab {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   // On retient l'onglet par sa clé et non par son rang : l'onglet Recettes
-  // peut apparaître après coup (le temps de charger les gares), ce qui
-  // décalerait les rangs et ferait sauter l'utilisateur sur un autre écran.
-  String _currentKey = 'sessions';
-
-  // Le tableau de bord lance une requête par session : on ne le construit
-  // qu'à la première visite de l'onglet, pas au démarrage de l'app.
-  bool _recettesVisitees = false;
+  // apparaît après coup (le temps de charger les gares), ce qui décalerait
+  // les rangs et ferait sauter l'utilisateur sur un autre écran.
+  //
+  // null = aucun choix fait : on affiche l'accueil, qui est Recettes pour les
+  // rôles qui y ont droit et Sessions pour les autres. Dès que l'utilisateur
+  // touche un onglet, son choix prime.
+  String? _chosenKey;
 
   @override
   Widget build(BuildContext context) {
-    final access = ref.watch(recetteDashboardAccessProvider).value;
+    final accessAsync = ref.watch(recetteDashboardAccessProvider);
+    final access = accessAsync.value;
     final companyName = ref.watch(activeCompanyNameProvider).value;
 
+    // Tant qu'on ignore si l'utilisateur a droit à Recettes (son accueil),
+    // on n'affiche pas Sessions pour l'en retirer une seconde plus tard.
+    if (_chosenKey == null && access == null && accessAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final recettes = access == null
+        ? null
+        : _Tab(
+            'recettes',
+            // La clé force un état neuf si la compagnie ou le périmètre change.
+            RecetteDashboardScreen(
+              key: ValueKey(
+                  '${access.companyId}_${access.isOwner}_${access.gares.map((g) => g.id).join(",")}'),
+              access: access,
+              companyName: companyName,
+            ),
+            const BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Recettes'),
+          );
+
     final tabs = <_Tab>[
+      if (recettes != null) recettes,
       const _Tab(
         'sessions',
         SessionListScreen(),
         BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner), label: 'Sessions'),
       ),
-      if (access != null)
-        _Tab(
-          'recettes',
-          // La clé force un état neuf si la compagnie ou le périmètre change.
-          RecetteDashboardScreen(
-            key: ValueKey('${access.companyId}_${access.isOwner}_${access.gares.map((g) => g.id).join(",")}'),
-            access: access,
-            companyName: companyName,
-          ),
-          const BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Recettes'),
-        ),
       const _Tab(
         'admin',
         AdminScreen(),
@@ -82,25 +93,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
     ];
 
-    var index = tabs.indexWhere((t) => t.key == _currentKey);
+    // Accueil = premier onglet : Recettes s'il existe, sinon Sessions.
+    final currentKey = _chosenKey ?? tabs.first.key;
+    var index = tabs.indexWhere((t) => t.key == currentKey);
     if (index < 0) index = 0;
 
     return Scaffold(
-      body: IndexedStack(
-        index: index,
-        children: tabs
-            .map((t) => t.key == 'recettes' && !_recettesVisitees && _currentKey != 'recettes'
-                ? const SizedBox.shrink()
-                : t.screen)
-            .toList(),
-      ),
+      body: IndexedStack(index: index, children: tabs.map((t) => t.screen).toList()),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: index,
         type: BottomNavigationBarType.fixed,
-        onTap: (i) => setState(() {
-          _currentKey = tabs[i].key;
-          if (_currentKey == 'recettes') _recettesVisitees = true;
-        }),
+        onTap: (i) => setState(() => _chosenKey = tabs[i].key),
         items: tabs.map((t) => t.item).toList(),
       ),
     );
