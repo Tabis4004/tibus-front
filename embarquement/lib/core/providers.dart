@@ -3,6 +3,7 @@ import '../data/services/auth_service.dart';
 import '../data/services/embarquement_service.dart';
 import '../data/services/ticket_ocr_service.dart';
 import '../data/models/app_role.dart';
+import '../data/models/embarquement_trajet.dart';
 
 final authServiceProvider = Provider((ref) => AuthService());
 final embarquementServiceProvider = Provider((ref) => EmbarquementService());
@@ -113,4 +114,45 @@ final isEmbarquementAdminProvider = FutureProvider<bool>((ref) async {
   final companyId = await ref.watch(activeCompanyIdProvider.future);
   return roles.any((r) =>
       r.isEmbarquementAdminRole && (r.companyId == companyId || r.name == 'super_admin'));
+});
+
+/// Périmètre du tableau de bord des recettes pour l'utilisateur connecté, sur
+/// la compagnie active.
+///
+/// - owner (et super_admin) : toutes les gares de la compagnie ;
+/// - gerant_gare et comptable_gare : uniquement leur(s) gare(s), telles que
+///   les renvoie embarquement_my_gares (le serveur en est l'autorité) ;
+/// - tout autre rôle (controleur_gare...) : pas de tableau de bord (null).
+///
+/// Si l'utilisateur cumule plusieurs rôles sur la compagnie, le plus large
+/// l'emporte (owner > gérant/comptable).
+class RecetteDashboardAccess {
+  final String companyId;
+  final bool isOwner;
+
+  /// Gares du périmètre (toutes pour l'owner, la sienne pour un gérant ou un
+  /// comptable).
+  final List<EmbarquementTrajetGare> gares;
+  const RecetteDashboardAccess({
+    required this.companyId,
+    required this.isOwner,
+    required this.gares,
+  });
+}
+
+final recetteDashboardAccessProvider = FutureProvider<RecetteDashboardAccess?>((ref) async {
+  final roles = await ref.watch(myRolesProvider.future);
+  final companyId = await ref.watch(activeCompanyIdProvider.future);
+  if (companyId == null) return null;
+
+  final mine = roles.where((r) => r.companyId == companyId || r.name == 'super_admin');
+  final isOwner = mine.any((r) => r.name == 'owner' || r.name == 'super_admin');
+  final isGareFinance = mine.any((r) => r.name == 'gerant_gare' || r.name == 'comptable_gare');
+  if (!isOwner && !isGareFinance) return null;
+
+  final gares = await ref.read(embarquementServiceProvider).myGares(companyId);
+  // Un gérant ou un comptable sans gare rattachée n'a rien à consulter.
+  if (!isOwner && gares.isEmpty) return null;
+
+  return RecetteDashboardAccess(companyId: companyId, isOwner: isOwner, gares: gares);
 });
