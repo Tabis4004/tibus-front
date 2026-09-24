@@ -6,8 +6,18 @@ import {
   resolveOwnerCompanyId,
 } from "@/lib/supabase/owner-company";
 
+export type OwnerRouteStop = {
+  gareId: string;
+  name: string;
+  city: string;
+  position: number;
+};
+
 export type OwnerRouteOption = {
   id: string;
+  originId: string;
+  destId: string;
+  stops: OwnerRouteStop[];
   originName: string;
   destName: string;
   originCity: string;
@@ -162,11 +172,20 @@ export async function listOwnerRoutesSupabase(
 
   if (arretsError) throw arretsError;
 
+  const { data: escales, error: escalesError } = await supabase
+    .from("ProgrammationTrajetEscales")
+    .select("trajetId, gareId, position")
+    .in("trajetId", trajetIds)
+    .order("position");
+
+  if (escalesError) throw escalesError;
+
   const gareIds = new Set<string>();
   for (const t of trajets ?? []) {
     gareIds.add(t.depart as string);
     gareIds.add(t.final as string);
   }
+  for (const e of escales ?? []) gareIds.add(e.gareId as string);
 
   const { data: gares, error: garesError } = await supabase
     .from("Gares")
@@ -218,8 +237,25 @@ export async function listOwnerRoutesSupabase(
     const originName = originGare.name;
     const destName = destGare.name;
 
+    const stops: OwnerRouteStop[] = [];
+    for (const e of escales ?? []) {
+      if (e.trajetId !== trajet.id) continue;
+      const g = gareMap.get(e.gareId as string);
+      if (!g) continue;
+      stops.push({
+        gareId: g.id,
+        name: g.name,
+        city: resolveGareCity(g, cityNames),
+        position: e.position as number,
+      });
+    }
+    stops.sort((a, b) => a.position - b.position);
+
     routes.push({
       id: trajet.id as string,
+      originId: trajet.depart as string,
+      destId: trajet.final as string,
+      stops,
       originName,
       destName,
       originCity: resolveGareCity(originGare, cityNames),
@@ -300,6 +336,47 @@ export async function createOwnerRouteSupabase(input: {
 
   if (error) throw error;
   return data as string;
+}
+
+export type OwnerStopSegmentInput = {
+  fromGareId: string;
+  toGareId: string;
+  price: number;
+  kilometrage?: number | null;
+};
+
+// Ajoute une escale à un itinéraire existant. `segments` doit contenir un
+// segment entre la nouvelle escale et CHAQUE autre gare de l'itinéraire.
+export async function addOwnerRouteStopSupabase(input: {
+  trajetId: string;
+  gareId: string;
+  position: number;
+  segments: OwnerStopSegmentInput[];
+}): Promise<void> {
+  const { error } = await supabase.rpc("add_owner_route_stop", {
+    p_trajet_id: input.trajetId,
+    p_gare_id: input.gareId,
+    p_position: input.position,
+    p_segments: input.segments.map((s) => ({
+      from_gare_id: s.fromGareId,
+      to_gare_id: s.toGareId,
+      price: s.price,
+      kilometrage: s.kilometrage ?? null,
+    })),
+  });
+  if (error) throw error;
+}
+
+// Refusée côté DB si un billet est déjà vendu sur un segment de l'escale.
+export async function removeOwnerRouteStopSupabase(
+  trajetId: string,
+  gareId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("remove_owner_route_stop", {
+    p_trajet_id: trajetId,
+    p_gare_id: gareId,
+  });
+  if (error) throw error;
 }
 
 export async function listOwnerBusesSupabase(

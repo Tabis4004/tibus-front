@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { RouteIcon, PlusIcon, ArrowRightIcon, TagIcon, TrashIcon } from "lucide-react";
+import { RouteIcon, PlusIcon, ArrowRightIcon, TagIcon, TrashIcon, MapPinIcon, XIcon } from "lucide-react";
 import { errorMessage } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -52,6 +52,9 @@ import {
   createOwnerRouteSupabase,
   setTrajetSchedulingActiveSupabase,
   deleteOwnerRouteSupabase,
+  addOwnerRouteStopSupabase,
+  removeOwnerRouteStopSupabase,
+  type OwnerStopSegmentInput,
   type OwnerRouteOption,
   type OwnerStationOption,
 } from "@/lib/supabase/owner-trips";
@@ -198,6 +201,161 @@ function RouteDialog({
   );
 }
 
+function StopDialog({
+  route,
+  stations,
+  onClose,
+  onSaved,
+}: {
+  route: OwnerRouteOption;
+  stations: OwnerStationOption[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation("owner");
+  const [saving, setSaving] = useState(false);
+  const [gareId, setGareId] = useState("");
+  // Ordre actuel de l'itinéraire : départ, escales existantes, arrivée.
+  const ordered = [
+    { gareId: route.originId, name: route.originName },
+    ...route.stops.map((s) => ({ gareId: s.gareId, name: s.name })),
+    { gareId: route.destId, name: route.destName },
+  ];
+  // Position = place de la nouvelle escale parmi les escales (1 = juste après le départ).
+  const [position, setPosition] = useState(1);
+  const [values, setValues] = useState<Record<string, { price: string; km: string }>>({});
+
+  const candidates = stations.filter((s) => !ordered.some((o) => o.gareId === s.id));
+  const chosen = stations.find((s) => s.id === gareId);
+  const newName = chosen?.name ?? t("routes.new_stop", { defaultValue: "Nouvelle escale" });
+
+  const setValue = (id: string, field: "price" | "km", v: string) =>
+    setValues((prev) => ({
+      ...prev,
+      [id]: { price: prev[id]?.price ?? "", km: prev[id]?.km ?? "", [field]: v },
+    }));
+
+  const submit = async () => {
+    if (!gareId) {
+      toast.error(t("routes.stop_select_error", { defaultValue: "Choisissez une gare" }));
+      return;
+    }
+    const segments: OwnerStopSegmentInput[] = [];
+    for (let i = 0; i < ordered.length; i++) {
+      const other = ordered[i];
+      const price = Number(values[other.gareId]?.price);
+      const kmRaw = values[other.gareId]?.km;
+      if (!values[other.gareId]?.price || !Number.isFinite(price) || price < 0) {
+        toast.error(
+          t("routes.stop_price_error", { defaultValue: "Renseignez un prix pour chaque segment" }),
+        );
+        return;
+      }
+      const before = i < position; // gare existante située avant la nouvelle escale
+      segments.push({
+        fromGareId: before ? other.gareId : gareId,
+        toGareId: before ? gareId : other.gareId,
+        price,
+        kilometrage: kmRaw ? Number(kmRaw) : null,
+      });
+    }
+    setSaving(true);
+    try {
+      await addOwnerRouteStopSupabase({ trajetId: route.id, gareId, position, segments });
+      toast.success(t("routes.stop_added", { defaultValue: "Escale ajoutée" }));
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(errorMessage(err, t("routes.stop_add_error", { defaultValue: "Impossible d'ajouter l'escale" })));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {t("routes.add_stop_title", { defaultValue: "Ajouter une escale" })}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <p className="text-xs text-muted-foreground">
+            {route.originName} → {route.destName}
+          </p>
+          <div className="space-y-1.5">
+            <Label>{t("routes.stop_station", { defaultValue: "Gare de l'escale" })}</Label>
+            <Select value={gareId} onValueChange={setGareId}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("routes.select_stop", { defaultValue: "Choisir une gare" })} />
+              </SelectTrigger>
+              <SelectContent>
+                {candidates.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                    {s.city ? ` (${s.city})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("routes.stop_position", { defaultValue: "Position" })}</Label>
+            <Select value={String(position)} onValueChange={(v) => setPosition(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ordered.slice(0, -1).map((o, i) => (
+                  <SelectItem key={o.gareId} value={String(i + 1)}>
+                    {t("routes.after", { defaultValue: "Après" })} {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t("routes.segment_prices", { defaultValue: "Prix par segment" })}</Label>
+            {ordered.map((o, i) => {
+              const before = i < position;
+              return (
+                <div key={o.gareId} className="grid grid-cols-[1fr_88px_64px] gap-2 items-center">
+                  <span className="text-xs truncate">
+                    {before ? `${o.name} → ${newName}` : `${newName} → ${o.name}`}
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder={t("labels.price", { ns: "common", defaultValue: "Prix" })}
+                    value={values[o.gareId]?.price ?? ""}
+                    onChange={(e) => setValue(o.gareId, "price", e.target.value)}
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Km"
+                    value={values[o.gareId]?.km ?? ""}
+                    onChange={(e) => setValue(o.gareId, "km", e.target.value)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+            {t("buttons.cancel", { ns: "common" })}
+          </Button>
+          <Button type="button" onClick={() => void submit()} disabled={saving || !gareId}>
+            {t("routes.add_stop_btn", { defaultValue: "Ajouter" })}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SupabaseRoutesManager() {
   const { t } = useTranslation("owner");
   const { appUserId } = useSupabaseAuth();
@@ -208,6 +366,25 @@ export default function SupabaseRoutesManager() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OwnerRouteOption | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [stopRoute, setStopRoute] = useState<OwnerRouteOption | null>(null);
+  const [removeStop, setRemoveStop] = useState<{ route: OwnerRouteOption; gareId: string; name: string } | null>(null);
+  const [removingStop, setRemovingStop] = useState(false);
+
+  const handleRemoveStop = async () => {
+    if (!removeStop) return;
+    setRemovingStop(true);
+    try {
+      await removeOwnerRouteStopSupabase(removeStop.route.id, removeStop.gareId);
+      toast.success(t("routes.stop_removed", { defaultValue: "Escale supprimée" }));
+      setRemoveStop(null);
+      void loadData();
+    } catch (err) {
+      // Le serveur refuse si des billets sont déjà vendus sur cette escale.
+      toast.error(errorMessage(err, t("routes.stop_remove_error", { defaultValue: "Impossible de supprimer l'escale" })));
+    } finally {
+      setRemovingStop(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     if (!appUserId || !companyId) return;
@@ -348,6 +525,38 @@ export default function SupabaseRoutesManager() {
                     <span>{route.kilometrage} km</span>
                   )}
                 </div>
+                {route.stops.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <MapPinIcon className="w-3 h-3 text-muted-foreground" />
+                    {route.stops.map((stop) => (
+                      <span
+                        key={stop.gareId}
+                        className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5"
+                      >
+                        {stop.name}
+                        <button
+                          type="button"
+                          aria-label={t("routes.remove_stop", { defaultValue: "Supprimer l'escale" })}
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setRemoveStop({ route, gareId: stop.gareId, name: stop.name })
+                          }
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => setStopRoute(route)}
+                >
+                  <PlusIcon className="w-3 h-3 mr-1" />
+                  {t("routes.add_stop_title", { defaultValue: "Ajouter une escale" })}
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -361,6 +570,43 @@ export default function SupabaseRoutesManager() {
           onSaved={() => void loadData()}
         />
       )}
+
+      {stopRoute && (
+        <StopDialog
+          route={stopRoute}
+          stations={stations}
+          onClose={() => setStopRoute(null)}
+          onSaved={() => void loadData()}
+        />
+      )}
+
+      <AlertDialog open={!!removeStop} onOpenChange={(open) => !open && setRemoveStop(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("routes.remove_stop_confirm", { defaultValue: "Supprimer cette escale ?" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeStop?.name} —{" "}
+              {t("routes.remove_stop_desc", {
+                defaultValue: "Les segments et prix liés à cette escale seront supprimés.",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removingStop}>
+              {t("buttons.cancel", { ns: "common" })}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveStop}
+              disabled={removingStop}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("buttons.delete", { ns: "common" })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
