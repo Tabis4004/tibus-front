@@ -9,6 +9,7 @@ import '../../data/models/embarquement_session.dart';
 import '../common/session_signature.dart';
 import '../recette/recette_screen.dart';
 import '../report/report_screen.dart';
+import 'manifest_export.dart';
 
 /// Liste temps réel des scans d'une session (embarquement_list_manifest) —
 /// pull-to-refresh en V1 (pas de websocket/Realtime, suffisant pour un
@@ -32,6 +33,23 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
     final f = _load();
     setState(() => _future = f);
     await f;
+  }
+
+  Future<void> _export(String kind) async {
+    try {
+      final data = await ref.read(embarquementServiceProvider).manifestData(widget.session.id);
+      switch (kind) {
+        case 'pdf':
+          await ManifestExport.sharePdf(data);
+        case 'excel':
+          await ManifestExport.shareExcel(data);
+        case 'print':
+          await ManifestExport.print(data);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export impossible : $e')));
+    }
   }
 
   Color _statusColor(String status) {
@@ -69,6 +87,16 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
       appBar: AppBar(
         title: Text('Manifeste — ${widget.session.routeLabel}'),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Exporter le manifeste',
+            onSelected: _export,
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'pdf', child: Text('PDF')),
+              PopupMenuItem(value: 'excel', child: Text('Excel')),
+              PopupMenuItem(value: 'print', child: Text('Imprimer')),
+            ],
+          ),
           // Seul chemin vers les rapports d'une session déjà clôturée : la
           // liste des sessions ouvre le manifeste, pas l'écran de scan.
           IconButton(

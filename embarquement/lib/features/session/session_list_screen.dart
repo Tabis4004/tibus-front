@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_session.dart';
 import '../../data/models/company_bus_option.dart';
 import '../../data/models/embarquement_trajet.dart';
+import '../../data/models/embarquement_departure.dart';
 import '../../core/format.dart';
 import '../scan/scan_screen.dart';
 import '../manifest/manifest_screen.dart';
@@ -37,10 +38,34 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   }
 
   Future<void> _openNewSessionSheet(String companyId) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.directions_bus),
+              title: const Text('Départ Tibus'),
+              subtitle: const Text('Heure, plaque du bus et places repris de la programmation'),
+              onTap: () => Navigator.pop(ctx, 'tibus'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_road),
+              title: const Text('Session hors-Tibus'),
+              onTap: () => Navigator.pop(ctx, 'hors'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _NewHorsTibusSessionSheet(companyId: companyId),
+      builder: (_) => choice == 'tibus'
+          ? _NewTibusSessionSheet(companyId: companyId)
+          : _NewHorsTibusSessionSheet(companyId: companyId),
     );
     if (created == true) _load(companyId);
   }
@@ -176,6 +201,113 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
                 label: const Text('Nouvelle session'),
               ),
         orElse: () => null,
+      ),
+    );
+  }
+}
+
+/// Ouverture d'une session sur un départ de la programmation Tibus. Le serveur
+/// ne propose que les départs qui passent par une gare de l'utilisateur
+/// (gare de départ ou escale) et relit lui-même plaque, heure et capacité.
+class _NewTibusSessionSheet extends ConsumerStatefulWidget {
+  final String companyId;
+  const _NewTibusSessionSheet({required this.companyId});
+
+  @override
+  ConsumerState<_NewTibusSessionSheet> createState() => _NewTibusSessionSheetState();
+}
+
+class _NewTibusSessionSheetState extends ConsumerState<_NewTibusSessionSheet> {
+  late final Future<List<EmbarquementDeparture>> _future =
+      ref.read(embarquementServiceProvider).listDepartures(widget.companyId);
+  String? _openingId;
+  String? _error;
+
+  Future<void> _open(EmbarquementDeparture d) async {
+    setState(() {
+      _openingId = d.reservationId;
+      _error = null;
+    });
+    try {
+      await ref.read(embarquementServiceProvider).openSessionDeparture(
+            companyId: widget.companyId,
+            reservationId: d.reservationId,
+            gareId: d.boardingGareId,
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Échec : $e');
+    } finally {
+      if (mounted) setState(() => _openingId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Départs Tibus', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(_error!, style: const TextStyle(color: AppColors.accentRed)),
+              ),
+            Flexible(
+              child: FutureBuilder<List<EmbarquementDeparture>>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
+                  }
+                  if (snap.hasError) {
+                    return Padding(padding: const EdgeInsets.all(16), child: Text('Erreur : ${snap.error}'));
+                  }
+                  final list = snap.data ?? const [];
+                  if (list.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Aucun départ programmé pour votre gare dans les prochaines heures.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final d = list[i];
+                      final left = d.seatsLeft;
+                      return ListTile(
+                        leading: const Icon(Icons.directions_bus),
+                        title: Text('${DateFormat('dd/MM HH:mm').format(d.departureTime)} · ${d.routeLabel}'),
+                        subtitle: Text(
+                          'Embarquement à ${d.boardingGare}'
+                          '${d.busPlate != null ? " · Bus ${d.busPlate}" : ""}'
+                          '${left != null ? " · $left place${left > 1 ? "s" : ""} libre${left > 1 ? "s" : ""}" : ""}',
+                        ),
+                        trailing: _openingId == d.reservationId
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.chevron_right),
+                        onTap: _openingId == null ? () => _open(d) : null,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

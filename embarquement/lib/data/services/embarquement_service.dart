@@ -9,6 +9,9 @@ import '../models/embarquement_trajet.dart';
 import '../models/embarquement_permission.dart';
 import '../models/company_gare_option.dart';
 import '../models/company_bus_option.dart';
+import '../models/embarquement_departure.dart';
+import '../models/embarquement_gare_done.dart';
+import '../models/embarquement_manifest_data.dart';
 
 /// Enveloppe les RPC serveur Embarquement — celles déjà en place
 /// (embarquement_create_session/list_sessions/update_session,
@@ -315,6 +318,61 @@ class EmbarquementService {
       'p_session_id': sessionId,
     });
     return (data as List).whereType<Map<String, dynamic>>().map(EmbarquementScan.fromMap).toList();
+  }
+
+  // Départs Tibus, fin d'embarquement par gare, manifeste enrichi -------------
+
+  /// Départs de la programmation Tibus qui passent par une gare de
+  /// l'utilisateur (départ ou escale). Plaque, heure et capacité viennent de Tibus.
+  Future<List<EmbarquementDeparture>> listDepartures(String companyId) async {
+    final data = await _client.rpc('embarquement_list_departures', params: {
+      'p_company_id': companyId,
+    });
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(EmbarquementDeparture.fromMap)
+        .toList();
+  }
+
+  /// Ouvre une session liée à un départ Tibus, dans la gare d'embarquement.
+  Future<String> openSessionDeparture({
+    required String companyId,
+    required String reservationId,
+    required String gareId,
+  }) async {
+    final data = await _client.rpc('embarquement_open_session_departure', params: {
+      'p_company_id': companyId,
+      'p_reservation_id': reservationId,
+      'p_gare_id': gareId,
+    });
+    return (data as Map<String, dynamic>)['id'] as String;
+  }
+
+  /// Places restantes sur le départ (toutes gares confondues si session Tibus).
+  Future<SeatsLeft> seatsLeft(String sessionId) async {
+    final data = await _client.rpc('embarquement_seats_left', params: {'p_session_id': sessionId});
+    return SeatsLeft.fromMap(data as Map<String, dynamic>);
+  }
+
+  /// Déclare la fin d'embarquement de la gare SANS fermer la session. Si des
+  /// passagers sont dans le mauvais car, le serveur répond needsAck=true sans
+  /// rien enregistrer : rappeler avec ackWrong=true après information.
+  Future<GareDoneResult> declareGareDone({
+    required String sessionId,
+    required int passengerCount,
+    bool ackWrong = false,
+  }) async {
+    final data = await _client.rpc('embarquement_declare_gare_done', params: {
+      'p_session_id': sessionId,
+      'p_passenger_count': passengerCount,
+      'p_ack_wrong': ackWrong,
+    });
+    return GareDoneResult.fromMap(data as Map<String, dynamic>);
+  }
+
+  Future<EmbarquementManifestData> manifestData(String sessionId) async {
+    final data = await _client.rpc('embarquement_manifest_data', params: {'p_session_id': sessionId});
+    return EmbarquementManifestData.fromMap(data as Map<String, dynamic>);
   }
 
   Future<void> closeSession(String sessionId) {

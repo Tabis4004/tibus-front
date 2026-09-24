@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/embarquement_scan.dart';
 import '../../data/models/embarquement_session.dart';
+import '../../data/models/embarquement_gare_done.dart';
 import '../../data/services/external_qr_parser.dart';
 import '../../data/services/ticket_ocr_parser.dart';
 import '../../data/services/ticket_qr_parser.dart';
@@ -51,11 +52,114 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   _LastResult? _lastResult;
   int _validCount = 0;
   num _totalAmount = 0;
+  SeatsLeft? _seats;
 
   @override
   void initState() {
     super.initState();
     unawaited(_chargerCompteurDepuisManifeste());
+    unawaited(_chargerPlacesRestantes());
+  }
+
+  /// Places restantes : pour un départ Tibus, le décompte cumule toutes les
+  /// gares d'embarquement du même départ (pas seulement cette session).
+  Future<void> _chargerPlacesRestantes() async {
+    try {
+      final seats = await ref.read(embarquementServiceProvider).seatsLeft(widget.session.id);
+      if (mounted) setState(() => _seats = seats);
+    } catch (_) {
+      // affichage dégradé : on garde le compteur local
+    }
+  }
+
+  /// Fin d'embarquement dans MA gare : ne ferme pas la session, car d'autres
+  /// gares/escales du trajet peuvent encore embarquer.
+  Future<void> _declareFinEmbarquement() async {
+    final ctrl = TextEditingController(text: _validCount.toString());
+    final count = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Fin d'embarquement dans ma gare"),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Nombre total de passagers embarqués'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text.trim())),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (count == null || count < 0 || !mounted) return;
+    final service = ref.read(embarquementServiceProvider);
+    try {
+      var res = await service.declareGareDone(sessionId: widget.session.id, passengerCount: count);
+      if (res.needsAck) {
+        if (!mounted) return;
+        final confirmed = await _confirmWrongRoute(res.wrongRoute);
+        if (confirmed != true) return;
+        res = await service.declareGareDone(
+          sessionId: widget.session.id,
+          passengerCount: count,
+          ackWrong: true,
+        );
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res.countMismatch
+            ? "Embarquement déclaré : $count saisis, ${res.scannedCount} scannés"
+            : "Fin d'embarquement déclarée ($count passagers)"),
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
+      }
+    }
+  }
+
+  Future<bool?> _confirmWrongRoute(List<WrongRoutePassenger> list) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: AppColors.accentRed),
+          SizedBox(width: 8),
+          Expanded(child: Text('Passagers dans le mauvais car')),
+        ]),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Text(
+                "Ces passagers ne sont pas sur cet itinéraire. Ils doivent descendre à "
+                "l'escale et attendre leur départ.",
+                style: TextStyle(fontSize: 12.5),
+              ),
+              const SizedBox(height: 8),
+              ...list.map((w) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(w.passengerName ?? 'Passager'),
+                    subtitle: Text(
+                      '${w.ticketNumber ?? "—"} · ${w.ticketFrom ?? "?"} → ${w.ticketTo ?? "?"}\n${w.reasonLabel}',
+                    ),
+                    isThreeLine: true,
+                  )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Corriger d'abord")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Passagers informés, valider')),
+        ],
+      ),
+    );
   }
 
   /// Le compteur en tête d'écran n'était qu'un compteur local : remis à zéro
@@ -174,6 +278,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           _totalAmount += outcome.amount ?? 0;
         }
       });
+      if (outcome.status == 'valid') unawaited(_chargerPlacesRestantes());
     } catch (e) {
       if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : $e'));
     }
@@ -223,6 +328,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           _totalAmount += montant ?? 0;
         }
       });
+      if (status == 'valid') unawaited(_chargerPlacesRestantes());
     } catch (e) {
       if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : $e'));
     }
@@ -284,6 +390,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ],
           ),
           IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: "J'ai fini d'embarquer dans ma gare",
+            onPressed: _declareFinEmbarquement,
+          ),
+          IconButton(
             icon: const Icon(Icons.stop_circle_outlined),
             tooltip: 'Clôturer',
             onPressed: _closing ? null : _closeSession,
@@ -299,6 +410,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             child: Text(
               '$_validCount embarqué${_validCount > 1 ? "s" : ""}'
               '${widget.session.capacityDeclared != null ? " / ${widget.session.capacityDeclared} places" : ""}'
+              '${_seats?.seatsLeft != null ? " · ${_seats!.seatsLeft} libre${_seats!.seatsLeft! > 1 ? "s" : ""}" : ""}'
               ' · ${formatMontant(_totalAmount)}',
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlueDark),
