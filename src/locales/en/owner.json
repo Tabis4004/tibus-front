@@ -364,6 +364,7 @@
   "gare.team_role_vendeur": "Station counter seller",
   "gare.team_role_controleur": "Station controller",
   "gare.team_role_comptable": "Station accountant",
+  "gare.team_role_embarqueur": "Station boarding agent",
   "gare.team_role_emballeur": "Packer (parcel lots)",
   "gare.team_role_chargeur": "Loader (parcel lots)",
   "gare.team_role_distributeur": "Distributor (parcel lots)",

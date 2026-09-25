@@ -25,6 +25,7 @@ export const GARE_TEAM_ASSIGNABLE_ROLES = [
   "vendeur_gare",
   "controleur_gare",
   "comptable_gare",
+  "embarqueur_gare",
 ] as const;
 
 export type GareTeamAssignableRole = (typeof GARE_TEAM_ASSIGNABLE_ROLES)[number];
@@ -108,6 +109,17 @@ export function hasGareComptableDashboardAccess(roles: readonly string[]): boole
 
 export function hasGareControleurScanAccess(roles: readonly string[]): boolean {
   return roles.includes("controleur_gare");
+}
+
+/// embarqueur_gare est assignable depuis Équipe (parité avec l'app mobile
+/// Embarquement, qui l'assigne dans Administration), mais n'a pas de
+/// dashboard web dédié : le module Embarquement (scan/clôture) reste
+/// mobile uniquement, voir plan_module_embarquement_v2.md. Volontairement
+/// PAS dans GARE_CONSOLE_ACCESS_ROLE_NAMES/GARE_DASHBOARD_ROLE_NAMES : un
+/// utilisateur qui n'a que ce rôle est redirigé hors de la console web
+/// (SupabaseOwnerLayout.canAccess), comme avant que le rôle existe.
+export function hasEmbarqueurRole(roles: readonly string[]): boolean {
+  return roles.includes("embarqueur_gare");
 }
 
 export function hasCompanyControleurScanAccess(roles: readonly string[]): boolean {

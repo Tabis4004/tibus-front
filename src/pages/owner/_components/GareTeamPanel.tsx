@@ -40,6 +40,7 @@ const ROLE_LABEL_KEYS: Record<GareTeamAssignableRole, string> = {
   vendeur_gare: "gare.team_role_vendeur",
   controleur_gare: "gare.team_role_controleur",
   comptable_gare: "gare.team_role_comptable",
+  embarqueur_gare: "gare.team_role_embarqueur",
 };
 
 export default function GareTeamPanel({ gareId }: { gareId: string }) {
