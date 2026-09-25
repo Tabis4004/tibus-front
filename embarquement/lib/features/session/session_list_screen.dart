@@ -8,6 +8,7 @@ import '../../data/models/company_bus_option.dart';
 import '../../data/models/embarquement_trajet.dart';
 import '../../data/models/embarquement_departure.dart';
 import '../../core/format.dart';
+import '../itinerary/itinerary_screen.dart';
 import '../scan/scan_screen.dart';
 import '../manifest/manifest_screen.dart';
 
@@ -173,8 +174,19 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
                         ),
                         onTap: () async {
                           if (s.isOpen) {
+                            // Embarqueur : la session d'une AUTRE gare de son
+                            // itinéraire s'ouvre en consultation (gares, places
+                            // restantes) — il ne scanne que dans sa gare.
+                            var mine = true;
+                            if ((ref.read(isEmbarqueurOnlyProvider).value ?? false) && s.isTibus) {
+                              final gares = await ref.read(embarquementServiceProvider).myGares(companyId);
+                              mine = gares.any((g) => g.id == s.gareId);
+                            }
+                            if (!context.mounted) return;
                             final closed = await Navigator.of(context).push<bool>(
-                              MaterialPageRoute(builder: (_) => ScanScreen(session: s)),
+                              MaterialPageRoute(
+                                builder: (_) => mine ? ScanScreen(session: s) : ItineraryScreen(session: s),
+                              ),
                             );
                             if (closed == true) _load(companyId);
                           } else {

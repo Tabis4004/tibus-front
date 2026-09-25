@@ -12,6 +12,7 @@ import '../../data/models/embarquement_gare_done.dart';
 import '../../data/services/external_qr_parser.dart';
 import '../../data/services/ticket_ocr_parser.dart';
 import '../../data/services/ticket_qr_parser.dart';
+import '../itinerary/itinerary_screen.dart';
 import '../manifest/manifest_screen.dart';
 import '../recette/recette_screen.dart';
 import '../report/report_screen.dart';
@@ -52,6 +53,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   _LastResult? _lastResult;
   int _validCount = 0;
   num _totalAmount = 0;
+
+  /// null = pas encore su ; renseigné par embarquement_itinerary_status. Un
+  /// embarqueur ne peut clôturer qu'à la gare de destination.
+  bool? _canClose;
   SeatsLeft? _seats;
 
   @override
@@ -59,6 +64,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     super.initState();
     unawaited(_chargerCompteurDepuisManifeste());
     unawaited(_chargerPlacesRestantes());
+    unawaited(_chargerDroitDeCloture());
+  }
+
+  Future<void> _chargerDroitDeCloture() async {
+    try {
+      final it = await ref.read(embarquementServiceProvider).itineraryStatus(widget.session.id);
+      if (mounted) setState(() => _canClose = it.canClose);
+    } catch (_) {
+      // on garde le comportement par défaut (voir build) ; le serveur tranche
+    }
   }
 
   /// Places restantes : pour un départ Tibus, le décompte cumule toutes les
@@ -321,7 +336,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           title: reviewed['passengerName']!,
           subtitle: status == 'duplicate'
               ? 'Déjà scanné dans cette session'
-              : '${formatMontant(montant)} · ${fromPhoto ? "billet photographié" : "QR externe"} ajouté au manifeste',
+              : '${montant != null ? "${formatMontant(montant)} · " : ""}${fromPhoto ? "billet photographié" : "QR externe"} ajouté au manifeste',
         );
         if (status == 'valid') {
           _validCount++;
@@ -362,6 +377,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Embarqueur : aucun montant, aucun rapport de recette, clôture réservée
+    // à la gare de destination (voir isEmbarqueurOnlyProvider).
+    final hideMoney = ref.watch(isEmbarqueurOnlyProvider).value ?? false;
+    final canClose = _canClose ?? !hideMoney;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.session.routeLabel),
@@ -384,21 +403,34 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   : ReportScreen(session: widget.session);
               Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'embarquement', child: Text("Rapport d'embarquement")),
-              PopupMenuItem(value: 'recette', child: Text('Rapport de recette')),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'embarquement', child: Text("Rapport d'embarquement")),
+              if (!hideMoney)
+                const PopupMenuItem(value: 'recette', child: Text('Rapport de recette')),
             ],
           ),
+          if (widget.session.isTibus)
+            IconButton(
+              icon: const Icon(Icons.alt_route),
+              tooltip: 'Itinéraire et places restantes',
+              onPressed: () async {
+                final closed = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(builder: (_) => ItineraryScreen(session: widget.session)),
+                );
+                if (closed == true && mounted) Navigator.of(context).pop(true);
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.flag_outlined),
             tooltip: "J'ai fini d'embarquer dans ma gare",
             onPressed: _declareFinEmbarquement,
           ),
-          IconButton(
-            icon: const Icon(Icons.stop_circle_outlined),
-            tooltip: 'Clôturer',
-            onPressed: _closing ? null : _closeSession,
-          ),
+          if (canClose)
+            IconButton(
+              icon: const Icon(Icons.stop_circle_outlined),
+              tooltip: 'Clôturer',
+              onPressed: _closing ? null : _closeSession,
+            ),
         ],
       ),
       body: Column(
@@ -411,7 +443,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               '$_validCount embarqué${_validCount > 1 ? "s" : ""}'
               '${widget.session.capacityDeclared != null ? " / ${widget.session.capacityDeclared} places" : ""}'
               '${_seats?.seatsLeft != null ? " · ${_seats!.seatsLeft} libre${_seats!.seatsLeft! > 1 ? "s" : ""}" : ""}'
-              ' · ${formatMontant(_totalAmount)}',
+              '${hideMoney ? "" : " · ${formatMontant(_totalAmount)}"}',
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlueDark),
             ),

@@ -39,7 +39,13 @@ class EmbarquementCompanyOption {
 // sur AppRole.isEmbarquementRole et sur can_use_embarquement() (migration
 // 213) : les rôles à portée compagnie autres qu'owner n'ont plus accès au
 // module.
-const _rolePriority = ['owner', 'gerant_gare', 'controleur_gare', 'comptable_gare'];
+const _rolePriority = [
+  'owner',
+  'gerant_gare',
+  'controleur_gare',
+  'comptable_gare',
+  'embarqueur_gare',
+];
 
 int _rolePriorityIndex(String name) {
   final i = _rolePriority.indexOf(name);
@@ -155,4 +161,21 @@ final recetteDashboardAccessProvider = FutureProvider<RecetteDashboardAccess?>((
   if (!isOwner && gares.isEmpty) return null;
 
   return RecetteDashboardAccess(companyId: companyId, isOwner: isOwner, gares: gares);
+});
+
+/// Vrai si, sur la compagnie active, l'utilisateur n'a que le rôle
+/// embarqueur_gare (aucun rôle plus large). Dans ce cas l'app masque tout ce
+/// qui touche à l'argent (montants, rapport de recette, tableau de bord) ;
+/// le serveur le refuse de toute façon (embarquement_is_embarqueur_only).
+final isEmbarqueurOnlyProvider = FutureProvider<bool>((ref) async {
+  final roles = await ref.watch(myRolesProvider.future);
+  final companyId = await ref.watch(activeCompanyIdProvider.future);
+  if (companyId == null) return false;
+  final names = roles
+      .where((r) => r.companyId == companyId || r.name == 'super_admin')
+      .map((r) => r.name)
+      .toSet();
+  if (!names.contains('embarqueur_gare')) return false;
+  const wider = {'owner', 'gerant_gare', 'controleur_gare', 'comptable_gare', 'super_admin'};
+  return !names.any(wider.contains);
 });

@@ -12,6 +12,7 @@ import '../models/company_bus_option.dart';
 import '../models/embarquement_departure.dart';
 import '../models/embarquement_gare_done.dart';
 import '../models/embarquement_manifest_data.dart';
+import '../models/embarquement_itinerary.dart';
 
 /// Enveloppe les RPC serveur Embarquement — celles déjà en place
 /// (embarquement_create_session/list_sessions/update_session,
@@ -373,6 +374,17 @@ class EmbarquementService {
   Future<EmbarquementManifestData> manifestData(String sessionId) async {
     final data = await _client.rpc('embarquement_manifest_data', params: {'p_session_id': sessionId});
     return EmbarquementManifestData.fromMap(data as Map<String, dynamic>);
+  }
+
+  /// Itinéraire du départ : chaque gare (départ, escales, destination) avec
+  /// ses embarqués, si elle a terminé, et les places restantes après elle.
+  /// Aucun montant. Pour un embarqueur, le serveur dit aussi s'il peut
+  /// clôturer (uniquement à la gare de destination).
+  Future<EmbarquementItinerary> itineraryStatus(String sessionId) async {
+    final data = await _client.rpc('embarquement_itinerary_status', params: {
+      'p_session_id': sessionId,
+    });
+    return EmbarquementItinerary.fromMap(data as Map<String, dynamic>);
   }
 
   Future<void> closeSession(String sessionId) {

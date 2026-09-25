@@ -53,8 +53,15 @@ class AppRole {
         'gerant_gare',
         'controleur_gare',
         'comptable_gare',
+        'embarqueur_gare',
         'super_admin',
       ].contains(name);
+
+  /// Embarqueur de gare : scanne et clôture l'embarquement de SA gare, voit
+  /// tout l'itinéraire et les places restantes, mais jamais les recettes.
+  /// Miroir de embarquement_is_embarqueur_only() côté serveur (qui fait
+  /// autorité : ici on ne fait que masquer ce que les RPC refuseraient).
+  bool get isEmbarqueurRole => name == 'embarqueur_gare';
 
   /// Vrai pour les rôles autorisés à gérer le référentiel hors-Tibus
   /// (itinéraires/bus) — owner/super_admin uniquement, cf.

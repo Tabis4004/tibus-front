@@ -110,7 +110,7 @@ class AdminService {
   /// [email] doit correspondre à un compte déjà créé (dans Tibus ou
   /// courrier_mobile — même base) : cette action assigne un rôle, elle ne
   /// crée pas de compte. [gareId] est obligatoire pour les rôles gare
-  /// (gerant_gare, vendeur_gare, controleur_gare, comptable_gare).
+  /// (gerant_gare, vendeur_gare, controleur_gare, comptable_gare, embarqueur_gare).
   Future<void> assignRole({
     required String companyId,
     required String email,
@@ -260,7 +260,7 @@ class AdminTeamMember {
       );
 }
 
-/// Mêmes 11 rôles assignables que côté courrier_mobile (RoleAssignmentRules,
+/// Mêmes rôles assignables que côté courrier_mobile, plus embarqueur_gare (RoleAssignmentRules,
 /// confirmé en base) — c'est la même équipe compagnie partout dans Tibus,
 /// pas une notion propre à Embarquement. "owner" n'est pas assignable
 /// depuis l'app (attribué côté plateforme à la création de la compagnie).
@@ -269,6 +269,7 @@ const kAssignableRoles = <String>[
   'vendeur_gare',
   'controleur_gare',
   'comptable_gare',
+  'embarqueur_gare',
   'vendeur',
   'chauffeur',
   'comptable_compagnie',
@@ -279,7 +280,13 @@ const kAssignableRoles = <String>[
 ];
 
 bool isGareScopedRole(String roleName) =>
-    const ['gerant_gare', 'vendeur_gare', 'controleur_gare', 'comptable_gare'].contains(roleName);
+    const [
+      'gerant_gare',
+      'vendeur_gare',
+      'controleur_gare',
+      'comptable_gare',
+      'embarqueur_gare',
+    ].contains(roleName);
 
 class CompanyInfo {
   final String? name;

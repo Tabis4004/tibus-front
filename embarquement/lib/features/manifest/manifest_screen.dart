@@ -83,6 +83,7 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hideMoney = ref.watch(isEmbarqueurOnlyProvider).value ?? false;
     return Scaffold(
       appBar: AppBar(
         title: Text('Manifeste — ${widget.session.routeLabel}'),
@@ -106,13 +107,14 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
               MaterialPageRoute(builder: (_) => ReportScreen(session: widget.session)),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.payments_outlined),
-            tooltip: 'Recette',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => RecetteScreen(session: widget.session)),
+          if (!hideMoney)
+            IconButton(
+              icon: const Icon(Icons.payments_outlined),
+              tooltip: 'Recette',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => RecetteScreen(session: widget.session)),
+              ),
             ),
-          ),
         ],
       ),
       body: RefreshIndicator(
@@ -161,7 +163,7 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Text(
                     '$validCount embarqué${validCount > 1 ? "s" : ""} · ${scans.length} scan${scans.length > 1 ? "s" : ""} au total'
-                    '\n${formatMontant(total)} encaissés',
+                    '${hideMoney ? "" : "\n${formatMontant(total)} encaissés"}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -178,7 +180,7 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                         ),
                         title: Text(s.passengerName ?? 'Voyageur'),
                         subtitle: Text(
-                          '${s.ticketNumber ?? "—"} · ${formatMontant(s.amount)}'
+                          '${s.ticketNumber ?? "—"}${hideMoney ? "" : " · ${formatMontant(s.amount)}"}'
                           '${s.originLabel != null ? " · ${s.originLabel} → ${s.destinationLabel ?? "?"}" : ""}'
                           '\n${DateFormat('HH:mm:ss').format(s.scannedAt)} · ${s.source == 'tibus' ? "Tibus" : "Externe"}',
                         ),
