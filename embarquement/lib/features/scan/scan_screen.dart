@@ -59,6 +59,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   bool? _canClose;
   SeatsLeft? _seats;
 
+  /// Ma gare a-t-elle déjà déclaré sa fin d'embarquement ? null tant qu'on ne
+  /// sait pas encore, ou pour une session hors-Tibus (pas d'itinéraire à
+  /// suivre). Sert uniquement à changer l'apparence du bouton 🚩 ci-dessous
+  /// pour que l'agent voie que c'est déjà fait — la déclaration elle-même
+  /// reste toujours possible pour corriger un chiffre.
+  bool? _gareDone;
+
   @override
   void initState() {
     super.initState();
@@ -70,7 +77,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Future<void> _chargerDroitDeCloture() async {
     try {
       final it = await ref.read(embarquementServiceProvider).itineraryStatus(widget.session.id);
-      if (mounted) setState(() => _canClose = it.canClose);
+      if (!mounted) return;
+      final mine = it.gares.where((g) => g.isMine).toList();
+      setState(() {
+        _canClose = it.canClose;
+        _gareDone = mine.isEmpty ? null : mine.every((g) => g.done);
+      });
     } catch (_) {
       // on garde le comportement par défaut (voir build) ; le serveur tranche
     }
@@ -94,7 +106,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final count = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Fin d'embarquement dans ma gare"),
+        title: Text(_gareDone == true
+            ? "Fin d'embarquement déjà déclarée — corriger ?"
+            : "Fin d'embarquement dans ma gare"),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.number,
@@ -130,6 +144,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ? "Embarquement déclaré : $count saisis, ${res.scannedCount} scannés"
             : "Fin d'embarquement déclarée ($count passagers)"),
       ));
+      // Rafraîchit l'état du bouton 🚩 (coché) et les places restantes après
+      // ma gare, pour que la prochaine escale voie tout de suite le nouveau
+      // décompte si elle consulte l'écran Itinéraire.
+      unawaited(_chargerDroitDeCloture());
+      unawaited(_chargerPlacesRestantes());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
@@ -421,8 +440,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               },
             ),
           IconButton(
-            icon: const Icon(Icons.flag_outlined),
-            tooltip: "J'ai fini d'embarquer dans ma gare",
+            icon: Icon(_gareDone == true ? Icons.flag : Icons.flag_outlined),
+            color: _gareDone == true ? AppColors.scanValid : null,
+            tooltip: _gareDone == true
+                ? "Fin d'embarquement déclarée ici (appuyer pour corriger)"
+                : "J'ai fini d'embarquer dans ma gare",
             onPressed: _declareFinEmbarquement,
           ),
           if (canClose)
