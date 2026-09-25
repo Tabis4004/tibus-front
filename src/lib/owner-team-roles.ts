@@ -26,6 +26,7 @@ export const GARE_TEAM_ASSIGNABLE_ROLES = [
   "controleur_gare",
   "comptable_gare",
   "embarqueur_gare",
+  "chef_embarqueur",
 ] as const;
 
 export type GareTeamAssignableRole = (typeof GARE_TEAM_ASSIGNABLE_ROLES)[number];
@@ -50,6 +51,12 @@ export const GARE_DASHBOARD_ROLE_NAMES = [
 export const GARE_CONSOLE_ACCESS_ROLE_NAMES = [
   ...GARE_DASHBOARD_ROLE_NAMES,
   "controleur_gare",
+  // chef_embarqueur doit pouvoir entrer sur la console web (itinéraires/
+  // trajets via GARE_OPERATIONS_ROLE_NAMES) alors qu'il n'a pas de dashboard
+  // dédié : sans lui ici, hasGareConsoleAccess() le rejette avant même
+  // d'atteindre le filtrage des modules. Ne PAS ajouter à
+  // GARE_DASHBOARD_ROLE_NAMES/GARE_MANAGER_CONSOLE_ROLE_NAMES (accès argent).
+  "chef_embarqueur",
 ] as const;
 
 export const GARE_CASH_VALIDATOR_ROLE_NAMES = [
@@ -120,6 +127,18 @@ export function hasGareControleurScanAccess(roles: readonly string[]): boolean {
 /// (SupabaseOwnerLayout.canAccess), comme avant que le rôle existe.
 export function hasEmbarqueurRole(roles: readonly string[]): boolean {
   return roles.includes("embarqueur_gare");
+}
+
+/// chef_embarqueur = memes droits que gerant_gare, SAUF les recettes (caisse
+/// guichet, reversements, commissions, journal colis). Cote base, c'est fait
+/// via embarquement_hides_money() et en ne l'ajoutant PAS aux fonctions
+/// financieres (close_station_cash_register, validate_station_cash_reversal,
+/// get_colis_sales_journal...). Cote web, il n'est volontairement PAS ajoute
+/// a GARE_MANAGER_CONSOLE_ROLE_NAMES (qui donne acces a "Caisse gare" et
+/// "Comptabilite gare") : voir GARE_OPERATIONS_ROLE_NAMES ci-dessous pour ce
+/// qu'il voit a la place (itineraires/trajets, pas d'argent).
+export function hasChefEmbarqueurRole(roles: readonly string[]): boolean {
+  return roles.includes("chef_embarqueur");
 }
 
 export function hasCompanyControleurScanAccess(roles: readonly string[]): boolean {

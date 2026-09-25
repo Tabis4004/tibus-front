@@ -21,6 +21,7 @@ const DASHBOARD_ROLE_PRIORITY = [
   "controleur_gare",
   "gerant_gare",
   "gestionnaire_gare",
+  "chef_embarqueur",
   "chauffeur",
   "vendeur_gare",
   "vendeur_reseau",
@@ -60,6 +61,11 @@ export function resolveDashboardPath(lng: string, roles: readonly string[]): str
   }
   if (role === "comptable_gare") return roleDashboardPath(locale, "comptable_gare");
   if (role === "controleur_gare") return roleDashboardPath(locale, "controleur_gare");
+  // chef_embarqueur n'a pas de dashboard dédié (pas d'argent à afficher) :
+  // il atterrit sur la console owner générale, où filterOwnerConsoleModules
+  // ne lui montre que les modules GARE_OPERATIONS_ROLE_NAMES (itinéraires,
+  // trajets) — voir owner-console-modules.tsx.
+  if (role === "chef_embarqueur") return `/${locale}/owner`;
   if (role === "super_admin" || role === "admin_pays") return `/${locale}/admin`;
   if (role === "demarcheur") return `/${locale}/admin/demarcheur`;
   if (

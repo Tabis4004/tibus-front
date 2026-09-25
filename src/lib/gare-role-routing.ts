@@ -38,6 +38,14 @@ export function resolvePrimaryGareStaffDashboardPath(
   if (roles.includes("controleur_gare")) {
     return roleDashboardPath(lng, "controleur_gare");
   }
+  // chef_embarqueur : ni gérant, ni comptable, ni contrôleur — pas de
+  // dashboard dédié (il ne voit aucune donnée d'argent). Avant ce cas, on
+  // retombait sur "gerant_gare" par défaut, dont GareDashboardPage refuse
+  // ensuite l'accès (canAccessVariant exige isGareManagerRole) : impasse.
+  if (roles.includes("chef_embarqueur")) {
+    const locale = lng || "fr";
+    return `/${locale}/owner`;
+  }
   return roleDashboardPath(lng, "gerant_gare");
 }
 
