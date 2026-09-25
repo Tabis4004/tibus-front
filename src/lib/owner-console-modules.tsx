@@ -51,6 +51,14 @@ export const GARE_MANAGER_CONSOLE_ROLE_NAMES = [
   "gestionnaire_gare",
 ] as const;
 
+/// Comme GARE_MANAGER_CONSOLE_ROLE_NAMES, plus chef_embarqueur — mais
+/// uniquement pour les modules SANS montant (itineraires, trajets). Ne
+/// jamais utiliser cette liste pour "cash" / "gare-comptable" / "gare-gerant".
+export const GARE_OPERATIONS_ROLE_NAMES = [
+  ...GARE_MANAGER_CONSOLE_ROLE_NAMES,
+  "chef_embarqueur",
+] as const;
+
 /** Roles with access to the counter / vendor card (`/seller`). */
 export const VENDOR_CONSOLE_ROLE_NAMES = [
   "owner",
@@ -318,7 +326,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/routes",
     icon: RouteIcon,
     tourTarget: "owner-routes",
-    roles: ["owner", "comptable_compagnie", "controleur", ...GARE_MANAGER_CONSOLE_ROLE_NAMES, "controleur_gare", "comptable_gare", "super_admin"],
+    roles: ["owner", "comptable_compagnie", "controleur", ...GARE_OPERATIONS_ROLE_NAMES, "controleur_gare", "comptable_gare", "super_admin"],
   },
   {
     id: "team",
@@ -344,7 +352,7 @@ export const OWNER_CONSOLE_MODULES: OwnerConsoleModule[] = [
     toSuffix: "/owner/trips",
     icon: CalendarIcon,
     tourTarget: "owner-trips",
-    roles: ["owner", "comptable_compagnie", "controleur", ...GARE_MANAGER_CONSOLE_ROLE_NAMES, "controleur_gare", "comptable_gare", "super_admin"],
+    roles: ["owner", "comptable_compagnie", "controleur", ...GARE_OPERATIONS_ROLE_NAMES, "controleur_gare", "comptable_gare", "super_admin"],
   },
   {
     id: "partner-api",

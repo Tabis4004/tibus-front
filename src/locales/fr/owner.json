@@ -368,6 +368,7 @@
   "gare.team_role_controleur": "Contrôleur gare",
   "gare.team_role_comptable": "Comptable gare",
   "gare.team_role_embarqueur": "Embarqueur gare",
+  "gare.team_role_chef_embarqueur": "Chef embarqueur",
   "gare.team_role_emballeur": "Emballeur (lots colis)",
   "gare.team_role_chargeur": "Chargeur (lots colis)",
   "gare.team_role_distributeur": "Distributeur (lots colis)",
