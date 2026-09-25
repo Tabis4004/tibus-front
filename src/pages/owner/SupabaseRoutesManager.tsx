@@ -67,6 +67,13 @@ const routeSchema = z.object({
 });
 type RouteFormData = z.infer<typeof routeSchema>;
 
+// Partagé par RouteDialog (aperçu du libellé le temps de créer l'itinéraire)
+// et par le parent (construction de l'itinéraire minimal transmis à
+// StopDialog juste après la création, voir onSaved ci-dessous).
+function stationLabel(s: OwnerStationOption) {
+  return `${s.name}${s.city ? ` (${s.city})` : ""}`;
+}
+
 function RouteDialog({
   stations,
   onClose,
@@ -74,7 +81,16 @@ function RouteDialog({
 }: {
   stations: OwnerStationOption[];
   onClose: () => void;
-  onSaved: () => void;
+  // Renvoie l'itinéraire tout juste créé (au lieu de rien) pour que le
+  // parent puisse enchaîner directement sur l'ajout d'escales, sans que
+  // l'utilisateur ait à rouvrir l'itinéraire depuis la liste.
+  onSaved: (created: {
+    id: string;
+    originStationId: string;
+    destinationStationId: string;
+    price: number;
+    kilometrage?: number;
+  }) => void;
 }) {
   const { t } = useTranslation("owner");
   const [saving, setSaving] = useState(false);
@@ -98,9 +114,6 @@ function RouteDialog({
   const originId = watch("originStationId");
   const destId = watch("destinationStationId");
 
-  const stationLabel = (s: OwnerStationOption) =>
-    `${s.name}${s.city ? ` (${s.city})` : ""}`;
-
   const onSubmit = async (data: RouteFormData) => {
     if (data.originStationId === data.destinationStationId) {
       toast.error(t("routes.same_error"));
@@ -108,14 +121,20 @@ function RouteDialog({
     }
     setSaving(true);
     try {
-      await createOwnerRouteSupabase({
+      const routeId = await createOwnerRouteSupabase({
         originStationId: data.originStationId,
         destinationStationId: data.destinationStationId,
         price: data.price,
         kilometrage: data.kilometrage,
       });
       toast.success(t("routes.created"));
-      onSaved();
+      onSaved({
+        id: routeId,
+        originStationId: data.originStationId,
+        destinationStationId: data.destinationStationId,
+        price: data.price,
+        kilometrage: data.kilometrage,
+      });
       onClose();
     } catch (err) {
       toast.error(errorMessage(err, t("routes.create_error")));
@@ -204,22 +223,33 @@ function RouteDialog({
 function StopDialog({
   route,
   stations,
+  appUserId,
+  companyId,
   onClose,
   onSaved,
 }: {
   route: OwnerRouteOption;
   stations: OwnerStationOption[];
+  // Pour se rafraîchir soi-même après chaque escale ajoutée (voir submit
+  // ci-dessous), sans dépendre d'un aller-retour par le parent.
+  appUserId: string | null | undefined;
+  companyId: string | null | undefined;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useTranslation("owner");
   const [saving, setSaving] = useState(false);
   const [gareId, setGareId] = useState("");
+  // Copie locale de l'itinéraire, mise à jour après chaque escale ajoutée
+  // (voir submit) pour permettre d'en enchaîner plusieurs à la suite sans
+  // fermer la boîte de dialogue — c'est ça qui manquait à la création.
+  const [currentRoute, setCurrentRoute] = useState(route);
+  const [addedCount, setAddedCount] = useState(0);
   // Ordre actuel de l'itinéraire : départ, escales existantes, arrivée.
   const ordered = [
-    { gareId: route.originId, name: route.originName },
-    ...route.stops.map((s) => ({ gareId: s.gareId, name: s.name })),
-    { gareId: route.destId, name: route.destName },
+    { gareId: currentRoute.originId, name: currentRoute.originName },
+    ...currentRoute.stops.map((s) => ({ gareId: s.gareId, name: s.name })),
+    { gareId: currentRoute.destId, name: currentRoute.destName },
   ];
   // Position = place de la nouvelle escale parmi les escales (1 = juste après le départ).
   const [position, setPosition] = useState(1);
@@ -261,10 +291,29 @@ function StopDialog({
     }
     setSaving(true);
     try {
-      await addOwnerRouteStopSupabase({ trajetId: route.id, gareId, position, segments });
+      await addOwnerRouteStopSupabase({ trajetId: currentRoute.id, gareId, position, segments });
       toast.success(t("routes.stop_added", { defaultValue: "Escale ajoutée" }));
-      onSaved();
-      onClose();
+      onSaved(); // rafraîchit la liste en arrière-plan (carte de l'itinéraire)
+
+      // On reste ouvert et on se recharge soi-même pour permettre d'enchaîner
+      // l'escale suivante immédiatement (prix/segments recalculés par rapport
+      // à TOUTES les gares déjà présentes, escale qu'on vient d'ajouter comprise) —
+      // c'est ce qui manquait pour ajouter plusieurs escales à la création.
+      if (appUserId && companyId) {
+        const list = await listOwnerRoutesSupabase(appUserId, companyId);
+        const updated = list.find((r) => r.id === currentRoute.id);
+        if (updated) {
+          setCurrentRoute(updated);
+          setAddedCount((n) => n + 1);
+          setGareId("");
+          setValues({});
+          setPosition(1);
+        } else {
+          onClose();
+        }
+      } else {
+        onClose();
+      }
     } catch (err) {
       toast.error(errorMessage(err, t("routes.stop_add_error", { defaultValue: "Impossible d'ajouter l'escale" })));
     } finally {
@@ -282,8 +331,21 @@ function StopDialog({
         </DialogHeader>
         <div className="space-y-4 py-1">
           <p className="text-xs text-muted-foreground">
-            {route.originName} → {route.destName}
+            {currentRoute.originName} → {currentRoute.destName}
           </p>
+          {currentRoute.stops.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <MapPinIcon className="w-3 h-3 text-muted-foreground" />
+              {currentRoute.stops.map((s) => (
+                <span
+                  key={s.gareId}
+                  className="inline-flex items-center rounded-full bg-muted px-2 py-0.5"
+                >
+                  {s.name}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>{t("routes.stop_station", { defaultValue: "Gare de l'escale" })}</Label>
             <Select value={gareId} onValueChange={setGareId}>
@@ -345,10 +407,14 @@ function StopDialog({
         </div>
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
-            {t("buttons.cancel", { ns: "common" })}
+            {addedCount > 0
+              ? t("buttons.done", { ns: "common", defaultValue: "Terminé" })
+              : t("buttons.cancel", { ns: "common" })}
           </Button>
           <Button type="button" onClick={() => void submit()} disabled={saving || !gareId}>
-            {t("routes.add_stop_btn", { defaultValue: "Ajouter" })}
+            {saving
+              ? t("buttons.saving", { ns: "common" })
+              : t("routes.add_stop_btn", { defaultValue: "Ajouter" })}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -567,7 +633,29 @@ export default function SupabaseRoutesManager() {
         <RouteDialog
           stations={stations}
           onClose={() => setShowForm(false)}
-          onSaved={() => void loadData()}
+          onSaved={(created) => {
+            void loadData();
+            setShowForm(false);
+            // Enchaîne directement sur l'ajout d'escales : on n'a pas besoin
+            // d'attendre loadData(), on construit l'itinéraire minimal à
+            // partir de ce qu'on sait déjà (origine/destination choisies).
+            const origin = stations.find((s) => s.id === created.originStationId);
+            const dest = stations.find((s) => s.id === created.destinationStationId);
+            setStopRoute({
+              id: created.id,
+              originId: created.originStationId,
+              destId: created.destinationStationId,
+              stops: [],
+              originName: origin ? stationLabel(origin) : "",
+              destName: dest ? stationLabel(dest) : "",
+              originCity: origin?.city ?? "",
+              destCity: dest?.city ?? "",
+              price: created.price,
+              currency: "",
+              kilometrage: created.kilometrage ?? null,
+              isSchedulingActive: true,
+            });
+          }}
         />
       )}
 
@@ -575,6 +663,8 @@ export default function SupabaseRoutesManager() {
         <StopDialog
           route={stopRoute}
           stations={stations}
+          appUserId={appUserId}
+          companyId={companyId}
           onClose={() => setStopRoute(null)}
           onSaved={() => void loadData()}
         />
