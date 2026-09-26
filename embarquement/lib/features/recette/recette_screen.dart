@@ -12,9 +12,11 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/format.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/embarquement_itinerary.dart';
 import '../../data/models/embarquement_recette.dart';
 import '../../data/models/embarquement_session.dart';
 import '../common/session_signature.dart';
+import '../common/gares_breakdown.dart';
 
 /// Rapport de recette (migration 210) — second rapport du module, document
 /// de caisse : la liste des embarquements ligne à ligne avec leur montant, et
@@ -37,6 +39,7 @@ class RecetteScreen extends ConsumerStatefulWidget {
 
 class _RecetteScreenState extends ConsumerState<RecetteScreen> {
   late Future<EmbarquementRecette> _future = _load();
+  late Future<List<ItineraryGare>> _garesFuture = loadGaresBreakdown(ref, widget.session.id);
   bool _exporting = false;
 
   Future<EmbarquementRecette> _load() =>
@@ -44,7 +47,11 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
 
   Future<void> _refresh() async {
     final f = _load();
-    setState(() => _future = f);
+    final g = loadGaresBreakdown(ref, widget.session.id);
+    setState(() {
+      _future = f;
+      _garesFuture = g;
+    });
     await f;
   }
 
@@ -62,8 +69,9 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
   Future<void> _exportPdf(EmbarquementRecette r) async {
     setState(() => _exporting = true);
     try {
+      final gares = await _garesFuture;
       await Printing.sharePdf(
-        bytes: await _buildPdf(r),
+        bytes: await _buildPdf(r, gares),
         filename: 'recette_$_slug.pdf',
       );
     } catch (e) {
@@ -73,13 +81,30 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
     }
   }
 
+  /// Impression directe — Printing.layoutPdf gère son fichier temporaire en
+  /// interne (pas de dépendance à path_provider, contrairement au manifeste
+  /// détaillé, voir manifest_export.dart).
+  Future<void> _print(EmbarquementRecette r) async {
+    setState(() => _exporting = true);
+    try {
+      final gares = await _garesFuture;
+      final bytes = await _buildPdf(r, gares);
+      await Printing.layoutPdf(onLayout: (_) async => bytes, name: 'recette_$_slug');
+    } catch (e) {
+      _showError('Impression impossible : $e');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   Future<void> _exportCsv(EmbarquementRecette r) async {
     setState(() => _exporting = true);
     try {
+      final gares = await _garesFuture;
       await Share.shareXFiles(
         [
           XFile.fromData(
-            Uint8List.fromList(utf8.encode(_buildCsv(r))),
+            Uint8List.fromList(utf8.encode(_buildCsv(r, gares))),
             mimeType: 'text/csv',
             name: 'recette_$_slug.csv',
           ),
@@ -96,7 +121,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
   String _csvCell(String value) =>
       value.contains(RegExp(r'[";\n]')) ? '"${value.replaceAll('"', '""')}"' : value;
 
-  String _buildCsv(EmbarquementRecette r) {
+  String _buildCsv(EmbarquementRecette r, List<ItineraryGare> gares) {
     final dt = DateFormat('dd/MM/yyyy HH:mm');
     final heure = DateFormat('HH:mm:ss');
     final rows = <List<String>>[
@@ -106,16 +131,17 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
       ['Ouverte le', dt.format(r.openedAt)],
       ['Statut', r.isClosed ? 'Cloturee le ${dt.format(r.closedAt!)}' : 'En cours (provisoire)'],
       ['Edite le', dt.format(r.generatedAt)],
+      ...garesBreakdownCsvRows(gares),
       [],
-      ['Heure', 'Nom', 'N billet', 'Trajet', 'Origine du scan', 'Montant'],
+      ['Heure', 'Nom', 'N billet', 'Montant'],
       // Montants en valeur brute (point décimal, sans devise) : le tableur
-      // doit pouvoir sommer la colonne sans retraitement.
+      // doit pouvoir sommer la colonne sans retraitement. Colonne Origine
+      // (Tibus/Externe) retirée : redondante, le lecteur du rapport sait déjà
+      // quels embarquements sont hors-Tibus.
       ...r.lines.map((l) => [
             heure.format(l.scannedAt),
             l.passengerName ?? '',
             l.ticketNumber ?? '',
-            l.originLabel != null ? '${l.originLabel} - ${l.destinationLabel ?? ""}' : '',
-            l.isTibus ? 'Tibus' : 'Externe',
             montantCsv(l.amount),
           ]),
       [],
@@ -130,7 +156,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
     return rows.map((row) => row.map(_csvCell).join(';')).join('\n');
   }
 
-  Future<Uint8List> _buildPdf(EmbarquementRecette r) async {
+  Future<Uint8List> _buildPdf(EmbarquementRecette r, List<ItineraryGare> gares) async {
     final dt = DateFormat('dd/MM/yyyy HH:mm');
     final heure = DateFormat('HH:mm');
     final doc = pw.Document();
@@ -167,6 +193,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
                 : 'Session en cours — recette provisoire au ${dt.format(r.generatedAt)}',
             style: const pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
           ),
+          ...garesBreakdownPdfWidgets(gares),
           pw.SizedBox(height: 16),
           pw.Table(
             border: pw.TableBorder.all(width: 0.3, color: PdfColors.grey400),
@@ -174,8 +201,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
               0: pw.FlexColumnWidth(2),
               1: pw.FlexColumnWidth(6),
               2: pw.FlexColumnWidth(4),
-              3: pw.FlexColumnWidth(3),
-              4: pw.FlexColumnWidth(4),
+              3: pw.FlexColumnWidth(4),
             },
             children: [
               pw.TableRow(
@@ -184,7 +210,6 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
                   cellule('Heure', gras: true),
                   cellule('Voyageur', gras: true),
                   cellule('N° billet', gras: true),
-                  cellule('Origine', gras: true),
                   cellule('Montant', gras: true, droite: true),
                 ],
               ),
@@ -193,14 +218,12 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
                   cellule('—'),
                   cellule('Aucun embarquement enregistré.'),
                   cellule(''),
-                  cellule(''),
                   cellule('', droite: true),
                 ]),
               ...r.lines.map((l) => pw.TableRow(children: [
                     cellule(heure.format(l.scannedAt)),
                     cellule(l.passengerName ?? 'Voyageur'),
                     cellule(l.ticketNumber ?? '—'),
-                    cellule(l.isTibus ? 'Tibus' : 'Externe'),
                     cellule(formatMontant(l.amount), droite: true),
                   ])),
               pw.TableRow(
@@ -208,7 +231,6 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
                 children: [
                   cellule('TOTAL', gras: true),
                   cellule('${r.boarded} embarquement${r.boarded > 1 ? "s" : ""}', gras: true),
-                  cellule(''),
                   cellule(''),
                   cellule(formatMontant(r.total), gras: true, droite: true),
                 ],
@@ -266,10 +288,12 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
                   if (recette == null) return;
                   if (value == 'pdf') _exportPdf(recette);
                   if (value == 'csv') _exportCsv(recette);
+                  if (value == 'print') _print(recette);
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: 'pdf', child: Text('Exporter en PDF')),
                   PopupMenuItem(value: 'csv', child: Text('Exporter en CSV')),
+                  PopupMenuItem(value: 'print', child: Text('Imprimer')),
                 ],
               );
             },
@@ -298,6 +322,17 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
               children: [
                 _TotalCard(recette: r),
                 const SizedBox(height: 12),
+                FutureBuilder<List<ItineraryGare>>(
+                  future: _garesFuture,
+                  builder: (context, garesSnap) {
+                    final gares = garesSnap.data ?? const [];
+                    if (gares.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: GaresBreakdownCard(gares: gares),
+                    );
+                  },
+                ),
                 SessionSignature(sessionId: widget.session.id),
                 if (r.withoutAmount > 0) ...[
                   const SizedBox(height: 12),
@@ -341,6 +376,15 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _exporting ? null : () => _print(r),
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Imprimer'),
+                  ),
                 ),
                 const SizedBox(height: 32),
               ],

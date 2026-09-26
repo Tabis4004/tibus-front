@@ -144,6 +144,14 @@ function AppShell() {
                   <Route path="gare/gerant" element={<OwnerGareGerantDashboard />} />
                   <Route path="gare/comptable" element={<OwnerGareComptableDashboard />} />
                   <Route path="gare/controleur" element={<OwnerGareControleurDashboard />} />
+                  {/* Variantes avec :gareId — accès à une gare précise d'une compagnie
+                      choisie dans le sélecteur (voir "Gérer" dans StationsManager),
+                      par opposition aux routes ci-dessus qui résolvent toujours la
+                      gare personnelle de l'utilisateur (resolveUserGareIdSupabase),
+                      indépendamment de la compagnie active. */}
+                  <Route path="gare/:gareId/gerant" element={<OwnerGareGerantDashboard />} />
+                  <Route path="gare/:gareId/comptable" element={<OwnerGareComptableDashboard />} />
+                  <Route path="gare/:gareId/controleur" element={<OwnerGareControleurDashboard />} />
                   <Route path="controleur" element={<OwnerCompanyControleurDashboard />} />
                   <Route path="counter-commissions" element={<OwnerCounterCommissions />} />
                   <Route path="expenses" element={<OwnerExpenses />} />

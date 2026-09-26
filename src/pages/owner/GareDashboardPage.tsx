@@ -41,12 +41,20 @@ function canAccessVariant(
 
 export default function GareDashboardPage({ variant }: { variant: GareDashboardVariant }) {
   const { t } = useTranslation("owner");
-  const { lng } = useParams<{ lng: string }>();
+  const { lng, gareId: routeGareId } = useParams<{ lng: string; gareId?: string }>();
   const locale = lng ?? "fr";
-  const { companyId: ownerCompanyId } = useOwnerCompany();
+  const { companyId: ownerCompanyId, selectedCompany } = useOwnerCompany();
   const appUser = useAppUser();
   const [gare, setGare] = useState<GareSummary | null | undefined>(undefined);
-  const companyId = ownerCompanyId ?? gare?.companyId ?? null;
+  // La compagnie qui compte pour cette page est TOUJOURS celle propriétaire
+  // de la gare affichée (gare.companyId) — jamais celle du sélecteur en haut
+  // (ownerCompanyId). Les deux ne coïncidaient que par hasard : un owner qui
+  // change de compagnie dans le sélecteur voyait companyId changer alors que
+  // `gare` restait la même (sa gare personnelle, résolue une fois pour
+  // toutes via resolveUserGareIdSupabase) — les panneaux enfants recevaient
+  // alors un companyId qui ne correspondait plus à la gare réellement
+  // affichée. Voir aussi la vérification de cohérence juste avant le rendu.
+  const companyId = gare?.companyId ?? null;
 
   // Owner et super_admin voient tout le tableau de bord gérant (équipe,
   // commissions, reversements) même sans rôle gerant_gare explicite — sinon
@@ -62,9 +70,16 @@ export default function GareDashboardPage({ variant }: { variant: GareDashboardV
   useEffect(() => {
     let cancelled = false;
 
+    // Un gareId explicite dans l'URL (venu de "Gérer" dans la liste des
+    // gares) n'est honoré que pour un owner/super_admin — pour un staff gare
+    // (gerant_gare, comptable_gare...), le rôle en base n'est pas garanti
+    // scoping à CETTE gare précise ; on continue donc à résoudre uniquement
+    // sa propre gare via resolveUserGareIdSupabase, comme avant.
+    const useRouteGareId = Boolean(routeGareId) && isOwnerLike;
+
     void (async () => {
       try {
-        const gareId = await resolveUserGareIdSupabase();
+        const gareId = useRouteGareId ? routeGareId! : await resolveUserGareIdSupabase();
         if (cancelled) return;
         if (!gareId) {
           setGare(null);
@@ -103,7 +118,7 @@ export default function GareDashboardPage({ variant }: { variant: GareDashboardV
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [t, routeGareId, isOwnerLike]);
 
   if (!appUser.isReady) {
     return (
@@ -180,6 +195,15 @@ export default function GareDashboardPage({ variant }: { variant: GareDashboardV
                   : "Équipe, commissions guichet et programmation des départs.",
           })}
         </p>
+        {isOwnerLike && ownerCompanyId && companyId && ownerCompanyId !== companyId ? (
+          <p className="text-xs mt-2 rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1.5 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900">
+            {t("gare.other_company_notice", {
+              defaultValue:
+                `Cette gare n'appartient pas à ${selectedCompany?.name ?? "la compagnie sélectionnée"} ci-dessus` +
+                (routeGareId ? " — normal, tu l'as ouverte directement depuis la liste des gares." : "."),
+            })}
+          </p>
+        ) : null}
       </div>
 
       {variant === "gerant" && canManageTeam ? (

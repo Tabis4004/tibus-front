@@ -11,9 +11,11 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/embarquement_itinerary.dart';
 import '../../data/models/embarquement_report.dart';
 import '../../data/models/embarquement_session.dart';
 import '../common/session_signature.dart';
+import '../common/gares_breakdown.dart';
 
 /// Rapport d'embarquement (plan §7, Phase 4) — trois chiffres qui portent
 /// tout : embarqués, places disponibles, no-show ; le reste (doublons,
@@ -39,6 +41,7 @@ class ReportScreen extends ConsumerStatefulWidget {
 
 class _ReportScreenState extends ConsumerState<ReportScreen> {
   late Future<EmbarquementReport> _future = _load();
+  late Future<List<ItineraryGare>> _garesFuture = loadGaresBreakdown(ref, widget.session.id);
   bool _exporting = false;
 
   Future<EmbarquementReport> _load() =>
@@ -46,7 +49,11 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
 
   Future<void> _refresh() async {
     final f = _load();
-    setState(() => _future = f);
+    final g = loadGaresBreakdown(ref, widget.session.id);
+    setState(() {
+      _future = f;
+      _garesFuture = g;
+    });
     await f;
   }
 
@@ -59,10 +66,28 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   Future<void> _exportPdf(EmbarquementReport r) async {
     setState(() => _exporting = true);
     try {
-      final bytes = await _buildPdf(r);
-      await Printing.sharePdf(bytes: bytes, filename: 'rapport_embarquement_$_slug.pdf');
+      final gares = await _garesFuture;
+      final bytes = await _buildPdf(r, gares);
+      await Printing.sharePdf(bytes: bytes, filename: 'rapport_embarquement_resume_$_slug.pdf');
     } catch (e) {
       _showError('Export PDF impossible : $e');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  /// Impression directe (sans passer par le partage) — Printing.layoutPdf
+  /// gère lui-même son fichier temporaire en interne, donc pas de dépendance
+  /// à path_provider ici (contrairement au manifeste détaillé, voir
+  /// manifest_export.dart).
+  Future<void> _print(EmbarquementReport r) async {
+    setState(() => _exporting = true);
+    try {
+      final gares = await _garesFuture;
+      final bytes = await _buildPdf(r, gares);
+      await Printing.layoutPdf(onLayout: (_) async => bytes, name: 'rapport_embarquement_resume_$_slug');
+    } catch (e) {
+      _showError('Impression impossible : $e');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -71,16 +96,17 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   Future<void> _exportCsv(EmbarquementReport r) async {
     setState(() => _exporting = true);
     try {
-      final csv = _buildCsv(r);
+      final gares = await _garesFuture;
+      final csv = _buildCsv(r, gares);
       await Share.shareXFiles(
         [
           XFile.fromData(
             Uint8List.fromList(utf8.encode(csv)),
             mimeType: 'text/csv',
-            name: 'rapport_embarquement_$_slug.csv',
+            name: 'rapport_embarquement_resume_$_slug.csv',
           ),
         ],
-        subject: 'Rapport embarquement — ${r.routeLabel}',
+        subject: 'Rapport embarquement résumé — ${r.routeLabel}',
       );
     } catch (e) {
       _showError('Export CSV impossible : $e');
@@ -121,16 +147,17 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     return value;
   }
 
-  String _buildCsv(EmbarquementReport r) {
+  String _buildCsv(EmbarquementReport r, List<ItineraryGare> gares) {
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
     final rows = <List<String>>[
-      ['Rapport d embarquement'],
+      ['Rapport d embarquement resume'],
       ['Trajet', r.routeLabel],
       if (r.busLabel != null) ['Bus', r.busLabel!],
       ['Type', r.isTibus ? 'Depart Tibus' : 'Hors-Tibus'],
       ['Ouverte le', fmt.format(r.openedAt)],
       ['Statut', r.isClosed ? 'Cloturee le ${fmt.format(r.closedAt!)}' : 'En cours (chiffres provisoires)'],
       ['Edite le', fmt.format(r.generatedAt)],
+      ...garesBreakdownCsvRows(gares),
       [],
       ['Rubrique', 'Valeur'],
       ...(_rubriques(r).map((e) => [e.$1, e.$2])),
@@ -154,7 +181,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     return rows.map((row) => row.map(_csvCell).join(';')).join('\n');
   }
 
-  Future<Uint8List> _buildPdf(EmbarquementReport r) async {
+  Future<Uint8List> _buildPdf(EmbarquementReport r, List<ItineraryGare> gares) async {
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
     final doc = pw.Document();
 
@@ -180,7 +207,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         build: (context) => [
-          pw.Text("Rapport d'embarquement",
+          pw.Text("Rapport d'embarquement résumé",
               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 4),
           pw.Text(r.routeLabel, style: const pw.TextStyle(fontSize: 14)),
@@ -197,6 +224,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                 : 'Session en cours — chiffres provisoires au ${fmt.format(r.generatedAt)}',
             style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
           ),
+          ...garesBreakdownPdfWidgets(gares),
           pw.SizedBox(height: 16),
           pw.Divider(),
           ...(_rubriques(r).take(3).map((e) => ligne(e.$1, e.$2, fort: true))),
@@ -265,10 +293,12 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                   if (report == null) return;
                   if (value == 'pdf') _exportPdf(report);
                   if (value == 'csv') _exportCsv(report);
+                  if (value == 'print') _print(report);
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: 'pdf', child: Text('Exporter en PDF')),
                   PopupMenuItem(value: 'csv', child: Text('Exporter en CSV')),
+                  PopupMenuItem(value: 'print', child: Text('Imprimer')),
                 ],
               );
             },
@@ -297,6 +327,17 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               children: [
                 _StatusBanner(report: r),
                 const SizedBox(height: 10),
+                FutureBuilder<List<ItineraryGare>>(
+                  future: _garesFuture,
+                  builder: (context, garesSnap) {
+                    final gares = garesSnap.data ?? const [];
+                    if (gares.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: GaresBreakdownCard(gares: gares),
+                    );
+                  },
+                ),
                 SessionSignature(sessionId: widget.session.id),
                 const SizedBox(height: 16),
                 _MetricTile(
@@ -348,6 +389,15 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _exporting ? null : () => _print(r),
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Imprimer'),
+                  ),
                 ),
                 const SizedBox(height: 32),
               ],

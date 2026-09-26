@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,7 @@ import {
   PencilIcon,
   TrashIcon,
   BuildingIcon,
+  LayoutDashboardIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -346,6 +348,8 @@ function StationDialog({
 
 export default function SupabaseStationsManager() {
   const { t } = useTranslation("owner");
+  const { lng } = useParams<{ lng: string }>();
+  const locale = lng ?? "fr";
   const { appUserId } = useSupabaseAuth();
   const { companyId, selectedCompany } = useOwnerCompany();
   const [stations, setStations] = useState<SupabaseOwnerStation[] | undefined>(undefined);
@@ -485,6 +489,17 @@ export default function SupabaseStationsManager() {
                           )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            asChild
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title={t("stations.manage_station", { defaultValue: "Gérer cette gare" })}
+                          >
+                            <Link to={`/${locale}/owner/gare/${station.id}/gerant`}>
+                              <LayoutDashboardIcon className="w-3.5 h-3.5" />
+                            </Link>
+                          </Button>
                           <Button
                             size="icon"
                             variant="ghost"

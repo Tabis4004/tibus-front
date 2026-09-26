@@ -4,11 +4,14 @@ import 'package:intl/intl.dart';
 import '../../core/format.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/embarquement_itinerary.dart';
 import '../../data/models/embarquement_scan.dart';
 import '../../data/models/embarquement_session.dart';
 import '../common/session_signature.dart';
+import '../common/gares_breakdown.dart';
 import '../recette/recette_screen.dart';
 import '../report/report_screen.dart';
+import '../../data/models/embarquement_report.dart';
 import 'manifest_export.dart';
 
 /// Liste temps réel des scans d'une session (embarquement_list_manifest) —
@@ -24,6 +27,7 @@ class ManifestScreen extends ConsumerStatefulWidget {
 
 class _ManifestScreenState extends ConsumerState<ManifestScreen> {
   late Future<List<EmbarquementScan>> _future = _load();
+  late Future<List<ItineraryGare>> _garesFuture = loadGaresBreakdown(ref, widget.session.id);
 
   Future<List<EmbarquementScan>> _load() {
     return ref.read(embarquementServiceProvider).listManifest(widget.session.id);
@@ -31,20 +35,36 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
 
   Future<void> _refresh() async {
     final f = _load();
-    setState(() => _future = f);
+    final g = loadGaresBreakdown(ref, widget.session.id);
+    setState(() {
+      _future = f;
+      _garesFuture = g;
+    });
     await f;
   }
 
   Future<void> _export(String kind) async {
     try {
-      final data = await ref.read(embarquementServiceProvider).manifestData(widget.session.id);
+      final service = ref.read(embarquementServiceProvider);
+      // Le rapport détaillé réaffiche les 3 chiffres du rapport résumé en
+      // en-tête — on va les chercher, mais sans bloquer l'export si cet
+      // appel échoue (droits, réseau) : le tableau des passagers reste utile
+      // même sans ces trois chiffres.
+      EmbarquementReport? report;
+      try {
+        report = await service.report(widget.session.id);
+      } catch (_) {
+        report = null;
+      }
+      final data = await service.manifestData(widget.session.id);
+      final gares = await _garesFuture;
       switch (kind) {
         case 'pdf':
-          await ManifestExport.sharePdf(data);
+          await ManifestExport.sharePdf(data, report: report, gares: gares);
         case 'excel':
-          await ManifestExport.shareExcel(data);
+          await ManifestExport.shareExcel(data, report: report, gares: gares);
         case 'print':
-          await ManifestExport.print(data);
+          await ManifestExport.print(data, report: report, gares: gares);
       }
     } catch (e) {
       if (!mounted) return;
@@ -158,6 +178,17 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                   child: SessionSignature(sessionId: widget.session.id, compact: true),
+                ),
+                FutureBuilder<List<ItineraryGare>>(
+                  future: _garesFuture,
+                  builder: (context, garesSnap) {
+                    final gares = garesSnap.data ?? const [];
+                    if (gares.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                      child: GaresBreakdownCard(gares: gares),
+                    );
+                  },
                 ),
                 Padding(
                   padding: const EdgeInsets.all(12),

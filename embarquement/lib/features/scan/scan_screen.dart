@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -59,13 +60,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   bool? _canClose;
   SeatsLeft? _seats;
 
-  /// Ma gare a-t-elle déjà déclaré sa fin d'embarquement ? null tant qu'on ne
-  /// sait pas encore, ou pour une session hors-Tibus (pas d'itinéraire à
-  /// suivre). Sert uniquement à changer l'apparence du bouton 🚩 ci-dessous
-  /// pour que l'agent voie que c'est déjà fait — la déclaration elle-même
-  /// reste toujours possible pour corriger un chiffre.
-  bool? _gareDone;
-
   @override
   void initState() {
     super.initState();
@@ -77,12 +71,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Future<void> _chargerDroitDeCloture() async {
     try {
       final it = await ref.read(embarquementServiceProvider).itineraryStatus(widget.session.id);
-      if (!mounted) return;
-      final mine = it.gares.where((g) => g.isMine).toList();
-      setState(() {
-        _canClose = it.canClose;
-        _gareDone = mine.isEmpty ? null : mine.every((g) => g.done);
-      });
+      if (mounted) setState(() => _canClose = it.canClose);
     } catch (_) {
       // on garde le comportement par défaut (voir build) ; le serveur tranche
     }
@@ -101,30 +90,36 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   /// Fin d'embarquement dans MA gare : ne ferme pas la session, car d'autres
   /// gares/escales du trajet peuvent encore embarquer.
+  ///
+  /// Le nombre déclaré n'est PAS saisissable : c'est le compteur système
+  /// (_validCount, les scans valides de cette session) que l'embarqueur ne
+  /// fait que confirmer. Une saisie libre pouvait diverger du réel par
+  /// erreur de frappe ; embarquement_declare_gare_done() côté serveur
+  /// compare de toute façon le déclaré au scanné (count_mismatch), donc
+  /// laisser l'utilisateur taper un autre chiffre ne servait qu'à créer un
+  /// écart artificiel.
   Future<void> _declareFinEmbarquement() async {
-    final ctrl = TextEditingController(text: _validCount.toString());
-    final count = await showDialog<int>(
+    final count = _validCount;
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_gareDone == true
-            ? "Fin d'embarquement déjà déclarée — corriger ?"
-            : "Fin d'embarquement dans ma gare"),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Nombre total de passagers embarqués'),
+        title: const Text("Fin d'embarquement dans ma gare"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nombre de passagers embarqués (scans valides de cette session) :'),
+            const SizedBox(height: 8),
+            Text('$count', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+          ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text.trim())),
-            child: const Text('Valider'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmer')),
         ],
       ),
     );
-    ctrl.dispose();
-    if (count == null || count < 0 || !mounted) return;
+    if (confirmed != true || !mounted) return;
     final service = ref.read(embarquementServiceProvider);
     try {
       var res = await service.declareGareDone(sessionId: widget.session.id, passengerCount: count);
@@ -144,11 +139,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ? "Embarquement déclaré : $count saisis, ${res.scannedCount} scannés"
             : "Fin d'embarquement déclarée ($count passagers)"),
       ));
-      // Rafraîchit l'état du bouton 🚩 (coché) et les places restantes après
-      // ma gare, pour que la prochaine escale voie tout de suite le nouveau
-      // décompte si elle consulte l'écran Itinéraire.
-      unawaited(_chargerDroitDeCloture());
-      unawaited(_chargerPlacesRestantes());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
@@ -436,15 +426,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 final closed = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(builder: (_) => ItineraryScreen(session: widget.session)),
                 );
-                if (closed == true && mounted) Navigator.of(context).pop(true);
+                if (!context.mounted) return;
+                if (closed == true) Navigator.of(context).pop(true);
               },
             ),
           IconButton(
-            icon: Icon(_gareDone == true ? Icons.flag : Icons.flag_outlined),
-            color: _gareDone == true ? AppColors.scanValid : null,
-            tooltip: _gareDone == true
-                ? "Fin d'embarquement déclarée ici (appuyer pour corriger)"
-                : "J'ai fini d'embarquer dans ma gare",
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: "J'ai fini d'embarquer dans ma gare",
             onPressed: _declareFinEmbarquement,
           ),
           if (canClose)
@@ -511,12 +499,20 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   children: [
                     if (_lastResult != null) _buildResultBanner(_lastResult!) else _buildIdleBanner(),
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _photographierBillet,
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Photographier le billet (sans QR)'),
-                    ),
-                    const SizedBox(height: 8),
+                    // Photo + OCR (google_mlkit_text_recognition) est un plugin
+                    // Android/iOS on-device : il n'existe aucune implémentation
+                    // web pour ce channel, donc le bouton échoue toujours en
+                    // navigateur (MissingPluginException). On le masque sur
+                    // web plutôt que de laisser échouer une action visible ;
+                    // la saisie manuelle du numéro juste en dessous reste le
+                    // chemin de secours, et fonctionne partout.
+                    if (!kIsWeb)
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : _photographierBillet,
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        label: const Text('Photographier le billet (sans QR)'),
+                      ),
+                    if (!kIsWeb) const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
