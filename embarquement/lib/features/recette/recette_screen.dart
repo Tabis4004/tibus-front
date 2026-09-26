@@ -182,7 +182,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
         margin: const pw.EdgeInsets.all(32),
         build: (context) => [
           pw.Text('Rapport de recette',
-              style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 4),
           pw.Text(r.routeLabel, style: const pw.TextStyle(fontSize: 14)),
           if (r.busLabel != null) pw.Text(r.busLabel!, style: const pw.TextStyle(fontSize: 10)),
@@ -191,7 +191,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
             r.isClosed
                 ? 'Session clôturée le ${dt.format(r.closedAt!)} — recette définitive'
                 : 'Session en cours — recette provisoire au ${dt.format(r.generatedAt)}',
-            style: const pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
           ),
           ...garesBreakdownPdfWidgets(gares),
           pw.SizedBox(height: 16),
