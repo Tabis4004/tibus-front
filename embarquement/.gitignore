@@ -46,3 +46,4 @@ windows/
 # IDE
 .idea/
 .vscode/
+*.zip
