@@ -39,14 +39,18 @@ WRANGLER_CONFIG="wrangler.$CLIENT.jsonc"
 # — voir tool/brand_dart_defines.py. Vide pour tout client qui ne définit
 # rien dans brand.json : comportement inchangé (repli sur Tibus 1.0).
 #
-# Chaîne (pas un tableau bash) + expansion NON quotée volontaire ci-dessous :
-# évite le piège classique "tableau vide + set -u" qui plante sous le
-# /bin/bash 3.2 encore livré par défaut sur macOS (corrigé seulement en
-# bash >= 4.4). Sûr ici : les tokens --dart-define=CLE=VALEUR ne contiennent
-# pas d'espace.
-DART_DEFINES="$(python3 tool/brand_dart_defines.py "$CLIENT" | tr '\n' ' ')"
-if [ -n "$DART_DEFINES" ]; then
-  echo "==> --dart-define spécifiques à « $CLIENT » : $DART_DEFINES"
+# Un token par ligne, lu dans un tableau : les valeurs peuvent contenir des
+# espaces (ex. BRAND_NAME=SIS COURRIER). Lecture par `while read` (pas
+# `mapfile`, absent du /bin/bash 3.2 de macOS) et expansion
+# ${DART_DEFINES[@]+"${DART_DEFINES[@]}"} : sûre avec `set -u` même quand le
+# tableau est vide (piège classique de bash < 4.4).
+DART_DEFINES=()
+while IFS= read -r line; do
+  if [ -n "$line" ]; then DART_DEFINES+=("$line"); fi
+done < <(python3 tool/brand_dart_defines.py "$CLIENT")
+if [ ${#DART_DEFINES[@]} -gt 0 ]; then
+  echo "==> --dart-define spécifiques à « $CLIENT » :"
+  printf '    %s\n' "${DART_DEFINES[@]}"
 fi
 
 # Play Store exige un versionCode strictement croissant à chaque envoi, PAR
@@ -55,19 +59,27 @@ fi
 # BUILD_NUMBER (optionnel, ex. github.run_number côté CI) écrase le +N de
 # pubspec.yaml pour ce build précis, SANS modifier le fichier -- en local,
 # sans cette variable, comportement inchangé (numéro de pubspec.yaml).
+#
+# En local (sans BUILD_NUMBER), pour apk/aab, le numéro est incrémenté
+# automatiquement par marque via tool/bump_version_code.py (compteur dans
+# branding/<client>/version_code -- à committer après chaque envoi Play).
 EXTRA_BUILD_ARGS=""
 if [ -n "${BUILD_NUMBER:-}" ]; then
   EXTRA_BUILD_ARGS="--build-number=$BUILD_NUMBER"
   echo "==> --build-number=$BUILD_NUMBER (fourni par l'environnement, ex. CI)"
+elif [ "$TARGET" = "apk" ] || [ "$TARGET" = "aab" ]; then
+  BUILD_NUMBER="$(python3 tool/bump_version_code.py "$CLIENT")"
+  EXTRA_BUILD_ARGS="--build-number=$BUILD_NUMBER"
+  echo "==> versionCode auto « $CLIENT » : $BUILD_NUMBER (branding/$CLIENT/version_code)"
 fi
 
 echo "==> Compilation : $TARGET"
 case "$TARGET" in
-  web)     flutter build web --release $DART_DEFINES ;;
-  deploy)  flutter build web --release $DART_DEFINES ;;
-  apk)     flutter build apk --release $DART_DEFINES $EXTRA_BUILD_ARGS ;;
-  aab)     flutter build appbundle --release $DART_DEFINES $EXTRA_BUILD_ARGS ;;
-  windows) flutter build windows --release $DART_DEFINES ;;
+  web)     flutter build web --release ${DART_DEFINES[@]+"${DART_DEFINES[@]}"} ;;
+  deploy)  flutter build web --release ${DART_DEFINES[@]+"${DART_DEFINES[@]}"} ;;
+  apk)     flutter build apk --release ${DART_DEFINES[@]+"${DART_DEFINES[@]}"} $EXTRA_BUILD_ARGS ;;
+  aab)     flutter build appbundle --release ${DART_DEFINES[@]+"${DART_DEFINES[@]}"} $EXTRA_BUILD_ARGS ;;
+  windows) flutter build windows --release ${DART_DEFINES[@]+"${DART_DEFINES[@]}"} ;;
   *) echo "cible inconnue : $TARGET" >&2; exit 1 ;;
 esac
 
