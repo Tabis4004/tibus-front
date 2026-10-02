@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/update/app_update_service.dart';
 import 'features/auth/login_screen.dart';
 import 'features/shell/agent_shell.dart';
 
@@ -12,10 +13,38 @@ class CourrierApp extends StatefulWidget {
   State<CourrierApp> createState() => _CourrierAppState();
 }
 
-class _CourrierAppState extends State<CourrierApp> {
+class _CourrierAppState extends State<CourrierApp> with WidgetsBindingObserver {
+  // Navigateur racine : permet d'afficher le pop-up de mise à jour
+  // par-dessus n'importe quel écran (connexion comprise).
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => AppUpdateService.check(_navigatorKey, force: true));
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Retour au premier plan : nouvelle vérification (limitée à une
+    // toutes les 30 min par AppUpdateService).
+    if (state == AppLifecycleState.resumed) {
+      AppUpdateService.check(_navigatorKey);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Courrier',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),

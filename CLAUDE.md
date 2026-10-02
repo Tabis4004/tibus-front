@@ -138,3 +138,19 @@ gare, et qu'à un rôle de niveau **strictement inférieur** au sien — sinon l
 délégation deviendrait une escalade de privilèges. Seuls les rôles en
 `%_gare` sont éligibles ; accorder à un rôle à portée compagnie rouvrirait
 exactement ce que la migration 213 a fermé.
+
+## Pop-up de mise à jour des apps mobiles (migration 215)
+
+Registre central `public.app_versions` dans **Tibus 1.0**, une ligne par
+`(app_id, platform)` — `app_id` = applicationId Android / bundle id iOS
+(ex. `com.sis.courrier`). Lu par `courrier_mobile` au démarrage et au retour
+au premier plan via la RPC `get_app_update` (`lib/core/update/
+app_update_service.dart`), avec un client Supabase **dédié à Tibus 1.0**,
+même pour SIS dont la base métier est ailleurs : c'est l'éditeur qui tient le
+registre. `versionCode < min_version_code` → pop-up bloquant ;
+`< latest_version_code` → pop-up avec « Plus tard ». Pas de vérification sur
+le web (toujours à jour au rechargement).
+
+Ne relever `latest_version_code` qu'**après** que la version est réellement
+disponible sur le store (déploiement Play terminé), sinon le pop-up envoie
+vers une fiche qui ne propose encore rien. Écriture réservée à super_admin.
