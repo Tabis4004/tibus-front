@@ -9,6 +9,7 @@ import '../../../data/models/app_role.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/stats_service.dart';
 import 'colis_sales_journal_print_sheet.dart';
+import '../../../core/config/brand_identity.dart';
 
 /// Écran Stats — vue compagnie (owner/gérant) filtrable par agent, gare de
 /// départ et période, avec une carte "Mes ventes" toujours visible et
@@ -273,13 +274,22 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   companyName: null,
                 ),
               )
-              .companyName ??
-          'Tibus';
+              .companyName;
+      // Repli : nom de compagnie via le cache référentiel, puis la marque du
+      // client (jamais « Tibus » en dur — cf. brand_identity.dart).
+      var resolvedName = (companyName ?? '').trim();
+      if (resolvedName.isEmpty) {
+        try {
+          final info = await ref.read(referenceCacheServiceProvider).loadCompanyInfo(companyId);
+          resolvedName = info.name.trim();
+        } catch (_) {}
+      }
+      resolvedName = brandCompanyName(resolvedName);
       if (!mounted) return;
       await showColisSalesJournalPrintSheet(
         context,
         journal: journal,
-        companyName: companyName,
+        companyName: resolvedName,
         periodLabel: _periodLabel,
         reportSetting: _uiConfig.reports['salesJournal'] ?? const ColisReportSetting(),
       );

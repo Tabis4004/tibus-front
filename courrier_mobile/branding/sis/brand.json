@@ -15,5 +15,10 @@
   "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg3NTA2OTQ2LCJleHAiOjIxMDI4NjY5NDZ9.C9fLbaX-yHhILIOX7NHCPUsGnp1VCw_9eoLdsVgXs-0",
   "features": {
     "showLoyaltyPromoReferral": false
+  },
+  "identity": {
+    "name": "SIS COURRIER",
+    "shortName": "SIS Courrier",
+    "poweredBy": "Powered by www.tibus.app"
   }
 }

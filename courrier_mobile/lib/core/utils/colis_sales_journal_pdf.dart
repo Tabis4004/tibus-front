@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../data/models/colis.dart';
+import '../config/brand_identity.dart';
 import 'colis_sales_journal_lines.dart';
 
 /// PDF A4 du JOURNAL DE VENTE — version tableau, à archiver ou à remettre
@@ -25,7 +26,7 @@ Future<Uint8List> buildColisSalesJournalPdfA4(
   required String periodLabel,
   ColisReportSetting reportSetting = const ColisReportSetting(),
 }) async {
-  final company = companyName.isNotEmpty ? companyName : 'TIBUS COURRIER';
+  final company = brandCompanyName(companyName);
   final showMontant = reportSetting.showField('montant');
   final showValeur = reportSetting.showField('valeur');
   final showDestination = reportSetting.showField('destination');
@@ -112,8 +113,7 @@ Future<Uint8List> buildColisSalesJournalPdfA4(
         child: pw.Text(
           'Sous-total ${group.vendeurUsername ?? group.vendeurName} : '
           '${group.count} colis'
-          '${showMontant ? " · Frais ${amount(group.totalFrais)}" : ""}'
-          '${showValeur ? " · Valeur ${amount(group.totalValeur)}" : ""}',
+          '${showMontant ? " · Frais ${amount(group.totalFrais)}" : ""}',
           style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
         ),
       ),
@@ -157,8 +157,7 @@ Future<Uint8List> buildColisSalesJournalPdfA4(
           decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
           child: pw.Text(
             'TOTAL GÉNÉRAL : ${journal.grandCount} colis'
-            '${showMontant ? "  ·  Frais ${amount(journal.grandTotalFrais)}" : ""}'
-            '${showValeur ? "  ·  Valeur ${amount(journal.grandTotalValeur)}" : ""}',
+            '${showMontant ? "  ·  Frais ${amount(journal.grandTotalFrais)}" : ""}',
             style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
           ),
         ),

@@ -10,6 +10,7 @@ import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/models/app_role.dart';
 import 'colis_detail_screen.dart';
+import '../../../core/config/brand_identity.dart';
 
 /// Manifeste colis — réplique l'onglet "Colis autonomes" de
 /// owner/analytics/SupabaseTripReports.tsx : statistiques (envois, total
@@ -141,7 +142,7 @@ class _ColisManifestScreenState extends ConsumerState<ColisManifestScreen> {
                 orElse: () => roles.isNotEmpty ? roles.first : const AppRole(id: '', name: '', scope: '', level: 99, droits: []),
               )
               .companyName ??
-          'Tibus';
+          kBrandShortName;
       await shareColisManifestCsv(
         rows: rows,
         companyName: companyName,

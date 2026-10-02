@@ -8,6 +8,7 @@ import '../../../data/models/colis.dart';
 import '../../../core/utils/colis_receipt_pdf.dart';
 import '../../../core/utils/colis_sales_journal_pdf.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
+import '../../../core/config/brand_identity.dart';
 
 /// Aperçu + sélection du pont imprimante pour le journal de vente — même
 /// logique multi-pont que bordereau_print_sheet.dart (Xprinter desktop, P3
@@ -256,7 +257,7 @@ class _SalesJournalBox extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+                brandCompanyName(companyName),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
@@ -306,12 +307,9 @@ class _SalesJournalBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(child: Text('Total ${g.vendeurUsername ?? g.vendeurName} (${g.count})', style: const TextStyle(fontWeight: FontWeight.bold))),
-                      if (showMontant || showValeur)
+                      if (showMontant)
                         Text(
-                          [
-                            if (showMontant) 'F ${g.totalFrais.toStringAsFixed(0)}',
-                            if (showValeur) 'V ${g.totalValeur.toStringAsFixed(0)}',
-                          ].join(' / '),
+                          'F ${g.totalFrais.toStringAsFixed(0)}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                     ],
@@ -324,12 +322,9 @@ class _SalesJournalBox extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
-              if (showMontant || showValeur)
+              if (showMontant)
                 Text(
-                  [
-                    if (showMontant) 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
-                    if (showValeur) 'Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
-                  ].join(' - '),
+                  'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),

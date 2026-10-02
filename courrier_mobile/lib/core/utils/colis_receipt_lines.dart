@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import '../../data/models/colis.dart';
+import '../config/brand_identity.dart';
 
 /// Reproduit public.colis_gare_prefix (migration 180) côté client : 4
 /// premiers caractères alphanumériques du nom de gare, majuscules, accents
@@ -106,7 +107,7 @@ String colisDescriptionLabel(Colis colis) {
 /// disponible (voir PrinterService._currentAgentName) — omis sinon.
 List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final ref = colisReceiptNumber(colis);
-  final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
+  final company = brandCompanyName(colis.companyName);
   return [
     {'text': company, 'align': 'center', 'bold': true},
     // Numéro de la gare de destination en en-tête (demande explicite du
@@ -186,7 +187,8 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
       {'text': "Pour plus d'informations veuillez appeler", 'align': 'center', 'bold': true, 'size': 'small'},
       {'text': 'le tél siège : ${colis.companyPhone}', 'align': 'center', 'bold': true, 'size': 'small'},
     ],
-    {'text': 'Powered by www.tibus.app', 'align': 'center', 'bold': true, 'size': 'small'},
+    if (kBrandPoweredBy.isNotEmpty)
+      {'text': kBrandPoweredBy, 'align': 'center', 'bold': true, 'size': 'small'},
   ];
 }
 
@@ -220,7 +222,7 @@ const int colisTalonFeedLines = 1;
 /// bas du talon.
 List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
   final ref = colisReceiptNumber(colis);
-  final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
+  final company = brandCompanyName(colis.companyName);
   return [
     {'text': company, 'align': 'center', 'bold': true},
     // Numéro de la gare de destination en en-tête (demande explicite du

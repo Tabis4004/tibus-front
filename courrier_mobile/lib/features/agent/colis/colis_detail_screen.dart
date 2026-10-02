@@ -8,6 +8,7 @@ import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/models/colis.dart';
 import 'colis_receipt_preview_sheet.dart';
+import '../../../core/config/brand_identity.dart';
 
 /// Référence publique courte affichée aux clients — même format que le web
 /// (colisPublicReference dans src/lib/colis-receipt.ts).
@@ -96,7 +97,7 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
   Future<void> _sendWhatsApp(Colis colis, {required bool toExpediteur}) async {
     final phone = toExpediteur ? colis.telephoneExpediteur : colis.telephoneDestinataire;
     final companyName = (_detail?['companyName'] as String?)?.trim();
-    final message = _whatsAppMessage(colis, (companyName?.isNotEmpty ?? false) ? companyName! : 'Tibus');
+    final message = _whatsAppMessage(colis, (companyName?.isNotEmpty ?? false) ? companyName! : kBrandShortName);
     final opened = await openWhatsApp(phone, message);
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import '../../data/services/bordereau_service.dart';
+import '../config/brand_identity.dart';
 
 String formatBordereauDate(DateTime dt) => DateFormat('dd/MM/yy HH:mm').format(dt.toLocal());
 
@@ -29,7 +30,7 @@ String formatBordereauPeriode(DateTime debut, DateTime? fin) {
 /// montant), puis le total fret — pour que le livreur/chauffeur ait la
 /// liste physique des colis du bordereau sans dépendre d'un écran.
 List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
-  final company = d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER';
+  final company = brandCompanyName(d.companyName);
   final trajet = '${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
 
   final lines = <Map<String, dynamic>>[
@@ -66,7 +67,8 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
   // valoriser le chargement.
   lines.addAll([
     {'text': '================================', 'align': 'center'},
-    {'text': 'Powered by www.tibus.app', 'align': 'center', 'size': 'small'},
+    if (kBrandPoweredBy.isNotEmpty)
+      {'text': kBrandPoweredBy, 'align': 'center', 'size': 'small'},
   ]);
 
   return lines;

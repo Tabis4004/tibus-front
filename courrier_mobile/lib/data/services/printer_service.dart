@@ -8,6 +8,7 @@ import '../models/colis.dart';
 import 'bordereau_service.dart';
 import 'esc_pos_printer_service.dart';
 import 'pos_bridge/pos_bridge.dart';
+import '../../core/config/brand_identity.dart';
 
 export 'esc_pos_printer_service.dart' show EscPosPrinterService;
 export 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart'
@@ -84,7 +85,7 @@ class PrinterService {
     required String reference,
     required List<List<String>> rows,
     String qr = '',
-    String footer = 'Powered by www.tibus.app',
+    String footer = kBrandPoweredBy,
     int paperWidthMm = 58,
   }) async {
     if (!isAvailable) {
@@ -126,7 +127,7 @@ class PrinterService {
     final agent = agentName ?? _currentAgentName();
     return printReceipt(
       header: [
-        colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+        brandCompanyName(colis.companyName),
         // Destination en toutes lettres sous le nom de la compagnie —
         // remplace l'ancien "Tél dest: <numéro>" (demande explicite du
         // 20/08/2026). Le téléphone du SIÈGE (compagnie) est lui déplacé en
@@ -177,7 +178,7 @@ class PrinterService {
       // P3PrinterModule.kt), pas besoin de changement côté natif ici.
       footer: 'Retrait sous 72h - passé ce délai,\nfrais de magasinage.'
           '${colis.companyPhone.isNotEmpty ? "\nPour plus d'informations veuillez appeler\nle tél siège : ${colis.companyPhone}" : ""}'
-          '\nPowered by www.tibus.app',
+          '${kBrandPoweredBy.isNotEmpty ? "\n$kBrandPoweredBy" : ""}',
       paperWidthMm: paperWidthMm,
     );
   }
@@ -190,7 +191,7 @@ class PrinterService {
   Future<void> printColisTalon(Colis colis, {int paperWidthMm = 58}) {
     return printReceipt(
       header: [
-        colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+        brandCompanyName(colis.companyName),
         // Même en-tête que le reçu (voir printColisReceipt) : destination en
         // toutes lettres au lieu du téléphone de la gare de destination
         // (demande explicite du 20/08/2026), puis sous-titre explicite —
@@ -243,7 +244,7 @@ class PrinterService {
     final dateFmt = _journalDateFmt;
     return printReceipt(
       header: [
-        companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+        brandCompanyName(companyName),
         'Journal de caisse — $sessionLabel',
       ],
       reference: 'TOTAL  ${currentBalance.toStringAsFixed(0)} FCFA',
@@ -275,7 +276,7 @@ class PrinterService {
     }
     final dateFmt = _journalDateFmt;
     return _bridge.printViaWisePrinter(
-      header: companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(companyName),
       lines: [
         {'text': 'Journal de caisse', 'align': 'center', 'bold': true, 'size': 'large'},
         {'text': sessionLabel, 'align': 'center', 'size': 'small'},
@@ -289,7 +290,8 @@ class PrinterService {
         {'text': '================================', 'align': 'center'},
         {'text': 'TOTAL (solde final)', 'align': 'center', 'bold': true},
         {'text': '${currentBalance.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true, 'size': 'large'},
-        {'text': 'Powered by www.tibus.app', 'align': 'center', 'size': 'small'},
+        if (kBrandPoweredBy.isNotEmpty)
+          {'text': kBrandPoweredBy, 'align': 'center', 'size': 'small'},
       ],
       qr: '',
       qrSize: 220,
@@ -349,16 +351,15 @@ class PrinterService {
       }
       rows.add([
         'Total ${group.vendeurUsername ?? group.vendeurName} (${group.count})',
-        [
-          if (showMontant) 'F ${group.totalFrais.toStringAsFixed(0)}',
-          if (showValeur) 'V ${group.totalValeur.toStringAsFixed(0)}',
-        ].join(' / '),
+        // Pas de total « Valeur » (valeur déclarée des marchandises, pas une
+        // vente) : seul le total des frais est affiché.
+        if (showMontant) 'F ${group.totalFrais.toStringAsFixed(0)}' else '',
       ]);
       rows.add(['--------------------------------', '']);
     }
     return printReceipt(
       header: [
-        companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+        brandCompanyName(companyName),
         'Journal de vente',
         periodLabel,
       ],
@@ -367,8 +368,8 @@ class PrinterService {
       qr: '',
       footer: [
         if (showMontant) 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
-        if (showValeur) 'Valeur ${journal.grandTotalValeur.toStringAsFixed(0)}',
-      ].join(' - '),
+        if (kBrandPoweredBy.isNotEmpty) kBrandPoweredBy,
+      ].join('\n'),
       paperWidthMm: paperWidthMm,
     );
   }
@@ -386,7 +387,7 @@ class PrinterService {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
-      header: companyName.isNotEmpty ? companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(companyName),
       lines: colisSalesJournalLines(
         journal,
         companyName: companyName,
@@ -406,7 +407,7 @@ class PrinterService {
   Future<void> printBordereau(BordereauDetail d, {int paperWidthMm = 58}) {
     final trajet = '${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}';
     return printReceipt(
-      header: [d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER', 'Bordereau de livraison'],
+      header: [brandCompanyName(d.companyName), 'Bordereau de livraison'],
       // Le pont P3 natif affiche "reference" en gros dans un encadré
       // (printBoxedLine) : on y met le numéro de lot ENTIER (étiquette à
       // coller sur le lot, demande explicite), pas la référence technique
@@ -429,7 +430,7 @@ class PrinterService {
         // Pas de total sur le bordereau d'emballage (demande promoteur).
       ],
       qr: d.id,
-      footer: 'Powered by www.tibus.app',
+      footer: kBrandPoweredBy,
       paperWidthMm: paperWidthMm,
     );
   }
@@ -440,7 +441,7 @@ class PrinterService {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
-      header: d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(d.companyName),
       lines: bordereauReceiptLines(d),
       qr: d.id,
       qrSize: 200,
@@ -465,7 +466,7 @@ class PrinterService {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
-      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(colis.companyName),
       lines: colisReceiptLines(colis, agentName: agentName ?? _currentAgentName()),
       // Pas de QR sur le reçu client — voir printColisReceipt (pont P3) et
       // demande "enlever le QR code du reçu du client".
@@ -482,7 +483,7 @@ class PrinterService {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     return _bridge.printViaWisePrinter(
-      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(colis.companyName),
       lines: colisTalonLines(colis),
       qr: colis.id,
       // QR compact sur le talon (demande explicite — un gros QR n'était pas
@@ -513,7 +514,7 @@ class PrinterService {
       throw StateError('Web Serial indisponible sur ce navigateur (Chrome/Edge desktop requis).');
     }
     await _bridge.printViaWebSerial(
-      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(colis.companyName),
       lines: colisReceiptLines(colis, agentName: agentName ?? _currentAgentName()),
       qr: '',
       qrSize: 220,
@@ -521,7 +522,7 @@ class PrinterService {
       cut: true,
     );
     await _bridge.printViaWebSerial(
-      header: colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+      header: brandCompanyName(colis.companyName),
       lines: colisTalonLines(colis),
       qr: colis.id,
       // Même agencement compact que le pont ESC/POS USB/Bluetooth : QR

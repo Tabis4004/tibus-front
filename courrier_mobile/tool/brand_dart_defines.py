@@ -10,6 +10,9 @@ par tool/build_client.sh :
     de celle par défaut (Tibus 1.0), sans toucher au code des autres
     clients — voir supabase_service.dart, qui lit déjà ces --dart-define
     en priorité et retombe sur Tibus 1.0 en leur absence.
+  - identity.name / shortName / poweredBy : nom de marque de repli
+    (tickets, rapports, messages) — voir lib/core/config/brand_identity.dart.
+    poweredBy peut être "" (marque blanche : aucune mention).
   - features.* : bascules de fonctionnalités par marque, voir
     lib/core/config/brand_features.dart.
 
@@ -43,6 +46,13 @@ def main() -> None:
     supabase_anon_key = brand.get('supabaseAnonKey')
     if supabase_anon_key:
         defines.append(f"SUPABASE_ANON_KEY={supabase_anon_key}")
+
+    identity = brand.get('identity', {})
+    for key, define in (('name', 'BRAND_NAME'),
+                        ('shortName', 'BRAND_SHORT_NAME'),
+                        ('poweredBy', 'BRAND_POWERED_BY')):
+        if key in identity and identity[key] is not None:
+            defines.append(f"{define}={identity[key]}")
 
     features = brand.get('features', {})
     if 'showLoyaltyPromoReferral' in features:

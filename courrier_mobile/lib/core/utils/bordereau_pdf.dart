@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../data/services/bordereau_service.dart';
 import 'bordereau_receipt_lines.dart';
+import '../config/brand_identity.dart';
 
 /// Bordereau de livraison en PDF A4 — mise en page tableau (une ligne par
 /// colis), distincte du format ticket 56/80mm de bordereau_receipt_lines.dart
@@ -29,7 +30,7 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    d.companyName.isNotEmpty ? d.companyName : 'TIBUS COURRIER',
+                    brandCompanyName(d.companyName),
                     style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                   ),
                   pw.Text('Bordereau de livraison', style: const pw.TextStyle(fontSize: 10)),
@@ -64,7 +65,7 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
       footer: (context) => pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text('Powered by www.tibus.app', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+          pw.Text(kBrandPoweredBy, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
           pw.Text('Page ${context.pageNumber} / ${context.pagesCount}',
               style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
         ],

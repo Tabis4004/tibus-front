@@ -5,6 +5,7 @@ import '../../../core/config/colis_ui_config.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/colis.dart';
 import '../stats/colis_sales_journal_print_sheet.dart';
+import '../../../core/config/brand_identity.dart';
 
 /// Caisse physique guichet — réplique StationCashPanel.tsx (web) :
 /// ouverture (gare + fond de roulement), solde + journal de mouvements
@@ -250,7 +251,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
             dateFrom: from,
             dateTo: from.add(const Duration(days: 1)),
           );
-      String companyName = 'Tibus';
+      String companyName = kBrandName;
       try {
         final info = await ref.read(referenceCacheServiceProvider).loadCompanyInfo(companyId);
         if (info.name.isNotEmpty) companyName = info.name;

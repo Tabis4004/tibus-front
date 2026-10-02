@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import '../../data/models/colis.dart';
+import '../config/brand_identity.dart';
 
 /// Réglage par défaut (rapport visible, aucun champ masqué) tant qu'aucune
 /// config owner n'est fournie par l'appelant — voir ColisReportSetting,
@@ -31,7 +32,7 @@ List<Map<String, dynamic>> colisSalesJournalLines(
   /// voir ColisFormBuilderPanel.tsx et get_company_colis_settings.
   ColisReportSetting reportSetting = _defaultReportSetting,
 }) {
-  final company = companyName.isNotEmpty ? companyName : 'TIBUS COURRIER';
+  final company = brandCompanyName(companyName);
   final showMontant = reportSetting.showField('montant');
   final showValeur = reportSetting.showField('valeur');
   final showDestination = reportSetting.showField('destination');
@@ -68,12 +69,12 @@ List<Map<String, dynamic>> colisSalesJournalLines(
       'text': 'Total ${group.vendeurUsername ?? group.vendeurName} (${group.count})',
       'bold': true,
     });
-    if (showMontant || showValeur) {
-      final totalLine = StringBuffer();
-      if (showMontant) totalLine.write('Frais ${_amount(group.totalFrais)}');
-      if (showMontant && showValeur) totalLine.write(' - ');
-      if (showValeur) totalLine.write('Valeur ${_amount(group.totalValeur)}');
-      lines.add({'text': totalLine.toString(), 'bold': true});
+    // Pas de total « Valeur » : c'est la valeur déclarée des marchandises,
+    // pas un chiffre de vente — trompeur sur un journal de vente. Seul le
+    // total des frais (= ventes) est totalisé ; la valeur reste visible
+    // colis par colis.
+    if (showMontant) {
+      lines.add({'text': 'Frais ${_amount(group.totalFrais)}', 'bold': true});
     }
     lines.add({'text': '================================', 'align': 'center'});
   }
@@ -81,17 +82,15 @@ List<Map<String, dynamic>> colisSalesJournalLines(
   lines.addAll([
     {'text': 'TOTAL GENERAL', 'align': 'center', 'bold': true, 'size': 'large'},
     {'text': '${journal.grandCount} colis', 'align': 'center', 'bold': true},
-    if (showMontant || showValeur)
+    if (showMontant)
       {
-        'text': [
-          if (showMontant) 'Frais ${_amount(journal.grandTotalFrais)}',
-          if (showValeur) 'Valeur ${_amount(journal.grandTotalValeur)}',
-        ].join(' - '),
+        'text': 'Frais ${_amount(journal.grandTotalFrais)}',
         'align': 'center',
         'bold': true,
       },
     {'text': '================================', 'align': 'center'},
-    {'text': 'Powered by www.tibus.app', 'align': 'center', 'size': 'small'},
+    if (kBrandPoweredBy.isNotEmpty)
+      {'text': kBrandPoweredBy, 'align': 'center', 'size': 'small'},
   ]);
 
   return lines;

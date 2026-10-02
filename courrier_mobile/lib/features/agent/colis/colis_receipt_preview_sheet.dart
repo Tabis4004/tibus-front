@@ -13,6 +13,7 @@ import '../../../core/utils/colis_receipt_pdf.dart';
 import '../../../core/utils/sms.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/printer_service.dart' show EscPosPrinterService, PrinterDevice, PrinterType;
+import '../../../core/config/brand_identity.dart';
 
 /// Message texte de partage du reçu (SMS) — même contenu informatif que le
 /// reçu papier, pour envoi manuel à l'expéditeur ou au destinataire (voir
@@ -22,7 +23,7 @@ import '../../../data/services/printer_service.dart' show EscPosPrinterService, 
 /// contact précis — un vrai reçu visuel nécessite le partage fichier.
 String _colisTextShareMessage(Colis colis) {
   final ref = colisShortRef(colis);
-  final company = colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER';
+  final company = brandCompanyName(colis.companyName);
   return [
     '$company — Reçu colis $ref',
     'Trajet : ${colis.gareDepart} -> ${colis.gareDestination}',
@@ -394,7 +395,7 @@ class _ReceiptBox extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Column(
                 children: [
-                  Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+                  Text(brandCompanyName(colis.companyName),
                       textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   // Nom de la gare de destination en en-tête (aligné sur ce
                   // qui est réellement imprimé — printer_service.dart /
@@ -505,7 +506,8 @@ class _ReceiptBox extends StatelessWidget {
                   // aperçu : l'aperçu doit refléter le rendu papier. Le QR
                   // reste sur le TALON uniquement (voir _TalonBox).
                   const SizedBox(height: 6),
-                  const Text('Powered by www.tibus.app', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.black54)),
+                  if (kBrandPoweredBy.isNotEmpty)
+                  const Text(kBrandPoweredBy, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.black54)),
                 ],
               ),
             ),
@@ -598,7 +600,7 @@ class _TalonBox extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(colis.companyName.isNotEmpty ? colis.companyName : 'TIBUS COURRIER',
+            Text(brandCompanyName(colis.companyName),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
             // Nom de la gare de destination en en-tête (voir la même
             // correction et son explication dans le bloc "Aperçu du reçu"

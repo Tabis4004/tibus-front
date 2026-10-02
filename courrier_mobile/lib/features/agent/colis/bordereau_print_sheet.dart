@@ -11,6 +11,7 @@ import '../../../core/utils/mailto.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/services/bordereau_service.dart';
 import '../../../data/services/printer_service.dart' show PrinterDevice, PrinterType;
+import '../../../core/config/brand_identity.dart';
 
 /// Message de partage du BL — synthèse (référence, trajet, colis, total),
 /// vers les utilisateurs du module (propriétaire, contrôleur), pas
@@ -18,7 +19,7 @@ import '../../../data/services/printer_service.dart' show PrinterDevice, Printer
 /// document interne au transporteur.
 String _bordereauShareMessage(BordereauDetail d) {
   return [
-    'TIBUS COURRIER — Bordereau ${d.reference}',
+    '$kBrandName — Bordereau ${d.reference}',
     'Trajet : ${d.villeDepart} -> ${d.gareDestination ?? "Toutes destinations"}',
     if (d.busPlateNumber != null) 'Bus : ${d.busPlateNumber}',
     '${d.colis.length} colis',
@@ -351,7 +352,7 @@ class _BordereauBox extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                detail.companyName.isNotEmpty ? detail.companyName : 'TIBUS COURRIER',
+                brandCompanyName(detail.companyName),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
