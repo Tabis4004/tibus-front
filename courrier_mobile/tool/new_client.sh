@@ -163,7 +163,7 @@ Reste à faire dans Cloudflare, une seule fois par client :
      Dépôt Tabis4004/tibus-front
      Nom du Worker      courrier-$CLIENT
      Root directory     courrier_mobile
-     Build command      ./vercel-build.sh
+     Build command      ./cloudflare-build.sh
      Deploy command     npx wrangler deploy -c wrangler.$CLIENT.jsonc
 
   2. Settings -> Variables and Secrets -> Add

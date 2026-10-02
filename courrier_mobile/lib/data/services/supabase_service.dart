@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Projet Supabase "Tibus 1.0" (kqudaqtydimjclwaihqr) — voir CLAUDE.md,
 /// courrier_mobile ne doit JAMAIS pointer vers Tibus Ride (bjtklpjdsmqmzhncfflu).
-/// Mêmes valeurs de repli déjà utilisées telles quelles dans vercel-build.sh
+/// Mêmes valeurs de repli déjà utilisées telles quelles dans cloudflare-build.sh
 /// (donc déjà présentes en clair dans le dépôt — ce sont des clés anon
 /// publiques, protégées par les policies RLS, pas des secrets).
 const String _fallbackSupabaseUrl = 'https://kqudaqtydimjclwaihqr.supabase.co';
@@ -21,7 +21,7 @@ class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
 
   static Future<void> initialize() async {
-    // Les --dart-define restent PRIORITAIRES quand ils sont fournis (Vercel,
+    // Les --dart-define restent PRIORITAIRES quand ils sont fournis (Cloudflare,
     // CI...), mais un build local sans rien passer (ex. `flutter build apk
     // --release` tout court) doit fonctionner comme courrier_client/livreur,
     // pas planter avec un écran blanc au démarrage (StateError avant runApp).

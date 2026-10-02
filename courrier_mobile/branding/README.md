@@ -45,7 +45,7 @@ Commite, pousse, puis dans Cloudflare, **une seule fois par client** :
    | Dépôt | `Tabis4004/tibus-front` |
    | Nom du Worker | `courrier-<client>` |
    | Root directory | `courrier_mobile` |
-   | Build command | `./vercel-build.sh` |
+   | Build command | `./cloudflare-build.sh` |
    | Deploy command | `npx wrangler deploy -c wrangler.<client>.jsonc` |
 
    La *deploy command* est indispensable : sans `-c`, wrangler prend
@@ -57,7 +57,7 @@ Commite, pousse, puis dans Cloudflare, **une seule fois par client** :
        BRAND = <client>
 
    C'est ce qui sélectionne `branding/<client>/webassets/` dans
-   `vercel-build.sh`. Sans elle, le build sort en marque Tibus.
+   `cloudflare-build.sh`. Sans elle, le build sort en marque Tibus.
 
 3. **Settings → Domains & Routes → Add → Custom domain**
 
