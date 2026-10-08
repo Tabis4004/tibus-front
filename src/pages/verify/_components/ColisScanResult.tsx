@@ -36,7 +36,9 @@ export default function ColisScanResult({
   const action = colisScanAction(detail);
   const currentStep = colisStepIndex(detail.statutColis);
   const isDone = detail.statutColis === "livre";
-  const ref = colisPublicReference(detail.id);
+  // Numéro de reçu par gare (ex. GAMO000123) en priorité, comme sur le reçu ;
+  // l'ancienne référence CL-XXXXXXXX ne sert plus que de repli.
+  const ref = detail.numeroRecu || colisPublicReference(detail.id);
 
   return (
     <div className="space-y-4">

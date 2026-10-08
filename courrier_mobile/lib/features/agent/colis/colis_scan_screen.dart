@@ -263,7 +263,11 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
 
   Widget _buildResult(BuildContext context, Colis colis) {
     final action = _actionFor(colis.statut);
-    final reference = colisPublicReference(colis.id);
+    // Numéro de reçu par gare (ex. GAMO000123, migration 180), comme la
+    // liste, le détail et les reçus — l'ancienne référence CL-XXXXXXXX ne
+    // sert plus que de repli pour un colis sans numéro.
+    final numero = colis.numeroRecu;
+    final reference = (numero != null && numero.isNotEmpty) ? numero : colisPublicReference(colis.id);
     return ListView(
       children: [
         Card(
