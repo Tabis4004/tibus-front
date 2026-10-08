@@ -513,7 +513,7 @@ class _BordereauEscPosPrinterSheetState extends ConsumerState<_BordereauEscPosPr
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(icon),
-                title: Text(d.name?.isNotEmpty == true ? d.name! : 'Imprimante'),
+                title: Text(d.name.isNotEmpty ? d.name : 'Imprimante'),
                 onTap: _busy ? null : () => _printOn(d, type),
               ))
           .toList(),

@@ -153,7 +153,8 @@ class _AdminGaresScreenState extends ConsumerState<AdminGaresScreen> {
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom de la gare *')),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: cityId,
+                key: ValueKey('city:$cityId'),
+                initialValue: cityId,
                 decoration: const InputDecoration(labelText: 'Ville *'),
                 items: _cities.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
                 onChanged: (v) => setSheetState(() => cityId = v),
@@ -701,7 +702,8 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: roleName,
+                key: ValueKey('role:$roleName'),
+                initialValue: roleName,
                 decoration: const InputDecoration(labelText: 'Rôle *'),
                 items: kAssignableRoles.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
                 onChanged: (v) => setSheetState(() {
@@ -712,7 +714,10 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
               if (roleName != null && isGareScopedRole(roleName!)) ...[
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: gareId,
+                  // Clé liée à la valeur : un changement de rôle remet gareId
+                  // à null et doit aussi vider la liste affichée.
+                  key: ValueKey('gare:$gareId'),
+                  initialValue: gareId,
                   decoration: const InputDecoration(labelText: 'Gare *'),
                   items: _gares.map((g) => DropdownMenuItem(value: g.id, child: Text(g.name))).toList(),
                   onChanged: (v) => setSheetState(() => gareId = v),
@@ -1123,7 +1128,7 @@ class _AdminColisSettingsScreenState extends ConsumerState<AdminColisSettingsScr
 
           const Text('Prix minimum général (override)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const Text(
-            "Si renseigné, remplace les prix minimums par nature pour tous les colis. Laissez vide pour utiliser les règles par nature.",
+            'Si renseigné, remplace les prix minimums par nature pour tous les colis. Laissez vide pour utiliser les règles par nature.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),

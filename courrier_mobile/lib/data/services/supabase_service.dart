@@ -38,7 +38,8 @@ class SupabaseService {
 
     await Supabase.initialize(
       url: url,
-      anonKey: anonKey,
+      // anonKey déprécié : même clé, nouveau nom de paramètre.
+      publishableKey: anonKey,
     );
   }
 }

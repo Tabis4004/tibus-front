@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../data/models/colis.dart';
 import 'colis_receipt_lines.dart';
-import 'colis_ref.dart';
 
 /// Export CSV du manifeste colis — même contenu/colonnes que
 /// exportColisManifestExcel côté web (src/lib/colis-manifest-export.ts),

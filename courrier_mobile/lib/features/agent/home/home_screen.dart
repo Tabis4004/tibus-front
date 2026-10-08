@@ -133,21 +133,21 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
+          const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text('Bonjour,', style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
                     Text('Mon compte', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
-              const NotificationsBellButton(),
-              const SizedBox(width: 4),
-              const CircleAvatar(backgroundColor: AppColors.primaryGreen, child: Text('C', style: TextStyle(color: Colors.white))),
+              NotificationsBellButton(),
+              SizedBox(width: 4),
+              CircleAvatar(backgroundColor: AppColors.primaryGreen, child: Text('C', style: TextStyle(color: Colors.white))),
             ],
           ),
           const SizedBox(height: 16),
@@ -402,7 +402,7 @@ class _MontantDuJourCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.payments_outlined, color: Colors.white, size: 20),
@@ -435,7 +435,7 @@ class _MontantDuJourCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: Material(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(8),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),

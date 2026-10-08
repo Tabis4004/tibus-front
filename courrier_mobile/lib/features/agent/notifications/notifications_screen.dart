@@ -145,9 +145,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       final color = _kTypeColors[n.type] ?? AppColors.primaryGreen;
                       return ListTile(
                         onTap: () => _markRead(n),
-                        tileColor: n.isRead ? null : AppColors.primaryGreen.withOpacity(0.06),
+                        tileColor: n.isRead ? null : AppColors.primaryGreen.withValues(alpha: 0.06),
                         leading: CircleAvatar(
-                          backgroundColor: color.withOpacity(0.12),
+                          backgroundColor: color.withValues(alpha: 0.12),
                           child: Icon(icon, color: color, size: 20),
                         ),
                         title: Text(

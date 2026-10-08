@@ -1,4 +1,7 @@
-import 'dart:js_util' as js_util;
+// dart:js_interop (et non plus dart:js_util, retiré du SDK pour les
+// plateformes non web : `flutter analyze` levait une erreur sur ce fichier).
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import '../../../core/utils/esc_pos_lines_encoder.dart';
 import 'pos_bridge_interface.dart';
 
@@ -12,25 +15,43 @@ class _WebPosBridge implements PosBridge {
   // Port série choisi par l'utilisateur — mémorisé pour la session (évite de
   // re-déclencher la popup de sélection à chaque impression). Réinitialisé
   // si la page est rechargée, par design de l'API Web Serial.
-  Object? _rememberedPort;
+  JSObject? _rememberedPort;
 
-  Object? _wisePrinter() {
+  JSObject? _wisePrinter() {
     try {
-      final w = js_util.getProperty(js_util.globalThis, 'WisePrinter');
-      return w;
+      final w = globalContext['WisePrinter'];
+      if (w.isUndefinedOrNull) return null;
+      return w as JSObject;
     } catch (_) {
       return null;
     }
   }
 
-  Object? _navigatorSerial() {
+  JSObject? _navigatorSerial() {
     try {
-      final nav = js_util.getProperty(js_util.globalThis, 'navigator');
-      if (!js_util.hasProperty(nav, 'serial')) return null;
-      return js_util.getProperty(nav, 'serial');
+      final nav = globalContext['navigator'];
+      if (nav.isUndefinedOrNull) return null;
+      final navObj = nav as JSObject;
+      if (!navObj.has('serial')) return null;
+      final serial = navObj['serial'];
+      if (serial.isUndefinedOrNull) return null;
+      return serial as JSObject;
     } catch (_) {
       return null;
     }
+  }
+
+  /// Attend [value] si c'est une promesse JS (objet « thenable »), sinon
+  /// ne fait rien — les wrappers d'impression renvoient l'un ou l'autre.
+  Future<void> _awaitIfPromise(JSAny? value) async {
+    if (value.isUndefinedOrNull) return;
+    var thenable = false;
+    try {
+      thenable = (value as JSObject).has('then');
+    } catch (_) {
+      thenable = false; // valeur primitive (booléen, nombre...) : rien à attendre
+    }
+    if (thenable) await (value as JSPromise<JSAny?>).toDart;
   }
 
   @override
@@ -38,8 +59,8 @@ class _WebPosBridge implements PosBridge {
     final wp = _wisePrinter();
     if (wp == null) return false;
     try {
-      if (js_util.hasProperty(wp, 'isNative')) {
-        final isNative = js_util.getProperty(wp, 'isNative');
+      if (wp.has('isNative')) {
+        final isNative = wp['isNative'].dartify();
         if (isNative is bool) return isNative;
       }
     } catch (_) {
@@ -67,7 +88,7 @@ class _WebPosBridge implements PosBridge {
     if (wp == null) {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
-    final payload = js_util.jsify({
+    final payload = <String, Object?>{
       'header': header,
       'lines': lines,
       'qr': qr,
@@ -78,11 +99,9 @@ class _WebPosBridge implements PosBridge {
       // wrappers qui ne connaissent pas ce champ l'ignorent simplement et
       // gardent leur placement par défaut — rétrocompatible.
       if (qrAfterLine != null) 'qrAfterLine': qrAfterLine,
-    });
-    final result = js_util.callMethod(wp, 'printReceipt', [payload]);
-    if (result != null && js_util.hasProperty(result, 'then')) {
-      await js_util.promiseToFuture<dynamic>(result);
-    }
+    }.jsify();
+    final result = wp.callMethod<JSAny?>('printReceipt'.toJS, payload);
+    await _awaitIfPromise(result);
   }
 
   @override
@@ -100,22 +119,20 @@ class _WebPosBridge implements PosBridge {
       throw StateError('Web Serial indisponible sur ce navigateur (Chrome/Edge desktop requis).');
     }
 
-    Object? port = _rememberedPort;
+    var port = _rememberedPort;
     if (port == null) {
       // IMPORTANT : ne fonctionne que si appelée depuis un vrai geste
       // utilisateur (onPressed d'un bouton) — activation utilisateur requise
       // par la spec Web Serial, sinon la promesse est rejetée silencieusement.
-      final portPromise = js_util.callMethod(serial, 'requestPort', []);
-      port = await js_util.promiseToFuture<Object?>(portPromise);
+      final portPromise = serial.callMethod<JSPromise<JSObject>>('requestPort'.toJS);
+      port = await portPromise.toDart;
       _rememberedPort = port;
     }
+    final openedPort = port;
 
-    final openPromise = js_util.callMethod(
-      port!,
-      'open',
-      [js_util.jsify({'baudRate': 9600})],
-    );
-    await js_util.promiseToFuture<void>(openPromise);
+    await openedPort
+        .callMethod<JSPromise<JSAny?>>('open'.toJS, <String, Object?>{'baudRate': 9600}.jsify())
+        .toDart;
 
     try {
       final bytes = EscPosLinesEncoder.encode(
@@ -128,29 +145,27 @@ class _WebPosBridge implements PosBridge {
         qrAfterLine: qrAfterLine,
       );
 
-      final writable = js_util.getProperty(port, 'writable');
-      final writer = js_util.callMethod(writable, 'getWriter', []);
-      final writePromise = js_util.callMethod(writer, 'write', [bytes]);
-      await js_util.promiseToFuture<void>(writePromise);
-      js_util.callMethod(writer, 'releaseLock', []);
+      final writable = openedPort['writable'] as JSObject;
+      final writer = writable.callMethod<JSObject>('getWriter'.toJS);
+      await writer.callMethod<JSPromise<JSAny?>>('write'.toJS, bytes.toJS).toDart;
+      writer.callMethod<JSAny?>('releaseLock'.toJS);
     } finally {
-      final closePromise = js_util.callMethod(port, 'close', []);
-      await js_util.promiseToFuture<void>(closePromise);
+      await openedPort.callMethod<JSPromise<JSAny?>>('close'.toJS).toDart;
     }
   }
 
   @override
   bool triggerBrowserPrint({required bool wide}) {
     try {
-      final doc = js_util.getProperty(js_util.globalThis, 'document');
-      final docEl = js_util.getProperty(doc, 'documentElement');
-      final classList = js_util.getProperty(docEl, 'classList');
-      js_util.callMethod(classList, 'remove', ['print-80mm', 'print-56mm']);
-      js_util.callMethod(classList, 'add', [wide ? 'print-80mm' : 'print-56mm']);
-      js_util.callMethod(js_util.globalThis, 'print', []);
+      final doc = globalContext['document'] as JSObject;
+      final docEl = doc['documentElement'] as JSObject;
+      final classList = docEl['classList'] as JSObject;
+      classList.callMethod<JSAny?>('remove'.toJS, 'print-80mm'.toJS, 'print-56mm'.toJS);
+      classList.callMethod<JSAny?>('add'.toJS, (wide ? 'print-80mm' : 'print-56mm').toJS);
+      globalContext.callMethod<JSAny?>('print'.toJS);
       Future<void>.delayed(const Duration(seconds: 1), () {
         try {
-          js_util.callMethod(classList, 'remove', ['print-80mm', 'print-56mm']);
+          classList.callMethod<JSAny?>('remove'.toJS, 'print-80mm'.toJS, 'print-56mm'.toJS);
         } catch (_) {}
       });
       return true;

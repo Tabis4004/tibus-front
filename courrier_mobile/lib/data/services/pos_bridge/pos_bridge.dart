@@ -1,5 +1,5 @@
 import 'pos_bridge_interface.dart';
-import 'pos_bridge_stub.dart' if (dart.library.js) 'pos_bridge_web.dart' as impl;
+import 'pos_bridge_stub.dart' if (dart.library.js_interop) 'pos_bridge_web.dart' as impl;
 
 export 'pos_bridge_interface.dart';
 

@@ -49,7 +49,7 @@ class _TodayByGareSheetState extends ConsumerState<_TodayByGareSheet> {
                 children: [
                   const Expanded(
                     child: Text(
-                      "Montant du jour — détail par agence",
+                      'Montant du jour — détail par agence',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),

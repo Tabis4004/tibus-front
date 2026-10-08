@@ -84,7 +84,7 @@ class AuthService {
     final countries = await _client.from('Countries').select('id').limit(1);
     if ((countries as List).isEmpty) {
       throw Exception(
-        "Aucun pays en base. Impossible de créer le profil (voir table Countries).",
+        'Aucun pays en base. Impossible de créer le profil (voir table Countries).',
       );
     }
 

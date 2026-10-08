@@ -205,8 +205,8 @@ class _ColisReceiptPreviewSheetState extends ConsumerState<_ColisReceiptPreviewS
                 child: _ReceiptBox(colis: colis, agentName: agentName),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Expanded(child: Divider()),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
@@ -865,7 +865,7 @@ class _EscPosPrinterSheetState extends ConsumerState<_EscPosPrinterSheet> {
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(icon),
-                title: Text(d.name?.isNotEmpty == true ? d.name! : 'Imprimante'),
+                title: Text(d.name.isNotEmpty ? d.name : 'Imprimante'),
                 onTap: _busy ? null : () => _printOn(d, type),
               ))
           .toList(),

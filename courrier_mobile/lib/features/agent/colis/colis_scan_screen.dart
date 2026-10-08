@@ -301,7 +301,8 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
         const SizedBox(height: 20),
         if (action?.next == ColisStatut.charge && _buses.isNotEmpty) ...[
           DropdownButtonFormField<String?>(
-            value: _selectedBusId,
+            key: ValueKey('bus:$_selectedBusId'),
+            initialValue: _selectedBusId,
             decoration: const InputDecoration(labelText: 'Bus du convoi (optionnel)'),
             items: [
               const DropdownMenuItem(value: null, child: Text('Aucun / à définir plus tard')),
