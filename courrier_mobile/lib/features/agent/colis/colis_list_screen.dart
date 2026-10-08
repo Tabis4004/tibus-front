@@ -25,6 +25,7 @@ class _ColisListScreenState extends ConsumerState<ColisListScreen> {
   final _searchCtrl = TextEditingController();
   ColisStatut? _statutFilter;
   DateTime? _dateFilter;
+  ColisSaleOrigin? _originFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +82,8 @@ class _ColisListScreenState extends ConsumerState<ColisListScreen> {
             onStatutChanged: (s) => setState(() => _statutFilter = s),
             dateFilter: _dateFilter,
             onDateChanged: (d) => setState(() => _dateFilter = d),
+            originFilter: _originFilter,
+            onOriginChanged: (o) => setState(() => _originFilter = o),
           );
         },
       ),
@@ -95,6 +98,8 @@ class _ListBody extends ConsumerStatefulWidget {
   final ValueChanged<ColisStatut?> onStatutChanged;
   final DateTime? dateFilter;
   final ValueChanged<DateTime?> onDateChanged;
+  final ColisSaleOrigin? originFilter;
+  final ValueChanged<ColisSaleOrigin?> onOriginChanged;
 
   const _ListBody({
     required this.companyId,
@@ -103,6 +108,8 @@ class _ListBody extends ConsumerStatefulWidget {
     required this.onStatutChanged,
     required this.dateFilter,
     required this.onDateChanged,
+    required this.originFilter,
+    required this.onOriginChanged,
   });
 
   @override
@@ -220,6 +227,24 @@ class _ListBodyState extends ConsumerState<_ListBody> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    // Origine de la vente (migration 217) : une vente hors
+                    // ligne garde son étiquette même après synchronisation,
+                    // quel que soit le numéro définitif attribué.
+                    child: PopupMenuButton<ColisSaleOrigin?>(
+                      onSelected: widget.onOriginChanged,
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: null, child: Text('Toutes les ventes')),
+                        ...ColisSaleOrigin.values.map((o) => PopupMenuItem(value: o, child: Text(o.label))),
+                      ],
+                      child: OutlinedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.cloud_sync_outlined, size: 16),
+                        label: Text(widget.originFilter?.label ?? 'Origine', overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -246,14 +271,25 @@ class _ListBodyState extends ConsumerState<_ListBody> {
                       c.nomExpediteur,
                       c.telephoneDestinataire,
                       c.telephoneExpediteur,
+                      // Référence provisoire imprimée hors ligne (« ABOI-1A2B3C4D ») :
+                      // permet de retrouver la vente avec le reçu remis au client.
+                      if (c.offlineLocalId != null)
+                        offlineProvisionalRef(c.gareDepart, c.offlineLocalId!),
                     ].join(' ').toLowerCase();
                     return haystack.contains(query);
                   }).toList();
                 }
+                final origin = widget.originFilter;
+                if (origin != null) {
+                  items = items
+                      .where((c) => origin == ColisSaleOrigin.offline ? c.isOffline : !c.isOffline)
+                      .toList();
+                }
                 final date = widget.dateFilter;
                 if (date != null) {
                   items = items.where((c) {
-                    final d = c.createdAt.toLocal();
+                    // Date réelle de la vente (heure appareil si hors ligne).
+                    final d = c.saleAt.toLocal();
                     return d.year == date.year && d.month == date.month && d.day == date.day;
                   }).toList();
                 }

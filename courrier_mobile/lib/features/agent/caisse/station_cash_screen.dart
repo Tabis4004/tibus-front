@@ -5,6 +5,8 @@ import '../../../core/config/colis_ui_config.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/colis.dart';
 import '../stats/colis_sales_journal_print_sheet.dart';
+import '../colis/pending_colis_screen.dart';
+import '../../../data/models/pending_colis.dart';
 import '../../../core/config/brand_identity.dart';
 
 /// Caisse physique guichet — réplique StationCashPanel.tsx (web) :
@@ -280,12 +282,47 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
   Future<void> _closeCash() async {
     final cash = _cash;
     if (cash == null || !cash.open || cash.id == null) return;
+
+    // 1. Ventes hors ligne : on synchronise AVANT de clôturer. Sinon elles
+    // seraient encaissées dans la session suivante, avec une autre date et
+    // un autre numéro (doublon apparent côté finance). Clôture BLOQUÉE tant
+    // qu'il en reste (décision produit, voir migration 217).
+    setState(() => _saving = true);
+    List<PendingColis> remaining;
+    try {
+      final sync = ref.read(syncServiceProvider);
+      final companyId = cash.companyId ?? ref.read(activeCompanyIdProvider).valueOrNull;
+      if ((await sync.pendingMineFor(companyId)).isNotEmpty) {
+        await sync.syncMine();
+      }
+      remaining = await sync.pendingMineFor(companyId);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+    if (!mounted) return;
+    if (remaining.isNotEmpty) {
+      await _showUnsyncedBlockingDialog(remaining);
+      return;
+    }
+
+    // 2. Ventilation en ligne / hors ligne de la session (best-effort : un
+    // échec de chargement ne doit pas empêcher la clôture).
+    StationCashOriginSummary? summary;
+    try {
+      summary = await ref.read(colisServiceProvider).getStationCashOriginSummary(cash.id!);
+    } catch (_) {}
+    if (!mounted) return;
+    final originSummary = summary;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Clôturer la caisse ?'),
         content: Text(
           'Solde espèces actuel : ${(cash.balance ?? 0).toStringAsFixed(0)} FCFA.\n'
+          '${originSummary == null ? '' : '\nVentes colis de la session :\n'
+              '• En ligne : ${originSummary.onlineCount} · ${originSummary.onlineMontant.toStringAsFixed(0)} FCFA\n'
+              '• Hors ligne (synchronisées) : ${originSummary.offlineCount} · ${originSummary.offlineMontant.toStringAsFixed(0)} FCFA\n\n'}'
           'Vous ne pourrez plus enregistrer de ventes sur cette session après clôture.',
         ),
         actions: [
@@ -312,6 +349,34 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Clôture refusée : des ventes hors ligne de l'agent ne sont pas encore
+  /// synchronisées (pas de réseau, ou erreur serveur à corriger).
+  Future<void> _showUnsyncedBlockingDialog(List<PendingColis> remaining) async {
+    final total = remaining.fold<double>(0, (sum, e) => sum + e.montantFret);
+    final withError = remaining.where((e) => e.lastError != null).length;
+    final goToQueue = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.cloud_off, color: Color(0xFFC62828), size: 36),
+        title: const Text('Ventes non synchronisées'),
+        content: Text(
+          '${remaining.length} vente(s) hors ligne ne sont pas encore synchronisées '
+          '(${total.toStringAsFixed(0)} FCFA).\n\n'
+          '${withError > 0 ? '$withError vente(s) ont été refusées par le serveur : ouvrez la file d\'attente pour voir le motif.\n\n' : 'Vérifiez la connexion internet puis réessayez.\n\n'}'
+          'La caisse ne peut pas être clôturée tant que ces ventes ne sont pas synchronisées, '
+          'sinon elles seraient comptées dans la session suivante.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Fermer')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Voir les ventes en attente')),
+        ],
+      ),
+    );
+    if (goToQueue == true && mounted) {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PendingColisScreen()));
     }
   }
 
@@ -421,7 +486,8 @@ class _OpenCashForm extends StatelessWidget {
               )
             else
               DropdownButtonFormField<String>(
-                value: selectedGareId,
+                key: ValueKey('gare:$selectedGareId'),
+                initialValue: selectedGareId,
                 decoration: const InputDecoration(labelText: 'Gare du guichet *'),
                 items: gares.map((g) => DropdownMenuItem(value: g.id, child: Text(g.name))).toList(),
                 onChanged: onGareChanged,

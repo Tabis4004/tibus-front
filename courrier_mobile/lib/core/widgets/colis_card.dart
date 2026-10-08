@@ -56,11 +56,46 @@ class ColisCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   StatusBadge(statut: colis.statut),
+                  if (colis.isOffline || colis.isPendingSync) ...[
+                    const SizedBox(height: 4),
+                    OfflineSaleBadge(pending: colis.isPendingSync),
+                  ],
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Étiquette « Hors ligne » (vente faite sans réseau puis synchronisée,
+/// migration 217) ou « Non synchronisé » (encore dans la file locale).
+class OfflineSaleBadge extends StatelessWidget {
+  final bool pending;
+  const OfflineSaleBadge({super.key, this.pending = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = pending ? const Color(0xFFC62828) : const Color(0xFF6D4C41);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(pending ? Icons.cloud_off : Icons.cloud_sync_outlined, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(
+            pending ? 'Non synchronisé' : 'Hors ligne',
+            style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

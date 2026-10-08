@@ -15,6 +15,15 @@ String formatSalesJournalHour(DateTime dt) => DateFormat('HH:mm').format(dt.toLo
 
 String _amount(num? v) => (v ?? 0).toStringAsFixed(0);
 
+/// Référence d'une ligne de journal : numéro de reçu, suivi de « HL » pour
+/// une vente faite hors ligne (migration 217) — l'heure affichée est alors
+/// l'heure réelle de la vente, pas celle de la synchronisation.
+String salesJournalRef(ColisSalesJournalLine c) => '${c.numeroRecu ?? "—"}${c.isOffline ? " HL" : ""}';
+
+/// Mention « dont hors ligne » sous un total, vide s'il n'y en a aucune.
+String salesJournalOfflineNote(int count, double frais, {required bool showMontant}) =>
+    count == 0 ? '' : 'dont hors ligne (HL) : $count${showMontant ? " · ${_amount(frais)}F" : ""}';
+
 /// Lignes du journal de vente au format {text, align, bold, size} — partagées
 /// par les ponts qui ne connaissent pas l'API structurée rows du pont P3
 /// natif (voir printer_service.dart printColisSalesJournal pour l'équivalent
@@ -54,7 +63,7 @@ List<Map<String, dynamic>> colisSalesJournalLines(
       // destination - valeur (2 lignes compactes, plus d'expéditeur/
       // destinataire). Champs sensibles (montant/valeur/destination)
       // masquables individuellement par l'owner — voir reportSetting.
-      final firstLine = StringBuffer('${formatSalesJournalHour(c.createdAt)}  ${c.numeroRecu ?? "—"}');
+      final firstLine = StringBuffer('${formatSalesJournalHour(c.createdAt)}  ${salesJournalRef(c)}');
       if (showMontant) firstLine.write('  ${_amount(c.montantFret)}F');
       lines.add({'text': firstLine.toString(), 'bold': true, 'size': 'small'});
       if (showDestination || showValeur) {
@@ -76,6 +85,12 @@ List<Map<String, dynamic>> colisSalesJournalLines(
     if (showMontant) {
       lines.add({'text': 'Frais ${_amount(group.totalFrais)}', 'bold': true});
     }
+    if (group.offlineCount > 0) {
+      lines.add({
+        'text': salesJournalOfflineNote(group.offlineCount, group.offlineFrais, showMontant: showMontant),
+        'size': 'small',
+      });
+    }
     lines.add({'text': '================================', 'align': 'center'});
   }
 
@@ -87,6 +102,12 @@ List<Map<String, dynamic>> colisSalesJournalLines(
         'text': 'Frais ${_amount(journal.grandTotalFrais)}',
         'align': 'center',
         'bold': true,
+      },
+    if (journal.grandOfflineCount > 0)
+      {
+        'text': salesJournalOfflineNote(journal.grandOfflineCount, journal.grandOfflineFrais, showMontant: showMontant),
+        'align': 'center',
+        'size': 'small',
       },
     {'text': '================================', 'align': 'center'},
     if (kBrandPoweredBy.isNotEmpty)

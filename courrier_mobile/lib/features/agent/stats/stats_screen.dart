@@ -37,6 +37,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   _PeriodPreset _period = _PeriodPreset.today;
   DateTime? _customFrom;
   DateTime? _customTo;
+  // Origine de la vente (en ligne / hors ligne, migration 217) — null = tout.
+  ColisSaleOrigin? _origin;
 
   List<ColisVendeur>? _vendeurs;
   List<GareOption>? _gares;
@@ -50,7 +52,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   // ci-dessus) : ce n'est donc plus un filtre "actif" à signaler (pas de
   // bouton Réinitialiser, pas de badge "Vue filtrée" tant que l'agent n'a
   // rien changé d'autre).
-  bool get _hasFilters => _vendeurId != null || _gareId != null || _period != _PeriodPreset.today;
+  bool get _hasFilters =>
+      _vendeurId != null || _gareId != null || _origin != null || _period != _PeriodPreset.today;
 
   DateTime? get _dateFrom {
     final now = DateTime.now();
@@ -141,6 +144,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               gareDepartId: _gareId,
               dateFrom: _dateFrom,
               dateTo: _dateToExclusive,
+              origin: _origin,
             ),
           );
     });
@@ -155,6 +159,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       _period = _PeriodPreset.today;
       _customFrom = null;
       _customTo = null;
+      _origin = null;
     });
     if (_companyId != null) _reload(_companyId!);
   }
@@ -258,18 +263,19 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             dateFrom: _dateFrom ?? DateTime(2000, 1, 1),
             dateTo: _dateToExclusive,
             vendeurId: _vendeurId,
+            origin: _origin,
           );
       if (!mounted) return;
       final roles = await ref.read(myRolesProvider.future);
       final companyName = roles
               .firstWhere(
                 (r) => r.companyId == companyId,
-                orElse: () => AppRole(
+                orElse: () => const AppRole(
                   id: '',
                   name: '',
                   scope: '',
                   level: 0,
-                  droits: const [],
+                  droits: [],
                   companyId: null,
                   companyName: null,
                 ),
@@ -290,7 +296,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         context,
         journal: journal,
         companyName: resolvedName,
-        periodLabel: _periodLabel,
+        // Le filtre d'origine est rappelé sur le journal imprimé, pour qu'un
+        // journal « hors ligne » ne soit jamais pris pour le journal complet.
+        periodLabel: _origin == null ? _periodLabel : '$_periodLabel · Ventes ${_origin!.label.toLowerCase()}',
         reportSetting: _uiConfig.reports['salesJournal'] ?? const ColisReportSetting(),
       );
     } catch (e) {
@@ -382,6 +390,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       KpiCard(icon: Icons.trending_up, value: '${s.montantThisMonth.toStringAsFixed(0)} FCFA', label: 'Montant du mois', background: AppColors.primaryGreenLight, foreground: AppColors.primaryGreenDark),
                     ],
                   ),
+                  if (s.offlineTotal > 0 && _origin != ColisSaleOrigin.online) ...[
+                    const SizedBox(height: 12),
+                    _OfflineShareCard(count: s.offlineTotal, montant: s.offlineMontant, total: s.total),
+                  ],
                   const SizedBox(height: 24),
                   const Text('Statut des colis', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
@@ -417,7 +429,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.person_outline, color: Colors.white, size: 22),
@@ -499,6 +511,18 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 ...?_gares?.map((g) => PopupMenuItem(value: g.id, child: Text(g.name))),
               ],
             ),
+            _FilterChipDropdown<ColisSaleOrigin?>(
+              label: _origin == null ? 'Origine : toutes' : 'Ventes ${_origin!.label.toLowerCase()}',
+              icon: Icons.cloud_sync_outlined,
+              onSelected: (o) {
+                setState(() => _origin = o);
+                _reload(companyId);
+              },
+              items: [
+                const PopupMenuItem(value: null, child: Text('Toutes les ventes')),
+                ...ColisSaleOrigin.values.map((o) => PopupMenuItem(value: o, child: Text('Ventes ${o.label.toLowerCase()}'))),
+              ],
+            ),
             _FilterChipDropdown<_PeriodPreset>(
               label: _periodLabel,
               icon: Icons.calendar_month_outlined,
@@ -550,6 +574,40 @@ class _FilterChipDropdown<T> extends StatelessWidget {
         avatar: Icon(icon, size: 16, color: AppColors.primaryGreenDark),
         label: Text(label, overflow: TextOverflow.ellipsis),
         backgroundColor: AppColors.primaryGreenLight,
+      ),
+    );
+  }
+}
+
+/// Part des ventes faites hors ligne sur la vue courante (migration 217) —
+/// comptées à leur date réelle de vente, pas à leur date de synchronisation.
+class _OfflineShareCard extends StatelessWidget {
+  final int count;
+  final double montant;
+  final int total;
+
+  const _OfflineShareCard({required this.count, required this.montant, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFEBE9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBCAAA4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_sync_outlined, color: Color(0xFF6D4C41)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Dont ventes hors ligne : $count / $total colis · ${montant.toStringAsFixed(0)} FCFA',
+              style: const TextStyle(color: Color(0xFF6D4C41), fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

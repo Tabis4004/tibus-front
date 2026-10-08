@@ -31,6 +31,9 @@ class ColisStats {
   /// vendeurs confondus, avec filtre par agent dans ce périmètre
   /// (migration 183).
   final bool gareScope;
+  /// Dont ventes hors ligne synchronisées (migration 217).
+  final int offlineTotal;
+  final double offlineMontant;
 
   const ColisStats({
     required this.total,
@@ -45,6 +48,8 @@ class ColisStats {
     required this.mineMontantTotal,
     this.fullAccess = false,
     this.gareScope = false,
+    this.offlineTotal = 0,
+    this.offlineMontant = 0,
   });
 
   factory ColisStats.fromMap(Map<String, dynamic> map) => ColisStats(
@@ -60,6 +65,8 @@ class ColisStats {
         mineMontantTotal: (map['mineMontantTotal'] as num?)?.toDouble() ?? 0,
         fullAccess: map['fullAccess'] == true,
         gareScope: map['gareScope'] == true,
+        offlineTotal: (map['offlineTotal'] as num?)?.toInt() ?? 0,
+        offlineMontant: (map['offlineMontant'] as num?)?.toDouble() ?? 0,
       );
 }
 
@@ -71,10 +78,13 @@ class StatsFilter {
   final String? gareDepartId;
   final DateTime? dateFrom;
   final DateTime? dateTo;
+  /// Origine de la vente (en ligne / hors ligne) — null = toutes.
+  final ColisSaleOrigin? origin;
 
-  const StatsFilter({this.vendeurId, this.gareDepartId, this.dateFrom, this.dateTo});
+  const StatsFilter({this.vendeurId, this.gareDepartId, this.dateFrom, this.dateTo, this.origin});
 
-  bool get isEmpty => vendeurId == null && gareDepartId == null && dateFrom == null && dateTo == null;
+  bool get isEmpty =>
+      vendeurId == null && gareDepartId == null && dateFrom == null && dateTo == null && origin == null;
 }
 
 class StatsService {
@@ -88,6 +98,7 @@ class StatsService {
       gareDepartId: filter.gareDepartId,
       dateFrom: filter.dateFrom,
       dateTo: filter.dateTo,
+      origin: filter.origin,
     );
     return ColisStats.fromMap(data);
   }

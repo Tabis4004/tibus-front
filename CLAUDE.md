@@ -154,3 +154,16 @@ le web (toujours à jour au rechargement).
 Ne relever `latest_version_code` qu'**après** que la version est réellement
 disponible sur le store (déploiement Play terminé), sinon le pop-up envoie
 vers une fiche qui ne propose encore rien. Écriture réservée à super_admin.
+
+## Ventes colis hors ligne (migration 217)
+
+Toute vente passe par `register_colis_autonome_offline` (idempotent) avec une
+clé `offline_local_id` générée par l'app AVANT l'appel : un délai dépassé ou
+une synchro rejouée ne peut plus créer de 2e colis. `offline_created_at`
+(heure appareil, bornée à [ouverture caisse, now()]) n'est renseigné que pour
+une vente réellement faite hors ligne : c'est ce qui la qualifie « hors
+ligne ». Journal de vente et stats comptent la date réelle
+`COALESCE(offline_created_at, created_at)` et acceptent `p_origin`
+('online' | 'offline'). La clôture de caisse est bloquée côté app tant que
+l'agent a des ventes hors ligne non synchronisées. Patch SIS :
+`courrier_mobile/tool/hostinger_migration/pour_technicien/00_patch_2026-10-08.sql`.

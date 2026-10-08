@@ -57,6 +57,15 @@ String colisShortRef(Colis colis) {
   return 'CL-${id.replaceAll('-', '').toUpperCase().substring(0, 8)}';
 }
 
+/// Référence provisoire imprimée sur le reçu d'une vente hors ligne, recalculée
+/// à partir de son identifiant local (même règle que [colisShortRef]) — sert à
+/// relier une vente synchronisée au reçu provisoire remis au client.
+String offlineProvisionalRef(String gareDepart, String offlineLocalId) {
+  final suffix = offlineLocalId.split('-').last;
+  final tag = suffix.length >= 8 ? suffix.toUpperCase().substring(0, 8) : suffix.toUpperCase();
+  return '${_garePrefixLocal(gareDepart)}-$tag';
+}
+
 /// Numéro affiché sur le reçu/talon : numérotation séquentielle par gare de
 /// départ (ex. ABOI000001, migration 180) si disponible, sinon repli sur la
 /// référence CL-XXXXXXXX (colis hors connexion pas encore synchronisé).

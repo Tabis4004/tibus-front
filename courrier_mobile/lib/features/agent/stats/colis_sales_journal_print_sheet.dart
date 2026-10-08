@@ -281,7 +281,7 @@ class _SalesJournalBox extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(c.numeroRecu ?? '—'),
+                            Text(salesJournalRef(c)),
                             Text(formatSalesJournalDate(c.createdAt)),
                           ],
                         ),
@@ -327,6 +327,12 @@ class _SalesJournalBox extends StatelessWidget {
                   'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              if (journal.grandOfflineCount > 0)
+                Text(
+                  salesJournalOfflineNote(journal.grandOfflineCount, journal.grandOfflineFrais, showMontant: showMontant),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12),
                 ),
             ],
           ),
@@ -464,7 +470,7 @@ class _SalesJournalEscPosPrinterSheetState extends ConsumerState<_SalesJournalEs
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(icon),
-                title: Text(d.name?.isNotEmpty == true ? d.name! : 'Imprimante'),
+                title: Text(d.name.isNotEmpty ? d.name : 'Imprimante'),
                 onTap: _busy ? null : () => _printOn(d, type),
               ))
           .toList(),

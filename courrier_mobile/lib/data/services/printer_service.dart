@@ -339,7 +339,7 @@ class PrinterService {
       rows.add(['Agent: ${group.vendeurUsername ?? group.vendeurName}', '']);
       for (final c in group.colis) {
         rows.add([
-          '${formatSalesJournalHour(c.createdAt)}  ${c.numeroRecu ?? "—"}',
+          '${formatSalesJournalHour(c.createdAt)}  ${salesJournalRef(c)}',
           showMontant ? '${c.montantFret.toStringAsFixed(0)}F' : '',
         ]);
         if (showDestination || showValeur) {
@@ -355,6 +355,9 @@ class PrinterService {
         // vente) : seul le total des frais est affiché.
         if (showMontant) 'F ${group.totalFrais.toStringAsFixed(0)}' else '',
       ]);
+      if (group.offlineCount > 0) {
+        rows.add([salesJournalOfflineNote(group.offlineCount, group.offlineFrais, showMontant: showMontant), '']);
+      }
       rows.add(['--------------------------------', '']);
     }
     return printReceipt(
@@ -368,6 +371,8 @@ class PrinterService {
       qr: '',
       footer: [
         if (showMontant) 'Frais ${journal.grandTotalFrais.toStringAsFixed(0)}',
+        if (journal.grandOfflineCount > 0)
+          salesJournalOfflineNote(journal.grandOfflineCount, journal.grandOfflineFrais, showMontant: showMontant),
         if (kBrandPoweredBy.isNotEmpty) kBrandPoweredBy,
       ].join('\n'),
       paperWidthMm: paperWidthMm,

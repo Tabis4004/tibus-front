@@ -138,9 +138,26 @@ class SyncService extends ChangeNotifier {
     }
   }
 
+  /// Ventes hors ligne de l'agent connecté encore en file pour [companyId]
+  /// — utilisé avant la clôture de caisse (station_cash_screen.dart) : la
+  /// caisse ne peut pas être clôturée tant qu'il en reste, sinon ces ventes
+  /// tomberaient dans la session suivante (vente « qui change de date »).
+  Future<List<PendingColis>> pendingMineFor(String? companyId) async {
+    final items = await _queue.loadAll();
+    return items.where((e) => isMine(e) && (companyId == null || e.companyId == companyId)).toList();
+  }
+
   Future<bool> _syncOne(PendingColis item) async {
     try {
-      final result = await _colisService.registerColis(item.toInput());
+      // Appel idempotent (migration 217) : le localId identifie la vente,
+      // donc une synchro rejouée (réponse perdue, double déclenchement) ne
+      // peut jamais créer un 2e colis ; l'heure réelle de la vente sur
+      // l'appareil est conservée côté serveur (offline_created_at).
+      final result = await _colisService.registerColisIdempotent(
+        item.toInput(),
+        localId: item.localId,
+        offlineCreatedAt: item.createdAt,
+      );
       final colisId = result['id'] as String?;
       if (colisId != null && item.photoBase64 != null && item.photoBase64!.isNotEmpty) {
         try {

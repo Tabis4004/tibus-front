@@ -110,7 +110,8 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         );
       case 'select':
         return DropdownButtonFormField<String>(
-          value: _customFieldValues[field.key] as String?,
+          key: ValueKey('custom:${field.key}:${_customFieldValues[field.key]}'),
+          initialValue: _customFieldValues[field.key] as String?,
           decoration: InputDecoration(labelText: label),
           items: field.options
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
@@ -440,8 +441,16 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         await _registerOffline(input);
         return;
       }
+      // Clé anti-doublon générée AVANT l'appel (migration 217) : si le délai
+      // de 15 s est dépassé alors que le serveur a bien enregistré la vente,
+      // la file hors ligne réutilise la MÊME clé et la synchro retrouve le
+      // colis existant au lieu d'en créer un second.
+      final localId = generateLocalId();
       try {
-        final result = await ref.read(colisServiceProvider).registerColis(input).timeout(const Duration(seconds: 15));
+        final result = await ref
+            .read(colisServiceProvider)
+            .registerColisIdempotent(input, localId: localId)
+            .timeout(const Duration(seconds: 15));
         if (!mounted) return;
         final colisId = result['id'] as String;
         unawaited(ref.read(staffNotificationsServiceProvider).notifyFromRpcResult(
@@ -525,12 +534,13 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                 phone: colis.companyPhone,
               );
         }
+        if (!mounted) return;
         await showColisReceiptPreview(context, colis);
         if (mounted) Navigator.of(context).pop();
       } on TimeoutException {
-        await _registerOffline(input);
+        await _registerOffline(input, localId: localId);
       } on SocketException {
-        await _registerOffline(input);
+        await _registerOffline(input, localId: localId);
       }
     } catch (e) {
       if (mounted) {
@@ -548,7 +558,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
   /// l'agent peut ainsi encaisser et servir le client tout de suite, la
   /// vraie référence étant confirmée automatiquement dès que le réseau
   /// revient (AgentShell écoute la connectivité).
-  Future<void> _registerOffline(RegisterColisInput input) async {
+  Future<void> _registerOffline(RegisterColisInput input, {String? localId}) async {
     final cache = ref.read(referenceCacheServiceProvider);
     final companyInfo = await cache.loadCompanyInfo(input.companyId);
     final natureLabel = _natures
@@ -559,7 +569,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         .firstWhere((g) => g.id == input.gareDestinationId, orElse: () => const GareOption(id: '', name: ''))
         .name;
     final pending = PendingColis(
-      localId: generateLocalId(),
+      localId: localId ?? generateLocalId(),
       createdAt: DateTime.now(),
       companyId: input.companyId,
       gareDepartId: input.gareDepartId,
@@ -662,7 +672,8 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _gareDestinationId,
+                  key: ValueKey('dest:$_gareDestinationId'),
+                  initialValue: _gareDestinationId,
                   decoration: const InputDecoration(labelText: 'Gare de destination'),
                   items: _destinationGares
                       .map((g) => DropdownMenuItem(value: g.id, child: Text(g.name)))
@@ -686,7 +697,8 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
                 const Text('Colis', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: _selectedNatureId,
+                  key: ValueKey('nature:$_selectedNatureId'),
+                  initialValue: _selectedNatureId,
                   decoration: const InputDecoration(labelText: 'Nature de colis'),
                   items: _natures
                       .map((n) => DropdownMenuItem(value: n.id, child: Text(n.libelle)))

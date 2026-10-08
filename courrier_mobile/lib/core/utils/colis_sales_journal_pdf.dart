@@ -95,7 +95,7 @@ Future<Uint8List> buildColisSalesJournalPdfA4(
           for (final c in group.colis)
             pw.TableRow(children: [
               cell(formatSalesJournalDate(c.createdAt)),
-              cell(c.numeroRecu ?? '—'),
+              cell(salesJournalRef(c)),
               cell(c.nomExpediteur),
               cell(c.nomDestinataire),
               if (showDestination) cell(c.gareDestination),
@@ -113,7 +113,8 @@ Future<Uint8List> buildColisSalesJournalPdfA4(
         child: pw.Text(
           'Sous-total ${group.vendeurUsername ?? group.vendeurName} : '
           '${group.count} colis'
-          '${showMontant ? " · Frais ${amount(group.totalFrais)}" : ""}',
+          '${showMontant ? " · Frais ${amount(group.totalFrais)}" : ""}'
+          '${group.offlineCount > 0 ? "  —  ${salesJournalOfflineNote(group.offlineCount, group.offlineFrais, showMontant: showMontant)}" : ""}',
           style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
         ),
       ),
@@ -157,7 +158,8 @@ Future<Uint8List> buildColisSalesJournalPdfA4(
           decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
           child: pw.Text(
             'TOTAL GÉNÉRAL : ${journal.grandCount} colis'
-            '${showMontant ? "  ·  Frais ${amount(journal.grandTotalFrais)}" : ""}',
+            '${showMontant ? "  ·  Frais ${amount(journal.grandTotalFrais)}" : ""}'
+            '${journal.grandOfflineCount > 0 ? "\n${salesJournalOfflineNote(journal.grandOfflineCount, journal.grandOfflineFrais, showMontant: showMontant)}" : ""}',
             style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
           ),
         ),

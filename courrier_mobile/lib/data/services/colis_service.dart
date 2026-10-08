@@ -46,6 +46,63 @@ class ColisService {
     return data as Map<String, dynamic>?;
   }
 
+  /// Enregistrement idempotent (register_colis_autonome_offline, migration
+  /// 217) : [localId] identifie la vente de façon unique — un 2e appel avec
+  /// le même [localId] renvoie le colis existant au lieu d'en créer un
+  /// autre (synchro rejouée, ou réponse perdue après un délai dépassé).
+  /// [offlineCreatedAt] : heure réelle de la vente sur l'appareil, à fournir
+  /// UNIQUEMENT pour une vente faite hors ligne (null = vente en ligne).
+  Future<Map<String, dynamic>> registerColisIdempotent(
+    RegisterColisInput input, {
+    required String localId,
+    DateTime? offlineCreatedAt,
+  }) async {
+    try {
+      return await _registerColisIdempotentRpc(input, localId: localId, offlineCreatedAt: offlineCreatedAt);
+    } on PostgrestException catch (e) {
+      // Base pas encore migrée (217 absente, ex. instance SIS avant patch) :
+      // fonction introuvable -> repli sur l'enregistrement classique, pour
+      // que les ventes ne soient jamais bloquées par un ordre de déploiement.
+      if (e.code == 'PGRST202' || e.code == '42883') return registerColis(input);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _registerColisIdempotentRpc(
+    RegisterColisInput input, {
+    required String localId,
+    DateTime? offlineCreatedAt,
+  }) async {
+    final data = await _client.rpc('register_colis_autonome_offline', params: {
+      'p_offline_local_id': localId,
+      'p_offline_created_at': offlineCreatedAt?.toUtc().toIso8601String(),
+      'p_company_id': input.companyId,
+      'p_gare_depart_id': input.gareDepartId,
+      'p_gare_destination_id': input.gareDestinationId,
+      'p_nom_expediteur': input.nomExpediteur,
+      'p_telephone_expediteur': input.telephoneExpediteur,
+      'p_nom_destinataire': input.nomDestinataire,
+      'p_telephone_destinataire': input.telephoneDestinataire,
+      'p_description_contenu': input.descriptionContenu,
+      'p_poids_kg': input.poidsKg,
+      'p_nombre_pieces': input.nombrePieces,
+      'p_montant_fret': input.montantFret,
+      'p_nature_ids': input.natureIds,
+      'p_valeur_marchandise': input.valeurMarchandise,
+      'p_pourcentage_percu': input.pourcentagePercu,
+      'p_bus_id': input.busId,
+      'p_custom_fields': input.customFields,
+    });
+    return data as Map<String, dynamic>;
+  }
+
+  /// Ventilation en ligne / hors ligne des encaissements colis d'une session
+  /// de caisse (migration 217) — affichée à la clôture.
+  Future<StationCashOriginSummary> getStationCashOriginSummary(String caisseId) async {
+    final data = await _client.rpc('get_station_cash_origin_summary', params: {'p_caisse_id': caisseId});
+    return StationCashOriginSummary.fromMap((data ?? {}) as Map<String, dynamic>);
+  }
+
   Future<Map<String, dynamic>> registerColis(RegisterColisInput input) async {
     final data = await _client.rpc('register_colis_autonome', params: {
       'p_company_id': input.companyId,
@@ -165,6 +222,7 @@ class ColisService {
     String? gareDepartId,
     DateTime? dateFrom,
     DateTime? dateTo,
+    ColisSaleOrigin? origin,
   }) async {
     final data = await _client.rpc('get_colis_autonome_stats', params: {
       'p_company_id': companyId,
@@ -172,6 +230,9 @@ class ColisService {
       'p_gare_depart_id': gareDepartId,
       'p_date_from': dateFrom?.toIso8601String(),
       'p_date_to': dateTo?.toIso8601String(),
+      // Envoyé seulement si filtré : une base pas encore migrée (217)
+      // continue de répondre sans filtre d'origine.
+      if (origin != null) 'p_origin': origin.dbValue,
     });
     return (data ?? {}) as Map<String, dynamic>;
   }
@@ -214,12 +275,14 @@ class ColisService {
     required DateTime dateFrom,
     DateTime? dateTo,
     String? vendeurId,
+    ColisSaleOrigin? origin,
   }) async {
     final data = await _client.rpc('get_colis_sales_journal', params: {
       'p_company_id': companyId,
       'p_date_from': dateFrom.toIso8601String(),
       'p_date_to': dateTo?.toIso8601String(),
       'p_vendeur_id': vendeurId,
+      if (origin != null) 'p_origin': origin.dbValue,
     });
     return ColisSalesJournal.fromMap((data ?? {}) as Map<String, dynamic>);
   }

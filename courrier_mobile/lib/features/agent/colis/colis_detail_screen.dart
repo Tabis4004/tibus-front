@@ -58,12 +58,14 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
     setState(() => _loading = true);
     final service = ref.read(colisServiceProvider);
     final detail = await service.getColisDetail(widget.colisId);
-    if (mounted) setState(() {
-      _detail = detail;
-      _loading = false;
-      _selectedBusId = null;
-      _photoUrl = null;
-    });
+    if (mounted) {
+      setState(() {
+        _detail = detail;
+        _loading = false;
+        _selectedBusId = null;
+        _photoUrl = null;
+      });
+    }
     final companyId = detail?['companyId'] as String?;
     final statut = detail != null ? ColisStatutX.fromDb(detail['statutColis'] as String? ?? 'enregistre') : null;
     if (companyId != null && statut?.next == ColisStatut.charge) {
@@ -173,6 +175,10 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
               Text('${colis.montantFret.toStringAsFixed(0)} FCFA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
+          if (colis.isOffline) ...[
+            const SizedBox(height: 12),
+            _OfflineSaleInfo(colis: colis),
+          ],
           const SizedBox(height: 20),
           _InfoSection(title: 'Expéditeur', name: colis.nomExpediteur, phone: colis.telephoneExpediteur),
           const SizedBox(height: 12),
@@ -247,7 +253,8 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
           const SizedBox(height: 24),
           if (colis.statut.next == ColisStatut.charge && _buses.isNotEmpty) ...[
             DropdownButtonFormField<String?>(
-              value: _selectedBusId,
+              key: ValueKey('bus:$_selectedBusId'),
+              initialValue: _selectedBusId,
               decoration: const InputDecoration(labelText: 'Bus du convoi (optionnel)'),
               items: [
                 const DropdownMenuItem(value: null, child: Text('Aucun / à définir plus tard')),
@@ -263,7 +270,7 @@ class _ColisDetailScreenState extends ConsumerState<ColisDetailScreen> {
               child: Text(_updating ? 'Mise à jour...' : 'Marquer "${colis.statut.next!.label}"'),
             ),
           const SizedBox(height: 12),
-          Text(
+          const Text(
             'Notifier par WhatsApp',
             style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 12),
           ),
@@ -321,6 +328,50 @@ class _InfoSection extends StatelessWidget {
             Text(phone, style: const TextStyle(color: AppColors.textSecondary)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Encadré « vente hors ligne » (migration 217) : heure réelle de la vente,
+/// référence provisoire imprimée sur le reçu remis au client et heure de
+/// synchronisation — pour rapprocher le reçu provisoire du numéro définitif.
+class _OfflineSaleInfo extends StatelessWidget {
+  final Colis colis;
+  const _OfflineSaleInfo({required this.colis});
+
+  String _fmt(DateTime d) {
+    final l = d.toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(l.day)}/${two(l.month)}/${l.year} ${two(l.hour)}:${two(l.minute)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFEBE9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFBCAAA4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.cloud_sync_outlined, size: 16, color: Color(0xFF6D4C41)),
+              SizedBox(width: 6),
+              Text('Vente hors ligne', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6D4C41))),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Vendu le ${_fmt(colis.saleAt)}'),
+          if (colis.offlineLocalId != null)
+            Text('Réf. provisoire (reçu client) : ${offlineProvisionalRef(colis.gareDepart, colis.offlineLocalId!)}'),
+          Text('Synchronisé le ${_fmt(colis.createdAt)}',
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        ],
       ),
     );
   }

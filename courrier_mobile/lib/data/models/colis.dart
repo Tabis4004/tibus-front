@@ -112,6 +112,14 @@ class Colis {
   /// voir ColisFormBuilderPanel.tsx côté web) — clé -> valeur saisie par
   /// l'agent. Vide si la compagnie n'a défini aucun champ personnalisé.
   final Map<String, dynamic> customFields;
+  /// Vente faite HORS LIGNE puis synchronisée (migration 217) : vrai quand
+  /// le serveur a reçu une heure de vente appareil (offline_created_at).
+  final bool isOffline;
+  /// Heure réelle de la vente sur l'appareil (vente hors ligne uniquement).
+  final DateTime? offlineCreatedAt;
+  /// Identifiant local de la vente hors ligne (« local-<ms>-<hex8> ») : sert
+  /// à retrouver la référence provisoire imprimée sur le reçu remis au client.
+  final String? offlineLocalId;
 
   const Colis({
     required this.id,
@@ -141,7 +149,14 @@ class Colis {
     this.photoPath,
     this.isPendingSync = false,
     this.customFields = const {},
+    this.isOffline = false,
+    this.offlineCreatedAt,
+    this.offlineLocalId,
   });
+
+  /// Date qui compte pour la vente : heure réelle sur l'appareil pour une
+  /// vente hors ligne, sinon date d'enregistrement serveur.
+  DateTime get saleAt => offlineCreatedAt ?? createdAt;
 
   factory Colis.fromMap(Map<String, dynamic> map) {
     return Colis(
@@ -171,8 +186,20 @@ class Colis {
       companyPhone: (map['companyPhone'] as String?)?.trim() ?? '',
       photoPath: map['photoPath'] as String?,
       customFields: (map['customFields'] as Map?)?.cast<String, dynamic>() ?? const {},
+      isOffline: map['isOffline'] == true,
+      offlineCreatedAt: DateTime.tryParse(map['offlineCreatedAt'] as String? ?? ''),
+      offlineLocalId: map['offlineLocalId'] as String?,
     );
   }
+}
+
+/// Filtre « origine de la vente » (migration 217) — valeur envoyée aux RPC
+/// via [ColisSaleOriginX.dbValue] (null = toutes les ventes).
+enum ColisSaleOrigin { online, offline }
+
+extension ColisSaleOriginX on ColisSaleOrigin {
+  String get dbValue => this == ColisSaleOrigin.online ? 'online' : 'offline';
+  String get label => this == ColisSaleOrigin.online ? 'En ligne' : 'Hors ligne';
 }
 
 /// Bus actif de la compagnie, pour le sélecteur "bus du convoi" — reflète
@@ -263,6 +290,11 @@ class ColisSalesJournalLine {
   final double montantFret;
   final double? valeurMarchandise;
   final String gareDestination;
+  /// Vente hors ligne (migration 217) — [createdAt] est alors l'heure réelle
+  /// de la vente sur l'appareil, [syncedAt] l'heure d'arrivée sur le serveur.
+  final bool isOffline;
+  final DateTime? syncedAt;
+  final String? offlineLocalId;
 
   const ColisSalesJournalLine({
     required this.id,
@@ -273,6 +305,9 @@ class ColisSalesJournalLine {
     required this.montantFret,
     required this.valeurMarchandise,
     required this.gareDestination,
+    this.isOffline = false,
+    this.syncedAt,
+    this.offlineLocalId,
   });
 
   factory ColisSalesJournalLine.fromMap(Map<String, dynamic> map) => ColisSalesJournalLine(
@@ -284,6 +319,9 @@ class ColisSalesJournalLine {
         montantFret: (map['montantFret'] as num?)?.toDouble() ?? 0,
         valeurMarchandise: (map['valeurMarchandise'] as num?)?.toDouble(),
         gareDestination: map['gareDestination'] as String? ?? '',
+        isOffline: map['isOffline'] == true,
+        syncedAt: DateTime.tryParse(map['syncedAt'] as String? ?? ''),
+        offlineLocalId: map['offlineLocalId'] as String?,
       );
 }
 
@@ -296,6 +334,8 @@ class ColisSalesJournalGroup {
   final int count;
   final double totalFrais;
   final double totalValeur;
+  final int offlineCount;
+  final double offlineFrais;
 
   const ColisSalesJournalGroup({
     required this.vendeurId,
@@ -305,6 +345,8 @@ class ColisSalesJournalGroup {
     required this.count,
     required this.totalFrais,
     required this.totalValeur,
+    this.offlineCount = 0,
+    this.offlineFrais = 0,
   });
 
   factory ColisSalesJournalGroup.fromMap(Map<String, dynamic> map) => ColisSalesJournalGroup(
@@ -318,6 +360,8 @@ class ColisSalesJournalGroup {
         count: (map['count'] as num?)?.toInt() ?? 0,
         totalFrais: (map['totalFrais'] as num?)?.toDouble() ?? 0,
         totalValeur: (map['totalValeur'] as num?)?.toDouble() ?? 0,
+        offlineCount: (map['offlineCount'] as num?)?.toInt() ?? 0,
+        offlineFrais: (map['offlineFrais'] as num?)?.toDouble() ?? 0,
       );
 }
 
@@ -332,6 +376,9 @@ class ColisSalesJournal {
   final double grandTotalValeur;
   final bool fullAccess;
   final bool gareScope;
+  /// Dont ventes hors ligne (migration 217).
+  final int grandOfflineCount;
+  final double grandOfflineFrais;
 
   const ColisSalesJournal({
     required this.groups,
@@ -340,6 +387,8 @@ class ColisSalesJournal {
     required this.grandTotalValeur,
     required this.fullAccess,
     required this.gareScope,
+    this.grandOfflineCount = 0,
+    this.grandOfflineFrais = 0,
   });
 
   factory ColisSalesJournal.fromMap(Map<String, dynamic> map) => ColisSalesJournal(
@@ -352,6 +401,32 @@ class ColisSalesJournal {
         grandTotalValeur: (map['grandTotalValeur'] as num?)?.toDouble() ?? 0,
         fullAccess: map['fullAccess'] == true,
         gareScope: map['gareScope'] == true,
+        grandOfflineCount: (map['grandOfflineCount'] as num?)?.toInt() ?? 0,
+        grandOfflineFrais: (map['grandOfflineFrais'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+/// Ventilation en ligne / hors ligne des encaissements colis d'une session
+/// de caisse — get_station_cash_origin_summary (migration 217), affichée à
+/// la clôture.
+class StationCashOriginSummary {
+  final int onlineCount;
+  final double onlineMontant;
+  final int offlineCount;
+  final double offlineMontant;
+
+  const StationCashOriginSummary({
+    this.onlineCount = 0,
+    this.onlineMontant = 0,
+    this.offlineCount = 0,
+    this.offlineMontant = 0,
+  });
+
+  factory StationCashOriginSummary.fromMap(Map<String, dynamic> map) => StationCashOriginSummary(
+        onlineCount: (map['onlineCount'] as num?)?.toInt() ?? 0,
+        onlineMontant: (map['onlineMontant'] as num?)?.toDouble() ?? 0,
+        offlineCount: (map['offlineCount'] as num?)?.toInt() ?? 0,
+        offlineMontant: (map['offlineMontant'] as num?)?.toDouble() ?? 0,
       );
 }
 
