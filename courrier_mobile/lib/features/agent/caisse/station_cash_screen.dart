@@ -241,13 +241,18 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
   /// Journal de VENTE du jour (colis vendus par cet agent — scoping serveur,
   /// get_colis_sales_journal) : même impression que Stats → « Mon rapport
   /// d'activité », en raccourci depuis la caisse pour la fin de session.
-  Future<void> _printSalesJournal() async {
+  /// [day] : journée à imprimer (réimpression d'un journal passé) — par
+  /// défaut aujourd'hui. Les ventes hors ligne y sont comptées à leur date
+  /// réelle de vente (migration 217).
+  Future<void> _printSalesJournal({DateTime? day}) async {
     final companyId = _companyId;
     if (companyId == null || _saving) return;
     setState(() => _saving = true);
     try {
+      final ref0 = day ?? DateTime.now();
+      final from = DateTime(ref0.year, ref0.month, ref0.day);
       final now = DateTime.now();
-      final from = DateTime(now.year, now.month, now.day);
+      final isToday = from == DateTime(now.year, now.month, now.day);
       final journal = await ref.read(colisServiceProvider).getColisSalesJournal(
             companyId: companyId,
             dateFrom: from,
@@ -265,7 +270,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         context,
         journal: journal,
         companyName: companyName,
-        periodLabel: "Aujourd'hui",
+        periodLabel: isToday ? "Aujourd'hui" : 'Journée du ${DateFormat('dd/MM/yyyy').format(from)}',
       );
     } catch (e) {
       if (mounted) {
@@ -380,6 +385,19 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
     }
   }
 
+  /// Choix d'une journée passée puis impression de son journal de vente.
+  Future<void> _pickAndPrintSalesJournal() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.subtract(const Duration(days: 1)),
+      firstDate: DateTime(2024),
+      lastDate: now,
+      helpText: 'Journal de vente du…',
+    );
+    if (picked != null) await _printSalesJournal(day: picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -428,6 +446,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
               onCloseCash: _closeCash,
               onPrintJournal: _printJournal,
               onPrintSalesJournal: _printSalesJournal,
+              onPickSalesJournalDay: _pickAndPrintSalesJournal,
               dateFmt: _dateFmt,
               showCashJournal: _uiConfig.showReport('cashJournal'),
               showSalesJournal: _uiConfig.showReport('salesJournal'),
@@ -520,6 +539,7 @@ class _OpenCashDetails extends StatelessWidget {
   final VoidCallback onCloseCash;
   final VoidCallback onPrintJournal;
   final VoidCallback onPrintSalesJournal;
+  final VoidCallback onPickSalesJournalDay;
   final DateFormat dateFmt;
   final bool showCashJournal;
   final bool showSalesJournal;
@@ -533,6 +553,7 @@ class _OpenCashDetails extends StatelessWidget {
     required this.onCloseCash,
     required this.onPrintJournal,
     required this.onPrintSalesJournal,
+    required this.onPickSalesJournalDay,
     required this.dateFmt,
     required this.showCashJournal,
     required this.showSalesJournal,
@@ -627,10 +648,22 @@ class _OpenCashDetails extends StatelessWidget {
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: saving ? null : onPrintSalesJournal,
-                    icon: const Icon(Icons.receipt_long_outlined),
-                    label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: saving ? null : onPrintSalesJournal,
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: Text(saving ? '…' : 'Imprimer le journal de vente'),
+                      ),
+                      // Réimpression d'un journal passé (choix de la date).
+                      OutlinedButton.icon(
+                        onPressed: saving ? null : onPickSalesJournalDay,
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        label: const Text('Autre date…'),
+                      ),
+                    ],
                   ),
                 ],
               ),
