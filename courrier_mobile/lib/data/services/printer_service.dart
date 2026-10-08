@@ -153,7 +153,7 @@ class PrinterService {
         ['Agence', colis.gareDepart],
         if (colis.gareDepartPhone.isNotEmpty) ['Tél. agence', colis.gareDepartPhone],
         if (agent != null) ['Agent', agent],
-        ['Déposé le', formatColisDate(colis.createdAt)],
+        ['Déposé le', formatColisDate(colis.saleAt)],
         ['BÉNÉFICIAIRE', colis.nomDestinataire],
         ['Téléphone ', colis.telephoneDestinataire],
         ['Destination', colis.gareDestination],
@@ -204,6 +204,8 @@ class PrinterService {
       ],
       reference: colisReceiptNumber(colis),
       rows: [
+        // Date et heure d'enregistrement (demande terrain du 08/10/2026).
+        ['Enregistré le', formatColisDate(colis.saleAt)],
         ['Destination', colis.gareDestination],
         ['Montant', '${colis.montantFret.toStringAsFixed(0)} FCFA'],
         ['Destinataire', colis.nomDestinataire],

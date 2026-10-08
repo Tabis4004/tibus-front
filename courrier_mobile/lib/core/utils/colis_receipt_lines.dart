@@ -76,7 +76,7 @@ String colisReceiptNumber(Colis colis) {
   return (numero != null && numero.isNotEmpty) ? numero : colisShortRef(colis);
 }
 
-String formatColisDate(DateTime dt) => DateFormat('dd/MM/yy HH:mm').format(dt);
+String formatColisDate(DateTime dt) => DateFormat('dd/MM/yy HH:mm').format(dt.toLocal());
 
 String colisContentLabel(Colis colis) {
   if (colis.natures.isNotEmpty) return colis.natures.join(', ');
@@ -166,7 +166,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
     if (colis.gareDepartPhone.isNotEmpty)
       {'text': 'Tél. agence     ${colis.gareDepartPhone}', 'bold': true},
     if (agentName != null && agentName.isNotEmpty) {'text': 'Agent           $agentName', 'bold': true},
-    {'text': 'Déposé le       ${formatColisDate(colis.createdAt)}', 'bold': true},
+    {'text': 'Déposé le       ${formatColisDate(colis.saleAt)}', 'bold': true},
     {'text': '--------------------------------', 'bold': true},
     {'text': 'BÉNÉFICIAIRE', 'bold': true},
     {'text': colis.nomDestinataire, 'bold': true},
@@ -261,6 +261,10 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
 /// esc_pos_printer_service.dart) sans toucher à l'ordre des autres ponts
 /// (P3 natif, WisePrinter) qui utilisent colisTalonBodyLines tel quel.
 List<Map<String, dynamic>> colisTalonDestinataireLines(Colis colis) => [
+      // Date et heure d'enregistrement (demande terrain du 08/10/2026) :
+      // visible sur le colis lui-même, pour savoir depuis quand il attend.
+      // Heure réelle de la vente pour un colis vendu hors ligne (saleAt).
+      {'text': 'Enregistré le ${formatColisDate(colis.saleAt)}', 'align': 'center', 'size': 'small'},
       // Nom de ville réduit (large -> défaut, demande explicite du
       // 26/08/2026) : c'était l'élément le plus imposant du talon, au
       // détriment du numéro du destinataire ci-dessous, qui est

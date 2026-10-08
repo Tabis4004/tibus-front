@@ -454,7 +454,7 @@ class _ReceiptBox extends StatelessWidget {
                 _Field('Agence', colis.gareDepart),
                 if (colis.gareDepartPhone.isNotEmpty) _Field('Tél. agence', colis.gareDepartPhone),
                 if (agentName != null) _Field('Agent', agentName!),
-                _Field('Déposé le', formatColisDate(colis.createdAt)),
+                _Field('Déposé le', formatColisDate(colis.saleAt)),
               ],
             ),
             _Section(
@@ -639,7 +639,11 @@ class _TalonBox extends StatelessWidget {
                 QrImageView(data: colis.id, size: 32),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            // Date et heure d'enregistrement (demande terrain du 08/10/2026).
+            Text('Enregistré le ${formatColisDate(colis.saleAt)}',
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
+            const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

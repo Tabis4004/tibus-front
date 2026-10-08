@@ -6,6 +6,7 @@ import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/utils/colis_ref.dart';
+import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../data/models/colis.dart';
 
 /// Action de scan disponible pour un statut donné — même 3 étapes que le
@@ -285,6 +286,11 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
                 ),
                 const Divider(height: 24),
                 Text('De ${colis.gareDepart} vers ${colis.gareDestination}'),
+                const SizedBox(height: 4),
+                // Date et heure d'enregistrement (demande terrain du
+                // 08/10/2026) — même valeur que celle imprimée sur le talon.
+                Text('Enregistré le ${formatColisDate(colis.saleAt)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Text('Expéditeur : ${colis.nomExpediteur} — ${colis.telephoneExpediteur}',
                     style: const TextStyle(color: AppColors.textSecondary)),
