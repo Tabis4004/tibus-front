@@ -6,6 +6,7 @@ import '../../../core/utils/colis_receipt_lines.dart';
 import '../../../core/widgets/colis_card.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/models/app_role.dart';
+import '../../../data/models/pending_colis.dart';
 import 'colis_create_screen.dart';
 import 'colis_detail_screen.dart';
 import 'colis_scan_screen.dart';
@@ -134,7 +135,54 @@ class _ListBodyState extends ConsumerState<_ListBody> {
   }
 
   Future<List<Colis>> _fetch() {
-    return ref.read(colisServiceProvider).listColis(companyId: widget.companyId, statut: widget.statutFilter);
+    // Délai borné : sans réseau, la liste restait en chargement infini.
+    return ref
+        .read(colisServiceProvider)
+        .listColis(companyId: widget.companyId, statut: widget.statutFilter)
+        .timeout(const Duration(seconds: 20));
+  }
+
+  /// Hors connexion : la liste serveur est indisponible, on montre au moins
+  /// les ventes hors ligne de ce téléphone encore en attente de synchro.
+  Widget _buildOffline() {
+    return FutureBuilder<List<PendingColis>>(
+      future: ref.read(syncServiceProvider).loadPending(),
+      builder: (context, snap) {
+        final pending = (snap.data ?? const <PendingColis>[])
+            .where((p) => p.companyId == widget.companyId)
+            .toList();
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.cloud_off, color: Color(0xFFE65100)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pas de connexion : la liste complète des colis est indisponible. '
+                      'Tirez vers le bas pour réessayer.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (pending.isNotEmpty) ...[
+              Text('Ventes hors ligne de ce téléphone (${pending.length})',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              for (final p in pending) ...[
+                ColisCard(colis: p.toColis(), reference: colisReceiptNumber(p.toColis())),
+                const SizedBox(height: 10),
+              ],
+            ],
+          ],
+        );
+      },
+    );
   }
 
   /// Tire-pour-rafraîchir — voir home_screen.dart pour le contexte complet :
@@ -256,6 +304,7 @@ class _ListBodyState extends ConsumerState<_ListBody> {
             child: FutureBuilder<List<Colis>>(
               future: _colisFuture,
               builder: (context, snapshot) {
+                if (snapshot.hasError) return _buildOffline();
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 var items = snapshot.data!;
                 final query = widget.search.text.trim().toLowerCase();

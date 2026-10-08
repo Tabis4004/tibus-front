@@ -146,7 +146,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               dateTo: _dateToExclusive,
               origin: _origin,
             ),
-          );
+          )
+          // Délai borné : sans réseau, la page restait en chargement infini.
+          .timeout(const Duration(seconds: 20));
     });
   }
 
@@ -335,6 +337,31 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           return FutureBuilder<ColisStats>(
             future: _statsFuture,
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off, size: 40, color: Color(0xFFE65100)),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Statistiques indisponibles sans connexion internet.\n'
+                          'Les ventes hors ligne y apparaîtront après synchronisation.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () => _reload(companyId),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Réessayer'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
               final s = snapshot.data!;
               return ListView(

@@ -251,6 +251,7 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
       await cache.saveGares(companyId, gares);
       await cache.saveNatures(companyId, natures);
       await cache.saveDefaultPct(companyId, defaultPct);
+      await cache.saveColisSettings(companyId, settings);
       await cache.saveOpenCash(openCash);
       setState(() {
         _companyId = companyId;
@@ -289,12 +290,16 @@ class _ColisCreateScreenState extends ConsumerState<ColisCreateScreen> {
         return;
       }
       final cachedPct = await cache.loadDefaultPct(companyId);
+      // Réglages du formulaire (champs masqués par l'owner) : sans eux, le
+      // formulaire hors ligne réaffichait poids/pièces/etc.
+      final cachedSettings = await cache.loadColisSettings(companyId);
       if (!mounted) return;
       setState(() {
         _companyId = companyId;
         _gares = cachedGares;
         _natures = cachedNatures.where((n) => n.isActive).toList();
         _openCash = cachedOpenCash;
+        if (cachedSettings != null) _uiConfig = ColisUiConfig.fromSettings(cachedSettings);
         _offline = true;
         if (cachedPct != null && _pourcentagePercu.text.isEmpty) {
           _pourcentagePercu.text = cachedPct.toString();

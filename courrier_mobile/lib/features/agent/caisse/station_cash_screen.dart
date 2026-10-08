@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import '../../../data/models/colis.dart';
 import '../stats/colis_sales_journal_print_sheet.dart';
 import '../colis/pending_colis_screen.dart';
 import '../../../data/models/pending_colis.dart';
+import '../../../core/utils/connectivity.dart';
 import '../../../core/config/brand_identity.dart';
 
 /// Caisse physique guichet — réplique StationCashPanel.tsx (web) :
@@ -36,6 +38,10 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
+  // Hors connexion (voir _load) : dernière caisse connue + ventes en attente.
+  bool _offline = false;
+  OpenStationCash? _offlineCash;
+  List<PendingColis> _offlinePending = const [];
   String? _companyId;
   List<GareOption> _gares = [];
   String? _selectedGareId;
@@ -58,9 +64,12 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _offline = false;
     });
     try {
-      final companyId = await ref.read(activeCompanyIdProvider.future);
+      // Délais bornés : sans réseau, ces appels pouvaient ne jamais aboutir
+      // (chargement infini) au lieu de basculer sur la vue hors ligne.
+      final companyId = await ref.read(activeCompanyIdProvider.future).timeout(const Duration(seconds: 12));
       if (!mounted) return;
       if (companyId == null) {
         setState(() {
@@ -81,11 +90,14 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         service.listStationGares(companyId),
         service.getOpenStationCash(),
         service.getCompanyColisSettings(companyId),
-      ]);
+      ]).timeout(const Duration(seconds: 15));
       if (!mounted) return;
       final gares = results[0] as List<GareOption>;
       final cash = results[1] as OpenStationCash;
-      final uiConfig = ColisUiConfig.fromSettings(results[2] as Map<String, dynamic>);
+      final settings = results[2] as Map<String, dynamic>;
+      final uiConfig = ColisUiConfig.fromSettings(settings);
+      // Garde les réglages pour le formulaire hors ligne (champs masqués).
+      unawaited(ref.read(referenceCacheServiceProvider).saveColisSettings(companyId, settings));
       List<StationCashMovement> movements = [];
       if (cash.open && cash.id != null) {
         movements = await service.listStationCashMovements(cash.id!, limit: 80);
@@ -103,6 +115,22 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         _loading = false;
       });
     } catch (e) {
+      // Pas de réseau : au lieu de l'erreur technique brute, on affiche la
+      // dernière caisse connue et les ventes en attente de synchronisation
+      // (toutes les actions de caisse exigent, elles, une connexion).
+      if (!await hasNetworkConnection() || _looksLikeNetworkError(e)) {
+        final cachedCash = await ref.read(referenceCacheServiceProvider).loadOpenCash();
+        final pending = await ref.read(syncServiceProvider).pendingMineFor(cachedCash?.companyId);
+        if (mounted) {
+          setState(() {
+            _offline = true;
+            _offlineCash = cachedCash;
+            _offlinePending = pending;
+            _loading = false;
+          });
+        }
+        return;
+      }
       if (mounted) {
         setState(() {
           _error = '$e';
@@ -110,6 +138,15 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         });
       }
     }
+  }
+
+  bool _looksLikeNetworkError(Object e) {
+    final s = '$e'.toLowerCase();
+    return s.contains('socketexception') ||
+        s.contains('failed host lookup') ||
+        s.contains('clientexception') ||
+        s.contains('timeoutexception') ||
+        s.contains('network');
   }
 
   Future<void> _openCash() async {
@@ -409,9 +446,11 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _CenteredMessage(text: 'Erreur : $_error', onRetry: _load)
-              : _buildBody(context),
+          : _offline
+              ? _OfflineCashView(cash: _offlineCash, pending: _offlinePending, onRetry: _load)
+              : _error != null
+                  ? _CenteredMessage(text: 'Erreur : $_error', onRetry: _load)
+                  : _buildBody(context),
     );
   }
 
@@ -845,6 +884,90 @@ class _CenteredMessage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+/// Caisse sans connexion : solde, remise et clôture exigent le serveur.
+/// On affiche la dernière caisse connue sur ce téléphone et les ventes hors
+/// ligne en attente, pour que le vendeur sache où il en est.
+class _OfflineCashView extends StatelessWidget {
+  final OpenStationCash? cash;
+  final List<PendingColis> pending;
+  final VoidCallback onRetry;
+
+  const _OfflineCashView({required this.cash, required this.pending, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = pending.fold<double>(0, (sum, e) => sum + e.montantFret);
+    final c = cash;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF3E0),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFFB74D)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.cloud_off, color: Color(0xFFE65100)),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Pas de connexion internet. Vous pouvez continuer à enregistrer des colis : '
+                  'ils seront synchronisés au retour du réseau. Solde, remise et clôture de '
+                  'caisse nécessitent une connexion.',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Dernière caisse connue sur ce téléphone', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                if (c == null || !c.open)
+                  const Text('Aucune caisse ouverte connue.')
+                else ...[
+                  Text(c.sessionLabel ?? c.gareName ?? 'Caisse ouverte'),
+                  if (c.balance != null)
+                    Text('Solde au dernier chargement : ${c.balance!.toStringAsFixed(0)} FCFA',
+                        style: const TextStyle(color: Colors.grey)),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ventes hors ligne en attente', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(
+                  pending.isEmpty
+                      ? 'Aucune vente en attente.'
+                      : '${pending.length} vente(s) · ${total.toStringAsFixed(0)} FCFA — '
+                          'seront ajoutées à la caisse dès la synchronisation.',
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Réessayer')),
+      ],
     );
   }
 }

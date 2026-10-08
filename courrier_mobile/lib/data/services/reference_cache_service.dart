@@ -21,6 +21,31 @@ class ReferenceCacheService {
   String _naturesKey(String companyId) => 'ref_cache_natures_$companyId';
   String _pctKey(String companyId) => 'ref_cache_pct_$companyId';
   static const _openCashKey = 'ref_cache_open_cash_v1';
+  String _colisSettingsKey(String companyId) => 'ref_cache_colis_settings_$companyId';
+
+  /// Réglages « colis autonome » de la compagnie (get_company_colis_settings :
+  /// champs masqués du formulaire, rapports visibles, champs personnalisés…)
+  /// — sans ce cache, le formulaire hors ligne retombait sur les réglages
+  /// par défaut et réaffichait des champs masqués par l'owner (poids…).
+  Future<void> saveColisSettings(String companyId, Map<String, dynamic> settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      await prefs.setString(_colisSettingsKey(companyId), jsonEncode(settings));
+    } catch (_) {
+      // Réglages non sérialisables : on garde le cache précédent.
+    }
+  }
+
+  Future<Map<String, dynamic>?> loadColisSettings(String companyId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_colisSettingsKey(companyId));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> saveGares(String companyId, List<GareOption> gares) async {
     final prefs = await SharedPreferences.getInstance();
