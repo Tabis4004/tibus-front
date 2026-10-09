@@ -305,7 +305,7 @@ export default function BordereauPanel({
                 size="sm"
                 variant="outline"
                 className="cursor-pointer gap-1"
-                onClick={() => exportBordereauPDF(detail, { hiddenFields: bordereauReportConfig.hiddenFields })}
+                onClick={() => exportBordereauPDF(detail, { reportConfig: bordereauReportConfig })}
               >
                 <PrinterIcon className="w-3.5 h-3.5" />
                 {t("colis.bordereau_print", { defaultValue: "Imprimer" })}

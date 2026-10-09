@@ -33,6 +33,8 @@ import {
 import {
   COLIS_BUILTIN_FORM_FIELDS,
   COLIS_REPORT_FIELD_REGISTRY,
+  COLIS_REPORT_OPT_IN_FIELDS,
+  isReportFieldVisible,
   COLIS_REPORT_KEYS,
   COLIS_REPORT_LABELS,
   getCompanyColisSettingsSupabase,
@@ -222,6 +224,15 @@ export default function ColisFormBuilderPanel({ companyId }: { companyId: string
 
   const toggleReportField = (key: ColisReportKey, fieldKey: string, visible: boolean) => {
     const current = config.reports[key];
+    // Donnée « à activer » (masquée par défaut) : on note qu'elle est
+    // affichée ; sinon on note qu'elle est masquée. Même règle que le mobile.
+    if (COLIS_REPORT_OPT_IN_FIELDS[key]?.includes(fieldKey)) {
+      const shown = (current.shownFields ?? []).filter((f) => f !== fieldKey);
+      const shownFields = visible ? [...shown, fieldKey] : shown;
+      setConfig({ ...config, reports: { ...config.reports, [key]: { ...current, shownFields } } });
+      setDirty(true);
+      return;
+    }
     const hiddenFields = visible
       ? current.hiddenFields.filter((f) => f !== fieldKey)
       : [...current.hiddenFields.filter((f) => f !== fieldKey), fieldKey];
@@ -342,7 +353,7 @@ export default function ColisFormBuilderPanel({ companyId }: { companyId: string
                         <Label className="text-xs font-normal text-muted-foreground">{f.label}</Label>
                         <Switch
                           className="scale-90"
-                          checked={!report.hiddenFields.includes(f.key)}
+                          checked={isReportFieldVisible(report, key, f.key)}
                           onCheckedChange={(v) => toggleReportField(key, f.key, v)}
                         />
                       </div>

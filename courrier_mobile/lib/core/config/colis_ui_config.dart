@@ -79,9 +79,7 @@ class ColisUiConfig {
   /// journal de vente) — distinct de showReport qui masque le rapport
   /// entier. Visible par défaut si le rapport n'a pas de réglage explicite.
   bool showReportField(String reportKey, String fieldKey) {
-    final setting = reports[reportKey];
-    if (setting == null) return true;
-    return setting.showField(fieldKey);
+    return (reports[reportKey] ?? const ColisReportSetting()).isFieldVisible(reportKey, fieldKey);
   }
 
   static Map<String, dynamic>? _nestedMap(Map<String, dynamic> map, String key) {

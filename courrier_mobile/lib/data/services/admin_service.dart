@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import '../models/colis.dart' show kOptInReportFields;
 
 /// Administration réservée au rôle owner : Gares, Bus, Catégories de
 /// dépenses, Villes, Équipe (rôles). Toutes les RPC appelées ici vérifient
@@ -541,8 +542,20 @@ class ColisSettings {
     return hidden is List ? hidden.map((e) => e.toString()).toSet() : <String>{};
   }
 
-  bool reportFieldVisible(String reportKey, String fieldKey) =>
-      !_hiddenFieldsOf(reportKey).contains(fieldKey);
+  Set<String> _shownFieldsOf(String reportKey) {
+    final reports = rawUiConfig['reports'];
+    final report = reports is Map ? reports[reportKey] : null;
+    final shown = report is Map ? report['shownFields'] : null;
+    return shown is List ? shown.map((e) => e.toString()).toSet() : <String>{};
+  }
+
+  static bool _isOptIn(String reportKey, String fieldKey) =>
+      kOptInReportFields[reportKey]?.contains(fieldKey) ?? false;
+
+  /// Même règle que ColisReportSetting.isFieldVisible et le web.
+  bool reportFieldVisible(String reportKey, String fieldKey) => _isOptIn(reportKey, fieldKey)
+      ? _shownFieldsOf(reportKey).contains(fieldKey)
+      : !_hiddenFieldsOf(reportKey).contains(fieldKey);
 
   /// uiConfig complet avec une donnée de rapport affichée/masquée — le reste
   /// (enabled, autres rapports, formFields, customFields) est conservé.
@@ -550,13 +563,24 @@ class ColisSettings {
     final next = Map<String, dynamic>.from(rawUiConfig);
     final reports = Map<String, dynamic>.from((rawUiConfig['reports'] as Map?)?.cast<String, dynamic>() ?? {});
     final current = Map<String, dynamic>.from((reports[reportKey] as Map?)?.cast<String, dynamic>() ?? {'enabled': true});
-    final hidden = _hiddenFieldsOf(reportKey);
-    if (visible) {
-      hidden.remove(fieldKey);
+    if (_isOptIn(reportKey, fieldKey)) {
+      // Donnée « à activer » : on note qu'elle est affichée.
+      final shown = _shownFieldsOf(reportKey);
+      if (visible) {
+        shown.add(fieldKey);
+      } else {
+        shown.remove(fieldKey);
+      }
+      current['shownFields'] = shown.toList();
     } else {
-      hidden.add(fieldKey);
+      final hidden = _hiddenFieldsOf(reportKey);
+      if (visible) {
+        hidden.remove(fieldKey);
+      } else {
+        hidden.add(fieldKey);
+      }
+      current['hiddenFields'] = hidden.toList();
     }
-    current['hiddenFields'] = hidden.toList();
     reports[reportKey] = current;
     next['reports'] = reports;
     return next;

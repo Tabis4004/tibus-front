@@ -79,7 +79,7 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
 }
 
 /// Lignes de total du bordereau, selon le réglage owner (voir
-/// BordereauDetail.hiddenReportFields) — partagées par tous les rendus.
+/// BordereauDetail.reportSetting) — partagées par tous les rendus.
 List<String> bordereauTotalTexts(BordereauDetail d) => [
       if (d.showsMontantTotal) 'Total fret : ${d.totalFret.toStringAsFixed(0)} FCFA',
       if (d.showsValeurTotal) 'Valeur totale : ${d.totalValeur.toStringAsFixed(0)} FCFA',

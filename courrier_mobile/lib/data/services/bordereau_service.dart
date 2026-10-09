@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import '../models/colis.dart';
 
 /// Lot colis / bordereau de livraison (BL-XXXXXXXX, numéro de lot entier
 /// affiché sur l'étiquette) : mêmes RPC que le web (migration 182) —
@@ -315,11 +316,12 @@ class BordereauDetail {
   final DateTime? createdAt;
   final DateTime? closedAt;
   final List<BordereauColisRow> colis;
-  /// Données du rapport bordereau masquées par l'owner (hiddenFields du
-  /// réglage « bordereau » : 'montantTotal', 'valeurTotal') — renseignées
-  /// par l'écran après chargement des réglages (withHiddenReportFields), et
-  /// lues par tous les rendus (ticket, PDF, aperçu), comme sur le web.
-  final Set<String> hiddenReportFields;
+  /// Réglage owner du rapport bordereau ('montantTotal', 'valeurTotal' :
+  /// masqués par défaut, affichés seulement si l'owner les active) —
+  /// renseigné par l'écran après chargement des réglages
+  /// (withReportSetting), lu par tous les rendus (ticket, PDF, aperçu),
+  /// comme sur le web.
+  final ColisReportSetting reportSetting;
 
   const BordereauDetail({
     required this.id,
@@ -336,10 +338,10 @@ class BordereauDetail {
     this.createdAt,
     this.closedAt,
     required this.colis,
-    this.hiddenReportFields = const {},
+    this.reportSetting = const ColisReportSetting(),
   });
 
-  BordereauDetail withHiddenReportFields(Set<String> hidden) => BordereauDetail(
+  BordereauDetail withReportSetting(ColisReportSetting setting) => BordereauDetail(
         id: id,
         reference: reference,
         numeroLot: numeroLot,
@@ -354,11 +356,11 @@ class BordereauDetail {
         createdAt: createdAt,
         closedAt: closedAt,
         colis: colis,
-        hiddenReportFields: hidden,
+        reportSetting: setting,
       );
 
-  bool get showsMontantTotal => !hiddenReportFields.contains('montantTotal');
-  bool get showsValeurTotal => !hiddenReportFields.contains('valeurTotal');
+  bool get showsMontantTotal => reportSetting.isFieldVisible('bordereau', 'montantTotal');
+  bool get showsValeurTotal => reportSetting.isFieldVisible('bordereau', 'valeurTotal');
   double get totalValeur => colis.fold(0, (sum, row) => sum + (row.valeurMarchandise ?? 0));
 
   bool get isOpen => statut == 'ouvert';

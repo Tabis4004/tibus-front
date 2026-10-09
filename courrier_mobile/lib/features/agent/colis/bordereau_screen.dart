@@ -414,7 +414,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       } catch (_) {
         // Réglages indisponibles : on garde le dernier connu (ou le défaut).
       }
-      if (mounted) setState(() => _detail = detail.withHiddenReportFields(_bordereauSetting.hiddenFields));
+      if (mounted) setState(() => _detail = detail.withReportSetting(_bordereauSetting));
       if (detail.isOpen) unawaited(_loadAvailable());
     } catch (e) {
       if (mounted) {
@@ -528,7 +528,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     setState(() => _busy = true);
     try {
       final closed = await ref.read(bordereauServiceProvider).close(detail.id);
-      if (mounted) setState(() => _detail = closed.withHiddenReportFields(_bordereauSetting.hiddenFields));
+      if (mounted) setState(() => _detail = closed.withReportSetting(_bordereauSetting));
       _toast('Lot ${closed.reference} emballé — prêt à charger.');
     } catch (e) {
       _toast('Action impossible : ${friendlyError(e)}');

@@ -631,11 +631,21 @@ class ColisCustomFieldDef {
 /// Réglage de visibilité d'un rapport (report entier + champs sensibles
 /// masqués) — reflète colis_ui_config.reports.<key>, voir
 /// ColisFormBuilderPanel.tsx et get_company_colis_settings.
+/// Données MASQUÉES par défaut, affichées seulement si l'owner les active
+/// (demande du 09/10/2026 : bordereau sans valeurs par défaut). Toutes les
+/// autres données sont visibles par défaut (masquables via hiddenFields).
+/// Même liste côté web (COLIS_REPORT_OPT_IN_FIELDS, colis-autonomes.ts).
+const kOptInReportFields = <String, Set<String>>{
+  'bordereau': {'montantTotal', 'valeurTotal'},
+};
+
 class ColisReportSetting {
   final bool enabled;
   final Set<String> hiddenFields;
+  /// Données « à activer » (voir kOptInReportFields) affichées par l'owner.
+  final Set<String> shownFields;
 
-  const ColisReportSetting({this.enabled = true, this.hiddenFields = const {}});
+  const ColisReportSetting({this.enabled = true, this.hiddenFields = const {}, this.shownFields = const {}});
 
   factory ColisReportSetting.fromMap(Map<String, dynamic>? map) {
     if (map == null) return const ColisReportSetting();
@@ -643,8 +653,20 @@ class ColisReportSetting {
       enabled: map['enabled'] != false,
       hiddenFields:
           (map['hiddenFields'] as List?)?.map((e) => e.toString()).toSet() ?? const {},
+      shownFields:
+          (map['shownFields'] as List?)?.map((e) => e.toString()).toSet() ?? const {},
     );
   }
 
   bool showField(String key) => !hiddenFields.contains(key);
+
+  /// Donnée visible dans le rapport [reportKey] — tient compte des données
+  /// « à activer » (masquées par défaut). Même règle que le web
+  /// (isReportFieldVisible).
+  bool isFieldVisible(String reportKey, String fieldKey) {
+    if (kOptInReportFields[reportKey]?.contains(fieldKey) ?? false) {
+      return shownFields.contains(fieldKey);
+    }
+    return !hiddenFields.contains(fieldKey);
+  }
 }

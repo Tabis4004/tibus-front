@@ -125,15 +125,17 @@ export function exportColisManifestPDF(rows: ColisAutonomeRow[], meta: ColisMani
 // Document créé au chargement du bus (colis scannés un à un), imprimé pour
 // accompagner le convoyage et être émargé à la gare de destination.
 import type { BordereauDetail } from "@/lib/supabase/bordereaux.ts";
+import { isReportFieldVisible, type ColisReportConfig } from "@/lib/supabase/colis-autonomes.ts";
 
 export function exportBordereauPDF(
   bordereau: BordereauDetail,
-  opts?: { hiddenFields?: string[] },
+  opts?: { reportConfig?: ColisReportConfig },
 ) {
   // Réglage owner du rapport bordereau — mêmes clés et même rendu que
-  // l'app mobile (bordereauTotalTexts, courrier_mobile).
-  const hideMontantTotal = opts?.hiddenFields?.includes("montantTotal") ?? false;
-  const hideValeurTotal = opts?.hiddenFields?.includes("valeurTotal") ?? false;
+  // l'app mobile (bordereauTotalTexts, courrier_mobile). Totaux masqués par
+  // défaut, affichés seulement si l'owner les active.
+  const hideMontantTotal = !isReportFieldVisible(opts?.reportConfig, "bordereau", "montantTotal");
+  const hideValeurTotal = !isReportFieldVisible(opts?.reportConfig, "bordereau", "valeurTotal");
   const totalValeur = bordereau.colis.reduce((sum, row) => sum + (row.valeurMarchandise ?? 0), 0);
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const totalFret = bordereau.colis.reduce((sum, row) => sum + row.montantFret, 0);

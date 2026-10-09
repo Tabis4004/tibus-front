@@ -34,7 +34,31 @@ export type ColisReportKey = (typeof COLIS_REPORT_KEYS)[number];
 export type ColisReportConfig = {
   enabled: boolean;
   hiddenFields: string[];
+  /** Données « à activer » (voir COLIS_REPORT_OPT_IN_FIELDS) explicitement affichées par l'owner. */
+  shownFields?: string[];
 };
+
+/**
+ * Données MASQUÉES par défaut, affichées seulement si l'owner les active
+ * (demande du 09/10/2026 : bordereau sans valeurs par défaut). Toutes les
+ * autres données sont visibles par défaut (masquables via hiddenFields).
+ * Même liste côté mobile (kOptInReportFields, courrier_mobile).
+ */
+export const COLIS_REPORT_OPT_IN_FIELDS: Partial<Record<ColisReportKey, string[]>> = {
+  bordereau: ["montantTotal", "valeurTotal"],
+};
+
+/** Donnée visible dans un rapport, selon le réglage owner — à utiliser partout (web = mobile). */
+export function isReportFieldVisible(
+  config: ColisReportConfig | null | undefined,
+  reportKey: ColisReportKey,
+  fieldKey: string,
+): boolean {
+  if (COLIS_REPORT_OPT_IN_FIELDS[reportKey]?.includes(fieldKey)) {
+    return config?.shownFields?.includes(fieldKey) ?? false;
+  }
+  return !(config?.hiddenFields ?? []).includes(fieldKey);
+}
 
 /** Champs "sensibles" masquables par rapport, tout en gardant le rapport visible. */
 export const COLIS_REPORT_FIELD_REGISTRY: Record<ColisReportKey, { key: string; label: string }[]> = {
@@ -120,6 +144,7 @@ export function mapUiConfig(raw: unknown): ColisUiConfig {
       reports[key] = {
         enabled: e.enabled !== false,
         hiddenFields: Array.isArray(e.hiddenFields) ? e.hiddenFields.map((x) => String(x)) : [],
+        shownFields: Array.isArray(e.shownFields) ? e.shownFields.map((x) => String(x)) : [],
       };
     }
   }
