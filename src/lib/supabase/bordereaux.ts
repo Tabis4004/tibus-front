@@ -33,6 +33,8 @@ export type BordereauColisRow = {
   poidsKg: number | null;
   nombrePieces: number;
   montantFret: number;
+  /** Valeur déclarée (migration 218) — total « valeur des marchandises » du bordereau. */
+  valeurMarchandise: number | null;
   gareDepart: string;
   gareDestination: string;
   natures: string[];
@@ -81,6 +83,7 @@ function mapDetail(data: Record<string, unknown>): BordereauDetail {
       poidsKg: row.poidsKg != null ? Number(row.poidsKg) : null,
       nombrePieces: Number(row.nombrePieces ?? 1),
       montantFret: Number(row.montantFret ?? 0),
+      valeurMarchandise: row.valeurMarchandise != null ? Number(row.valeurMarchandise) : null,
       gareDepart: String(row.gareDepart ?? ""),
       gareDestination: String(row.gareDestination ?? ""),
       natures: Array.isArray(row.natures) ? row.natures.map((n) => String(n)) : [],

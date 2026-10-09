@@ -8,6 +8,7 @@ import '../../../core/utils/colis_ref.dart';
 import '../../../core/utils/error_message.dart';
 import '../../../data/models/colis.dart';
 import '../../../data/services/bordereau_service.dart';
+import '../../../core/config/colis_ui_config.dart';
 import 'bordereau_print_sheet.dart';
 
 final bordereauServiceProvider = Provider((ref) => BordereauService());
@@ -386,6 +387,10 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
   String _lastScan = '';
   List<BordereauColisRow>? _available;
   String? _addingId;
+  // Réglage owner du rapport bordereau (activé + données masquées), comme
+  // sur le web (BordereauPanel.tsx). Visible par défaut tant qu'il n'est
+  // pas chargé.
+  ColisReportSetting _bordereauSetting = const ColisReportSetting();
 
   @override
   void initState() {
@@ -403,7 +408,13 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
   Future<void> _load() async {
     try {
       final detail = await ref.read(bordereauServiceProvider).get(widget.bordereauId);
-      if (mounted) setState(() => _detail = detail);
+      try {
+        final settings = await ref.read(colisServiceProvider).getCompanyColisSettings(detail.companyId);
+        _bordereauSetting = ColisUiConfig.fromSettings(settings).reports['bordereau'] ?? const ColisReportSetting();
+      } catch (_) {
+        // Réglages indisponibles : on garde le dernier connu (ou le défaut).
+      }
+      if (mounted) setState(() => _detail = detail.withHiddenReportFields(_bordereauSetting.hiddenFields));
       if (detail.isOpen) unawaited(_loadAvailable());
     } catch (e) {
       if (mounted) {
@@ -517,7 +528,7 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
     setState(() => _busy = true);
     try {
       final closed = await ref.read(bordereauServiceProvider).close(detail.id);
-      if (mounted) setState(() => _detail = closed);
+      if (mounted) setState(() => _detail = closed.withHiddenReportFields(_bordereauSetting.hiddenFields));
       _toast('Lot ${closed.reference} emballé — prêt à charger.');
     } catch (e) {
       _toast('Action impossible : ${friendlyError(e)}');
@@ -539,11 +550,13 @@ class _BordereauDetailScreenState extends ConsumerState<BordereauDetailScreen> {
       appBar: AppBar(
         title: Text('Lot ${detail.numeroLot ?? detail.reference}'),
         actions: [
-          IconButton(
-            onPressed: detail.colis.isEmpty ? null : () => showBordereauPrintSheet(context, detail),
-            icon: const Icon(Icons.print_outlined),
-            tooltip: 'Imprimer l\'étiquette du lot',
-          ),
+          // Rapport bordereau désactivable par l'owner (comme sur le web).
+          if (_bordereauSetting.enabled)
+            IconButton(
+              onPressed: detail.colis.isEmpty ? null : () => showBordereauPrintSheet(context, detail),
+              icon: const Icon(Icons.print_outlined),
+              tooltip: 'Imprimer l\'étiquette du lot',
+            ),
         ],
       ),
       // Bouton de clôture toujours visible en bas de l'écran (pas seulement

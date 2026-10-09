@@ -246,6 +246,9 @@ class BordereauColisRow {
   final int nombrePieces;
   final double? poidsKg;
   final double montantFret;
+  /// Valeur déclarée (migration 218) — sert au total « valeur des
+  /// marchandises » du bordereau, si l'owner l'affiche (valeurTotal).
+  final double? valeurMarchandise;
 
   const BordereauColisRow({
     required this.id,
@@ -261,6 +264,7 @@ class BordereauColisRow {
     required this.nombrePieces,
     this.poidsKg,
     required this.montantFret,
+    this.valeurMarchandise,
   });
 
   // Numéro séquentiel par gare (ex. GESC000024) — même référence que celle
@@ -290,6 +294,7 @@ class BordereauColisRow {
         nombrePieces: (map['nombrePieces'] as num?)?.toInt() ?? 1,
         poidsKg: (map['poidsKg'] as num?)?.toDouble(),
         montantFret: (map['montantFret'] as num?)?.toDouble() ?? 0,
+        valeurMarchandise: (map['valeurMarchandise'] as num?)?.toDouble(),
       );
 }
 
@@ -310,6 +315,11 @@ class BordereauDetail {
   final DateTime? createdAt;
   final DateTime? closedAt;
   final List<BordereauColisRow> colis;
+  /// Données du rapport bordereau masquées par l'owner (hiddenFields du
+  /// réglage « bordereau » : 'montantTotal', 'valeurTotal') — renseignées
+  /// par l'écran après chargement des réglages (withHiddenReportFields), et
+  /// lues par tous les rendus (ticket, PDF, aperçu), comme sur le web.
+  final Set<String> hiddenReportFields;
 
   const BordereauDetail({
     required this.id,
@@ -326,7 +336,30 @@ class BordereauDetail {
     this.createdAt,
     this.closedAt,
     required this.colis,
+    this.hiddenReportFields = const {},
   });
+
+  BordereauDetail withHiddenReportFields(Set<String> hidden) => BordereauDetail(
+        id: id,
+        reference: reference,
+        numeroLot: numeroLot,
+        statut: statut,
+        companyId: companyId,
+        companyName: companyName,
+        villeDepart: villeDepart,
+        gareDestination: gareDestination,
+        busPlateNumber: busPlateNumber,
+        dateDebut: dateDebut,
+        dateFin: dateFin,
+        createdAt: createdAt,
+        closedAt: closedAt,
+        colis: colis,
+        hiddenReportFields: hidden,
+      );
+
+  bool get showsMontantTotal => !hiddenReportFields.contains('montantTotal');
+  bool get showsValeurTotal => !hiddenReportFields.contains('valeurTotal');
+  double get totalValeur => colis.fold(0, (sum, row) => sum + (row.valeurMarchandise ?? 0));
 
   bool get isOpen => statut == 'ouvert';
   bool get isClosed => statut == 'clos';

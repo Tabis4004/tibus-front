@@ -966,6 +966,24 @@ class _AdminColisSettingsScreenState extends ConsumerState<AdminColisSettingsScr
     }
   }
 
+  /// Données visibles dans un rapport (montant, valeur…) — même réglage
+  /// que la console web owner (hiddenFields), affiché sous le rapport.
+  List<Widget> _reportFieldSwitches(ColisSettings s, String reportKey) {
+    final fields = ColisSettings.reportFieldLabels[reportKey] ?? const [];
+    return [
+      for (final (fieldKey, label) in fields)
+        Padding(
+          padding: const EdgeInsets.only(left: 24),
+          child: SwitchListTile(
+            dense: true,
+            title: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            value: s.reportFieldVisible(reportKey, fieldKey),
+            onChanged: (v) => _saveUiConfig(s.toUpdatedReportField(reportKey, fieldKey, v)),
+          ),
+        ),
+    ];
+  }
+
   Future<void> _saveUiConfig(Map<String, dynamic> nextConfig) async {
     try {
       await ref.read(adminServiceProvider).updateColisUiConfig(companyId: widget.companyId, uiConfig: nextConfig);
@@ -1163,27 +1181,31 @@ class _AdminColisSettingsScreenState extends ConsumerState<AdminColisSettingsScr
           const Divider(height: 32),
 
           const Text('Visibilité des rapports', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const Text('Masquer un rapport entier pour votre compagnie.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const Text('Masquer un rapport entier, ou seulement certaines de ses données. Mêmes réglages que sur la console web.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           SwitchListTile(
             title: const Text('Rapport d\'activité (Stats)'),
             value: s.reportStatsEnabled,
             onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(statsEnabled: v)),
           ),
+          if (s.reportStatsEnabled) ..._reportFieldSwitches(s, 'stats'),
           SwitchListTile(
             title: const Text('Bordereau d\'envoi (manifeste / emballage)'),
             value: s.reportBordereauEnabled,
             onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(bordereauEnabled: v)),
           ),
+          if (s.reportBordereauEnabled) ..._reportFieldSwitches(s, 'bordereau'),
           SwitchListTile(
             title: const Text('Journal de caisse'),
             value: s.reportCashJournalEnabled,
             onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(cashJournalEnabled: v)),
           ),
+          if (s.reportCashJournalEnabled) ..._reportFieldSwitches(s, 'cashJournal'),
           SwitchListTile(
             title: const Text('Journal de vente'),
             value: s.reportSalesJournalEnabled,
             onChanged: (v) => _saveUiConfig(s.toUpdatedUiConfig(salesJournalEnabled: v)),
           ),
+          if (s.reportSalesJournalEnabled) ..._reportFieldSwitches(s, 'salesJournal'),
           const SizedBox(height: 24),
         ],
       ),

@@ -108,8 +108,8 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
           ],
         ),
         pw.SizedBox(height: 12),
-        // Pas de total (montant) sur le bordereau d'emballage — on ne garde
-        // que le nombre de colis du lot (demande promoteur).
+        // Nombre de colis + totaux selon le réglage owner (voir
+        // bordereauTotalTexts) — même règle que l'export web.
         pw.Align(
           alignment: pw.Alignment.centerRight,
           child: pw.Text(
@@ -117,6 +117,11 @@ Future<Uint8List> buildBordereauPdfA4(BordereauDetail d) async {
             style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
           ),
         ),
+        for (final t in bordereauTotalTexts(d))
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(t, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+          ),
       ],
     ),
   );

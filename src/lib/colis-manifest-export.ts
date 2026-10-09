@@ -130,7 +130,11 @@ export function exportBordereauPDF(
   bordereau: BordereauDetail,
   opts?: { hiddenFields?: string[] },
 ) {
+  // Réglage owner du rapport bordereau — mêmes clés et même rendu que
+  // l'app mobile (bordereauTotalTexts, courrier_mobile).
   const hideMontantTotal = opts?.hiddenFields?.includes("montantTotal") ?? false;
+  const hideValeurTotal = opts?.hiddenFields?.includes("valeurTotal") ?? false;
+  const totalValeur = bordereau.colis.reduce((sum, row) => sum + (row.valeurMarchandise ?? 0), 0);
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const totalFret = bordereau.colis.reduce((sum, row) => sum + row.montantFret, 0);
   const totalPieces = bordereau.colis.reduce((sum, row) => sum + row.nombrePieces, 0);
@@ -165,7 +169,8 @@ export function exportBordereauPDF(
   );
   doc.text(
     `Colis : ${bordereau.colis.length} · Pièces : ${totalPieces}` +
-      (hideMontantTotal ? "" : ` · Total fret : ${totalFret.toLocaleString()}`),
+      (hideMontantTotal ? "" : ` · Total fret : ${totalFret.toLocaleString()}`) +
+      (hideValeurTotal ? "" : ` · Valeur totale : ${totalValeur.toLocaleString()}`),
     14,
     42,
   );

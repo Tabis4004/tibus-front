@@ -62,9 +62,13 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
     lines.add({'text': '   ${c.montantFret.toStringAsFixed(0)} FCFA', 'size': 'small'});
   }
 
-  // Pas de total sur le bordereau d'emballage (demande promoteur) :
-  // l'objectif est de regrouper les colis par lot et destination, pas de
-  // valoriser le chargement.
+  // Totaux pilotés par le réglage owner du rapport bordereau (montantTotal,
+  // valeurTotal) — même règle que l'export web (colis-manifest-export.ts).
+  // Pour revenir à un bordereau sans total (ancienne demande promoteur),
+  // l'owner masque ces deux données dans Réglages colis autonome.
+  for (final t in bordereauTotalTexts(d)) {
+    lines.add({'text': t, 'bold': true});
+  }
   lines.addAll([
     {'text': '================================', 'align': 'center'},
     if (kBrandPoweredBy.isNotEmpty)
@@ -73,3 +77,10 @@ List<Map<String, dynamic>> bordereauReceiptLines(BordereauDetail d) {
 
   return lines;
 }
+
+/// Lignes de total du bordereau, selon le réglage owner (voir
+/// BordereauDetail.hiddenReportFields) — partagées par tous les rendus.
+List<String> bordereauTotalTexts(BordereauDetail d) => [
+      if (d.showsMontantTotal) 'Total fret : ${d.totalFret.toStringAsFixed(0)} FCFA',
+      if (d.showsValeurTotal) 'Valeur totale : ${d.totalValeur.toStringAsFixed(0)} FCFA',
+    ];

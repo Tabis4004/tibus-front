@@ -253,6 +253,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
           movements: _movements,
           openingFloat: cash.openingFloat ?? 0,
           currentBalance: cash.balance ?? 0,
+          reportSetting: _uiConfig.reports['cashJournal'] ?? const ColisReportSetting(),
         );
       } else {
         await printer.printCaisseJournalViaWisePrinter(
@@ -261,6 +262,7 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
           movements: _movements,
           openingFloat: cash.openingFloat ?? 0,
           currentBalance: cash.balance ?? 0,
+          reportSetting: _uiConfig.reports['cashJournal'] ?? const ColisReportSetting(),
         );
       }
       if (mounted) {
@@ -308,6 +310,10 @@ class _StationCashScreenState extends ConsumerState<StationCashScreen> {
         journal: journal,
         companyName: companyName,
         periodLabel: isToday ? "Aujourd'hui" : 'Journée du ${DateFormat('dd/MM/yyyy').format(from)}',
+        // Réglage owner (montant / valeur / destination) — n'était pas
+        // transmis ici : le journal lancé depuis la Caisse ignorait les
+        // données masquées, contrairement à celui des Statistiques.
+        reportSetting: _uiConfig.reports['salesJournal'] ?? const ColisReportSetting(),
       );
     } catch (e) {
       if (mounted) {

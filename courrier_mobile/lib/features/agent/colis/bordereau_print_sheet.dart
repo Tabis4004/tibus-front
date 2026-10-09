@@ -390,7 +390,9 @@ class _BordereauBox extends StatelessWidget {
                 );
               }),
               const Divider(height: 16),
-              // Pas de total sur le bordereau d'emballage (demande promoteur).
+              // Totaux selon le réglage owner (voir bordereauTotalTexts).
+              for (final t in bordereauTotalTexts(detail))
+                Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Center(child: QrImageView(data: detail.id, size: 80)),
             ],

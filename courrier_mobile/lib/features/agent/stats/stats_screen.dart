@@ -364,12 +364,40 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               }
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
               final s = snapshot.data!;
+              // Rapport d'activité désactivable par l'owner (réglage « stats »,
+              // même clé que la console web) — le journal de vente garde son
+              // propre réglage.
+              if (_loadedUiConfig && !_uiConfig.showReport('stats')) {
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'Le rapport d\'activité est désactivé pour votre compagnie '
+                        '(Réglages colis autonome → Visibilité des rapports).',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    if (_uiConfig.showReport('salesJournal'))
+                      ElevatedButton.icon(
+                        onPressed: _printingJournal ? null : () => _printJournal(companyId),
+                        icon: const Icon(Icons.description_outlined),
+                        label: const Text("Mon rapport d'activité"),
+                      ),
+                  ],
+                );
+              }
+              // Montants masquables par l'owner (donnée « montant » du rapport
+              // « stats ») : les compteurs restent visibles.
+              final showMontant = _uiConfig.showReportField('stats', 'montant');
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   _buildFilters(companyId, showAgentFilter: s.fullAccess || s.gareScope),
                   const SizedBox(height: 20),
-                  _buildMesVentes(s),
+                  _buildMesVentes(s, showMontant: showMontant),
                   const SizedBox(height: 24),
                   Text(
                     // Libellé honnête selon le périmètre serveur :
@@ -412,14 +440,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     childAspectRatio: 1.5,
                     children: [
                       KpiCard(icon: Icons.inventory_2_outlined, value: '${s.total}', label: 'Total colis', background: AppColors.primaryGreenLight, foreground: AppColors.primaryGreenDark),
-                      KpiCard(icon: Icons.payments_outlined, value: '${s.montantTotal.toStringAsFixed(0)} FCFA', label: 'Montant total', background: const Color(0xFFFFF3E0), foreground: const Color(0xFFF57C00)),
+                      if (showMontant)
+                        KpiCard(icon: Icons.payments_outlined, value: '${s.montantTotal.toStringAsFixed(0)} FCFA', label: 'Montant total', background: const Color(0xFFFFF3E0), foreground: const Color(0xFFF57C00)),
                       KpiCard(icon: Icons.calendar_today_outlined, value: '${s.thisMonth}', label: 'Ce mois', background: const Color(0xFFE3F2FD), foreground: const Color(0xFF1565C0)),
-                      KpiCard(icon: Icons.trending_up, value: '${s.montantThisMonth.toStringAsFixed(0)} FCFA', label: 'Montant du mois', background: AppColors.primaryGreenLight, foreground: AppColors.primaryGreenDark),
+                      if (showMontant)
+                        KpiCard(icon: Icons.trending_up, value: '${s.montantThisMonth.toStringAsFixed(0)} FCFA', label: 'Montant du mois', background: AppColors.primaryGreenLight, foreground: AppColors.primaryGreenDark),
                     ],
                   ),
                   if (s.offlineTotal > 0 && _origin != ColisSaleOrigin.online) ...[
                     const SizedBox(height: 12),
-                    _OfflineShareCard(count: s.offlineTotal, montant: s.offlineMontant, total: s.total),
+                    _OfflineShareCard(count: s.offlineTotal, montant: showMontant ? s.offlineMontant : null, total: s.total),
                   ],
                   const SizedBox(height: 24),
                   const Text('Statut des colis', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
@@ -444,7 +474,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   /// connecté (mineTotal/mineMontantTotal côté RPC), indépendamment du
   /// filtre "par agent" ci-dessus : répond explicitement au cas "le owner
   /// lui-même effectue un envoi".
-  Widget _buildMesVentes(ColisStats s) {
+  Widget _buildMesVentes(ColisStats s, {bool showMontant = true}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -469,7 +499,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 const Text('Mes ventes', style: TextStyle(color: Colors.white, fontSize: 13)),
                 const SizedBox(height: 2),
                 Text(
-                  '${s.mineTotal} colis · ${s.mineMontantTotal.toStringAsFixed(0)} FCFA',
+                  showMontant ? '${s.mineTotal} colis · ${s.mineMontantTotal.toStringAsFixed(0)} FCFA' : '${s.mineTotal} colis',
                   style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -610,7 +640,7 @@ class _FilterChipDropdown<T> extends StatelessWidget {
 /// comptées à leur date réelle de vente, pas à leur date de synchronisation.
 class _OfflineShareCard extends StatelessWidget {
   final int count;
-  final double montant;
+  final double? montant;
   final int total;
 
   const _OfflineShareCard({required this.count, required this.montant, required this.total});
@@ -630,7 +660,7 @@ class _OfflineShareCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Dont ventes hors ligne : $count / $total colis · ${montant.toStringAsFixed(0)} FCFA',
+              'Dont ventes hors ligne : $count / $total colis${montant != null ? ' · ${montant!.toStringAsFixed(0)} FCFA' : ''}',
               style: const TextStyle(color: Color(0xFF6D4C41), fontWeight: FontWeight.w600),
             ),
           ),

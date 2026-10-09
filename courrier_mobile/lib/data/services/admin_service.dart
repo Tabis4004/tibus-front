@@ -510,6 +510,58 @@ class ColisSettings {
     );
   }
 
+  /// Données masquables à l'intérieur d'un rapport encore visible — mêmes
+  /// clés que COLIS_REPORT_FIELD_REGISTRY (src/lib/supabase/
+  /// colis-autonomes.ts, console web owner), jusque-là réglables uniquement
+  /// depuis le web. Appliqués à l'identique sur mobile et web.
+  static const reportFieldLabels = <String, List<(String, String)>>{
+    'salesJournal': [
+      ('montant', "Prix / frais d'envoi"),
+      ('valeur', 'Valeur marchandise'),
+      ('destination', 'Destination'),
+    ],
+    'cashJournal': [
+      ('totalEncaisse', 'Total encaissé'),
+      ('totalDecaisse', 'Total décaissé'),
+      ('solde', 'Solde final'),
+    ],
+    'bordereau': [
+      ('montantTotal', "Montant total (frais d'envoi)"),
+      ('valeurTotal', 'Valeur totale des marchandises'),
+    ],
+    'stats': [
+      ('montant', 'Montants (XOF)'),
+    ],
+  };
+
+  Set<String> _hiddenFieldsOf(String reportKey) {
+    final reports = rawUiConfig['reports'];
+    final report = reports is Map ? reports[reportKey] : null;
+    final hidden = report is Map ? report['hiddenFields'] : null;
+    return hidden is List ? hidden.map((e) => e.toString()).toSet() : <String>{};
+  }
+
+  bool reportFieldVisible(String reportKey, String fieldKey) =>
+      !_hiddenFieldsOf(reportKey).contains(fieldKey);
+
+  /// uiConfig complet avec une donnée de rapport affichée/masquée — le reste
+  /// (enabled, autres rapports, formFields, customFields) est conservé.
+  Map<String, dynamic> toUpdatedReportField(String reportKey, String fieldKey, bool visible) {
+    final next = Map<String, dynamic>.from(rawUiConfig);
+    final reports = Map<String, dynamic>.from((rawUiConfig['reports'] as Map?)?.cast<String, dynamic>() ?? {});
+    final current = Map<String, dynamic>.from((reports[reportKey] as Map?)?.cast<String, dynamic>() ?? {'enabled': true});
+    final hidden = _hiddenFieldsOf(reportKey);
+    if (visible) {
+      hidden.remove(fieldKey);
+    } else {
+      hidden.add(fieldKey);
+    }
+    current['hiddenFields'] = hidden.toList();
+    reports[reportKey] = current;
+    next['reports'] = reports;
+    return next;
+  }
+
   /// Reconstruit un uiConfig complet à jour, en conservant hiddenFields et
   /// customFields inchangés — à utiliser juste avant updateColisUiConfig.
   Map<String, dynamic> toUpdatedUiConfig({

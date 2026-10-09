@@ -242,14 +242,18 @@ class PrinterService {
     required double openingFloat,
     required double currentBalance,
     int paperWidthMm = 58,
+    ColisReportSetting reportSetting = const ColisReportSetting(),
   }) {
     final dateFmt = _journalDateFmt;
+    final t = _CaisseJournalTotals(movements, reportSetting);
     return printReceipt(
       header: [
         brandCompanyName(companyName),
         'Journal de caisse — $sessionLabel',
       ],
-      reference: 'TOTAL  ${currentBalance.toStringAsFixed(0)} FCFA',
+      reference: t.showSolde
+          ? 'TOTAL  ${currentBalance.toStringAsFixed(0)} FCFA'
+          : '${movements.length} mouvement(s)',
       rows: [
         ['Fond de roulement', '${openingFloat.toStringAsFixed(0)} FCFA'],
         ['--------------------------------', ''],
@@ -258,9 +262,14 @@ class PrinterService {
             '${dateFmt(m.createdAt)}  ${m.typeLabel}',
             '${m.isDebit ? '-' : '+'}${m.amount.toStringAsFixed(0)} FCFA',
           ],
+        ['--------------------------------', ''],
+        if (t.showEncaisse) ['Total encaissé', '${t.encaisse.toStringAsFixed(0)} FCFA'],
+        if (t.showDecaisse) ['Total décaissé', '${t.decaisse.toStringAsFixed(0)} FCFA'],
       ],
       qr: '',
-      footer: '${movements.length} mouvement(s) — Solde final : ${currentBalance.toStringAsFixed(0)} FCFA',
+      footer: t.showSolde
+          ? '${movements.length} mouvement(s) — Solde final : ${currentBalance.toStringAsFixed(0)} FCFA'
+          : '${movements.length} mouvement(s)',
       paperWidthMm: paperWidthMm,
     );
   }
@@ -272,11 +281,13 @@ class PrinterService {
     required List<StationCashMovement> movements,
     required double openingFloat,
     required double currentBalance,
+    ColisReportSetting reportSetting = const ColisReportSetting(),
   }) {
     if (!hasWisePrinterBridge) {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
     final dateFmt = _journalDateFmt;
+    final t = _CaisseJournalTotals(movements, reportSetting);
     return _bridge.printViaWisePrinter(
       header: brandCompanyName(companyName),
       lines: [
@@ -290,8 +301,12 @@ class PrinterService {
           {'text': '${m.isDebit ? '-' : '+'}${m.amount.toStringAsFixed(0)} FCFA', 'bold': true},
         ],
         {'text': '================================', 'align': 'center'},
-        {'text': 'TOTAL (solde final)', 'align': 'center', 'bold': true},
-        {'text': '${currentBalance.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true, 'size': 'large'},
+        if (t.showEncaisse) {'text': 'Total encaissé : ${t.encaisse.toStringAsFixed(0)} FCFA', 'bold': true},
+        if (t.showDecaisse) {'text': 'Total décaissé : ${t.decaisse.toStringAsFixed(0)} FCFA', 'bold': true},
+        if (t.showSolde) ...[
+          {'text': 'TOTAL (solde final)', 'align': 'center', 'bold': true},
+          {'text': '${currentBalance.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true, 'size': 'large'},
+        ],
         if (kBrandPoweredBy.isNotEmpty)
           {'text': kBrandPoweredBy, 'align': 'center', 'size': 'small'},
       ],
@@ -434,7 +449,9 @@ class PrinterService {
             '${i + 1}. ${d.colis[i].reference}',
             '${d.colis[i].nomDestinataire} · ${d.colis[i].montantFret.toStringAsFixed(0)} FCFA',
           ],
-        // Pas de total sur le bordereau d'emballage (demande promoteur).
+        // Totaux selon le réglage owner (voir bordereauTotalTexts).
+        if (d.showsMontantTotal) ['Total fret', '${d.totalFret.toStringAsFixed(0)} FCFA'],
+        if (d.showsValeurTotal) ['Valeur totale', '${d.totalValeur.toStringAsFixed(0)} FCFA'],
       ],
       qr: d.id,
       footer: kBrandPoweredBy,
@@ -552,4 +569,21 @@ class PrinterService {
   bool printColisReceiptBrowser({bool wide = true}) {
     return _bridge.triggerBrowserPrint(wide: wide);
   }
+}
+/// Totaux du journal de caisse et leur visibilité selon le réglage owner du
+/// rapport « cashJournal » (hiddenFields : totalEncaisse, totalDecaisse,
+/// solde) — mêmes clés que la console web (COLIS_REPORT_FIELD_REGISTRY).
+class _CaisseJournalTotals {
+  final double encaisse;
+  final double decaisse;
+  final bool showEncaisse;
+  final bool showDecaisse;
+  final bool showSolde;
+
+  _CaisseJournalTotals(List<StationCashMovement> movements, ColisReportSetting setting)
+      : encaisse = movements.where((m) => !m.isDebit).fold(0.0, (sum, m) => sum + m.amount),
+        decaisse = movements.where((m) => m.isDebit).fold(0.0, (sum, m) => sum + m.amount),
+        showEncaisse = setting.showField('totalEncaisse'),
+        showDecaisse = setting.showField('totalDecaisse'),
+        showSolde = setting.showField('solde');
 }
