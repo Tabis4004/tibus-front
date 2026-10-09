@@ -98,8 +98,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     try {
       final gares = await _garesFuture;
       final csv = _buildCsv(r, gares);
-      await Share.shareXFiles(
-        [
+      await SharePlus.instance.share(ShareParams(files: [
           XFile.fromData(
             Uint8List.fromList(utf8.encode(csv)),
             mimeType: 'text/csv',
@@ -107,7 +106,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
           ),
         ],
         subject: 'Rapport embarquement résumé — ${r.routeLabel}',
-      );
+      ));
     } catch (e) {
       _showError('Export CSV impossible : $e');
     } finally {
@@ -474,7 +473,7 @@ class _MetricTile extends StatelessWidget {
                 if (detail != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(detail!, style: TextStyle(color: color.withOpacity(0.8), fontSize: 11)),
+                    child: Text(detail!, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 11)),
                   ),
               ],
             ),
@@ -514,13 +513,13 @@ class _NoShowCard extends StatelessWidget {
               : 'capacité moins embarqués',
         ),
         if (!nominatif && report.noShow != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, left: 4, right: 4),
+          const Padding(
+            padding: EdgeInsets.only(top: 8, left: 4, right: 4),
             child: Text(
               "Session hors-Tibus : la base ne connaît aucune liste de voyageurs attendus. "
               'Ce nombre compte des sièges vides, pas des absents identifiés — il est '
               'donc égal aux places disponibles.',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
             ),
           ),
       ],

@@ -181,12 +181,12 @@ class _ExternalScanReviewSheetState extends ConsumerState<ExternalScanReviewShee
             // Pas de champ montant, et c'est délibéré : le tarif est celui de
             // l'itinéraire, figé à l'ouverture de la session et appliqué par
             // le serveur. Le dire à l'agent évite qu'il le cherche.
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 6),
+                Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
+                SizedBox(width: 6),
                 Expanded(
-                  child: const Text(
+                  child: Text(
                     'Le montant est le tarif du trajet, appliqué automatiquement.',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),

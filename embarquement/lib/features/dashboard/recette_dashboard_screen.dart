@@ -412,8 +412,7 @@ class _RecetteDashboardScreenState extends ConsumerState<RecetteDashboardScreen>
   Future<void> _exportCsv() async {
     setState(() => _exporting = true);
     try {
-      await Share.shareXFiles(
-        [
+      await SharePlus.instance.share(ShareParams(files: [
           XFile.fromData(
             Uint8List.fromList(utf8.encode(_buildCsv())),
             mimeType: 'text/csv',
@@ -421,7 +420,7 @@ class _RecetteDashboardScreenState extends ConsumerState<RecetteDashboardScreen>
           ),
         ],
         subject: 'Recette embarquement — $_periodeTexte',
-      );
+      ));
     } catch (e) {
       _showError('Export CSV impossible : $e');
     } finally {
@@ -865,7 +864,8 @@ class _RecetteDashboardScreenState extends ConsumerState<RecetteDashboardScreen>
             )
           else
             DropdownButtonFormField<String?>(
-              value: _gareFilter,
+              key: ValueKey('gare_filter_$_gareFilter'),
+              initialValue: _gareFilter,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Gare',

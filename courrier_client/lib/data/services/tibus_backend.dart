@@ -32,7 +32,7 @@ class TibusBackend {
   static Future<void> init() async {
     await Supabase.initialize(
       url: Env.tibusSupabaseUrl,
-      anonKey: Env.tibusSupabaseAnonKey,
+      publishableKey: Env.tibusSupabaseAnonKey,
     );
   }
 

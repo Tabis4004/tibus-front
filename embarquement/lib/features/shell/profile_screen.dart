@@ -35,7 +35,8 @@ class ProfileScreen extends ConsumerWidget {
               }
               final activeId = activeCompanyIdAsync.value;
               return DropdownButtonFormField<String>(
-                value: activeId,
+                key: ValueKey('company_$activeId'),
+                initialValue: activeId,
                 decoration: const InputDecoration(
                   helperText: 'Plusieurs compagnies détectées — choisis celle à utiliser ici.',
                 ),

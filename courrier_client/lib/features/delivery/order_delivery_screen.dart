@@ -158,10 +158,12 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
               urgent: _urgent,
               insulatedBag: _insulatedBag,
             );
-      if (mounted) setState(() {
-        _estimate = price;
-        _error = null;
-      });
+      if (mounted) {
+        setState(() {
+          _estimate = price;
+          _error = null;
+        });
+      }
     } catch (e) {
       // Ne bloque pas la commande (le prix réel est recalculé serveur au
       // moment de createDeliveryRide/createRideRequest) — juste un aperçu
@@ -340,7 +342,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
           const SizedBox(height: 16),
           if (_isRideMode) ...[
             DropdownButtonFormField<String>(
-              value: _rideCategory,
+              initialValue: _rideCategory,
               decoration: const InputDecoration(labelText: 'Catégorie'),
               items: rideCategoryLabel.entries
                   .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
@@ -352,7 +354,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             ),
           ] else ...[
             DropdownButtonFormField<DeliveryVehicle>(
-              value: _vehicle,
+              initialValue: _vehicle,
               decoration: const InputDecoration(labelText: 'Véhicule livreur'),
               items: DeliveryVehicle.values
                   .map((v) => DropdownMenuItem(value: v, child: Text(v.label)))
@@ -366,7 +368,7 @@ class _OrderDeliveryScreenState extends State<OrderDeliveryScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _packageType,
+              initialValue: _packageType,
               decoration: const InputDecoration(labelText: 'Type de colis'),
               items: _packageTypes.entries
                   .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))

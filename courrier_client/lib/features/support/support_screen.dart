@@ -218,7 +218,7 @@ class _NewTicketSheetState extends State<_NewTicketSheet> {
           TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: 'Sujet')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _category,
+            initialValue: _category,
             decoration: const InputDecoration(labelText: 'Catégorie'),
             items: ticketCategoryLabel.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
             onChanged: (v) => setState(() => _category = v ?? 'other'),

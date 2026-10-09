@@ -126,10 +126,10 @@ class ManifestExport {
     List<ItineraryGare> gares = const [],
   }) async {
     final bytes = await buildPdf(m, report: report, gares: gares);
-    await Share.shareXFiles(
-      [XFile.fromData(bytes, mimeType: 'application/pdf', name: '${_slug(m)}.pdf')],
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile.fromData(bytes, mimeType: 'application/pdf', name: '${_slug(m)}.pdf')],
       subject: "Rapport d'embarquement détaillé ${m.routeLabel ?? ""}",
-    );
+    ));
   }
 
   static Future<void> print(
@@ -164,8 +164,7 @@ class ManifestExport {
     }
     final bytes = book.encode();
     if (bytes == null) throw Exception('Génération du fichier Excel impossible');
-    await Share.shareXFiles(
-      [
+    await SharePlus.instance.share(ShareParams(files: [
         XFile.fromData(
           Uint8List.fromList(bytes),
           mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -173,6 +172,6 @@ class ManifestExport {
         ),
       ],
       subject: "Rapport d'embarquement détaillé ${m.routeLabel ?? ""}",
-    );
+    ));
   }
 }

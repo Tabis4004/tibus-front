@@ -203,7 +203,7 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: _statusColor(s.status).withOpacity(0.15),
+                          backgroundColor: _statusColor(s.status).withValues(alpha: 0.15),
                           child: Icon(
                             s.source == 'tibus' ? Icons.confirmation_number : Icons.qr_code,
                             color: _statusColor(s.status),
@@ -220,7 +220,7 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                         isThreeLine: true,
                         trailing: Chip(
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: _statusColor(s.status).withOpacity(0.15),
+                          backgroundColor: _statusColor(s.status).withValues(alpha: 0.15),
                           label: Text(_statusLabel(s.status), style: TextStyle(color: _statusColor(s.status))),
                         ),
                       ),

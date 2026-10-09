@@ -177,7 +177,7 @@ class _AdminGaresScreenState extends ConsumerState<AdminGaresScreen> {
                     style: TextStyle(color: AppColors.accentRed, fontSize: 12))
               else
                 DropdownButtonFormField<String>(
-                  value: cityId,
+                  initialValue: cityId,
                   decoration: const InputDecoration(labelText: 'Ville *'),
                   items: _cities.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
                   onChanged: (v) => setSheetState(() => cityId = v),
@@ -598,7 +598,7 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: roleName,
+                initialValue: roleName,
                 decoration: const InputDecoration(labelText: 'Rôle *'),
                 items: kAssignableRoles.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
                 onChanged: (v) => setSheetState(() {
@@ -609,7 +609,8 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
               if (roleName != null && isGareScopedRole(roleName!)) ...[
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: gareId,
+                  key: ValueKey('gare_$roleName'),
+                  initialValue: gareId,
                   decoration: const InputDecoration(labelText: 'Gare *'),
                   items: _gares.map((g) => DropdownMenuItem(value: g.id, child: Text(g.name))).toList(),
                   onChanged: (v) => setSheetState(() => gareId = v),

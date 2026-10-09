@@ -101,8 +101,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
     setState(() => _exporting = true);
     try {
       final gares = await _garesFuture;
-      await Share.shareXFiles(
-        [
+      await SharePlus.instance.share(ShareParams(files: [
           XFile.fromData(
             Uint8List.fromList(utf8.encode(_buildCsv(r, gares))),
             mimeType: 'text/csv',
@@ -110,7 +109,7 @@ class _RecetteScreenState extends ConsumerState<RecetteScreen> {
           ),
         ],
         subject: 'Recette embarquement — ${r.routeLabel}',
-      );
+      ));
     } catch (e) {
       _showError('Export CSV impossible : $e');
     } finally {
