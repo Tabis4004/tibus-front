@@ -147,7 +147,33 @@ class ProfileScreen extends ConsumerWidget {
             icon: Icons.logout,
             label: 'Se déconnecter',
             color: AppColors.accentRed,
-            onTap: () => ref.read(authServiceProvider).signOut(),
+            onTap: () async {
+              // Ventes hors ligne non envoyées : elles restent sur
+              // l'appareil, rattachées à cet agent, et partiront à sa
+              // prochaine connexion — on prévient avant de se déconnecter.
+              final pending = (await ref.read(syncServiceProvider).pendingMineFor(null)).length;
+              if (pending > 0) {
+                if (!context.mounted) return;
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Ventes non synchronisées'),
+                    content: Text(
+                      '$pending vente${pending > 1 ? "s" : ""} hors ligne ne '
+                      '${pending > 1 ? "sont" : "est"} pas encore envoyée${pending > 1 ? "s" : ""}. '
+                      'Elles restent sur cet appareil et partiront à votre prochaine '
+                      'connexion, sur cet appareil uniquement. Se déconnecter quand même ?',
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Se déconnecter')),
+                    ],
+                  ),
+                );
+                if (ok != true) return;
+              }
+              await ref.read(authServiceProvider).signOut();
+            },
           ),
           ],
         ),
