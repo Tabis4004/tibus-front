@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -54,6 +54,20 @@ class ScanScreen extends ConsumerStatefulWidget {
 class _ScanScreenState extends ConsumerState<ScanScreen> {
   final _scannerController = MobileScannerController();
   final _manualCtrl = TextEditingController();
+  final _manualFocus = FocusNode();
+
+  /// Caméra de scan : téléphone (Android / iOS) et navigateur. Sur Windows,
+  /// mobile_scanner n'existe pas : on travaille à la douchette USB (qui
+  /// « tape » le contenu du QR suivi d'Entrée) ou au clavier.
+  static bool get _hasCameraScan =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  /// Photo + OCR (ML Kit) : Android / iOS uniquement.
+  static bool get _hasOcr =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
 
   bool _busy = false;
   bool _closing = false;
@@ -219,6 +233,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   void dispose() {
     _scannerController.dispose();
     _manualCtrl.dispose();
+    _manualFocus.dispose();
     super.dispose();
   }
 
@@ -490,6 +505,30 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlueDark),
             ),
           ),
+          if (!_hasCameraScan)
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                color: AppColors.primaryBlueLight,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(24),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.qr_code_scanner, size: 56, color: AppColors.primaryBlueDark),
+                    SizedBox(height: 12),
+                    Text(
+                      'Scannez avec la douchette USB, ou tapez le numéro du billet '
+                      'dans le champ ci-dessous puis Entrée.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.primaryBlueDark),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
           Expanded(
             flex: 3,
             child: MobileScanner(
@@ -538,18 +577,28 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     // web plutôt que de laisser échouer une action visible ;
                     // la saisie manuelle du numéro juste en dessous reste le
                     // chemin de secours, et fonctionne partout.
-                    if (!kIsWeb)
+                    if (_hasOcr)
                       OutlinedButton.icon(
                         onPressed: _busy ? null : _photographierBillet,
                         icon: const Icon(Icons.camera_alt_outlined),
                         label: const Text('Photographier le billet (sans QR)'),
                       ),
-                    if (!kIsWeb) const SizedBox(height: 8),
+                    if (_hasOcr) const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _manualCtrl,
+                            focusNode: _manualFocus,
+                            // Poste fixe : le champ garde le focus pour que la
+                            // douchette puisse enchaîner les billets.
+                            autofocus: !_hasCameraScan,
+                            onSubmitted: (v) {
+                              final value = v.trim();
+                              _manualCtrl.clear();
+                              if (value.isNotEmpty && !_busy) unawaited(_handlePayload(value));
+                              _manualFocus.requestFocus();
+                            },
                             textCapitalization: TextCapitalization.characters,
                             decoration: const InputDecoration(hintText: 'TB-XXXXXXXX', prefixIcon: Icon(Icons.keyboard)),
                           ),

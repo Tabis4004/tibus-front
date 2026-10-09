@@ -1,0 +1,179 @@
+name: Build Embarquement Windows
+
+# Exécutable Windows + installateur de l'app Embarquement (backend Tibus 1.0).
+#
+# Impossible depuis macOS : Flutter exige la toolchain Windows (Visual Studio
+# + Desktop C++). Ce workflow s'en charge sur un runner windows-latest.
+#
+# Utilisation :
+#   GitHub → Actions → "Build Embarquement Windows" → "Run workflow"
+#   puis récupérer dans "Artifacts" :
+#     embarquement-windows-portable   dossier Release zippé
+#     embarquement-windows-installer  setup.exe à distribuer
+#
+# Sur Windows, pas de caméra de scan (mobile_scanner n'existe pas sur cette
+# plateforme) : on scanne à la douchette USB ou au clavier. Le mode hors
+# ligne (stockage local + synchronisation) fonctionne comme sur Android.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: embarquement
+
+    # Signature de code (optionnelle), mêmes secrets que courrier_mobile.
+    # Sans eux le build aboutit, mais Windows affiche un avertissement
+    # SmartScreen à l'installation.
+    env:
+      CERT_B64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+      CERT_PW: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      APP_NAME: Embarquement
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # windows/ est dans embarquement/.gitignore : on le régénère ici.
+      - name: Créer la plateforme Windows si absente
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "windows/CMakeLists.txt")) {
+            flutter create . --platforms=windows --project-name embarquement --org com.tibus
+          } else {
+            Write-Host "windows/ deja present"
+          }
+
+      # Nom affiché (barre de titre, propriétés du .exe) : « Embarquement »
+      # plutôt que le nom technique du projet.
+      - name: Nom de l'application
+        shell: pwsh
+        run: |
+          (Get-Content windows/runner/main.cpp -Raw) `
+            -replace 'window.Create\(L"[^"]*"', "window.Create(L`"$env:APP_NAME`"" |
+            Set-Content windows/runner/main.cpp -Encoding UTF8
+          (Get-Content windows/runner/Runner.rc -Raw) `
+            -replace '"FileDescription", "[^"]*"', "`"FileDescription`", `"$env:APP_NAME`"" `
+            -replace '"ProductName", "[^"]*"', "`"ProductName`", `"$env:APP_NAME`"" |
+            Set-Content windows/runner/Runner.rc -Encoding UTF8
+
+      - name: Dépendances
+        run: flutter pub get
+
+      # CMake ≥ 4 refuse les CMakeLists de certains plugins (minimum < 3.5).
+      - name: Build Windows (release)
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+        run: flutter build windows --release
+
+      - name: Localiser la sortie
+        id: out
+        shell: pwsh
+        run: |
+          $src = "build/windows/x64/runner/Release"
+          if (-not (Test-Path $src)) { $src = "build/windows/runner/Release" }
+          if (-not (Test-Path $src)) { throw "Dossier Release introuvable" }
+          "release_dir=$src" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $exe = (Get-ChildItem "$src/*.exe" | Select-Object -First 1).Name
+          if (-not $exe) { throw "Aucun .exe dans $src" }
+          "exe_name=$exe" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Executable : $exe"
+          Get-ChildItem $src | Select-Object Name, Length
+
+      - name: Signer l'exécutable (si certificat fourni)
+        if: ${{ env.CERT_B64 != '' }}
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:CERT_B64))
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          & $signtool sign /f cert.pfx /p $env:CERT_PW /fd SHA256 `
+            /tr http://timestamp.sectigo.com /td SHA256 `
+            "${{ steps.out.outputs.release_dir }}\${{ steps.out.outputs.exe_name }}"
+
+      - name: Version portable (zip)
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "${{ steps.out.outputs.release_dir }}/*" `
+            -DestinationPath "embarquement-windows.zip" -Force
+
+      - name: Publier la version portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: embarquement-windows-portable
+          path: embarquement/embarquement-windows.zip
+          retention-days: 14
+
+      # ─── Installateur (Inno Setup) ────────────────────────────────────
+      - name: Installer Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Générer le script Inno Setup
+        shell: pwsh
+        run: |
+          $m = Select-String -Path "pubspec.yaml" -Pattern '^version:\s*([0-9.]+)'
+          $version = if ($m) { $m.Matches[0].Groups[1].Value } else { "1.0.0" }
+          $release = "${{ steps.out.outputs.release_dir }}".Replace('/', '\')
+          $exeName = "${{ steps.out.outputs.exe_name }}"
+          $appName = $env:APP_NAME
+
+          $iss = @"
+          [Setup]
+          AppId={{3F6B2C1E-7A4D-4E9B-8C2F-5D1A9E7B4C60}
+          AppName=$appName
+          AppVersion=$version
+          AppPublisher=Tabis Technology
+          DefaultDirName={autopf}\$appName
+          DefaultGroupName=$appName
+          OutputDir=installer
+          OutputBaseFilename=embarquement-setup-$version
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64compatible
+          WizardStyle=modern
+          SetupIconFile=windows\runner\resources\app_icon.ico
+
+          [Files]
+          Source: "$release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\$appName"; Filename: "{app}\$exeName"
+          Name: "{autodesktop}\$appName"; Filename: "{app}\$exeName"
+
+          [Run]
+          Filename: "{app}\$exeName"; Description: "Lancer $appName"; Flags: nowait postinstall skipifsilent
+          "@
+          $iss | Out-File -FilePath "installer.iss" -Encoding UTF8
+          Get-Content installer.iss
+
+      - name: Compiler l'installateur
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Signer l'installateur (si certificat fourni)
+        if: ${{ env.CERT_B64 != '' }}
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          Get-ChildItem "installer\*.exe" | ForEach-Object {
+            & $signtool sign /f cert.pfx /p $env:CERT_PW /fd SHA256 `
+              /tr http://timestamp.sectigo.com /td SHA256 $_.FullName
+          }
+
+      - name: Publier l'installateur
+        uses: actions/upload-artifact@v4
+        with:
+          name: embarquement-windows-installer
+          path: embarquement/installer/*.exe
+          retention-days: 14
