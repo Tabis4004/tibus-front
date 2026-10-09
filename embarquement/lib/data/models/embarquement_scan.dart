@@ -17,6 +17,10 @@ class EmbarquementScan {
   /// passerait pour un total complet.
   final num? amount;
 
+  /// Scan enregistré sur l'appareil, pas encore synchronisé : statut et
+  /// montant provisoires (le serveur tranche à la synchronisation).
+  final bool pending;
+
   const EmbarquementScan({
     required this.id,
     required this.scannedAt,
@@ -27,6 +31,7 @@ class EmbarquementScan {
     this.destinationLabel,
     required this.status,
     this.amount,
+    this.pending = false,
   });
 
   bool get isValid => status == 'valid';
@@ -41,6 +46,7 @@ class EmbarquementScan {
         destinationLabel: map['destination_label'] as String?,
         status: (map['status'] ?? '') as String,
         amount: map['amount'] as num?,
+        pending: map['_pending'] == true,
       );
 }
 

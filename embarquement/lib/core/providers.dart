@@ -4,9 +4,34 @@ import '../data/services/embarquement_service.dart';
 import '../data/services/ticket_ocr_service.dart';
 import '../data/models/app_role.dart';
 import '../data/models/embarquement_trajet.dart';
+import '../data/offline/embarquement_repository.dart';
+import '../data/offline/offline_store.dart';
+import '../data/offline/offline_sync.dart';
 
 final authServiceProvider = Provider((ref) => AuthService());
 final embarquementServiceProvider = Provider((ref) => EmbarquementService());
+
+/// Stockage local du compte connecté (un fichier par compte : deux agents
+/// qui partagent un appareil ne mélangent jamais leurs files).
+final offlineStoreLoaderProvider = Provider<Future<OfflineStore> Function()>((ref) {
+  final auth = ref.read(authServiceProvider);
+  return () => OfflineStore.forUser(auth.currentSession?.user.id ?? 'anonyme');
+});
+
+/// Synchronisation de la file locale — état observé par le bandeau.
+final offlineSyncProvider = ChangeNotifierProvider<OfflineSync>((ref) {
+  final sync = OfflineSync(ref.read(embarquementServiceProvider), ref.read(offlineStoreLoaderProvider));
+  sync.start();
+  return sync;
+});
+
+final embarquementRepositoryProvider = Provider<EmbarquementRepository>((ref) {
+  return EmbarquementRepository(
+    ref.read(embarquementServiceProvider),
+    ref.read(offlineStoreLoaderProvider),
+    ref.read(offlineSyncProvider),
+  );
+});
 
 /// Un seul TextRecognizer pour toute l'app (voir ticket_ocr_service.dart) —
 /// Provider (pas autoDispose) pour ne jamais recréer/refermer le recognizer
@@ -14,11 +39,21 @@ final embarquementServiceProvider = Provider((ref) => EmbarquementService());
 final ticketOcrServiceProvider = Provider((ref) => TicketOcrService());
 
 /// Rôles de l'utilisateur connecté (une entrée par compagnie affectée) —
-/// même requête que courrier_mobile (myRolesProvider), sans le repli
-/// hors-ligne (pas de cache local en V1, Embarquement est un outil de
-/// guichet/portillon, pas un formulaire de saisie terrain isolé).
+/// même requête que courrier_mobile (myRolesProvider). Copie locale à chaque
+/// lecture réussie : l'app démarre hors ligne avec les derniers rôles connus
+/// (le serveur revérifie les droits à la synchronisation).
 final myRolesProvider = FutureProvider<List<AppRole>>((ref) async {
-  return ref.read(authServiceProvider).fetchMyRoles();
+  final auth = ref.read(authServiceProvider);
+  final store = await ref.read(offlineStoreLoaderProvider)();
+  try {
+    final rows = await auth.fetchMyRolesRaw().timeout(const Duration(seconds: 12));
+    await store.putCache(OfflineStore.rolesKey, rows);
+    return rows.map(AppRole.fromMap).toList();
+  } catch (_) {
+    final cached = store.getCache(OfflineStore.rolesKey);
+    if (cached == null) rethrow;
+    return (cached.data as List).map((e) => AppRole.fromMap(Map<String, dynamic>.from(e as Map))).toList();
+  }
 });
 
 /// Une compagnie où l'utilisateur a au moins un rôle Embarquement, avec le
@@ -156,7 +191,7 @@ final recetteDashboardAccessProvider = FutureProvider<RecetteDashboardAccess?>((
   final isGareFinance = mine.any((r) => r.name == 'gerant_gare' || r.name == 'comptable_gare');
   if (!isOwner && !isGareFinance) return null;
 
-  final gares = await ref.read(embarquementServiceProvider).myGares(companyId);
+  final gares = await ref.read(embarquementRepositoryProvider).myGares(companyId);
   // Un gérant ou un comptable sans gare rattachée n'a rien à consulter.
   if (!isOwner && gares.isEmpty) return null;
 

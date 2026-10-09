@@ -31,6 +31,13 @@ class AuthService {
   /// (fetchMyRoles), portée volontairement identique pour rester cohérent
   /// avec le reste de l'app Tibus.
   Future<List<AppRole>> fetchMyRoles() async {
+    final rows = await fetchMyRolesRaw();
+    return rows.map(AppRole.fromMap).toList();
+  }
+
+  /// Même requête, lignes à plat (format attendu par AppRole.fromMap) —
+  /// c'est ce qui est gardé en copie locale pour démarrer hors ligne.
+  Future<List<Map<String, dynamic>>> fetchMyRolesRaw() async {
     final authUserId = currentSession?.user.id;
     if (authUserId == null) return [];
 
@@ -50,7 +57,7 @@ class AuthService {
     return (rows as List).map((row) {
       final role = row['Role'] as Map<String, dynamic>? ?? {};
       final company = row['Companies'] as Map<String, dynamic>? ?? {};
-      return AppRole.fromMap({
+      return <String, dynamic>{
         'roleId': row['roleId'],
         'companyId': row['companyId'],
         'roleName': role['name'],
@@ -58,7 +65,7 @@ class AuthService {
         'level': role['level'],
         'droits': role['droits'],
         'companyName': company['name'],
-      });
+      };
     }).toList();
   }
 }

@@ -37,6 +37,11 @@ dans `.gitignore`, aucun code natif custom ici contrairement à
 - [ ] Phase 2 — scan QR externe (parseur multi-format)
 - [ ] Phase 3 — manifeste temps réel
 - [ ] Phase 4 — rapport & clôture (no-show, export)
-- [ ] Phase 5 — durcissement (permissions fines, mode hors-ligne)
+- [ ] Phase 5 — durcissement (permissions fines)
+- [x] Mode hors ligne Android / Windows — sessions hors-Tibus, billets tiers,
+      manifeste et clôture sur l'appareil, synchro idempotente
+      (`lib/data/offline/`, migration
+      `../supabase/migrations/219_embarquement_hors_ligne.sql`). Billets et
+      départs Tibus : en ligne uniquement. Blocage après 7 jours sans synchro.
 
 Voir `../plan_module_embarquement_v2.md` pour le détail de chaque phase.

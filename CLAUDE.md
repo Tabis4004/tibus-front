@@ -167,3 +167,18 @@ ligne ». Journal de vente et stats comptent la date réelle
 ('online' | 'offline'). La clôture de caisse est bloquée côté app tant que
 l'agent a des ventes hors ligne non synchronisées. Patch SIS :
 `courrier_mobile/tool/hostinger_migration/pour_technicien/00_patch_2026-10-08.sql`.
+
+## Embarquement hors ligne (migration 219)
+
+App installée (Android / Windows) : sessions hors-Tibus, scans de billets
+tiers et clôture s'enregistrent d'abord sur l'appareil
+(`embarquement/lib/data/offline/`, un fichier JSON par compte, écriture
+atomique) puis sont rejoués dans l'ordre par
+`embarquement_open_session_gare_offline`, `embarquement_scan_external_offline`
+et `embarquement_close_session_offline` — idempotentes (id généré par
+l'appareil), heure réelle bornée côté serveur. Aucun montant ne part de
+l'appareil : le tarif est relu dans Tibus à la synchro de l'ouverture.
+Scan de billets Tibus, départs Tibus et rapports : en ligne uniquement.
+Refus serveur (P0001, classes 22/23) → liste des refus visible par l'agent ;
+toute autre erreur → réessai. Au-delà de 7 jours non synchronisés, l'app
+bloque ouverture et scan (serveur : 8 jours).

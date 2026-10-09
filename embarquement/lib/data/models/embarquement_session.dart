@@ -14,6 +14,13 @@ class EmbarquementSession {
   final DateTime? closedAt;
   final int scansCount;
 
+  /// Opérations faites sur l'appareil et pas encore envoyées au serveur
+  /// (ouverture, scans, clôture) — mode hors ligne.
+  final int pendingOps;
+
+  /// Session ouverte hors ligne, encore inconnue du serveur.
+  final bool localOnly;
+
   const EmbarquementSession({
     required this.id,
     this.reservationId,
@@ -24,6 +31,8 @@ class EmbarquementSession {
     required this.openedAt,
     this.closedAt,
     required this.scansCount,
+    this.pendingOps = 0,
+    this.localOnly = false,
   });
 
   bool get isOpen => closedAt == null;
@@ -39,5 +48,7 @@ class EmbarquementSession {
         openedAt: DateTime.parse(map['opened_at'] as String),
         closedAt: map['closed_at'] != null ? DateTime.parse(map['closed_at'] as String) : null,
         scansCount: (map['scans_count'] as num?)?.toInt() ?? 0,
+        pendingOps: (map['_pending_ops'] as num?)?.toInt() ?? 0,
+        localOnly: map['_local_only'] == true,
       );
 }

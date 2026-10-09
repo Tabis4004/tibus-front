@@ -30,7 +30,8 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
   late Future<List<ItineraryGare>> _garesFuture = loadGaresBreakdown(ref, widget.session.id);
 
   Future<List<EmbarquementScan>> _load() {
-    return ref.read(embarquementServiceProvider).listManifest(widget.session.id);
+    // Copie locale + scans en attente si le réseau manque (mode hors ligne).
+    return ref.read(embarquementRepositoryProvider).listManifest(widget.session);
   }
 
   Future<void> _refresh() async {
@@ -213,7 +214,8 @@ class _ManifestScreenState extends ConsumerState<ManifestScreen> {
                         subtitle: Text(
                           '${s.ticketNumber ?? "—"}${hideMoney ? "" : " · ${formatMontant(s.amount)}"}'
                           '${s.originLabel != null ? " · ${s.originLabel} → ${s.destinationLabel ?? "?"}" : ""}'
-                          '\n${DateFormat('HH:mm:ss').format(s.scannedAt)} · ${s.source == 'tibus' ? "Tibus" : "Externe"}',
+                          '\n${DateFormat('HH:mm:ss').format(s.scannedAt)} · ${s.source == 'tibus' ? "Tibus" : "Externe"}'
+                          '${s.pending ? " · en attente de synchro" : ""}',
                         ),
                         isThreeLine: true,
                         trailing: Chip(

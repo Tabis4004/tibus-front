@@ -8,6 +8,9 @@ import '../../data/models/company_bus_option.dart';
 import '../../data/models/embarquement_trajet.dart';
 import '../../data/models/embarquement_departure.dart';
 import '../../core/format.dart';
+import '../../data/offline/embarquement_repository.dart';
+import '../../data/offline/offline_store.dart';
+import '../common/sync_status_banner.dart';
 import '../itinerary/itinerary_screen.dart';
 import '../scan/scan_screen.dart';
 import '../manifest/manifest_screen.dart';
@@ -20,6 +23,11 @@ import '../manifest/manifest_screen.dart';
 /// séparée. Une session ouverte mène au scan (embarquement_scan_tibus/
 /// embarquement_scan_external, Phase 1) ; une session clôturée mène
 /// directement au manifeste (lecture seule).
+///
+/// Hors ligne (Android / Windows) : la liste vient de la copie locale, les
+/// sessions ouvertes sur l'appareil y figurent marquées « Non synchronisée »,
+/// et l'ouverture hors-Tibus reste possible avec le tarif en copie locale
+/// (voir EmbarquementRepository).
 class SessionListScreen extends ConsumerStatefulWidget {
   const SessionListScreen({super.key});
 
@@ -28,13 +36,13 @@ class SessionListScreen extends ConsumerStatefulWidget {
 }
 
 class _SessionListScreenState extends ConsumerState<SessionListScreen> {
-  Future<List<EmbarquementSession>>? _future;
+  Future<CachedList<EmbarquementSession>>? _future;
   String? _companyId;
 
   void _load(String companyId) {
     setState(() {
       _companyId = companyId;
-      _future = ref.read(embarquementServiceProvider).listSessions(companyId: companyId, status: 'all');
+      _future = ref.read(embarquementRepositoryProvider).listSessions(companyId);
     });
   }
 
@@ -61,20 +69,31 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
       ),
     );
     if (choice == null || !mounted) return;
-    final created = await showModalBottomSheet<bool>(
+    final created = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (_) => choice == 'tibus'
           ? _NewTibusSessionSheet(companyId: companyId)
           : _NewHorsTibusSessionSheet(companyId: companyId),
     );
-    if (created == true) _load(companyId);
+    if (created == null) return;
+    _load(companyId);
+    if (created == 'pending' && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Session ouverte hors ligne — elle sera envoyée au retour du réseau.'),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final companyIdAsync = ref.watch(activeCompanyIdProvider);
     final companyNameAsync = ref.watch(activeCompanyNameProvider);
+
+    // File locale vidée (retour du réseau) : on relit la liste du serveur.
+    ref.listen<int>(offlineSyncProvider.select((s) => s.pendingCount), (prev, next) {
+      if (prev != null && prev > 0 && next == 0 && _companyId != null) _load(_companyId!);
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -114,93 +133,123 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
           if (_future == null || _companyId != companyId) {
             _load(companyId);
           }
-          return RefreshIndicator(
-            onRefresh: () async => _load(companyId),
-            child: FutureBuilder<List<EmbarquementSession>>(
-              future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snap.hasError) {
-                  return ListView(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text('Erreur : ${snap.error}', textAlign: TextAlign.center),
-                      ),
-                    ],
-                  );
-                }
-                final sessions = snap.data ?? const [];
-                if (sessions.isEmpty) {
-                  return ListView(
-                    children: const [
-                      Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text(
-                          'Aucune session pour le moment. Ouvre une session '
-                          'hors-Tibus avec le bouton ci-dessous — le scan sur '
-                          'un départ Tibus existant arrive prochainement.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: sessions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) {
-                    final s = sessions[i];
-                    return Card(
-                      child: ListTile(
-                        leading: Icon(
-                          s.isOpen ? Icons.play_circle_fill : Icons.check_circle,
-                          color: s.isOpen ? AppColors.primaryBlue : AppColors.textSecondary,
-                        ),
-                        title: Text(s.routeLabel),
-                        subtitle: Text(
-                          '${s.isTibus ? "Tibus" : "Hors-Tibus"}'
-                          '${s.busLabel != null ? " · Bus ${s.busLabel}" : ""}'
-                          ' · ${s.scansCount} scan${s.scansCount > 1 ? "s" : ""}'
-                          ' · ${DateFormat('dd/MM/yy HH:mm').format(s.openedAt)}',
-                        ),
-                        trailing: Chip(
-                          visualDensity: VisualDensity.compact,
-                          label: Text(s.isOpen ? 'Ouverte' : 'Clôturée'),
-                        ),
-                        onTap: () async {
-                          if (s.isOpen) {
-                            // Embarqueur : la session d'une AUTRE gare de son
-                            // itinéraire s'ouvre en consultation (gares, places
-                            // restantes) — il ne scanne que dans sa gare.
-                            var mine = true;
-                            if ((ref.read(isEmbarqueurOnlyProvider).value ?? false) && s.isTibus) {
-                              final gares = await ref.read(embarquementServiceProvider).myGares(companyId);
-                              mine = gares.any((g) => g.id == s.gareId);
-                            }
-                            if (!context.mounted) return;
-                            final closed = await Navigator.of(context).push<bool>(
-                              MaterialPageRoute(
-                                builder: (_) => mine ? ScanScreen(session: s) : ItineraryScreen(session: s),
-                              ),
-                            );
-                            if (closed == true) _load(companyId);
-                          } else {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => ManifestScreen(session: s)),
-                            );
-                          }
-                        },
-                      ),
-                    );
+          return Column(
+            children: [
+              const SyncStatusBanner(),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    final sync = ref.read(offlineSyncProvider)..resetBackoff();
+                    await sync.syncNow(force: true);
+                    _load(companyId);
                   },
-                );
-              },
-            ),
+                  child: FutureBuilder<CachedList<EmbarquementSession>>(
+                    future: _future,
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snap.hasError) {
+                        return ListView(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text('Erreur : ${snap.error}', textAlign: TextAlign.center),
+                            ),
+                          ],
+                        );
+                      }
+                      final cachedAt = snap.data?.cachedAt;
+                      final sessions = snap.data?.items ?? const <EmbarquementSession>[];
+                      if (sessions.isEmpty) {
+                        return ListView(
+                          children: const [
+                            Padding(
+                              padding: EdgeInsets.all(32),
+                              child: Text(
+                                'Aucune session pour le moment. Ouvre une session '
+                                'hors-Tibus avec le bouton ci-dessous — le scan sur '
+                                'un départ Tibus existant arrive prochainement.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return ListView.separated(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: sessions.length + (cachedAt != null ? 1 : 0),
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          if (cachedAt != null) {
+                            if (i == 0) {
+                              return Text(
+                                'Liste enregistrée sur cet appareil le '
+                                '${DateFormat('dd/MM HH:mm').format(cachedAt.toLocal())}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              );
+                            }
+                            i -= 1;
+                          }
+                          final s = sessions[i];
+                          return Card(
+                            child: ListTile(
+                              leading: Icon(
+                                s.isOpen ? Icons.play_circle_fill : Icons.check_circle,
+                                color: s.isOpen ? AppColors.primaryBlue : AppColors.textSecondary,
+                              ),
+                              title: Text(s.routeLabel),
+                              subtitle: Text(
+                                '${s.isTibus ? "Tibus" : "Hors-Tibus"}'
+                                '${s.busLabel != null ? " · Bus ${s.busLabel}" : ""}'
+                                ' · ${s.scansCount} scan${s.scansCount > 1 ? "s" : ""}'
+                                ' · ${DateFormat('dd/MM/yy HH:mm').format(s.openedAt)}'
+                                '${s.pendingOps > 0 ? " · ${s.pendingOps} en attente de synchro" : ""}',
+                              ),
+                              trailing: Chip(
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: s.localOnly ? AppColors.scanDuplicateBg : null,
+                                label: Text(
+                                  s.localOnly
+                                      ? 'Non synchronisée'
+                                      : (s.isOpen ? 'Ouverte' : 'Clôturée'),
+                                  style: s.localOnly ? const TextStyle(color: AppColors.scanDuplicate) : null,
+                                ),
+                              ),
+                              onTap: () async {
+                                if (s.isOpen) {
+                                  // Embarqueur : la session d'une AUTRE gare de son
+                                  // itinéraire s'ouvre en consultation (gares, places
+                                  // restantes) — il ne scanne que dans sa gare.
+                                  var mine = true;
+                                  if ((ref.read(isEmbarqueurOnlyProvider).value ?? false) && s.isTibus) {
+                                    final gares = await ref.read(embarquementRepositoryProvider).myGares(companyId);
+                                    mine = gares.any((g) => g.id == s.gareId);
+                                  }
+                                  if (!context.mounted) return;
+                                  final closed = await Navigator.of(context).push<bool>(
+                                    MaterialPageRoute(
+                                      builder: (_) => mine ? ScanScreen(session: s) : ItineraryScreen(session: s),
+                                    ),
+                                  );
+                                  if (closed == true) _load(companyId);
+                                } else {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => ManifestScreen(session: s)),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -246,7 +295,7 @@ class _NewTibusSessionSheetState extends ConsumerState<_NewTibusSessionSheet> {
             reservationId: d.reservationId,
             gareId: d.boardingGareId,
           );
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) Navigator.of(context).pop('ok');
     } catch (e) {
       if (mounted) setState(() => _error = 'Échec : $e');
     } finally {
@@ -280,7 +329,13 @@ class _NewTibusSessionSheetState extends ConsumerState<_NewTibusSessionSheet> {
                     return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
                   }
                   if (snap.hasError) {
-                    return Padding(padding: const EdgeInsets.all(16), child: Text('Erreur : ${snap.error}'));
+                    return Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Les départs Tibus demandent une connexion réseau. Hors ligne, '
+                        'ouvrez une session hors-Tibus.\n\nDétail : ${snap.error}',
+                      ),
+                    );
                   }
                   final list = snap.data ?? const [];
                   if (list.isEmpty) {
@@ -337,6 +392,7 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
   List<EmbarquementTrajet> _trajets = [];
   List<CompanyBusOption> _buses = [];
   bool _loadingRef = true;
+  DateTime? _trajetsCachedAt;
   String? _trajetKey;
   String? _busId;
   final _busLabelCtrl = TextEditingController();
@@ -358,18 +414,36 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
   }
 
   Future<void> _loadReferentiel() async {
-    final service = ref.read(embarquementServiceProvider);
-    final results = await Future.wait([
-      service.listTrajets(widget.companyId),
-      service.listCompanyBus(widget.companyId),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _trajets = results[0] as List<EmbarquementTrajet>;
-      _buses = results[1] as List<CompanyBusOption>;
-      _loadingRef = false;
-    });
+    final repo = ref.read(embarquementRepositoryProvider);
+    try {
+      final trajets = await repo.listTrajets(widget.companyId);
+      List<CompanyBusOption> buses;
+      try {
+        buses = await repo.listCompanyBus(widget.companyId);
+      } catch (_) {
+        buses = const []; // pas de bus en copie locale : saisie libre
+      }
+      if (!mounted) return;
+      setState(() {
+        _trajets = trajets.items;
+        _trajetsCachedAt = trajets.cachedAt;
+        _buses = buses;
+        _loadingRef = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingRef = false;
+        _error = "Itinéraires indisponibles : aucune copie sur cet appareil. Connectez-vous "
+            'une première fois au réseau pour les enregistrer.';
+      });
+    }
   }
+
+  /// Tarifs en copie locale de plus de 7 jours : on n'ouvre pas de session
+  /// hors ligne sur un prix qui a pu changer depuis.
+  bool get _tarifsPerimes =>
+      _trajetsCachedAt != null && DateTime.now().toUtc().difference(_trajetsCachedAt!) > kOfflineMaxAge;
 
   // Pas de firstOrNull : il vient de package:collection, absent des
   // dépendances de ce module.
@@ -405,21 +479,25 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
       return;
     }
 
+    if (_tarifsPerimes) {
+      setState(() => _error = 'Tarifs enregistrés il y a plus de 7 jours : connectez-vous pour les mettre à jour.');
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
-      await ref.read(embarquementServiceProvider).openSessionGare(
+      final res = await ref.read(embarquementRepositoryProvider).openSessionGare(
             companyId: widget.companyId,
-            fromGareId: trajet.fromGareId,
-            toGareId: trajet.toGareId,
+            trajet: trajet,
             capacityDeclared: capacity,
             busLabel: busLabel,
           );
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) Navigator.of(context).pop(res.pending ? 'pending' : 'ok');
     } catch (e) {
-      setState(() => _error = 'Échec : $e');
+      if (mounted) setState(() => _error = 'Échec : $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -440,6 +518,18 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text('Nouvelle session hors-Tibus', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  if (_trajetsCachedAt != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Hors ligne — tarifs enregistrés le '
+                      '${DateFormat('dd/MM/yy HH:mm').format(_trajetsCachedAt!.toLocal())}. '
+                      'Le serveur relira le tarif Tibus à la synchronisation.',
+                      style: TextStyle(
+                        color: _tarifsPerimes ? AppColors.accentRed : AppColors.scanDuplicate,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   if (_trajets.isEmpty) ...[
                     const Text(
@@ -518,7 +608,7 @@ class _NewHorsTibusSessionSheetState extends ConsumerState<_NewHorsTibusSessionS
                   ],
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: (_submitting || _trajets.isEmpty) ? null : _submit,
+                    onPressed: (_submitting || _trajets.isEmpty || _tarifsPerimes) ? null : _submit,
                     child: _submitting
                         ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Text('Ouvrir la session'),

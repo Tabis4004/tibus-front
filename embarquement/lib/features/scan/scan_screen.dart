@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import '../../core/format.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
@@ -13,6 +14,7 @@ import '../../data/models/embarquement_gare_done.dart';
 import '../../data/services/external_qr_parser.dart';
 import '../../data/services/ticket_ocr_parser.dart';
 import '../../data/services/ticket_qr_parser.dart';
+import '../common/sync_status_banner.dart';
 import '../itinerary/itinerary_screen.dart';
 import '../manifest/manifest_screen.dart';
 import '../recette/recette_screen.dart';
@@ -37,6 +39,10 @@ import 'external_scan_review_sheet.dart';
 /// qu'À L'INTÉRIEUR de la feuille de correction, laquelle ne s'ouvrait
 /// qu'après un QR décodé. Sans QR, aucun écran ne s'ouvrait et l'agent
 /// restait bloqué devant la caméra.
+///
+/// Hors ligne : les billets tiers (QR ou photo) sont enregistrés sur
+/// l'appareil et envoyés au retour du réseau ; le billet Tibus, lui, exige
+/// une vérification en ligne. Voir EmbarquementRepository.
 class ScanScreen extends ConsumerStatefulWidget {
   final EmbarquementSession session;
   const ScanScreen({super.key, required this.session});
@@ -66,6 +72,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     unawaited(_chargerCompteurDepuisManifeste());
     unawaited(_chargerPlacesRestantes());
     unawaited(_chargerDroitDeCloture());
+    if (!widget.session.localOnly) {
+      unawaited(ref.read(embarquementRepositoryProvider).refreshFare(widget.session.id));
+    }
   }
 
   Future<void> _chargerDroitDeCloture() async {
@@ -193,7 +202,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Future<void> _chargerCompteurDepuisManifeste() async {
     try {
       final manifest =
-          await ref.read(embarquementServiceProvider).listManifest(widget.session.id);
+          await ref.read(embarquementRepositoryProvider).listManifest(widget.session);
       if (!mounted) return;
       final valides = manifest.where((s) => s.isValid).toList();
       setState(() {
@@ -303,8 +312,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         }
       });
       if (outcome.status == 'valid') unawaited(_chargerPlacesRestantes());
+    } on PostgrestException catch (e) {
+      if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : ${e.message}'));
     } catch (e) {
-      if (mounted) setState(() => _lastResult = _LastResult.invalid('Échec : $e'));
+      // Pas de vérification possible sans réseau : un billet Tibus se contrôle
+      // contre la billetterie, jamais depuis l'appareil.
+      if (mounted) {
+        setState(() => _lastResult = _LastResult.invalid(
+            'Billet Tibus : vérification en ligne obligatoire (réseau indisponible).'));
+      }
     }
   }
 
@@ -328,8 +344,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     );
     if (reviewed == null) return; // annulé — pas d'ajout, pas de comptage
     try {
-      final outcome = await ref.read(embarquementServiceProvider).scanExternal(
-            sessionId: widget.session.id,
+      final outcome = await ref.read(embarquementRepositoryProvider).scanExternal(
+            session: widget.session,
             rawPayload: parsed.rawPayload,
             passengerName: reviewed['passengerName']!,
             ticketNumber: reviewed['ticketNumber'],
@@ -339,13 +355,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       final status = outcome.status;
       final montant = outcome.amount;
       if (!mounted) return;
+      final hideMoney = ref.read(isEmbarqueurOnlyProvider).value ?? false;
+      final enAttente = outcome.pending ? '\nEnregistré sur l\'appareil — sera synchronisé' : '';
       setState(() {
         _lastResult = _LastResult(
           status: status,
           title: reviewed['passengerName']!,
           subtitle: status == 'duplicate'
-              ? 'Déjà scanné dans cette session'
-              : '${montant != null ? "${formatMontant(montant)} · " : ""}${fromPhoto ? "billet photographié" : "QR externe"} ajouté au manifeste',
+              ? 'Déjà scanné dans cette session$enAttente'
+              : '${montant != null && !hideMoney ? "${formatMontant(montant)} · " : ""}${fromPhoto ? "billet photographié" : "QR externe"} ajouté au manifeste$enAttente',
         );
         if (status == 'valid') {
           _validCount++;
@@ -373,8 +391,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     if (confirm != true) return;
     setState(() => _closing = true);
     try {
-      await ref.read(embarquementServiceProvider).closeSession(widget.session.id);
-      if (mounted) Navigator.of(context).pop(true);
+      final pending = await ref.read(embarquementRepositoryProvider).closeSession(widget.session);
+      if (!mounted) return;
+      if (pending) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Clôture enregistrée hors ligne — elle sera envoyée au retour du réseau.'),
+        ));
+      }
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec : $e')));
@@ -390,6 +414,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     // à la gare de destination (voir isEmbarqueurOnlyProvider).
     final hideMoney = ref.watch(isEmbarqueurOnlyProvider).value ?? false;
     final canClose = _canClose ?? !hideMoney;
+    // Hors ligne (ou session pas encore connue du serveur) : places restantes
+    // calculées sur l'appareil pour une session hors-Tibus.
+    final capacity = widget.session.capacityDeclared;
+    final seatsLeft = _seats?.seatsLeft ??
+        (!widget.session.isTibus && capacity != null
+            ? (capacity > _validCount ? capacity - _validCount : 0)
+            : null);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.session.routeLabel),
@@ -445,6 +476,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       ),
       body: Column(
         children: [
+          const SyncStatusBanner(),
           Container(
             width: double.infinity,
             color: AppColors.primaryBlueLight,
@@ -452,7 +484,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             child: Text(
               '$_validCount embarqué${_validCount > 1 ? "s" : ""}'
               '${widget.session.capacityDeclared != null ? " / ${widget.session.capacityDeclared} places" : ""}'
-              '${_seats?.seatsLeft != null ? " · ${_seats!.seatsLeft} libre${_seats!.seatsLeft! > 1 ? "s" : ""}" : ""}'
+              '${seatsLeft != null ? " · $seatsLeft libre${seatsLeft > 1 ? "s" : ""}" : ""}'
               '${hideMoney ? "" : " · ${formatMontant(_totalAmount)}"}',
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlueDark),

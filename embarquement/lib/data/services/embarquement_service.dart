@@ -32,15 +32,24 @@ class EmbarquementService {
     required String companyId,
     String status = 'open',
   }) async {
+    final rows = await listSessionsRaw(companyId: companyId, status: status);
+    return rows.map(EmbarquementSession.fromMap).toList();
+  }
+
+  /// Lignes brutes, telles que gardées en copie locale (mode hors ligne).
+  Future<List<Map<String, dynamic>>> listSessionsRaw({
+    required String companyId,
+    String status = 'open',
+  }) async {
     final data = await _client.rpc('embarquement_list_sessions', params: {
       'p_company_id': companyId,
       'p_status': status,
     });
-    return (data as List)
-        .whereType<Map<String, dynamic>>()
-        .map(EmbarquementSession.fromMap)
-        .toList();
+    return _rows(data);
   }
+
+  static List<Map<String, dynamic>> _rows(dynamic data) =>
+      (data as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
 
   Future<String> createSession({
     required String companyId,
@@ -66,13 +75,15 @@ class EmbarquementService {
   /// le serveur aux gares auxquelles il est rattaché. Un gérant de gare ne
   /// voit que les départs de sa gare, un owner voit toute la compagnie.
   Future<List<EmbarquementTrajet>> listTrajets(String companyId) async {
+    final rows = await listTrajetsRaw(companyId);
+    return rows.map(EmbarquementTrajet.fromMap).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> listTrajetsRaw(String companyId) async {
     final data = await _client.rpc('embarquement_list_trajets', params: {
       'p_company_id': companyId,
     });
-    return (data as List)
-        .whereType<Map<String, dynamic>>()
-        .map(EmbarquementTrajet.fromMap)
-        .toList();
+    return _rows(data);
   }
 
   /// Crée ou met à jour un itinéraire tarifé (migration 214) — réservé au
@@ -139,13 +150,15 @@ class EmbarquementService {
   /// Gares du périmètre de l'utilisateur — toute la compagnie pour le
   /// propriétaire, sa seule gare pour un rôle de gare.
   Future<List<EmbarquementTrajetGare>> myGares(String companyId) async {
+    final rows = await myGaresRaw(companyId);
+    return rows.map(EmbarquementTrajetGare.fromMap).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> myGaresRaw(String companyId) async {
     final data = await _client.rpc('embarquement_my_gares', params: {
       'p_company_id': companyId,
     });
-    return (data as List)
-        .whereType<Map<String, dynamic>>()
-        .map(EmbarquementTrajetGare.fromMap)
-        .toList();
+    return _rows(data);
   }
 
   /// Ouvre une session sur un itinéraire Tibus. Le serveur revérifie que la
@@ -212,8 +225,13 @@ class EmbarquementService {
 
   /// Vrais bus de la compagnie (table "Bus") — même principe, lecture large.
   Future<List<CompanyBusOption>> listCompanyBus(String companyId) async {
+    final rows = await listCompanyBusRaw(companyId);
+    return rows.map(CompanyBusOption.fromMap).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> listCompanyBusRaw(String companyId) async {
     final data = await _client.rpc('embarquement_list_company_bus', params: {'p_company_id': companyId});
-    return (data as List).whereType<Map<String, dynamic>>().map(CompanyBusOption.fromMap).toList();
+    return _rows(data);
   }
 
   // Référentiel — itinéraires (Phase 0, non utilisé côté écrans depuis
@@ -315,10 +333,76 @@ class EmbarquementService {
   // Manifeste & clôture -----------------------------------------------------
 
   Future<List<EmbarquementScan>> listManifest(String sessionId) async {
+    final rows = await listManifestRaw(sessionId);
+    return rows.map(EmbarquementScan.fromMap).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> listManifestRaw(String sessionId) async {
     final data = await _client.rpc('embarquement_list_manifest', params: {
       'p_session_id': sessionId,
     });
-    return (data as List).whereType<Map<String, dynamic>>().map(EmbarquementScan.fromMap).toList();
+    return _rows(data);
+  }
+
+  // Hors ligne (migration 219) ----------------------------------------------
+  //
+  // Variantes idempotentes appelées par la synchronisation : l'identifiant
+  // vient de l'appareil et l'heure réelle de l'opération est transmise
+  // (bornée par le serveur). Aucun montant ne part de l'appareil.
+
+  Future<Map<String, dynamic>> openSessionGareOffline({
+    required String sessionId,
+    required DateTime openedAt,
+    required String companyId,
+    required String fromGareId,
+    required String toGareId,
+    required int capacityDeclared,
+    String? busLabel,
+  }) async {
+    final data = await _client.rpc('embarquement_open_session_gare_offline', params: {
+      'p_session_id': sessionId,
+      'p_opened_at': openedAt.toUtc().toIso8601String(),
+      'p_company_id': companyId,
+      'p_from_gare_id': fromGareId,
+      'p_to_gare_id': toGareId,
+      'p_bus_label': busLabel,
+      'p_capacity_declared': capacityDeclared,
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> scanExternalOffline({
+    required String scanId,
+    required DateTime scannedAt,
+    required String sessionId,
+    required String rawPayload,
+    required String passengerName,
+    String? ticketNumber,
+    String? originLabel,
+    String? destinationLabel,
+  }) async {
+    final data = await _client.rpc('embarquement_scan_external_offline', params: {
+      'p_scan_id': scanId,
+      'p_scanned_at': scannedAt.toUtc().toIso8601String(),
+      'p_session_id': sessionId,
+      'p_raw_payload': rawPayload,
+      'p_passenger_name': passengerName,
+      'p_ticket_number': ticketNumber,
+      'p_origin_label': originLabel,
+      'p_destination_label': destinationLabel,
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> closeSessionOffline({
+    required String sessionId,
+    required DateTime closedAt,
+  }) async {
+    final data = await _client.rpc('embarquement_close_session_offline', params: {
+      'p_session_id': sessionId,
+      'p_closed_at': closedAt.toUtc().toIso8601String(),
+    });
+    return Map<String, dynamic>.from(data as Map);
   }
 
   // Départs Tibus, fin d'embarquement par gare, manifeste enrichi -------------
@@ -407,5 +491,9 @@ class EmbarquementService {
 class ExternalScanOutcome {
   final String status;
   final num? amount;
-  const ExternalScanOutcome({required this.status, this.amount});
+
+  /// Vrai quand le scan est enregistré sur l'appareil mais pas encore sur le
+  /// serveur : le statut et le montant sont alors provisoires.
+  final bool pending;
+  const ExternalScanOutcome({required this.status, this.amount, this.pending = false});
 }
