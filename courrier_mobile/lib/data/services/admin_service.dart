@@ -156,17 +156,44 @@ class AdminService {
   /// compte. [gareId] est obligatoire pour les rôles gare (gerant_gare,
   /// vendeur_gare, controleur_gare, comptable_gare) — le serveur le
   /// vérifie et rejette sinon.
-  Future<void> assignRole({
+  /// Renvoie l'identifiant du compte qui a reçu le rôle (sert à enchaîner
+  /// sur le choix des gares d'un superviseur).
+  Future<String?> assignRole({
     required String companyId,
     required String email,
     required String roleName,
     String? gareId,
   }) async {
-    await _client.rpc('assign_company_role', params: {
+    final data = await _client.rpc('assign_company_role', params: {
       'p_company_id': companyId,
       'p_user_email': email,
       'p_role_name': roleName,
       'p_gare_id': gareId,
+    });
+    return data is Map ? data['userId'] as String? : null;
+  }
+
+  /// Gares supervisées, par compte (rôle « superviseur », migration 221).
+  Future<Map<String, List<AdminGare>>> listSuperviseurGares(String companyId) async {
+    final data = await _client.rpc('list_superviseur_gares', params: {'p_company_id': companyId});
+    final result = <String, List<AdminGare>>{};
+    for (final row in (data as List).whereType<Map<String, dynamic>>()) {
+      final userId = row['userId'] as String;
+      (result[userId] ??= []).add(AdminGare.fromSupervision(row['gareId'] as String, (row['gareName'] ?? '') as String));
+    }
+    return result;
+  }
+
+  /// Remplace la liste des gares supervisées par [gareIds].
+  Future<void> setSuperviseurGares({
+    required String companyId,
+    required String userId,
+    required List<String> gareIds,
+  }) async {
+    await _client.rpc('set_superviseur_gares', params: {
+      'p_company_id': companyId,
+      'p_user_id': userId,
+      'p_gare_ids': gareIds,
     });
   }
 
@@ -280,6 +307,10 @@ class AdminGare {
     this.googleMapsLink,
     required this.isActive,
   });
+
+  /// Gare telle que renvoyée par list_superviseur_gares (id + nom seuls).
+  factory AdminGare.fromSupervision(String id, String name) =>
+      AdminGare(id: id, name: name, cityId: '', cityName: '', isActive: true);
 
   factory AdminGare.fromMap(Map<String, dynamic> map) => AdminGare(
         id: map['id'] as String,
@@ -411,6 +442,9 @@ const kAssignableRoles = <String>[
   'emballeur_gare',
   'chargeur_gare',
   'distributeur_gare',
+  // Lecture seule des recettes et colis de plusieurs gares, choisies juste
+  // après l'attribution (migration 221).
+  'superviseur',
 ];
 
 /// Rôles qui exigent le choix d'une gare précise (le serveur le vérifie

@@ -658,6 +658,7 @@ class AdminTeamScreen extends ConsumerStatefulWidget {
 class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
   late Future<List<AdminTeamMember>> _future;
   List<AdminGare> _gares = [];
+  Map<String, List<AdminGare>> _superviseurGares = {};
 
   @override
   void initState() {
@@ -669,6 +670,96 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
     final service = ref.read(adminServiceProvider);
     setState(() => _future = service.listTeam(widget.companyId));
     service.listGares(widget.companyId).then((g) => setState(() => _gares = g));
+    service.listSuperviseurGares(widget.companyId).then((m) {
+      if (mounted) setState(() => _superviseurGares = m);
+    }).catchError((_) {});
+  }
+
+  /// Superviseur : le owner coche les gares dont il consulte les recettes.
+  Future<void> _editSuperviseurGares(String userId, String displayName) async {
+    final selected = {for (final g in _superviseurGares[userId] ?? const <AdminGare>[]) g.id};
+    String? error;
+    bool saving = false;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Gares supervisées — $displayName',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                const Text(
+                  'Le superviseur consulte les recettes et les colis de ces gares uniquement (lecture seule).',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.5),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _gares
+                        .map((g) => CheckboxListTile(
+                              dense: true,
+                              value: selected.contains(g.id),
+                              title: Text(g.name),
+                              onChanged: (v) => setSheetState(() {
+                                if (v == true) {
+                                  selected.add(g.id);
+                                } else {
+                                  selected.remove(g.id);
+                                }
+                              }),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(color: AppColors.accentRed, fontSize: 12)),
+                ],
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            setSheetState(() {
+                              saving = true;
+                              error = null;
+                            });
+                            try {
+                              await ref.read(adminServiceProvider).setSuperviseurGares(
+                                    companyId: widget.companyId,
+                                    userId: userId,
+                                    gareIds: selected.toList(),
+                                  );
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                              _reload();
+                            } catch (e) {
+                              setSheetState(() {
+                                saving = false;
+                                error = 'Échec : $e';
+                              });
+                            }
+                          },
+                    child: saving
+                        ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Text('Enregistrer (${selected.length} gare${selected.length > 1 ? "s" : ""})'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openAssignForm() async {
@@ -742,7 +833,7 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
                     }
                     setSheetState(() { saving = true; error = null; });
                     try {
-                      await ref.read(adminServiceProvider).assignRole(
+                      final userId = await ref.read(adminServiceProvider).assignRole(
                             companyId: widget.companyId,
                             email: emailCtrl.text.trim(),
                             roleName: roleName!,
@@ -750,6 +841,11 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
                           );
                       if (ctx.mounted) Navigator.of(ctx).pop();
                       _reload();
+                      // Superviseur : on enchaîne directement sur le choix
+                      // de ses gares.
+                      if (roleName == 'superviseur' && userId != null && mounted) {
+                        await _editSuperviseurGares(userId, emailCtrl.text.trim());
+                      }
                     } catch (e) {
                       setSheetState(() { saving = false; error = 'Échec : $e'; });
                     }
@@ -808,7 +904,10 @@ class _AdminTeamScreenState extends ConsumerState<AdminTeamScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   title: Text(m.displayName),
-                  subtitle: Text('${m.roleName}${m.gareName != null ? ' · ${m.gareName}' : ''}'),
+                  subtitle: Text(m.roleName == 'superviseur'
+                      ? 'superviseur · ${(_superviseurGares[m.userId] ?? const <AdminGare>[]).isEmpty ? "aucune gare — toucher pour choisir" : (_superviseurGares[m.userId]!).map((g) => g.name).join(", ")}'
+                      : '${m.roleName}${m.gareName != null ? ' · ${m.gareName}' : ''}'),
+                  onTap: m.roleName == 'superviseur' ? () => _editSuperviseurGares(m.userId, m.displayName) : null,
                   trailing: m.roleName == 'owner'
                       ? null
                       : IconButton(icon: const Icon(Icons.close, color: AppColors.accentRed), onPressed: () => _revoke(m)),
