@@ -140,14 +140,14 @@ class ProfileScreen extends ConsumerWidget {
                       icon: Icons.receipt_long_outlined,
                       label: 'Dépenses',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => ExpensesScreen(companyId: companyId!)),
+                        MaterialPageRoute(builder: (_) => ExpensesScreen(companyId: companyId)),
                       ),
                     ),
                     _MenuTile(
                       icon: Icons.account_balance_outlined,
                       label: 'Bilan SYSCOHADA',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => BilanScreen(companyId: companyId!)),
+                        MaterialPageRoute(builder: (_) => BilanScreen(companyId: companyId)),
                       ),
                     ),
                   ],
