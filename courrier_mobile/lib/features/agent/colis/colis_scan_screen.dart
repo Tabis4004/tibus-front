@@ -105,7 +105,9 @@ class _ColisScanScreenState extends ConsumerState<ColisScanScreen> {
       if (mounted) {
         final msg = e.toString().replaceFirst('Exception: ', '');
         setState(() => _error = msg.contains('introuvable')
-            ? 'Colis introuvable pour ce code — la référence fait 8 caractères (CL-XXXXXXXX).'
+            ? 'Colis introuvable pour ce code. Formats acceptés : numéro du reçu (ex. ABOI000042), '
+                'CL-XXXXXXXX, ou référence provisoire d\'un reçu hors ligne (ex. ABOI-1A2B3C4D). '
+                'Une vente hors ligne doit être synchronisée avant d\'être scannée.'
             : 'Échec : $msg');
       }
     } finally {

@@ -12,6 +12,15 @@ final RegExp _uuidRe = RegExp(
 final RegExp _colisRefRe = RegExp(r'^CL-[A-Z0-9]+$', caseSensitive: false);
 final RegExp _colisRefInTextRe = RegExp(r'(CL-[A-Z0-9]+)', caseSensitive: false);
 
+/// Vente faite hors ligne : le QR du reçu provisoire contient l'identifiant
+/// local de la vente (« local-<horodatage>-<8 hex> », voir generateLocalId),
+/// conservé côté serveur après synchronisation (offline_local_id).
+final RegExp _offlineLocalIdRe = RegExp(r'^local-\d+-[0-9a-f]+$', caseSensitive: false);
+
+/// Référence provisoire imprimée en clair sur ce même reçu : préfixe de gare
+/// + 8 caractères hexadécimaux (ex. « COCO-4EC8D4EB », voir colisShortRef).
+final RegExp _offlineProvisionalRefRe = RegExp(r'^[A-Z0-9]{1,8}-[0-9A-F]{8}$', caseSensitive: false);
+
 /// Référence publique courte affichée aux clients (reçu, SMS, WhatsApp) —
 /// même format que colisPublicReference côté web.
 String colisPublicReference(String colisId) {
@@ -30,13 +39,22 @@ String normalizeColisReference(String raw) {
   return compact;
 }
 
-/// Extrait un code retrait colis (UUID ou CL-XXXXXXXX) depuis un scan QR ou
-/// une saisie manuelle — accepte aussi un lien contenant la référence.
+/// Extrait un code retrait colis (UUID, CL-XXXXXXXX, numéro de reçu, ou
+/// identifiant / référence provisoire d'une vente faite hors ligne) depuis un
+/// scan QR ou une saisie manuelle — accepte aussi un lien contenant la
+/// référence.
 String parseColisScanPayload(String raw) {
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return '';
 
   if (_uuidRe.hasMatch(trimmed)) return trimmed;
+
+  // Reçus de ventes faites hors ligne : envoyés tels quels au serveur
+  // (resolve_colis_retrait_code les retrouve via offline_local_id). Avant
+  // la normalisation CL-, qui les rendait méconnaissables.
+  if (_offlineLocalIdRe.hasMatch(trimmed)) return trimmed.toLowerCase();
+  final compact = trimmed.toUpperCase().replaceAll(RegExp(r'\s+'), '');
+  if (_offlineProvisionalRefRe.hasMatch(compact)) return compact;
 
   final refMatch = _colisRefInTextRe.firstMatch(trimmed);
   if (refMatch != null) return normalizeColisReference(refMatch.group(1)!);
