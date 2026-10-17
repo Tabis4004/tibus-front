@@ -50,10 +50,11 @@ courrier_livreur, courrier_mobile)
 Traité à tort comme un dossier "généré" (comme `android/`/`ios/`). Les
 éditions directes de `web/index.html`, `web/manifest.json`, favicons etc.
 ne sont donc **jamais** commitées/déployées. Le contournement en place est
-`branding/webassets/` (suivi par git) que chaque `vercel-build.sh` recopie
-par-dessus le `web/` régénéré par `flutter create` à chaque build Vercel.
+`branding/webassets/` (suivi par git) que le script de build web
+(`build-web.sh`, ou `cloudflare-build.sh` pour courrier_mobile) recopie
+par-dessus le `web/` régénéré par `flutter create` à chaque build Cloudflare.
 Toute modification de branding web doit passer par `branding/webassets/` +
-la logique de copie dans `vercel-build.sh`, jamais par une édition directe
+la logique de copie dans ce script de build, jamais par une édition directe
 de `web/` seule.
 
 ## AndroidManifest release vs debug

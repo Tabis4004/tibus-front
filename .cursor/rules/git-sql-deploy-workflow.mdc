@@ -14,7 +14,7 @@ Quand une tâche est terminée (fix, feature, migration, edge function) :
 1. **Commit + push** sur la branche de travail (`main` ou feature branch).
 2. Exclure du commit : `.env*`, `docs/*.docx`, `docs/~$*`, fichiers binaires non liés.
 3. Message de commit : 1–2 phrases, orienté « pourquoi ».
-4. Pousser pour déclencher le déploiement Vercel du front.
+4. Pousser pour déclencher le déploiement Cloudflare du front.
 
 Ne pas laisser des changements code déployables uniquement en local sans commit/push, sauf demande explicite de l'utilisateur.
 

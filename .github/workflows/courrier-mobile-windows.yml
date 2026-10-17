@@ -78,7 +78,7 @@ jobs:
 
       # windows/ est dans .gitignore, comme ios/, macos/, linux/ et web/ :
       # ce dépôt ne versionne pas les dossiers de plateforme régénérables
-      # (voir vercel-build.sh, qui fait le même `flutter create` pour le web).
+      # (voir cloudflare-build.sh, qui fait le même `flutter create` pour le web).
       # Sans cette étape, `flutter build windows` échoue sur
       # « No Windows desktop project configured ».
       #

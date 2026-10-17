@@ -6,8 +6,8 @@ import '../theme/app_colors.dart';
 /// Aperçu carte retrait/livraison/position livreur — équivalent Flutter de
 /// RideTrackingMap.tsx côté tibusride-front, en version simplifiée : tuiles
 /// OpenStreetMap (gratuites, aucune clé API à provisionner côté build web
-/// Vercel — contrairement à Google Maps, qui aurait nécessité d'injecter une
-/// clé navigateur dans web/index.html à chaque build, voir vercel-build.sh).
+/// Cloudflare — contrairement à Google Maps, qui aurait nécessité d'injecter une
+/// clé navigateur dans web/index.html à chaque build, voir build-web.sh).
 /// Trace une ligne droite retrait -> livraison (pas de calcul d'itinéraire
 /// routier : cet aperçu sert à visualiser la course, pas à naviguer — la
 /// navigation guidée reste déléguée à Google Maps via lien externe, voir

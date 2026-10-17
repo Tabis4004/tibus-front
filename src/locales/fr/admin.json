@@ -399,7 +399,7 @@
     "current_tier": "Palier recommandé",
     "gauges_title": "Charge vs limites du palier actuel",
     "grid_title": "Grille de décision infra",
-    "grid_desc": "Coûts mensuels indicatifs (Vercel + Supabase Cloud + Edge Functions). Migration Hetzner au palier fort trafic.",
+    "grid_desc": "Coûts mensuels indicatifs (Cloudflare + Supabase Cloud + Edge Functions). Migration Hetzner au palier fort trafic.",
     "col": {
       "scenario": "Scénario",
       "sellers": "Vendeurs",
@@ -426,16 +426,16 @@
       "tres_haut_volume": "Très haut volume"
     },
     "reco": {
-      "demarrage": "Supabase Free/Pro, Vercel Hobby/Pro. Surveiller webhooks FedaPay et backups Supabase.",
+      "demarrage": "Supabase Free/Pro, Cloudflare Workers. Surveiller webhooks FedaPay et backups Supabase.",
       "croissance": "Passer Supabase Pro, activer PITR. Optimiser RPC guichet et index Reservations.",
       "fort_trafic": "Envisager Supabase Team ou migration self-hosted (Hetzner). Préparer staging + pg_dump.",
-      "national": "Self-hosted recommandé : Postgres Hetzner + Edge Functions dédiées. Load balancer Vercel.",
+      "national": "Self-hosted recommandé : Postgres Hetzner + Edge Functions dédiées. Load balancer Cloudflare.",
       "tres_haut_volume": "Architecture multi-région, read replicas, CDN assets. Audit RLS et rate limits API partenaire."
     },
     "infra_title": "Stack Tibus / TabiPay (aujourd'hui)",
-    "infra_desc": "Vercel (front) → Supabase Cloud (auth, PG, RLS, ~15 Edge Functions) → GeniusPay/FedaPay (TabisPay). Les alertes infra apparaissent dans la cloche header superadmin.",
+    "infra_desc": "Cloudflare (front) → Supabase Cloud (auth, PG, RLS, ~15 Edge Functions) → GeniusPay/FedaPay (TabisPay). Les alertes infra apparaissent dans la cloche header superadmin.",
     "infra_items": {
-      "vercel": "Front React/Vite sur Vercel",
+      "cloudflare": "Front React/Vite sur Cloudflare",
       "supabase": "Auth + PostgreSQL + RLS + Edge Functions (paiements, SMS, push)",
       "tabispay": "TabisPay : webhooks, TPE, API partenaire — critique en montée de charge",
       "backup": "Vérifier snapshots Supabase (plan Pro) avant palier fort trafic"

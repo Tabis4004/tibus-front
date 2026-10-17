@@ -1,6 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Build web pour Courrier Livreur (driver moto/voiture). Même schéma que
+# courrier_client/build-web.sh : le SDK Flutter n'est pas préinstallé sur
+# Cloudflare, ce script l'installe à chaque build.
 set -euo pipefail
 
+# Build web pour Cloudflare Workers (Workers Builds).
+# Réglages Cloudflare : Root directory = courrier_livreur (sans slash initial),
+# Build command = bash build-web.sh, Deploy command = npx wrangler deploy.
+# Le cd garantit qu'on part du dossier du module même si Cloudflare lance la
+# commande depuis la racine du dépôt.
+cd "$(dirname "$0")"
+
+# .env est gitignored (secrets) donc absent du clone Cloudflare, alors que
+# pubspec.yaml le déclare en asset (flutter_dotenv) — on le régénère depuis
+# les variables d'environnement du projet Cloudflare. Valeurs par défaut =
+# celles déjà présentes dans .env.example (clé anon publique du projet
+# Supabase Tibus Ride, sans risque à exposer côté client — anon key + RLS).
 cat > .env <<EOF
 RIDE_SUPABASE_URL=${RIDE_SUPABASE_URL:-https://bjtklpjdsmqmzhncfflu.supabase.co}
 RIDE_SUPABASE_ANON_KEY=${RIDE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdGtscGpkc21xbXpobmNmZmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTM0ODIsImV4cCI6MjA5NzQ2OTQ4Mn0.j5m-MZV5PDeknP0g3i06UjDpfpxTFbhndMauVYGmLvQ}
@@ -14,10 +29,14 @@ export PATH="$PATH:$HOME/flutter/bin"
 flutter config --enable-web --no-analytics
 flutter doctor -v || true
 
+# web/ est gitignored (régénérable, comme android/ios/macos/linux/windows) :
+# on le reconstitue avant le build si absent. Non destructif pour lib/ existant.
 if [ ! -d "web" ]; then
-  flutter create . --platforms=web --project-name courrier_client
+  flutter create . --platforms=web --project-name courrier_livreur --org com.tibus --template app
 fi
 
+# Copie forcée des assets de branding par-dessus le dossier web (source de
+# vérité : branding/webassets/, suivi par git — voir CLAUDE.md).
 if [ -d "branding/webassets" ]; then
   mkdir -p web/icons
   cp -f branding/webassets/favicon.png web/favicon.png 2>/dev/null || true

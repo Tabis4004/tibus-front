@@ -326,7 +326,7 @@ export default function PlatformScalingMetricsPanel() {
           <p className="text-xs text-muted-foreground">{t("scaling_metrics.infra_desc")}</p>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <InfraItem icon={CloudIcon} label={t("scaling_metrics.infra_items.vercel")} />
+          <InfraItem icon={CloudIcon} label={t("scaling_metrics.infra_items.cloudflare")} />
           <InfraItem icon={ActivityIcon} label={t("scaling_metrics.infra_items.supabase")} />
           <InfraItem icon={CreditCardIcon} label={t("scaling_metrics.infra_items.tabispay")} />
           <InfraItem icon={HardDriveIcon} label={t("scaling_metrics.infra_items.backup")} />

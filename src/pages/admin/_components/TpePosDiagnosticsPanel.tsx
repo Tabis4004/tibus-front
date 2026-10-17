@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CopyIcon, PrinterIcon, ScanLineIcon, SmartphoneIcon } from "lucide-react";
 import { toast } from "sonner";
+import { APP_SITE_URL } from "@/lib/brand.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -20,7 +21,7 @@ export default function TpePosDiagnosticsPanel() {
   useEffect(() => subscribeTibusBridges(setBridges), []);
 
   const tpeUrl = useMemo(() => {
-    if (typeof window === "undefined") return `https://tibus-front.vercel.app${DEFAULT_TPE_PATH}`;
+    if (typeof window === "undefined") return `${APP_SITE_URL}${DEFAULT_TPE_PATH}`;
     return `${window.location.origin}${DEFAULT_TPE_PATH}`;
   }, []);
 

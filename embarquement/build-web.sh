@@ -11,12 +11,6 @@ cd "$(dirname "$0")"
 
 # Build web d'Embarquement, pour Cloudflare Workers.
 #
-# Le fichier s'appelle build-web.sh et non vercel-build.sh : ce module est
-# déployé sur Cloudflare, pas sur Vercel. Les trois autres apps du dépôt ont
-# gardé le nom vercel-build.sh pour raisons historiques (elles ont d'abord
-# vécu sur Vercel), mais reproduire ce nom ici n'apportait que de la
-# confusion.
-#
 # Réglages Cloudflare correspondants :
 #   Root directory  : embarquement      (SANS slash initial)
 #   Build command   : bash build-web.sh

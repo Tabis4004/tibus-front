@@ -137,7 +137,7 @@ def main() -> None:
     for i, (a, b) in enumerate(
         [
             ("Couche", "Description"),
-            ("Interface utilisateur", "Application web responsive — hébergement cloud (Vercel)"),
+            ("Interface utilisateur", "Application web responsive — hébergement cloud (Cloudflare)"),
             ("Données & sécurité", "PostgreSQL, authentification, isolation par compagnie (RLS)"),
             ("Services métier", "Fonctions cloud : paiements, notifications, webhooks, contrôle billets"),
             ("Paiements (TabisPay)", "Passerelle Mobile Money — commissions selon réseau opérateur"),

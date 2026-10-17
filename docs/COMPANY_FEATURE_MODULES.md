@@ -54,6 +54,6 @@ Les plans d'abonnement owner (`/owner/subscription`) restent indépendants pour 
 
 1. `npm run supabase:push` (Tibus)
 2. `npm run build`
-3. Déployer sur Vercel (branche principale ou preview)
+3. Déployer sur Cloudflare (push sur la branche principale ou `./deploy-cloudflare.sh`)
 
 Sans migration 120, l'UI retombe sur les modules par défaut (tous actifs sauf F).

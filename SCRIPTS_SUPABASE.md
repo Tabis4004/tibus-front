@@ -395,7 +395,7 @@ npm run supabase:push
 
 **Frontend** : panneau admin sur fiche compagnie (`CompanyFeatureModulesPanel`), filtre console owner + sidebar, garde `/seller` (A) et `/verify/scan` (B).
 
-**Déploiement Vercel** : `npm run build` puis push branche (i18n `feature_modules`, `scaling_metrics`).
+**Déploiement Cloudflare** : `npm run build` puis push branche (ou `./deploy-cloudflare.sh`) (i18n `feature_modules`, `scaling_metrics`).
 
 ## Lot 122 — Rôle démarcheur + dashboard
 

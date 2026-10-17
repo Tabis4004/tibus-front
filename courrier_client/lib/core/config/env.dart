@@ -16,7 +16,7 @@ class Env {
   // dotenv.load() échoue toujours silencieusement (try/catch muet dans
   // main.dart) — dotenv.env est donc TOUJOURS vide en pratique, sur web
   // comme sur APK. D'où les valeurs de repli codées en dur ci-dessous
-  // (mêmes valeurs que courrier_livreur/lib/main.dart et les vercel-build.sh) :
+  // (mêmes valeurs que courrier_livreur/lib/main.dart et les build-web.sh) :
   // sans elles, RideBackend.client se construit avec une clé anon vide et
   // toute commande de livraison/course échoue avec "No API key found in
   // request". Vérifié en direct le 2026-07-26.

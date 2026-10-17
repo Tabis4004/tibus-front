@@ -399,7 +399,7 @@
     "current_tier": "Recommended tier",
     "gauges_title": "Load vs current tier limits",
     "grid_title": "Infra decision grid",
-    "grid_desc": "Indicative monthly costs (Vercel + Supabase Cloud + Edge Functions). Hetzner migration at high-traffic tier.",
+    "grid_desc": "Indicative monthly costs (Cloudflare + Supabase Cloud + Edge Functions). Hetzner migration at high-traffic tier.",
     "col": {
       "scenario": "Scenario",
       "sellers": "Sellers",
@@ -426,16 +426,16 @@
       "tres_haut_volume": "Very high volume"
     },
     "reco": {
-      "demarrage": "Supabase Free/Pro, Vercel Hobby/Pro. Monitor FedaPay webhooks and Supabase backups.",
+      "demarrage": "Supabase Free/Pro, Cloudflare Workers. Monitor FedaPay webhooks and Supabase backups.",
       "croissance": "Upgrade to Supabase Pro, enable PITR. Optimize counter RPCs and Reservations indexes.",
       "fort_trafic": "Consider Supabase Team or self-hosted (Hetzner). Prepare staging + pg_dump.",
-      "national": "Self-hosted recommended: Hetzner Postgres + dedicated Edge Functions. Vercel load balancing.",
+      "national": "Self-hosted recommended: Hetzner Postgres + dedicated Edge Functions. Cloudflare load balancing.",
       "tres_haut_volume": "Multi-region architecture, read replicas, asset CDN. Audit RLS and partner API rate limits."
     },
     "infra_title": "Tibus / TabiPay stack (today)",
-    "infra_desc": "Vercel (front) → Supabase Cloud (auth, PG, RLS, ~15 Edge Functions) → GeniusPay/FedaPay (TabisPay). Infra alerts appear in the superadmin header bell.",
+    "infra_desc": "Cloudflare (front) → Supabase Cloud (auth, PG, RLS, ~15 Edge Functions) → GeniusPay/FedaPay (TabisPay). Infra alerts appear in the superadmin header bell.",
     "infra_items": {
-      "vercel": "React/Vite front on Vercel",
+      "cloudflare": "React/Vite front on Cloudflare",
       "supabase": "Auth + PostgreSQL + RLS + Edge Functions (payments, SMS, push)",
       "tabispay": "TabisPay: webhooks, POS, partner API — critical under load",
       "backup": "Verify Supabase snapshots (Pro plan) before high-traffic tier"

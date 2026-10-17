@@ -28,7 +28,6 @@ tsconfig.tsbuildinfo
 
 # Environment variables
 .env*
-.vercel
 
 # Export sensible (hash de mots de passe / jetons GoTrue) -- jamais commité,
 # transmis manuellement par un canal sûr. Voir courrier_mobile/tool/

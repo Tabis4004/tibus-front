@@ -7,7 +7,7 @@ import '../theme/app_colors.dart';
 /// courrier_livreur/lib/core/widgets/delivery_map.dart (pas de package
 /// Flutter partagé entre les deux apps, dupliqué volontairement). Tuiles
 /// OpenStreetMap (gratuites, aucune clé API à provisionner côté build web
-/// Vercel). Trace une ligne droite retrait -> livraison (pas de calcul
+/// Cloudflare). Trace une ligne droite retrait -> livraison (pas de calcul
 /// d'itinéraire routier, voir RideBackend.haversineKm pour l'estimation de
 /// distance/prix côté commande).
 class DeliveryMap extends StatelessWidget {

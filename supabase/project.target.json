@@ -16,7 +16,7 @@
   "otherProjects": [
     {
       "name": "Gestabis / HBR",
-      "stack": "Vercel + Heroku (hbr) + PostgreSQL Hetzner",
+      "stack": "Cloudflare + Heroku (hbr) + PostgreSQL Hetzner",
       "repo": "hbr_frontend + code",
       "note": "Pas Supabase — ne pas coller les migrations SQL de tibus-front."
     }

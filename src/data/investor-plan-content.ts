@@ -2,7 +2,7 @@ export const INVESTOR_PLAN_META = {
   title: "Tibus — Plan d'affaires & ROI investisseur",
   date: "Juin 2026",
   product: "SaaS billetterie bus interurbaine · Afrique de l'Ouest",
-  url: "https://tibus-front.vercel.app",
+  url: "https://www.tibusafrica.com",
   currency: "XOF (FCFA)",
   eurRate: 655.957,
 };
@@ -396,7 +396,7 @@ export const INVESTOR_PLAN_ADVANTAGES = {
   headers: ["Avantage", "Preuve / différenciation"],
   rows: [
     ["Levier volume", "Seul paramètre d'ajustement = billets vendus via agents marchands"],
-    ["Stack production-ready", "App live Vercel + Supabase · multi-rôles · QR · mobile money"],
+    ["Stack production-ready", "App live Cloudflare + Supabase · multi-rôles · QR · mobile money"],
     ["Point mort rapide", "Scénario réaliste : équilibre An 1 · remboursement mi-An 2"],
     ["Réseau commercial intégré", "Vendeurs indépendants, masters, guichet cash, TPE"],
     ["Coût infra maîtrisé", "OPEX contrôlé 24–40 M FCFA / an"],

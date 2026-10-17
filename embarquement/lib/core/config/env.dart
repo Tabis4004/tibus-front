@@ -19,7 +19,7 @@ class Env {
   static const String _supabaseAnonKey =
       String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // Repli déjà utilisé tel quel côté courrier_mobile (vercel-build.sh) —
+  // Repli déjà utilisé tel quel côté courrier_mobile (cloudflare-build.sh) —
   // clé anon publique, protégée par les policies RLS, pas un secret.
   static const String _fallbackSupabaseUrl =
       'https://kqudaqtydimjclwaihqr.supabase.co';
