@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/providers.dart';
 import '../../core/utils/connectivity.dart';
 import '../../data/models/app_role.dart';
+import '../agent/subscription/subscription_notice.dart';
 
 /// Coquille de navigation "agent" — reproduit la barre basse à 5 entrées
 /// des maquettes de référence (Accueil / Colis / + / Stats / Profil).
@@ -46,6 +47,10 @@ class _AgentShellState extends ConsumerState<AgentShell> {
     // précédente, déjà reconnectée), puis à chaque fois que la connectivité
     // repasse de "hors-ligne" à "en ligne" pendant que l'app est ouverte.
     Future.microtask(() => ref.read(syncServiceProvider).syncAll());
+    // Abonnement : pop-up au owner un mois avant la date de fin (migration 222).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowSubscriptionReminder(context, ref).catchError((_) {});
+    });
     _connectivitySub = onConnectivityIsOnline().listen((online) {
       final wasOffline = _wasOnline == false;
       _wasOnline = online;
@@ -78,7 +83,8 @@ class _AgentShellState extends ConsumerState<AgentShell> {
     // AppRole.isSellerRole (demande du 27/08 : emballeur/chargeur/
     // distributeur/comptable ne doivent pas pouvoir créer de colis).
     final roles = ref.watch(myRolesProvider).valueOrNull ?? const <AppRole>[];
-    final canSell = roles.any((r) => r.isSellerRole);
+    // Abonnement Courrier expiré : lecture seule, plus de bouton « + ».
+    final canSell = roles.any((r) => r.isSellerRole) && !isAppReadOnly(ref, 'courrier');
 
     final items = <BottomNavigationBarItem>[
       const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accueil'),
@@ -98,10 +104,18 @@ class _AgentShellState extends ConsumerState<AgentShell> {
 
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: navIndexForScreen < 0 ? 0 : navIndexForScreen,
-        onTap: (i) => _onTap(screenForNavIndex, i),
-        items: items,
+      // Bandeau « lecture seule » (abonnement expiré) juste au-dessus de la
+      // barre de navigation : visible sur tous les onglets.
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SubscriptionReadOnlyBanner(),
+          BottomNavigationBar(
+            currentIndex: navIndexForScreen < 0 ? 0 : navIndexForScreen,
+            onTap: (i) => _onTap(screenForNavIndex, i),
+            items: items,
+          ),
+        ],
       ),
     );
   }

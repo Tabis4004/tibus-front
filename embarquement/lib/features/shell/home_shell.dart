@@ -5,6 +5,7 @@ import '../dashboard/recette_dashboard_screen.dart';
 import '../session/session_list_screen.dart';
 import '../admin/admin_screen.dart';
 import 'profile_screen.dart';
+import '../subscription/subscription_notice.dart';
 
 /// Coquille avec navigation basse — Recettes (tableau de bord, accueil de
 /// l'app pour owner / gérant / comptable de gare ; absent pour les autres
@@ -47,6 +48,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   // rôles qui y ont droit et Sessions pour les autres. Dès que l'utilisateur
   // touche un onglet, son choix prime.
   String? _chosenKey;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pop-up au owner un mois avant la fin de l'abonnement (migration 222).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowEmbarquementSubscriptionReminder(context, ref).catchError((_) {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,11 +110,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     return Scaffold(
       body: IndexedStack(index: index, children: tabs.map((t) => t.screen).toList()),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: index,
-        type: BottomNavigationBarType.fixed,
-        onTap: (i) => setState(() => _chosenKey = tabs[i].key),
-        items: tabs.map((t) => t.item).toList(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const EmbarquementReadOnlyBanner(),
+          BottomNavigationBar(
+            currentIndex: index,
+            type: BottomNavigationBarType.fixed,
+            onTap: (i) => setState(() => _chosenKey = tabs[i].key),
+            items: tabs.map((t) => t.item).toList(),
+          ),
+        ],
       ),
     );
   }

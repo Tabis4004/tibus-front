@@ -38,6 +38,7 @@ import { refreshOwnerCompanyContext } from "@/hooks/use-owner-company.tsx";
 import AdminAccessGate from "./_components/AdminAccessGate.tsx";
 import AdminAuditHub from "./_components/AdminAuditHub.tsx";
 import CompanyFeatureModulesPanel from "./_components/CompanyFeatureModulesPanel.tsx";
+import CompanyAppSubscriptionsPanel from "./_components/CompanyAppSubscriptionsPanel.tsx";
 import PayAtStationPanel from "./_components/PayAtStationPanel.tsx";
 import CompanyLiveAuthorizationPanel from "./_components/CompanyLiveAuthorizationPanel.tsx";
 import StakeholderPayoutDashboardPanel from "./_components/StakeholderPayoutDashboardPanel.tsx";
@@ -310,6 +311,7 @@ export default function SupabaseAdminCompanyManager() {
       </div>
 
       <CompanyFeatureModulesPanel companyId={company.id} readOnly={!canManageModules} />
+      <CompanyAppSubscriptionsPanel companyId={company.id} readOnly={!canManageModules} />
 
       <PayAtStationPanel
         companyId={company.id}

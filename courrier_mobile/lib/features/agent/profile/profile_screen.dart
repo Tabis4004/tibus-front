@@ -8,6 +8,9 @@ import '../../client/promo/promo_screen.dart';
 import '../../client/referral/referral_screen.dart';
 import '../support/support_screen.dart';
 import '../admin/admin_screen.dart';
+import '../accounting/expenses_screen.dart';
+import '../accounting/bilan_screen.dart';
+import '../subscription/subscription_notice.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -107,21 +110,50 @@ class ProfileScreen extends ConsumerWidget {
           // ce test côté client n'est qu'un confort d'affichage, pas la
           // sécurité réelle.
           rolesAsync.maybeWhen(
-            data: (roles) => roles.any((r) => r.name == 'owner')
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      const Text('Gestion', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      _MenuTile(
-                        icon: Icons.admin_panel_settings_outlined,
-                        label: 'Administration',
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen())),
+            data: (roles) {
+              final companyId = ref.watch(activeCompanyIdProvider).valueOrNull;
+              final isOwner = roles.any((r) => r.name == 'owner' && (companyId == null || r.companyId == companyId));
+              // Comptabilité (dépenses + bilan) : owner et comptable compagnie.
+              final canAccount = companyId != null &&
+                  roles.any((r) =>
+                      (r.name == 'owner' || r.name == 'comptable_compagnie') && r.companyId == companyId);
+              if (!isOwner && !canAccount) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Date de fin des abonnements : visible par le owner seul.
+                  if (isOwner) ...[
+                    const SizedBox(height: 16),
+                    const SubscriptionsCard(),
+                  ],
+                  const SizedBox(height: 16),
+                  const Text('Gestion', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  if (isOwner)
+                    _MenuTile(
+                      icon: Icons.admin_panel_settings_outlined,
+                      label: 'Administration',
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen())),
+                    ),
+                  if (canAccount) ...[
+                    _MenuTile(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Dépenses',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => ExpensesScreen(companyId: companyId!)),
                       ),
-                    ],
-                  )
-                : const SizedBox.shrink(),
+                    ),
+                    _MenuTile(
+                      icon: Icons.account_balance_outlined,
+                      label: 'Bilan SYSCOHADA',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => BilanScreen(companyId: companyId!)),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
             orElse: () => const SizedBox.shrink(),
           ),
           // Masqué pour les marques "logiciel métier" sans volet client

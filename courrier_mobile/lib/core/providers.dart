@@ -12,6 +12,8 @@ import '../data/services/reference_cache_service.dart';
 import '../data/services/sync_service.dart';
 import '../data/services/staff_notifications_service.dart';
 import '../data/services/support_service.dart';
+import '../data/services/subscription_service.dart';
+import '../data/services/accounting_service.dart';
 import '../data/models/app_role.dart';
 
 final authServiceProvider = Provider((ref) => AuthService());
@@ -24,6 +26,8 @@ final pushServiceProvider = Provider((ref) => PushService());
 final printerServiceProvider = Provider((ref) => PrinterService());
 final staffNotificationsServiceProvider = Provider((ref) => StaffNotificationsService());
 final supportServiceProvider = Provider((ref) => SupportService());
+final subscriptionServiceProvider = Provider((ref) => SubscriptionService());
+final accountingServiceProvider = Provider((ref) => AccountingService());
 
 /// Enregistrement de colis hors-ligne + synchronisation (voir demande
 /// "enregistrement même sans connexion") — file d'attente persistée
@@ -109,4 +113,19 @@ final activeCompanyIdProvider = FutureProvider<String?>((ref) async {
   final agentRoles = roles.where((r) => r.isAgentRole && r.companyId != null).toList();
   if (agentRoles.isEmpty) return null;
   return agentRoles.first.companyId;
+});
+
+
+/// Abonnements de la compagnie active (Courrier, Comptabilité…) — migration
+/// 222. Liste vide = aucune date saisie, donc aucune restriction. En cas
+/// d'erreur (hors ligne, ancienne base sans la fonction), liste vide aussi :
+/// le serveur reste seul juge du mode lecture seule.
+final companySubscriptionsProvider = FutureProvider<List<AppSubscription>>((ref) async {
+  final companyId = await ref.watch(activeCompanyIdProvider.future);
+  if (companyId == null) return const [];
+  try {
+    return await ref.read(subscriptionServiceProvider).listForCompany(companyId);
+  } catch (_) {
+    return const [];
+  }
 });

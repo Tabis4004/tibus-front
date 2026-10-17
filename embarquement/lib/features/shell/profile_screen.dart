@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../subscription/subscription_notice.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -50,6 +51,11 @@ class ProfileScreen extends ConsumerWidget {
               );
             },
           ),
+          // Date de fin de l'abonnement : owner de la compagnie active seul.
+          if (rolesAsync.valueOrNull?.any((r) => r.name == 'owner' && r.companyId == activeCompanyIdAsync.value) ?? false) ...[
+            const SizedBox(height: 16),
+            const EmbarquementSubscriptionCard(),
+          ],
           const SizedBox(height: 24),
           const Text('Rôles', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
