@@ -102,7 +102,7 @@ END;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.list_company_expense_categories(p_company_id uuid)
- RETURNS SETOF jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
+ RETURNS SETOF jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path TO 'public'
 AS $function$
 BEGIN
   PERFORM public.ensure_company_expense_categories(p_company_id);
