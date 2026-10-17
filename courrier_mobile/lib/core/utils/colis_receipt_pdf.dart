@@ -182,7 +182,7 @@ PdfPageFormat _pageFormat(List<Map<String, dynamic>> lines) {
   final lineHeightMm = lines.fold<double>(0, (total, line) {
     final size = compactPrintSize(line['size'] as String?);
     if (((line['text'] as String?) ?? '').isEmpty) return total + 3;
-    return total + (size == 'small' ? 4 : 5);
+    return total + (size == 'small' ? 5 : 6);
   });
   final heightMm = 28 + lineHeightMm;
   return PdfPageFormat(
@@ -225,7 +225,7 @@ pw.Widget _line(Map<String, dynamic> line) {
   // Même échelle réduite que les imprimantes thermiques (printer_text.dart).
   final size = compactPrintSize(line['size'] as String?);
   final align = line['align'] as String?;
-  final fontSize = size == 'small' ? 8.0 : 10.0;
+  final fontSize = size == 'small' ? 10.0 : 12.0; // +2 pt (17/10/2026)
   return pw.Padding(
     padding: const pw.EdgeInsets.only(bottom: 2),
     child: pw.Text(

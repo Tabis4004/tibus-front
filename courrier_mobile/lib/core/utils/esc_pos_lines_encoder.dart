@@ -136,15 +136,19 @@ class EscPosLinesEncoder {
     // l'augmentation la plus proche d'un léger agrandissement sans doubler
     // aussi la largeur, demande explicite du 27/08/2026), 0x11 double
     // largeur+hauteur ("large").
+    // Demande terrain du 17/10/2026 (+2 points) : les éléments mis en avant
+    // ('normal' après compactPrintSize) passent en double hauteur seule,
+    // largeur inchangée — donc sans coupure de ligne supplémentaire.
     bytes.addByte(_gs);
     bytes.addByte(0x21);
-    bytes.addByte(size == 'large' ? 0x11 : (size == 'medium' ? 0x01 : 0x00));
+    bytes.addByte(size == 'large' ? 0x11 : ((size == 'medium' || size == 'normal') ? 0x01 : 0x00));
 
-    // ESC M n — police : B (petite, ~42 caractères sur 58 mm) pour 'small',
-    // A (standard, 32 caractères) sinon. Voir printer_text.dart.
+    // ESC M n — police A (standard) pour tout le ticket : la police B du
+    // corps était trop petite (demande terrain du 17/10/2026, « +2 points »,
+    // seul palier disponible sur une imprimante thermique ESC/POS).
     bytes.addByte(_esc);
     bytes.addByte(0x4D);
-    bytes.addByte(size == 'small' ? 1 : 0);
+    bytes.addByte(0);
 
     bytes.add(latin1.encode(text));
     bytes.addByte(0x0A);

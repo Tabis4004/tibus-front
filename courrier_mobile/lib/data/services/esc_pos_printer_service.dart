@@ -235,11 +235,12 @@ class EscPosPrinterService {
         styles: PosStyles(
           align: _align(line['align'] as String?),
           bold: line['bold'] == true,
-          height: (size == 'large' || size == 'medium') ? PosTextSize.size2 : PosTextSize.size1,
+          height: (size == 'large' || size == 'medium' || size == 'normal') ? PosTextSize.size2 : PosTextSize.size1,
           width: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
-          // Police B (petite) pour le corps du ticket, A pour les éléments
-          // mis en avant — plus de lignes coupées sur 58 mm.
-          fontType: size == 'small' ? PosFontType.fontB : PosFontType.fontA,
+          // Police A partout (demande terrain du 17/10/2026, « +2 points ») :
+          // la police B du corps était trop petite. Les éléments mis en avant
+          // ('normal') sont en double hauteur seule, largeur inchangée.
+          fontType: PosFontType.fontA,
           // Sans codeTable explicite, esc_pos_utils_plus laisse la table de
           // caractères active sur son réglage d'usine (CP437 par défaut,
           // voir PosStyles.defaults) — variable d'un modèle à l'autre. C'est

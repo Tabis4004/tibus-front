@@ -1244,7 +1244,8 @@ class P3PrinterModule(private val ctx: Context) {
         // du 17/10/2026 : tickets trop longs, écriture trop grosse, lignes
         // coupées). Était 30/26/24/20 pt ; le nombre de caractères par
         // ligne suit la taille (base : 24 pt = [width] caractères).
-        val pt = when (opts.size) { "large" -> 24; "medium" -> 22; "small" -> 18; else -> 20 }
+        // +2 pt partout le 17/10/2026 (était 24/22/18/20 : trop petit).
+        val pt = when (opts.size) { "large" -> 26; "medium" -> 24; "small" -> 20; else -> 22 }
         val effectiveWidth = (width * 24 / pt).coerceAtLeast(width)
         wrap(line, effectiveWidth).forEach { part ->
             checkCode("printString", p.printString(
