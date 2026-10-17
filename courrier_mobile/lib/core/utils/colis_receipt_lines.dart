@@ -118,7 +118,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
   final ref = colisReceiptNumber(colis);
   final company = brandCompanyName(colis.companyName);
   return [
-    {'text': company, 'align': 'center', 'bold': true},
+    {'text': company, 'align': 'center', 'bold': true, 'size': 'medium'},
     // Numéro de la gare de destination en en-tête (demande explicite du
     // 26/08/2026, qui annule celle du 20/08/2026 ci-dessous) : la gare
     // d'arrivée doit pouvoir composer ce numéro directement à la lecture du
@@ -153,7 +153,7 @@ List<Map<String, dynamic>> colisReceiptLines(Colis colis, {String? agentName}) {
       {'text': 'En attente de connexion - sera confirmé', 'align': 'center', 'bold': true, 'size': 'small'},
     ],
     {'text': '================================', 'align': 'center', 'bold': true},
-    {'text': 'N°  $ref', 'align': 'center', 'bold': true},
+    {'text': 'N°  $ref', 'align': 'center', 'bold': true, 'size': 'medium'},
     {'text': '================================', 'align': 'center', 'bold': true},
     {'text': 'EXPÉDITEUR', 'bold': true},
     {'text': colis.nomExpediteur, 'bold': true},
@@ -233,7 +233,7 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
   final ref = colisReceiptNumber(colis);
   final company = brandCompanyName(colis.companyName);
   return [
-    {'text': company, 'align': 'center', 'bold': true},
+    {'text': company, 'align': 'center', 'bold': true, 'size': 'medium'},
     // Numéro de la gare de destination en en-tête (demande explicite du
     // 26/08/2026, qui annule celle du 20/08/2026 ci-dessus) : c'est ce
     // numéro que la gare d'arrivée doit pouvoir composer directement en
@@ -250,7 +250,7 @@ List<Map<String, dynamic>> colisTalonHeaderLines(Colis colis) {
     if (colis.isPendingSync)
       {'text': '*** PROVISOIRE (hors connexion) ***', 'align': 'center', 'bold': true, 'size': 'small'},
     {'text': '================================', 'align': 'center'},
-    {'text': ref, 'align': 'center', 'bold': true},
+    {'text': ref, 'align': 'center', 'bold': true, 'size': 'medium'},
     {'text': '================================', 'align': 'center'},
   ];
 }
@@ -269,8 +269,8 @@ List<Map<String, dynamic>> colisTalonDestinataireLines(Colis colis) => [
       // 26/08/2026) : c'était l'élément le plus imposant du talon, au
       // détriment du numéro du destinataire ci-dessous, qui est
       // l'information réellement utile à l'agent de la gare d'arrivée.
-      {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true},
-      {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true},
+      {'text': colis.gareDestination.toUpperCase(), 'align': 'center', 'bold': true, 'size': 'medium'},
+      {'text': '${colis.montantFret.toStringAsFixed(0)} FCFA', 'align': 'center', 'bold': true, 'size': 'medium'},
       {'text': colis.nomDestinataire, 'bold': true},
       // Téléphone du destinataire agrandi et mis en gras (demande explicite
       // du 26/08/2026) : c'est le numéro que la gare de destination doit

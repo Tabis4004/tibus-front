@@ -3,6 +3,7 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import '../../../core/utils/esc_pos_lines_encoder.dart';
+import '../../../core/utils/printer_text.dart';
 import 'pos_bridge_interface.dart';
 
 /// Implémentation web : détecte `window.WisePrinter` (pont Xprinter injecté
@@ -88,9 +89,10 @@ class _WebPosBridge implements PosBridge {
     if (wp == null) {
       throw StateError('Xprinter indisponible sur cet appareil.');
     }
+    // Taille réduite commune + texte sans accents (voir printer_text.dart).
     final payload = <String, Object?>{
-      'header': header,
-      'lines': lines,
+      'header': printerSafeText(header),
+      'lines': printReadyLines(lines),
       'qr': qr,
       'qrSize': qrSize,
       'feedLines': feedLines,
@@ -136,8 +138,8 @@ class _WebPosBridge implements PosBridge {
 
     try {
       final bytes = EscPosLinesEncoder.encode(
-        header: header,
-        lines: lines,
+        header: printerSafeText(header),
+        lines: printReadyLines(lines),
         qr: qr,
         qrSize: qrSize,
         feedLines: feedLines,

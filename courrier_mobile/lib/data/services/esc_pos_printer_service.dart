@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/bordereau_receipt_lines.dart';
 import '../../core/utils/colis_receipt_lines.dart';
 import '../../core/utils/colis_sales_journal_lines.dart';
+import '../../core/utils/printer_text.dart';
 import '../models/colis.dart';
 import 'bordereau_service.dart';
 
@@ -214,7 +215,9 @@ class EscPosPrinterService {
 
   List<int> _renderLines(Generator generator, List<Map<String, dynamic>> lines) {
     final bytes = <int>[];
-    for (final line in lines) {
+    // Taille réduite commune + texte sans accents (voir printer_text.dart) :
+    // même rendu que les autres imprimantes.
+    for (final line in printReadyLines(lines)) {
       final text = _sanitizeForEscPos((line['text'] as String?) ?? '');
       if (text.isEmpty) {
         bytes.addAll(generator.feed(1));
@@ -234,6 +237,9 @@ class EscPosPrinterService {
           bold: line['bold'] == true,
           height: (size == 'large' || size == 'medium') ? PosTextSize.size2 : PosTextSize.size1,
           width: size == 'large' ? PosTextSize.size2 : PosTextSize.size1,
+          // Police B (petite) pour le corps du ticket, A pour les éléments
+          // mis en avant — plus de lignes coupées sur 58 mm.
+          fontType: size == 'small' ? PosFontType.fontB : PosFontType.fontA,
           // Sans codeTable explicite, esc_pos_utils_plus laisse la table de
           // caractères active sur son réglage d'usine (CP437 par défaut,
           // voir PosStyles.defaults) — variable d'un modèle à l'autre. C'est

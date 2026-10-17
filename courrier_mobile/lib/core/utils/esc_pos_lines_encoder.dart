@@ -40,7 +40,9 @@ class EscPosLinesEncoder {
     bytes.addByte(0x40);
 
     if (header.isNotEmpty) {
-      _writeAligned(bytes, header, align: 'center', bold: true, size: 'large');
+      // En-tête en taille normale (plus de double largeur : elle coupait le
+      // nom de la compagnie en deux sur 58 mm).
+      _writeAligned(bytes, header, align: 'center', bold: true, size: 'normal');
       _feed(bytes, 1);
     }
 
@@ -138,12 +140,21 @@ class EscPosLinesEncoder {
     bytes.addByte(0x21);
     bytes.addByte(size == 'large' ? 0x11 : (size == 'medium' ? 0x01 : 0x00));
 
+    // ESC M n — police : B (petite, ~42 caractères sur 58 mm) pour 'small',
+    // A (standard, 32 caractères) sinon. Voir printer_text.dart.
+    bytes.addByte(_esc);
+    bytes.addByte(0x4D);
+    bytes.addByte(size == 'small' ? 1 : 0);
+
     bytes.add(latin1.encode(text));
     bytes.addByte(0x0A);
 
-    // Reset gras/taille pour la ligne suivante
+    // Reset gras/taille/police pour la ligne suivante
     bytes.addByte(_esc);
     bytes.addByte(0x45);
+    bytes.addByte(0);
+    bytes.addByte(_esc);
+    bytes.addByte(0x4D);
     bytes.addByte(0);
     bytes.addByte(_gs);
     bytes.addByte(0x21);

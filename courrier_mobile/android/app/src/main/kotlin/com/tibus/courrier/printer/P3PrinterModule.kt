@@ -1240,17 +1240,17 @@ class P3PrinterModule(private val ctx: Context) {
 
     private fun printWrappedLine(p: Printer, line: String, opts: PrintOptions, width: Int) {
         if (line.isBlank()) { blank(p); return }
-        val effectiveWidth = when (opts.size) {
-            "large" -> (width * 0.62f).toInt().coerceAtLeast(18)
-            "medium" -> (width * 0.92f).toInt().coerceAtLeast(20)
-            "small" -> (width * 1.18f).toInt().coerceAtLeast(width)
-            else -> width
-        }
+        // Échelle réduite commune à toutes les imprimantes (demande terrain
+        // du 17/10/2026 : tickets trop longs, écriture trop grosse, lignes
+        // coupées). Était 30/26/24/20 pt ; le nombre de caractères par
+        // ligne suit la taille (base : 24 pt = [width] caractères).
+        val pt = when (opts.size) { "large" -> 24; "medium" -> 22; "small" -> 18; else -> 20 }
+        val effectiveWidth = (width * 24 / pt).coerceAtLeast(width)
         wrap(line, effectiveWidth).forEach { part ->
             checkCode("printString", p.printString(
                 part,
                 if (opts.bold) Printer.Font.DEFAULT_BOLD else Printer.Font.MONOSPACE,
-                when (opts.size) { "large" -> 30; "medium" -> 26; "small" -> 20; else -> 24 },
+                pt,
                 when (opts.align) { "center" -> Printer.Align.CENTER; "right" -> Printer.Align.RIGHT; else -> Printer.Align.LEFT },
                 opts.bold, false, false
             ))

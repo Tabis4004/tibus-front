@@ -9,6 +9,7 @@ import '../../data/services/bordereau_service.dart';
 import 'bordereau_receipt_lines.dart';
 import 'colis_receipt_lines.dart';
 import 'colis_sales_journal_lines.dart';
+import 'printer_text.dart';
 
 /// PDF thermique 80 mm pour le fallback web.
 ///
@@ -179,9 +180,9 @@ pw.Widget _talonTicket(Colis colis) {
 
 PdfPageFormat _pageFormat(List<Map<String, dynamic>> lines) {
   final lineHeightMm = lines.fold<double>(0, (total, line) {
-    final size = line['size'] as String?;
+    final size = compactPrintSize(line['size'] as String?);
     if (((line['text'] as String?) ?? '').isEmpty) return total + 3;
-    return total + (size == 'large' ? 8 : size == 'small' ? 4 : 5);
+    return total + (size == 'small' ? 4 : 5);
   });
   final heightMm = 28 + lineHeightMm;
   return PdfPageFormat(
@@ -221,13 +222,10 @@ pw.Widget _ticket({
 pw.Widget _line(Map<String, dynamic> line) {
   final text = (line['text'] as String?) ?? '';
   if (text.isEmpty) return pw.SizedBox(height: 5);
-  final size = line['size'] as String?;
+  // Même échelle réduite que les imprimantes thermiques (printer_text.dart).
+  final size = compactPrintSize(line['size'] as String?);
   final align = line['align'] as String?;
-  final fontSize = size == 'large'
-      ? 14.0
-      : size == 'small'
-          ? 8.0
-          : 10.0;
+  final fontSize = size == 'small' ? 8.0 : 10.0;
   return pw.Padding(
     padding: const pw.EdgeInsets.only(bottom: 2),
     child: pw.Text(
